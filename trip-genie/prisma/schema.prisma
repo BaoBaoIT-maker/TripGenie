@@ -1,0 +1,727 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum UserRole {
+  ADMIN
+  USER
+
+  @@map("user_role_enum")
+}
+
+enum AuthProvider {
+  LOCAL
+  GOOGLE
+  FACEBOOK
+  GITHUB
+
+  @@map("auth_provider_enum")
+}
+
+enum BudgetLevel {
+  LOW
+  MEDIUM
+  HIGH
+  LUXURY
+
+  @@map("budget_level_enum")
+}
+
+enum PlaceStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+  DUPLICATE
+
+  @@map("place_status_enum")
+}
+
+enum ChatSender {
+  USER
+  AGENT
+  TOOL
+
+  @@map("chat_sender_enum")
+}
+
+enum CrawlJobType {
+  REGION_CRAWL
+  PLACE_SYNC
+  EMBEDDING_GEN
+
+  @@map("crawl_job_type_enum")
+}
+
+enum CrawlJobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+
+  @@map("crawl_job_status_enum")
+}
+
+enum SyncStatus {
+  OK
+  STALE
+  ERROR
+  PENDING
+
+  @@map("sync_status_enum")
+}
+
+enum CoverageStatus {
+  COMPLETE
+  PARTIAL
+  NOT_COVERED
+  STALE
+
+  @@map("coverage_status_enum")
+}
+
+enum ItineraryStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+
+  @@map("itinerary_status_enum")
+}
+
+enum AreaType {
+  COUNTRY
+  PROVINCE
+  CITY
+  DISTRICT
+  ZONE
+
+  @@map("area_type_enum")
+}
+
+enum GroupRole {
+  OWNER
+  EDITOR
+  VIEWER
+
+  @@map("group_role_enum")
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  APPROVE
+  REJECT
+  BAN
+  UNBAN
+  TRIGGER_CRAWL
+  CANCEL_CRAWL
+
+  @@map("audit_action_enum")
+}
+
+enum ReportType {
+  SPAM
+  INAPPROPRIATE
+  FALSE_INFO
+  COPYRIGHT
+  OTHER
+
+  @@map("report_type_enum")
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWING
+  RESOLVED
+  DISMISSED
+
+  @@map("report_status_enum")
+}
+
+// =============================================================================
+// MODELS
+// =============================================================================
+
+model User {
+  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  email        String    @unique
+  passwordHash String?   @map("password_hash") @db.VarChar(255)
+  fullName     String    @map("full_name") @db.VarChar(255)
+  avatarUrl    String?   @map("avatar_url")
+  phoneNumber  String?   @map("phone_number") @db.VarChar(20)
+  role         UserRole  @default(USER)
+  isActive     Boolean   @default(true) @map("is_active")
+  isVerified   Boolean   @default(false) @map("is_verified")
+  verifiedAt   DateTime? @map("verified_at") @db.Timestamptz
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  identities      UserIdentity[]
+  preferences     UserPreference?
+  createdPlaces   Place[]               @relation("UserCreatedPlaces")
+  uploadedImages  PlaceImage[]          @relation("UserUploadedImages")
+  reviews         PlaceReview[]
+  collections     Collection[]
+  itineraries     Itinerary[]
+  groupMembers    GroupMember[]
+  proposals       GroupPlaceProposal[]
+  votes           GroupPlaceVote[]
+  chatSessions    AiChatSession[]
+  posts           CommunityPost[]
+  postLikes       PostLike[]
+  postComments    PostComment[]
+  contentReports  ContentReport[]       @relation("UserReported")
+  reviewedReports ContentReport[]       @relation("AdminReviewedReports")
+  auditLogs       AuditLog[]
+  crawlJobs       CrawlJob[]            @relation("UserCrawlJobs")
+
+  @@map("users")
+}
+
+model UserIdentity {
+  id             String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  provider       AuthProvider
+  providerUserId String       @map("provider_user_id") @db.VarChar(255)
+  identityData   Json?        @map("identity_data")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId], map: "unique_provider_user")
+  @@map("user_identities")
+}
+
+model UserPreference {
+  id                  String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId              String      @unique @map("user_id") @db.Uuid
+  dietaryRestrictions String[]    @map("dietary_restrictions")
+  preferredCategories String[]    @map("preferred_categories")
+  budgetLevel         BudgetLevel @default(MEDIUM) @map("budget_level")
+  travelStyle         String[]    @map("travel_style")
+  updatedAt           DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model TravelArea {
+  id         Int      @id @default(autoincrement())
+  name       String   @db.VarChar(100)
+  nameVi     String?  @map("name_vi") @db.VarChar(100)
+  slug       String   @unique @db.VarChar(100)
+  type       AreaType
+  parentId   Int?     @map("parent_id")
+  bboxMinLat Float?   @map("bbox_min_lat")
+  bboxMaxLat Float?   @map("bbox_max_lat")
+  bboxMinLng Float?   @map("bbox_min_lng")
+  bboxMaxLng Float?   @map("bbox_max_lng")
+  isActive   Boolean  @default(true) @map("is_active")
+
+  parent      TravelArea?         @relation("TravelAreaParent", fields: [parentId], references: [id])
+  children    TravelArea[]        @relation("TravelAreaParent")
+  places      Place[]
+  coverage    DataCoverage?
+  crawlJobs   CrawlJob[]
+  documents   KnowledgeDocument[]
+  itineraries Itinerary[]
+
+  @@map("travel_areas")
+}
+
+model Category {
+  id        Int     @id @default(autoincrement())
+  name      String  @db.VarChar(100)
+  nameVi    String? @map("name_vi") @db.VarChar(100)
+  slug      String  @unique @db.VarChar(100)
+  iconUrl   String? @map("icon_url")
+  parentId  Int?    @map("parent_id")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  parent   Category?  @relation("CategoryParent", fields: [parentId], references: [id])
+  children Category[] @relation("CategoryParent")
+  places   Place[]
+
+  @@map("categories")
+}
+
+model Place {
+  id             String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name           String       @db.VarChar(255)
+  nameNormalized String?      @map("name_normalized") @db.VarChar(255)
+  description    String?
+  categoryId     Int?         @map("category_id")
+  areaId         Int?         @map("area_id")
+  address        String
+  district       String?      @db.VarChar(100)
+  city           String?      @db.VarChar(100)
+  province       String?      @db.VarChar(100)
+  country        String?      @default("Vietnam") @db.VarChar(50)
+  latitude       Float
+  longitude      Float
+  priceRange     Json?        @map("price_range")
+  priceLevel     BudgetLevel? @map("price_level")
+  openingHours   Json?        @map("opening_hours")
+  phone          String?      @db.VarChar(30)
+  website        String?
+  ratingAvg      Float        @default(0.0) @map("rating_avg")
+  reviewCount    Int          @default(0) @map("review_count")
+  imageCount     Int          @default(0) @map("image_count")
+  tags           String[]     @default([])
+  attributes     Json         @default("{}")
+  status         PlaceStatus  @default(ACTIVE)
+  mergedInto     String?      @map("merged_into") @db.Uuid
+  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz
+  createdBy      String?      @map("created_by") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  category         Category?              @relation(fields: [categoryId], references: [id])
+  area             TravelArea?            @relation(fields: [areaId], references: [id])
+  creator          User?                  @relation("UserCreatedPlaces", fields: [createdBy], references: [id])
+  mergedTarget     Place?                 @relation("PlaceMerged", fields: [mergedInto], references: [id])
+  mergedSources    Place[]                @relation("PlaceMerged")
+  images           PlaceImage[]
+  embedding        PlaceEmbedding?
+  sources          PlaceSource[]
+  reviews          PlaceReview[]
+  collectionPlaces CollectionPlace[]
+  destinations     ItineraryDestination[]
+  proposals        GroupPlaceProposal[]
+  crawlJobs        CrawlJob[]
+
+  @@map("places")
+}
+
+model PlaceImage {
+  id           String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  placeId      String   @map("place_id") @db.Uuid
+  imageUrl     String   @map("image_url")
+  thumbnailUrl String?  @map("thumbnail_url")
+  displayOrder Int      @default(0) @map("display_order")
+  isPrimary    Boolean  @default(false) @map("is_primary")
+  caption      String?
+  source       String?  @db.VarChar(50)
+  uploadedBy   String?  @map("uploaded_by") @db.Uuid
+  width        Int?
+  height       Int?
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  place    Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  uploader User? @relation("UserUploadedImages", fields: [uploadedBy], references: [id])
+
+  @@map("place_images")
+}
+
+model PlaceEmbedding {
+  id           String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  placeId      String   @unique @map("place_id") @db.Uuid
+  contentText  String   @map("content_text")
+  modelName    String?  @map("model_name") @db.VarChar(100)
+  modelVersion String?  @map("model_version") @db.VarChar(50)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@map("place_embeddings")
+}
+
+model PlaceSource {
+  id                String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  placeId           String     @map("place_id") @db.Uuid
+  provider          String     @db.VarChar(50)
+  externalId        String     @map("external_id") @db.VarChar(255)
+  externalUrl       String?    @map("external_url")
+  rawData           Json?      @map("raw_data")
+  lastSyncedAt      DateTime?  @map("last_synced_at") @db.Timestamptz
+  syncStatus        SyncStatus @default(PENDING) @map("sync_status")
+  syncError         String?    @map("sync_error")
+  syncAttemptCount  Int        @default(0) @map("sync_attempt_count")
+  sourceRating      Float?     @map("source_rating")
+  sourceReviewCount Int?       @map("source_review_count")
+
+  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, externalId], map: "uq_provider_external")
+  @@map("place_sources")
+}
+
+model PlaceReview {
+  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  placeId      String    @map("place_id") @db.Uuid
+  rating       Int
+  title        String?   @db.VarChar(255)
+  comment      String?
+  images       String[]
+  visitedAt    DateTime? @map("visited_at") @db.Date
+  helpfulCount Int       @default(0) @map("helpful_count")
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, placeId], map: "unique_user_place_review")
+  @@map("place_reviews")
+}
+
+model Collection {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  title       String    @db.VarChar(255)
+  description String?
+  isPublic    Boolean   @default(false) @map("is_public")
+  coverImage  String?   @map("cover_image")
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  places CollectionPlace[]
+
+  @@map("collections")
+}
+
+model CollectionPlace {
+  collectionId String   @map("collection_id") @db.Uuid
+  placeId      String   @map("place_id") @db.Uuid
+  notes        String?
+  addedAt      DateTime @default(now()) @map("added_at") @db.Timestamptz
+
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  place      Place      @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@id([collectionId, placeId])
+  @@map("collection_places")
+}
+
+model Itinerary {
+  id            String          @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  creatorId     String          @map("creator_id") @db.Uuid
+  title         String          @db.VarChar(255)
+  description   String?
+  destination   String?         @db.VarChar(255)
+  areaId        Int?            @map("area_id")
+  startDate     DateTime?       @map("start_date") @db.Date
+  endDate       DateTime?       @map("end_date") @db.Date
+  totalBudget   Decimal?        @map("total_budget") @db.Decimal(12, 2)
+  budgetLevel   BudgetLevel?    @map("budget_level")
+  estimatedCost Decimal?        @map("estimated_cost") @db.Decimal(12, 2)
+  isAiGenerated Boolean         @default(false) @map("is_ai_generated")
+  aiPrompt      String?         @map("ai_prompt")
+  aiPreferences Json?           @map("ai_preferences")
+  status        ItineraryStatus @default(DRAFT)
+  isPublic      Boolean         @default(false) @map("is_public")
+  clonedFromId  String?         @map("cloned_from_id") @db.Uuid
+  totalPlaces   Int             @default(0) @map("total_places")
+  deletedAt     DateTime?       @map("deleted_at") @db.Timestamptz
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  creator      User                   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  area         TravelArea?            @relation(fields: [areaId], references: [id])
+  clonedFrom   Itinerary?             @relation("ItineraryCloned", fields: [clonedFromId], references: [id])
+  clones       Itinerary[]            @relation("ItineraryCloned")
+  destinations ItineraryDestination[]
+  tripGroup    TripGroup?
+  post         CommunityPost?
+  chatSessions AiChatSession[]
+
+  @@map("itineraries")
+}
+
+model ItineraryDestination {
+  id                       String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  itineraryId              String    @map("itinerary_id") @db.Uuid
+  placeId                  String    @map("place_id") @db.Uuid
+  dayNumber                Int       @default(1) @map("day_number")
+  visitOrder               Decimal   @map("visit_order") @db.Decimal(12, 6)
+  startTime                DateTime? @map("start_time") @db.Time
+  endTime                  DateTime? @map("end_time") @db.Time
+  estimatedDurationMinutes Int?      @default(60) @map("estimated_duration_minutes")
+  estimatedCost            Decimal?  @map("estimated_cost") @db.Decimal(10, 2)
+  travelDistanceMeters     Int?      @map("travel_distance_meters")
+  travelDurationSeconds    Int?      @map("travel_duration_seconds")
+  notes                    String?
+  createdAt                DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt                DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  itinerary Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  place     Place     @relation(fields: [placeId], references: [id], onDelete: Cascade)
+
+  @@map("itinerary_destinations")
+}
+
+model TripGroup {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  itineraryId String   @unique @map("itinerary_id") @db.Uuid
+  name        String   @db.VarChar(255)
+  inviteCode  String   @unique @map("invite_code") @db.VarChar(20)
+  maxMembers  Int      @default(20) @map("max_members")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  itinerary Itinerary            @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  members   GroupMember[]
+  proposals GroupPlaceProposal[]
+
+  @@map("trip_groups")
+}
+
+model GroupMember {
+  tripGroupId String    @map("trip_group_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  role        GroupRole @default(VIEWER)
+  joinedAt    DateTime  @default(now()) @map("joined_at") @db.Timestamptz
+
+  tripGroup TripGroup @relation(fields: [tripGroupId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([tripGroupId, userId])
+  @@map("group_members")
+}
+
+model GroupPlaceProposal {
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tripGroupId String   @map("trip_group_id") @db.Uuid
+  placeId     String   @map("place_id") @db.Uuid
+  proposedBy  String   @map("proposed_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tripGroup TripGroup        @relation(fields: [tripGroupId], references: [id], onDelete: Cascade)
+  place     Place            @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  proposer  User             @relation(fields: [proposedBy], references: [id], onDelete: Cascade)
+  votes     GroupPlaceVote[]
+
+  @@unique([tripGroupId, placeId], map: "unique_group_place_proposal")
+  @@map("group_place_proposals")
+}
+
+model GroupPlaceVote {
+  proposalId String   @map("proposal_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  proposal GroupPlaceProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([proposalId, userId])
+  @@map("group_place_votes")
+}
+
+model AiChatSession {
+  id                      String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId                  String    @map("user_id") @db.Uuid
+  title                   String?   @default("Trò chuyện mới") @db.VarChar(255)
+  summary                 String?
+  lastSummarizedMessageId String?   @map("last_summarized_message_id") @db.Uuid
+  lastSummarizedAt        DateTime? @map("last_summarized_at") @db.Timestamptz
+  linkedItineraryId       String?   @map("linked_itinerary_id") @db.Uuid
+  contextCity             String?   @map("context_city") @db.VarChar(100)
+  messageCount            Int       @default(0) @map("message_count")
+  createdAt               DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedItinerary Itinerary?      @relation(fields: [linkedItineraryId], references: [id])
+  messages        AiChatMessage[]
+
+  @@map("ai_chat_sessions")
+}
+
+model AiChatMessage {
+  id          String     @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  sessionId   String     @map("session_id") @db.Uuid
+  sender      ChatSender
+  content     String?
+  toolCalls   Json?      @map("tool_calls")
+  toolResults Json?      @map("tool_results")
+  tokenCount  Int?       @map("token_count")
+  latencyMs   Int?       @map("latency_ms")
+  modelName   String?    @map("model_name") @db.VarChar(100)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz
+
+  session AiChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("ai_chat_messages")
+}
+
+model CommunityPost {
+  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  itineraryId  String    @unique @map("itinerary_id") @db.Uuid
+  title        String    @db.VarChar(255)
+  caption      String?
+  likeCount    Int       @default(0) @map("like_count")
+  commentCount Int       @default(0) @map("comment_count")
+  cloneCount   Int       @default(0) @map("clone_count")
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itinerary Itinerary     @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  likes     PostLike[]
+  comments  PostComment[]
+
+  @@map("community_posts")
+}
+
+model PostLike {
+  postId    String   @map("post_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@map("post_likes")
+}
+
+model PostComment {
+  id        String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  postId    String    @map("post_id") @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  content   String
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("post_comments")
+}
+
+model ContentReport {
+  id             String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  reportedBy     String       @map("reported_by") @db.Uuid
+  targetType     String       @map("target_type") @db.VarChar(50)
+  targetId       String       @map("target_id") @db.Uuid
+  reportType     ReportType   @map("report_type")
+  description    String?
+  status         ReportStatus @default(PENDING)
+  reviewedBy     String?      @map("reviewed_by") @db.Uuid
+  reviewedAt     DateTime?    @map("reviewed_at") @db.Timestamptz
+  resolutionNote String?      @map("resolution_note")
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+
+  reporter User  @relation("UserReported", fields: [reportedBy], references: [id], onDelete: Cascade)
+  reviewer User? @relation("AdminReviewedReports", fields: [reviewedBy], references: [id])
+
+  @@map("content_reports")
+}
+
+model DataCoverage {
+  areaId        Int            @id @map("area_id")
+  placeCount    Int            @default(0) @map("place_count")
+  status        CoverageStatus @default(NOT_COVERED)
+  lastCrawledAt DateTime?      @map("last_crawled_at") @db.Timestamptz
+  staleThreshold String?       @default("7 days") @map("stale_threshold")
+  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  area TravelArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  @@map("data_coverage")
+}
+
+model CrawlJob {
+  id             String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  jobType        CrawlJobType   @map("job_type")
+  status         CrawlJobStatus @default(PENDING)
+  areaId         Int?           @map("area_id")
+  placeId        String?        @map("place_id") @db.Uuid
+  provider       String?        @db.VarChar(50)
+  params         Json           @default("{}")
+  priority       Int            @default(5)
+  totalItems     Int?           @map("total_items")
+  processedItems Int            @default(0) @map("processed_items")
+  insertedCount  Int            @default(0) @map("inserted_count")
+  updatedCount   Int            @default(0) @map("updated_count")
+  duplicateCount Int            @default(0) @map("duplicate_count")
+  errorCount     Int            @default(0) @map("error_count")
+  checkpoint     Json           @default("{}")
+  scheduledAt    DateTime       @default(now()) @map("scheduled_at") @db.Timestamptz
+  startedAt      DateTime?      @map("started_at") @db.Timestamptz
+  completedAt    DateTime?      @map("completed_at") @db.Timestamptz
+  lastError      String?        @map("last_error")
+  retryCount     Int            @default(0) @map("retry_count")
+  maxRetries     Int            @default(3) @map("max_retries")
+  bullmqJobId    String?        @map("bullmq_job_id") @db.VarChar(255)
+  createdBy      String?        @map("created_by") @db.Uuid
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  area    TravelArea? @relation(fields: [areaId], references: [id])
+  place   Place?      @relation(fields: [placeId], references: [id])
+  creator User?       @relation("UserCrawlJobs", fields: [createdBy], references: [id])
+
+  @@map("crawl_jobs")
+}
+
+model KnowledgeDocument {
+  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  title        String    @db.VarChar(255)
+  sourceType   String    @map("source_type") @db.VarChar(50)
+  sourceUrl    String?   @map("source_url")
+  content      String
+  language     String?   @default("vi") @db.VarChar(10)
+  areaId       Int?      @map("area_id")
+  categoryTags String[]  @map("category_tags")
+  isProcessed  Boolean   @default(false) @map("is_processed")
+  chunkCount   Int       @default(0) @map("chunk_count")
+  processedAt  DateTime? @map("processed_at") @db.Timestamptz
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  area   TravelArea?      @relation(fields: [areaId], references: [id])
+  chunks KnowledgeChunk[]
+
+  @@map("knowledge_documents")
+}
+
+model KnowledgeChunk {
+  id         String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  documentId String   @map("document_id") @db.Uuid
+  chunkIndex Int      @map("chunk_index")
+  content    String
+  modelName  String?  @map("model_name") @db.VarChar(100)
+  metadata   Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@map("knowledge_chunks")
+}
+
+model AuditLog {
+  id          String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  actorId     String      @map("actor_id") @db.Uuid
+  actorRole   UserRole    @map("actor_role")
+  action      AuditAction
+  targetType  String      @map("target_type") @db.VarChar(50)
+  targetId    String?     @map("target_id") @db.Uuid
+  targetLabel String?     @map("target_label")
+  beforeData  Json?       @map("before_data")
+  afterData   Json?       @map("after_data")
+  ipAddress   String?     @map("ip_address")
+  userAgent   String?     @map("user_agent")
+  notes       String?
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz
+
+  actor User @relation(fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@map("audit_logs")
+}

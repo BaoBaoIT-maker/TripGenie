@@ -1,0 +1,30 @@
+# IDEs and Editors
+.vscode/
+.vscode
+.idea/
+*.sublime-workspace
+.project
+.classpath
+
+# AI Agents & Assistants
+.agent/
+.agents/
+.windsurf/
+.gemini/
+.claude/
+skills-lock.json
+
+# Dependencies & Build Output
+node_modules/
+dist/
+build/
+coverage/
+
+# Environment Variables
+.env
+.env.*
+!.env.example
+
+# OS Metadata
+.DS_Store
+Thumbs.db

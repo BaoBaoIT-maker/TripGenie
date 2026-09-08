@@ -5,6 +5,7 @@ import { AppService } from './app.service';
 import { PrismaModule } from './database/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
+import { CrawlerModule } from './modules/crawler/crawler.module';
 import { appConfig, databaseConfig, jwtConfig, redisConfig, aiConfig } from './config';
 import { envValidationSchema } from './config/env.validation';
 
@@ -18,6 +19,7 @@ import { envValidationSchema } from './config/env.validation';
     PrismaModule,
     AuthModule,
     UsersModule,
+    CrawlerModule,
   ],
   controllers: [AppController],
   providers: [AppService],

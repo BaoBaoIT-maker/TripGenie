@@ -20,7 +20,7 @@ import { AuthTokens } from './interfaces/auth.interface';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService) { }
 
   private setAuthCookies(res: Response, tokens: AuthTokens) {
     const isProd = process.env.NODE_ENV === 'production';
@@ -88,7 +88,7 @@ export class AuthController {
     this.clearAuthCookies(res);
     return { message: 'Đăng xuất thành công' };
   }
-
+ 
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)

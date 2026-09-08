@@ -168,8 +168,8 @@ model User {
 
   identities      UserIdentity[]
   preferences     UserPreference?
-  createdPlaces   Place[]               @relation("UserCreatedPlaces")
-  uploadedImages  PlaceImage[]          @relation("UserUploadedImages")
+  createdPlaces   Place[]              @relation("UserCreatedPlaces")
+  uploadedImages  PlaceImage[]         @relation("UserUploadedImages")
   reviews         PlaceReview[]
   collections     Collection[]
   itineraries     Itinerary[]
@@ -180,10 +180,10 @@ model User {
   posts           CommunityPost[]
   postLikes       PostLike[]
   postComments    PostComment[]
-  contentReports  ContentReport[]       @relation("UserReported")
-  reviewedReports ContentReport[]       @relation("AdminReviewedReports")
+  contentReports  ContentReport[]      @relation("UserReported")
+  reviewedReports ContentReport[]      @relation("AdminReviewedReports")
   auditLogs       AuditLog[]
-  crawlJobs       CrawlJob[]            @relation("UserCrawlJobs")
+  crawlJobs       CrawlJob[]           @relation("UserCrawlJobs")
 
   @@map("users")
 }
@@ -625,12 +625,12 @@ model ContentReport {
 }
 
 model DataCoverage {
-  areaId        Int            @id @map("area_id")
-  placeCount    Int            @default(0) @map("place_count")
-  status        CoverageStatus @default(NOT_COVERED)
-  lastCrawledAt DateTime?      @map("last_crawled_at") @db.Timestamptz
-  staleThreshold String?       @default("7 days") @map("stale_threshold")
-  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  areaId         Int            @id @map("area_id")
+  placeCount     Int            @default(0) @map("place_count")
+  status         CoverageStatus @default(NOT_COVERED)
+  lastCrawledAt  DateTime?      @map("last_crawled_at") @db.Timestamptz
+  staleThreshold String?        @default("7 days") @map("stale_threshold")
+  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   area TravelArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
 

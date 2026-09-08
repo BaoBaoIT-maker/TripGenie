@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './database/prisma.module';
+import { RedisModule } from './database/redis.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { CrawlerModule } from './modules/crawler/crawler.module';
@@ -17,6 +18,7 @@ import { envValidationSchema } from './config/env.validation';
       validationSchema: envValidationSchema,
     }),
     PrismaModule,
+    RedisModule,
     AuthModule,
     UsersModule,
     CrawlerModule,

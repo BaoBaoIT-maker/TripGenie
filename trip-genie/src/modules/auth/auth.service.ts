@@ -9,44 +9,30 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import { randomUUID } from 'crypto';
 import Redis from 'ioredis';
 import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
 import { IUsersRepository } from '@/modules/users/interfaces/users-repository.interface';
 import { RegisterDto, LoginDto, VerifyOtpDto } from './dto';
 import { AuthTokens, AuthResponse, UserResponse } from './interfaces/auth.interface';
 import { MailService } from './services/mail.service';
+import { TokenBlacklistService } from './services/token-blacklist.service';
 import { User, AuthProvider } from '@prisma/client';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private redisClient: Redis;
 
   constructor(
     @Inject(INJECT_TOKENS.USER_REPOSITORY)
     private readonly usersRepository: IUsersRepository,
+    @Inject('REDIS_CLIENT')
+    private readonly redisClient: Redis,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly mailService: MailService,
-  ) {
-    const redisUrl = this.configService.get<string>('REDIS_URL');
-    const redisHost = this.configService.get<string>('REDIS_HOST', 'localhost');
-    const redisPort = this.configService.get<number>('REDIS_PORT', 6379);
-
-    if (redisUrl && redisUrl.startsWith('redis')) {
-      this.redisClient = new Redis(redisUrl, { lazyConnect: true });
-    } else {
-      this.redisClient = new Redis({
-        host: redisHost,
-        port: redisPort,
-        lazyConnect: true,
-      });
-    }
-
-    this.redisClient.connect().catch((err) => {
-      this.logger.warn(`Redis connection warning: ${err.message}. OTP features will fallback.`);
-    });
-  }
+    private readonly tokenBlacklistService: TokenBlacklistService,
+  ) {}
 
   async register(dto: RegisterDto): Promise<{ message: string }> {
     const existingUser = await this.usersRepository.findByEmail(dto.email);
@@ -73,17 +59,15 @@ export class AuthService {
       });
     }
 
-    // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Store in Redis with 10 min TTL (600s)
     try {
       await this.redisClient.set(`otp:${dto.email.toLowerCase()}`, otp, 'EX', 600);
-    } catch (err: any) {
-      this.logger.error(`Redis set OTP failed: ${err.message}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Redis set OTP failed: ${message}`);
     }
 
-    // Send email OTP via Gmail SMTP
     await this.mailService.sendOtpEmail(dto.email, otp);
 
     return {
@@ -93,7 +77,6 @@ export class AuthService {
 
   async verifyOtp(dto: VerifyOtpDto): Promise<AuthResponse> {
     const user = await this.usersRepository.findByEmail(dto.email);
-
     if (!user) {
       throw new BadRequestException('Không tìm thấy tài khoản với email này');
     }
@@ -101,31 +84,26 @@ export class AuthService {
     let storedOtp: string | null = null;
     try {
       storedOtp = await this.redisClient.get(`otp:${dto.email.toLowerCase()}`);
-    } catch (err: any) {
-      this.logger.error(`Redis get OTP failed: ${err.message}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Redis get OTP failed: ${message}`);
     }
 
     if (!storedOtp || storedOtp !== dto.otp) {
       throw new BadRequestException('Mã OTP không chính xác hoặc đã hết hạn');
     }
 
-    // Clear OTP from Redis
     try {
       await this.redisClient.del(`otp:${dto.email.toLowerCase()}`);
-    } catch (err) {}
+    } catch { /* non-fatal */ }
 
-    // Verify user
     const updatedUser = await this.usersRepository.update(user.id, {
       isVerified: true,
       verifiedAt: new Date(),
     });
 
     const tokens = await this.generateTokens(updatedUser);
-
-    return {
-      user: this.formatUserResponse(updatedUser),
-      tokens,
-    };
+    return { user: this.formatUserResponse(updatedUser), tokens };
   }
 
   async login(dto: LoginDto): Promise<AuthResponse> {
@@ -144,17 +122,12 @@ export class AuthService {
     }
 
     const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
-
     if (!isPasswordValid) {
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác');
     }
 
     const tokens = await this.generateTokens(user);
-
-    return {
-      user: this.formatUserResponse(user),
-      tokens,
-    };
+    return { user: this.formatUserResponse(user), tokens };
   }
 
   async refreshTokens(refreshToken: string): Promise<AuthTokens> {
@@ -164,15 +137,22 @@ export class AuthService {
       });
 
       const user = await this.usersRepository.findById(payload.sub);
-
       if (!user || !user.isActive) {
         throw new UnauthorizedException('Tài khoản không hợp lệ');
       }
 
       return this.generateTokens(user);
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException('Refresh Token không hợp lệ hoặc đã hết hạn');
     }
+  }
+
+  /**
+   * Invalidates the current access token by adding it to the Redis blacklist.
+   * The token is revoked for the remainder of its natural TTL.
+   */
+  async logout(accessToken: string): Promise<void> {
+    await this.tokenBlacklistService.revokeAccessToken(accessToken);
   }
 
   async validateOAuthUser(oauthProfile: {
@@ -182,7 +162,6 @@ export class AuthService {
     fullName: string;
     avatarUrl?: string;
   }): Promise<AuthResponse> {
-    // 1. Find existing identity
     const existingIdentity = await this.usersRepository.findIdentity(
       oauthProfile.provider,
       oauthProfile.providerUserId,
@@ -193,11 +172,9 @@ export class AuthService {
     if (existingIdentity) {
       user = (existingIdentity as any).user || (await this.usersRepository.findById(existingIdentity.userId));
     } else {
-      // 2. Find by email
       user = await this.usersRepository.findByEmail(oauthProfile.email);
 
       if (!user) {
-        // Create new user
         user = await this.usersRepository.create({
           email: oauthProfile.email,
           fullName: oauthProfile.fullName,
@@ -207,7 +184,6 @@ export class AuthService {
         });
       }
 
-      // Create identity link
       await this.usersRepository.createIdentity({
         user: { connect: { id: user.id } },
         provider: oauthProfile.provider as AuthProvider,
@@ -221,25 +197,35 @@ export class AuthService {
     }
 
     const tokens = await this.generateTokens(user);
-
-    return {
-      user: this.formatUserResponse(user),
-      tokens,
-    };
+    return { user: this.formatUserResponse(user), tokens };
   }
 
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Generates access + refresh tokens.
+   * Each token embeds a unique `jti` (JWT ID) so it can be individually revoked.
+   */
   private async generateTokens(user: User): Promise<AuthTokens> {
-    const payload = { sub: user.id, email: user.email, role: user.role };
+    const basePayload = { sub: user.id, email: user.email, role: user.role };
 
     const [accessToken, refreshToken] = await Promise.all([
-      this.jwtService.signAsync(payload, {
-        secret: this.configService.get<string>('JWT_SECRET'),
-        expiresIn: (this.configService.get<string>('JWT_EXPIRES_IN', '1d') as any),
-      }),
-      this.jwtService.signAsync(payload, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-        expiresIn: (this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '7d') as any),
-      }),
+      this.jwtService.signAsync(
+        { ...basePayload, jti: randomUUID() }, // jti enables per-token revocation
+        {
+          secret: this.configService.get<string>('JWT_SECRET'),
+          expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '1d') as any,
+        },
+      ),
+      this.jwtService.signAsync(
+        { ...basePayload, jti: randomUUID() },
+        {
+          secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+          expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '7d') as any,
+        },
+      ),
     ]);
 
     return { accessToken, refreshToken };

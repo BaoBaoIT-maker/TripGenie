@@ -82,9 +82,24 @@ export class AuthController {
     return { tokens };
   }
 
+  /**
+   * Logout: blacklist current access token in Redis, then clear cookies.
+   * Guarded by JwtAuthGuard so anonymous calls are rejected.
+   */
   @Post('logout')
+  @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async logout(@Res({ passthrough: true }) res: Response) {
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const token: string =
+      req.cookies?.accessToken ||
+      (req.headers.authorization?.startsWith('Bearer ')
+        ? req.headers.authorization.slice(7)
+        : '');
+
+    if (token) {
+      await this.authService.logout(token);
+    }
+
     this.clearAuthCookies(res);
     return { message: 'Đăng xuất thành công' };
   }

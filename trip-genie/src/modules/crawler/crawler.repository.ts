@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { TravelArea, Category, PlaceSource, CrawlJob, DataCoverage } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import {
   ICrawlerRepository,
@@ -9,6 +10,7 @@ import {
   UpdateCrawlJobInput,
   UpsertCoverageInput,
 } from './interfaces/crawler-repository.interface';
+import { PlaceStatus } from '../../common/enums/crawler.enum';
 
 @Injectable()
 export class CrawlerRepository implements ICrawlerRepository {
@@ -16,13 +18,13 @@ export class CrawlerRepository implements ICrawlerRepository {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async getAreaById(areaId: number): Promise<any | null> {
+  async getAreaById(areaId: number): Promise<TravelArea | null> {
     return this.prisma.travelArea.findUnique({
       where: { id: areaId },
     });
   }
 
-  async getCategoryBySlug(slug: string): Promise<any | null> {
+  async getCategoryBySlug(slug: string): Promise<Category | null> {
     return this.prisma.category.findUnique({
       where: { slug },
     });
@@ -37,7 +39,7 @@ export class CrawlerRepository implements ICrawlerRepository {
     return map;
   }
 
-  async findPlaceSourceByExternal(provider: string, externalId: string): Promise<any | null> {
+  async findPlaceSourceByExternal(provider: string, externalId: string): Promise<PlaceSource | null> {
     return this.prisma.placeSource.findUnique({
       where: {
         provider_externalId: { provider, externalId },
@@ -55,7 +57,7 @@ export class CrawlerRepository implements ICrawlerRepository {
         ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326),
         ${radiusMeters}
       )
-      AND status != 'DUPLICATE'
+      AND status != ${PlaceStatus.DUPLICATE}::place_status_enum
     `;
   }
 
@@ -85,7 +87,7 @@ export class CrawlerRepository implements ICrawlerRepository {
     return (result as any[])[0];
   }
 
-  async createPlaceSource(data: CreatePlaceSourceInput): Promise<any> {
+  async createPlaceSource(data: CreatePlaceSourceInput): Promise<PlaceSource> {
     return this.prisma.placeSource.create({
       data: {
         placeId: data.placeId,
@@ -98,7 +100,7 @@ export class CrawlerRepository implements ICrawlerRepository {
     });
   }
 
-  async updatePlaceSource(id: string, data: UpdatePlaceSourceInput): Promise<any> {
+  async updatePlaceSource(id: string, data: UpdatePlaceSourceInput): Promise<PlaceSource> {
     return this.prisma.placeSource.update({
       where: { id },
       data: {
@@ -109,7 +111,7 @@ export class CrawlerRepository implements ICrawlerRepository {
     });
   }
 
-  async createCrawlJob(data: CreateCrawlJobInput): Promise<any> {
+  async createCrawlJob(data: CreateCrawlJobInput): Promise<CrawlJob> {
     return this.prisma.crawlJob.create({
       data: {
         areaId: data.areaId,
@@ -122,7 +124,7 @@ export class CrawlerRepository implements ICrawlerRepository {
     });
   }
 
-  async updateCrawlJob(id: string, data: UpdateCrawlJobInput): Promise<any> {
+  async updateCrawlJob(id: string, data: UpdateCrawlJobInput): Promise<CrawlJob> {
     return this.prisma.crawlJob.update({
       where: { id },
       data: {
@@ -141,13 +143,13 @@ export class CrawlerRepository implements ICrawlerRepository {
     });
   }
 
-  async getCrawlJobById(id: string): Promise<any | null> {
+  async getCrawlJobById(id: string): Promise<CrawlJob | null> {
     return this.prisma.crawlJob.findUnique({
       where: { id },
     });
   }
 
-  async upsertDataCoverage(areaId: number, data: UpsertCoverageInput): Promise<any> {
+  async upsertDataCoverage(areaId: number, data: UpsertCoverageInput): Promise<DataCoverage> {
     return this.prisma.dataCoverage.upsert({
       where: { areaId },
       create: {
@@ -168,7 +170,7 @@ export class CrawlerRepository implements ICrawlerRepository {
     return this.prisma.place.count({
       where: {
         areaId,
-        status: 'ACTIVE',
+        status: PlaceStatus.ACTIVE,
         deletedAt: null,
       },
     });

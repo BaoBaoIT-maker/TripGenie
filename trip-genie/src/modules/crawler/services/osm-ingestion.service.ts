@@ -4,7 +4,7 @@ import { ICrawlerRepository } from '../interfaces/crawler-repository.interface';
 import { ICrawlerProvider } from '../interfaces/provider.interface';
 import { IIngestionService } from '../interfaces/ingestion.interface';
 import { DeduplicationService } from './deduplication.service';
-import { CrawlJobStatus, CrawlProviderName, DataCoverageStatus, PlaceStatus } from '../../../common/enums/crawler.enum';
+import { CrawlJobStatus, DataCoverageStatus, PlaceStatus } from '../../../common/enums/crawler.enum';
 
 @Injectable()
 export class OsmIngestionService implements IIngestionService {

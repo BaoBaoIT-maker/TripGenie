@@ -104,23 +104,41 @@ Khi hoàn thành bất kỳ module nào, **BẮT BUỘC** thực hiện quy trì
 - [x] **Prisma 7 Schema** — `npx prisma generate` thành công
 - [x] **Core Infrastructure** — ExceptionsFilter, ResponseInterceptor, LoggingInterceptor, Guards, Decorators
 
-### DONE — PHASE 2: Auth Module
+### DONE — PHASE 2: Auth Module & Redis Token Blacklist
 
 - [x] **DTOs** — `RegisterDto`, `LoginDto`, `VerifyOtpDto`, `RefreshTokenDto`
 - [x] **UsersRepository & IUsersRepository** — Interface DI token `USER_REPOSITORY`
 - [x] **MailService** — Gửi mail OTP 6 số qua Gmail SMTP với `nodemailer`
-- [x] **AuthService** — bcrypt hash, Redis OTP (10 min TTL), JWT issue (1d/7d)
-- [x] **Passport Strategies** — `JwtStrategy` (dual cookie/header extractor), `GoogleStrategy`, `FacebookStrategy`
-- [x] **HttpOnly Cookie Support & Logout** — Auto set `accessToken` & `refreshToken` cookies, `POST /auth/logout` clear cookies
+- [x] **AuthService** — bcrypt hash, Redis OTP (10 min TTL), JWT issue (1d/7d) với `jti` UUID
+- [x] **RedisModule** — `@Global()` Redis provider (`REDIS_CLIENT`) dùng chung toàn ứng dụng
+- [x] **TokenBlacklistService** — Quản lý thu hồi JWT khi logout qua Redis `jti` (`blacklist:token:<jti>`), tự xóa khi token hết hạn TTL, hỗ trợ fail-open
+- [x] **Passport Strategies** — `JwtStrategy` (dual cookie/header extractor, tự động check Redis blacklist), `GoogleStrategy`, `FacebookStrategy`
+- [x] **HttpOnly Cookie Support & Logout** — Auto set `accessToken` & `refreshToken` cookies, `POST /auth/logout` blacklist `jti` từ `@CurrentUser()` & clear cookies (no double-decode)
 - [x] **AuthController** — Endpoints: `/auth/register`, `/auth/verify-otp`, `/auth/login`, `/auth/refresh`, `/auth/logout`, `/auth/google`, `/auth/facebook`, `/auth/me`
-- [x] **Unit Tests** — `auth.service.spec.ts`, `auth.controller.spec.ts` ➔ **100% PASS**
+- [x] **Unit Tests** — `auth.service.spec.ts`, `auth.controller.spec.ts`, `token-blacklist.service.spec.ts` ➔ **100% PASS (35/35 tests total)**
 - [x] **E2E Tests** — `test/auth.e2e-spec.ts` ➔ **100% PASS**
 
-### TODO — PHASE 3: Users Module (Tiếp theo)
+### DONE — PHASE 3: Data Crawler & Ingestion Module (OSM)
 
+- [x] **Database Seed** — `prisma/seed.sql`: 15 categories + 12 travel areas (Tier 1 & Tier 2) kèm tọa độ Bounding Box GPS
+- [x] **Centralized Enums & Utils** — `crawler.enum.ts` (`CrawlProviderName`, `CrawlJobType`, `CrawlJobStatus`, `DataCoverageStatus`, `PlaceStatus`, `OsmCategorySlug`), `string.util.ts` (`normalizeVietnamese`)
+- [x] **SOLID Contracts** — `ICrawlerProvider`, `ICrawlerRepository`, `IIngestionService` (Strategy Pattern)
+- [x] **CrawlerRepository** — Prisma-based data access layer với raw PostGIS spatial queries (`ST_DWithin`, `ST_SetSRID`, `ST_MakePoint`)
+- [x] **OsmProvider** — Tích hợp Overpass API với ConfigService (URL, 30s timeout), map OSM tags thành category slugs
+- [x] **DeduplicationService** — Chống cào lặp 2 tầng (Exact `provider+externalId` lookup + Spatial `ST_DWithin(50m)` & lexical similarity)
+- [x] **OsmIngestionService** — Implementation của `IIngestionService`, xử lý vòng lặp cào dữ liệu, ghi log tiến độ mỗi 50 items, tăng `errorCount`, upsert `data_coverage`
+- [x] **CrawlJobService** — Quản lý tạo job & trigger cào ngầm phụ thuộc `IIngestionService` abstraction qua `INJECT_TOKENS.OSM_INGESTION_SERVICE`
+- [x] **CrawlerController** — Endpoints: `POST /crawler/trigger` (HTTP 202 Accepted), `GET /crawler/jobs/:id`, gán `AuthenticatedRequest` DTOs
+- [x] **CrawlerModule** — Đăng ký DI tokens `CRAWLER_REPOSITORY`, `OSM_PROVIDER`, `OSM_INGESTION_SERVICE` và tích hợp vào `AppModule`
+- [x] **Unit Tests** — `deduplication.service.spec.ts`, `osm-ingestion.service.spec.ts`, `crawler.controller.spec.ts` ➔ **100% PASS**
+
+### TODO — PHASE 4: Places & Search API (Tiếp theo)
+
+- [ ] Place Detail API (`GET /places/:id` — thông tin chi tiết địa điểm, hình ảnh, nguồn cào)
+- [ ] Spatial & Hybrid Search API (`GET /places/search` — PostGIS + pgvector + pg_trgm)
 - [ ] User Profile Management API (`GET /users/me`, `PATCH /users/me`)
-- [ ] User Preferences API (`GET /users/preferences`, `PUT /users/preferences` — budget, dietary, categories, travel style)
-- [ ] Unit & E2E Tests cho Users Module
+- [ ] User Preferences API (`GET /users/preferences`, `PUT /users/preferences`)
+- [ ] Unit & E2E Tests cho Places Module
 
 ---
 
@@ -131,3 +149,4 @@ Khi hoàn thành bất kỳ module nào, **BẮT BUỘC** thực hiện quy trì
 | `docs/DB.md` | Schema SQL v5 — Nguồn sự thật duy nhất |
 | `docs/ARCHITECTURE.md` | Architecture overview đầy đủ (27 sections) |
 | `docs/Project-context.md` | File này — Living memory của dự án |
+

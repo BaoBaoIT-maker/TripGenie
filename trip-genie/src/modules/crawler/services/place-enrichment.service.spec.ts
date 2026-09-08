@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PlaceEnrichmentService } from './place-enrichment.service';
 import { INJECT_TOKENS } from '../../../common/constants/inject-tokens';
+import { BudgetLevel } from '@prisma/client';
 
 describe('PlaceEnrichmentService', () => {
   let service: PlaceEnrichmentService;
@@ -19,6 +20,9 @@ describe('PlaceEnrichmentService', () => {
     openingHours: null,
     phone: null,
     website: null,
+    sources: [
+      { rawData: { tags: { wikidata: 'Q379681' } } },
+    ],
   };
 
   beforeEach(async () => {
@@ -26,19 +30,23 @@ describe('PlaceEnrichmentService', () => {
       getPlaceById: jest.fn().mockResolvedValue(mockPlace),
       getUnenrichedPlacesByArea: jest.fn().mockResolvedValue([mockPlace]),
       updatePlace: jest.fn().mockResolvedValue({ ...mockPlace, ratingAvg: 4.5 }),
+      createPlaceImages: jest.fn().mockResolvedValue(1),
     };
 
     foursquareProvider = {
+      providerName: 'foursquare',
       enrichPlace: jest.fn().mockResolvedValue({
         ratingAvg: 4.5,
-        ratingCount: 120,
-        priceLevel: 2,
+        reviewCount: 120,
+        budgetLevel: BudgetLevel.MEDIUM,
         phone: '+842353861705',
         website: 'https://hoian.gov.vn',
+        photoUrls: ['https://foursquare.com/hoian.jpg'],
       }),
     };
 
     wikimediaProvider = {
+      providerName: 'wikimedia',
       enrichPlace: jest.fn().mockResolvedValue({
         description: 'Phố cổ Hội An là một đô thị cổ nằm ở hạ lưu sông Thu Bồn.',
         photoUrls: ['https://upload.wikimedia.org/hoian.jpg'],
@@ -49,8 +57,7 @@ describe('PlaceEnrichmentService', () => {
       providers: [
         PlaceEnrichmentService,
         { provide: INJECT_TOKENS.CRAWLER_REPOSITORY, useValue: crawlerRepo },
-        { provide: INJECT_TOKENS.FOURSQUARE_PROVIDER, useValue: foursquareProvider },
-        { provide: INJECT_TOKENS.WIKIMEDIA_PROVIDER, useValue: wikimediaProvider },
+        { provide: INJECT_TOKENS.ENRICHMENT_PROVIDERS, useValue: [wikimediaProvider, foursquareProvider] },
       ],
     }).compile();
 
@@ -66,7 +73,7 @@ describe('PlaceEnrichmentService', () => {
     expect(crawlerRepo.updatePlace).not.toHaveBeenCalled();
   });
 
-  it('should perform safe partial update when providers return data', async () => {
+  it('should perform safe partial update when providers return data and save images', async () => {
     const result = await service.enrichPlaceById('place-uuid-1');
 
     expect(result).toBe(true);
@@ -75,12 +82,13 @@ describe('PlaceEnrichmentService', () => {
       expect.objectContaining({
         description: expect.any(String),
         ratingAvg: 4.5,
-        ratingCount: 120,
-        priceLevel: 2,
+        reviewCount: 120,
+        priceLevel: BudgetLevel.MEDIUM,
         phone: '+842353861705',
         website: 'https://hoian.gov.vn',
       }),
     );
+    expect(crawlerRepo.createPlaceImages).toHaveBeenCalledTimes(2);
   });
 
   it('should enrich batch of unenriched places by areaId', async () => {

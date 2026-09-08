@@ -64,6 +64,7 @@ export class CrawlerRepository implements ICrawlerRepository {
   async getPlaceById(id: string): Promise<any | null> {
     return this.prisma.place.findUnique({
       where: { id },
+      include: { sources: true, images: true },
     });
   }
 
@@ -74,11 +75,12 @@ export class CrawlerRepository implements ICrawlerRepository {
         status: PlaceStatus.ACTIVE,
         deletedAt: null,
         OR: [
-          { ratingAvg: null as any },
+          { ratingAvg: 0 },
           { priceLevel: null as any },
           { openingHours: null as any },
         ],
       },
+      include: { sources: true, images: true },
       take: limit,
     });
   }
@@ -96,10 +98,45 @@ export class CrawlerRepository implements ICrawlerRepository {
         ...(data.openingHours !== undefined && { openingHours: data.openingHours }),
         ...(data.priceLevel !== undefined && { priceLevel: data.priceLevel }),
         ...(data.ratingAvg !== undefined && { ratingAvg: data.ratingAvg }),
-        ...(data.ratingCount !== undefined && { ratingCount: data.ratingCount }),
+        ...(data.reviewCount !== undefined && { reviewCount: data.reviewCount }),
         ...(data.tags && { tags: data.tags }),
       },
     });
+  }
+
+  async createPlaceImages(placeId: string, photoUrls: string[], sourceName: string = 'enrichment'): Promise<number> {
+    if (!photoUrls || photoUrls.length === 0) return 0;
+
+    // Filter out duplicate URLs already stored for this place
+    const existingImages = await this.prisma.placeImage.findMany({
+      where: { placeId },
+      select: { imageUrl: true },
+    });
+    const existingUrls = new Set(existingImages.map((img) => img.imageUrl));
+
+    const newUrls = photoUrls.filter((url) => !existingUrls.has(url));
+    if (newUrls.length === 0) return 0;
+
+    const countBefore = existingUrls.size;
+    const createData = newUrls.map((url, idx) => ({
+      placeId,
+      imageUrl: url,
+      displayOrder: countBefore + idx,
+      isPrimary: countBefore === 0 && idx === 0,
+      source: sourceName,
+    }));
+
+    await this.prisma.placeImage.createMany({
+      data: createData,
+    });
+
+    const totalImages = countBefore + newUrls.length;
+    await this.prisma.place.update({
+      where: { id: placeId },
+      data: { imageCount: totalImages },
+    });
+
+    return newUrls.length;
   }
 
   async createPlace(data: CreatePlaceInput): Promise<any> {

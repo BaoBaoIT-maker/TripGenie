@@ -4,6 +4,7 @@ import { IEnrichmentProvider, EnrichedPlaceDetails } from '../interfaces/enrichm
 
 @Injectable()
 export class WikimediaProvider implements IEnrichmentProvider {
+  readonly providerName = 'wikimedia';
   private readonly logger = new Logger(WikimediaProvider.name);
   private readonly httpClient: AxiosInstance;
 
@@ -24,13 +25,13 @@ export class WikimediaProvider implements IEnrichmentProvider {
     wikidataId?: string | null,
   ): Promise<EnrichedPlaceDetails | null> {
     try {
-      let titleToSearch = name;
+      // Priority search term: wikidataId (if available) or cleaned name
+      const searchTerm = wikidataId ? wikidataId.trim() : name.trim();
+      const encodedTitle = encodeURIComponent(searchTerm.replace(/\s+/g, '_'));
 
-      // If wikidataId is present, we can query Wikidata or search Wikipedia summary
-      const encodedTitle = encodeURIComponent(titleToSearch.trim().replace(/\s+/g, '_'));
       const response = await this.httpClient.get(`/${encodedTitle}`);
-
       const data = response.data;
+
       if (!data || data.type === 'https://mediawiki.org/wiki/HyperSwitch/errors/not_found') {
         return null;
       }
@@ -51,6 +52,7 @@ export class WikimediaProvider implements IEnrichmentProvider {
       return {
         photoUrls: photoUrls.length > 0 ? photoUrls : null,
         description,
+        sourceName: this.providerName,
       };
     } catch (error) {
       // Wikimedia returns 404 for non-existent page titles — expected and non-fatal

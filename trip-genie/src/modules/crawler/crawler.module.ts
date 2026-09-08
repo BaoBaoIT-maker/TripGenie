@@ -22,18 +22,22 @@ import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
       useClass: CrawlerRepository,
     },
 
-    // Data Providers — OSM, Foursquare, Wikimedia
+    // Individual Provider Classes
+    OsmProvider,
+    FoursquareProvider,
+    WikimediaProvider,
+
+    // Data Ingestion Provider Token
     {
       provide: INJECT_TOKENS.OSM_PROVIDER,
       useClass: OsmProvider,
     },
+
+    // Multi-Provider Enrichment Array Token (Plug & Play Chain of Responsibility)
     {
-      provide: INJECT_TOKENS.FOURSQUARE_PROVIDER,
-      useClass: FoursquareProvider,
-    },
-    {
-      provide: INJECT_TOKENS.WIKIMEDIA_PROVIDER,
-      useClass: WikimediaProvider,
+      provide: INJECT_TOKENS.ENRICHMENT_PROVIDERS,
+      useFactory: (fsq: FoursquareProvider, wiki: WikimediaProvider) => [wiki, fsq], // Order: Wiki landmark photos first, then Foursquare ratings
+      inject: [FoursquareProvider, WikimediaProvider],
     },
 
     // Ingestion Service — implements IIngestionService

@@ -1,3 +1,5 @@
+import { BudgetLevel } from '@prisma/client';
+
 export interface ICrawlerRepository {
   getAreaById(areaId: number): Promise<any | null>;
   getCategoryBySlug(slug: string): Promise<any | null>;
@@ -8,6 +10,7 @@ export interface ICrawlerRepository {
   getUnenrichedPlacesByArea(areaId: number, limit?: number): Promise<any[]>;
   updatePlace(id: string, data: UpdatePlaceInput): Promise<any>;
   createPlace(data: CreatePlaceInput): Promise<any>;
+  createPlaceImages(placeId: string, photoUrls: string[], sourceName?: string): Promise<number>;
   createPlaceSource(data: CreatePlaceSourceInput): Promise<any>;
   updatePlaceSource(id: string, data: UpdatePlaceSourceInput): Promise<any>;
   createCrawlJob(data: CreateCrawlJobInput): Promise<any>;
@@ -27,9 +30,9 @@ export interface UpdatePlaceInput {
   phone?: string | null;
   website?: string | null;
   openingHours?: any | null;
-  priceLevel?: number | null;
+  priceLevel?: BudgetLevel | null;
   ratingAvg?: number | null;
-  ratingCount?: number | null;
+  reviewCount?: number | null;
   tags?: string[];
   status?: string;
 }
@@ -54,8 +57,8 @@ export interface CreatePlaceSourceInput {
   placeId: string;
   provider: string;
   externalId: string;
-  externalUrl?: string | null; // maps to PlaceSource.externalUrl
-  rawData?: any;               // maps to PlaceSource.rawData
+  externalUrl?: string | null;
+  rawData?: any;
   lastSyncedAt: Date;
 }
 
@@ -82,13 +85,13 @@ export interface UpdateCrawlJobInput {
   duplicateCount?: number;
   errorCount?: number;
   checkpoint?: any;
-  lastError?: string | null; // maps to CrawlJob.lastError
+  lastError?: string | null;
   startedAt?: Date;
   completedAt?: Date;
 }
 
 export interface UpsertCoverageInput {
   placeCount: number;
-  status: string;           // maps to DataCoverage.status (CoverageStatus enum)
+  status: string;
   lastCrawledAt: Date;
 }

@@ -12,6 +12,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { CrawlJobService } from './services/crawl-job.service';
 import { TriggerRegionCrawlDto } from './dto/trigger-region-crawl.dto';
+import { TriggerEnrichmentDto } from './dto/trigger-enrichment.dto';
 import { TriggerCrawlResponseDto, CrawlJobStatusDto } from './dto/crawl-job-response.dto';
 
 import { PlaceEnrichmentService } from './services/place-enrichment.service';
@@ -49,7 +50,7 @@ export class CrawlerController {
   @Post('enrich')
   @HttpCode(HttpStatus.OK)
   async triggerEnrichment(
-    @Body() dto: { areaId: number; limit?: number },
+    @Body() dto: TriggerEnrichmentDto,
   ): Promise<{ message: string; processed: number; enriched: number }> {
     const result = await this.placeEnrichmentService.enrichPlacesByArea(dto.areaId, dto.limit || 50);
     return {

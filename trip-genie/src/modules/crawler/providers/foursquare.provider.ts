@@ -1,10 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosInstance } from 'axios';
 import { ConfigService } from '@nestjs/config';
+import { BudgetLevel } from '@prisma/client';
 import { IEnrichmentProvider, EnrichedPlaceDetails } from '../interfaces/enrichment-provider.interface';
 
 @Injectable()
 export class FoursquareProvider implements IEnrichmentProvider {
+  readonly providerName = 'foursquare';
   private readonly logger = new Logger(FoursquareProvider.name);
   private readonly apiKey: string;
   private readonly httpClient: AxiosInstance;
@@ -73,16 +75,34 @@ export class FoursquareProvider implements IEnrichmentProvider {
 
     // Convert Foursquare 0-10 rating to 0-5 scale
     const ratingAvg = typeof data.rating === 'number' ? Number((data.rating / 2).toFixed(1)) : null;
-    const ratingCount = typeof data.stats?.total_ratings === 'number' ? data.stats.total_ratings : null;
+    const reviewCount = typeof data.stats?.total_ratings === 'number' ? data.stats.total_ratings : null;
+    const budgetLevel = this.mapPriceToBudgetLevel(data.price);
 
     return {
       ratingAvg,
-      ratingCount,
-      priceLevel: typeof data.price === 'number' ? data.price : null,
+      reviewCount,
+      budgetLevel,
       openingHours: data.hours || null,
       phone: data.tel || null,
       website: data.website || null,
       photoUrls: photoUrls.length > 0 ? photoUrls : null,
+      sourceName: this.providerName,
     };
+  }
+
+  private mapPriceToBudgetLevel(price: any): BudgetLevel | null {
+    if (typeof price !== 'number') return null;
+    switch (price) {
+      case 1:
+        return BudgetLevel.LOW;
+      case 2:
+        return BudgetLevel.MEDIUM;
+      case 3:
+        return BudgetLevel.HIGH;
+      case 4:
+        return BudgetLevel.LUXURY;
+      default:
+        return null;
+    }
   }
 }

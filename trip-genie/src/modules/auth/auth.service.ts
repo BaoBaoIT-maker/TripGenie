@@ -148,11 +148,11 @@ export class AuthService {
   }
 
   /**
-   * Invalidates the current access token by adding it to the Redis blacklist.
-   * The token is revoked for the remainder of its natural TTL.
+   * Revokes the current session token by jti — no need to re-decode the raw token.
+   * jti and exp come directly from req.user (set by JwtStrategy.validate).
    */
-  async logout(accessToken: string): Promise<void> {
-    await this.tokenBlacklistService.revokeAccessToken(accessToken);
+  async logout(jti: string, exp: number, userId: string): Promise<void> {
+    await this.tokenBlacklistService.revokeByJti(jti, exp, userId);
   }
 
   async validateOAuthUser(oauthProfile: {

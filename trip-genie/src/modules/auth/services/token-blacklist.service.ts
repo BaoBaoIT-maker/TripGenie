@@ -33,7 +33,6 @@ export class TokenBlacklistService {
    */
   async revokeAccessToken(token: string): Promise<void> {
     try {
-      const secret = this.configService.get<string>('JWT_SECRET', '');
       const payload = this.jwtService.decode(token) as {
         jti?: string;
         exp?: number;
@@ -45,21 +44,37 @@ export class TokenBlacklistService {
         return;
       }
 
-      const nowSec = Math.floor(Date.now() / 1000);
-      const remainingTtl = payload.exp - nowSec;
-
-      if (remainingTtl <= 0) {
-        // Token already expired — no need to blacklist
-        return;
-      }
-
-      const key = `${this.BLACKLIST_PREFIX}${payload.jti}`;
-      await this.redisClient.set(key, payload.sub ?? '1', 'EX', remainingTtl);
-      this.logger.debug(`Token ${payload.jti} blacklisted for ${remainingTtl}s`);
+      await this.revokeByJti(payload.jti, payload.exp, payload.sub);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       this.logger.error(`Failed to blacklist token: ${message}`);
-      // Do NOT re-throw — logout should still succeed even if Redis is unavailable
+    }
+  }
+
+  /**
+   * Revokes a token by its jti + exp directly — preferred when jti is already available
+   * in req.user (e.g. from JwtStrategy.validate), avoiding a second token decode.
+   *
+   * @param jti  — JWT ID claim
+   * @param exp  — Token expiry as unix timestamp
+   * @param sub  — Optional subject (userId) stored as Redis value for traceability
+   */
+  async revokeByJti(jti: string, exp: number, sub?: string): Promise<void> {
+    try {
+      const nowSec = Math.floor(Date.now() / 1000);
+      const remainingTtl = exp - nowSec;
+
+      if (remainingTtl <= 0) {
+        return; // Already expired — nothing to revoke
+      }
+
+      const key = `${this.BLACKLIST_PREFIX}${jti}`;
+      await this.redisClient.set(key, sub ?? '1', 'EX', remainingTtl);
+      this.logger.debug(`Token jti=${jti} blacklisted for ${remainingTtl}s`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Failed to blacklist jti ${jti}: ${message}`);
+      // Non-fatal: logout should succeed even if Redis is temporarily unavailable
     }
   }
 

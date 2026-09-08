@@ -83,23 +83,17 @@ export class AuthController {
   }
 
   /**
-   * Logout: blacklist current access token in Redis, then clear cookies.
-   * Guarded by JwtAuthGuard so anonymous calls are rejected.
+   * Logout: Passport already validated the token → req.user contains jti + exp.
+   * We pass them directly to AuthService — no need to re-parse the Authorization header.
    */
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const token: string =
-      req.cookies?.accessToken ||
-      (req.headers.authorization?.startsWith('Bearer ')
-        ? req.headers.authorization.slice(7)
-        : '');
-
-    if (token) {
-      await this.authService.logout(token);
-    }
-
+  async logout(
+    @CurrentUser() user: { id: string; jti: string; exp: number },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    await this.authService.logout(user.jti, user.exp, user.id);
     this.clearAuthCookies(res);
     return { message: 'Đăng xuất thành công' };
   }

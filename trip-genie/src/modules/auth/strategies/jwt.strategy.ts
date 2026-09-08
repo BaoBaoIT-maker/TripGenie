@@ -33,7 +33,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
    * Called by Passport after the JWT signature is verified and not expired.
    * We additionally check the Redis blacklist to handle logged-out tokens.
    */
-  async validate(payload: JwtPayload & { jti?: string }) {
+  async validate(payload: JwtPayload) {
     // 1. Check blacklist (revoked on logout)
     if (payload.jti) {
       const revoked = await this.tokenBlacklistService.isBlacklisted(payload.jti);
@@ -48,10 +48,13 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Tài khoản không tồn tại hoặc đã bị khóa');
     }
 
+    // Return jti + exp so logout can revoke without re-decoding the token
     return {
       id: user.id,
       email: user.email,
       role: user.role,
+      jti: payload.jti ?? '',
+      exp: payload.exp ?? 0,
     };
   }
 }

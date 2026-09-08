@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { INJECT_TOKENS } from '../../../common/constants/inject-tokens';
 import { ICrawlerRepository } from '../interfaces/crawler-repository.interface';
 import { NormalizedPlace } from '../interfaces/provider.interface';
@@ -6,51 +7,61 @@ import { NormalizedPlace } from '../interfaces/provider.interface';
 @Injectable()
 export class DeduplicationService {
   private readonly logger = new Logger(DeduplicationService.name);
-  private readonly RADIUS_METERS = 50; // Threshold for spatial deduplication
+  private readonly radiusMeters: number;
 
   constructor(
     @Inject(INJECT_TOKENS.CRAWLER_REPOSITORY)
     private readonly crawlerRepo: ICrawlerRepository,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    // Configurable via env: DEDUP_RADIUS_METERS (default 50m)
+    this.radiusMeters = this.configService.get<number>('DEDUP_RADIUS_METERS', 50);
+  }
 
   /**
    * Checks if a crawled place already exists in our database.
-   * Logic:
-   * 1. Check if exactly same provider + externalId exists in place_sources (100% match)
-   * 2. Spatial + Lexical check: Find places within 50m, check if normalized names match closely.
+   *
+   * Strategy (2-step):
+   *  1. Exact provider+externalId match in place_sources — O(1) lookup
+   *  2. Spatial proximity (within radiusMeters) + normalized name substring match
+   *
+   * @returns existing placeId if duplicate found, null otherwise
    */
   async findDuplicate(place: NormalizedPlace): Promise<string | null> {
-    // 1. Exact Source Match
+    // Step 1: Exact source match
     const existingSource = await this.crawlerRepo.findPlaceSourceByExternal(
       place.provider,
       place.externalId,
     );
     if (existingSource) {
-      return existingSource.placeId; // Already exists
+      return existingSource.placeId as string;
     }
 
-    // 2. Spatial + Lexical Match
+    // Step 2: Spatial + lexical match
     const nearbyPlaces = await this.crawlerRepo.findNearbyPlaces(
       place.latitude,
       place.longitude,
-      this.RADIUS_METERS,
+      this.radiusMeters,
     );
 
     for (const nearby of nearbyPlaces) {
-      if (this.isNameMatch(place.nameNormalized, nearby.name_normalized)) {
-        this.logger.debug(`Found duplicate via spatial+lexical: ${place.name} == ${nearby.name}`);
-        return nearby.id;
+      if (this.isSimilarName(place.nameNormalized, nearby.name_normalized as string)) {
+        this.logger.debug(
+          `Duplicate detected via spatial+lexical: "${place.name}" ≈ "${nearby.name}"`,
+        );
+        return nearby.id as string;
       }
     }
 
-    return null; // Is a brand new place
+    return null;
   }
 
-  private isNameMatch(name1: string, name2: string): boolean {
-    if (!name1 || !name2) return false;
-    
-    // Very simple fuzzy match for now: substring or exact
-    // Ideally use pg_trgm similarity > 0.6 in DB query directly
-    return name1 === name2 || name1.includes(name2) || name2.includes(name1);
+  /**
+   * Simple similarity check: exact match or one contains the other.
+   * Future improvement: replace with Jaccard coefficient or delegate to pg_trgm similarity().
+   */
+  private isSimilarName(a: string, b: string): boolean {
+    if (!a || !b) return false;
+    return a === b || a.includes(b) || b.includes(a);
   }
 }

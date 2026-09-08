@@ -10,17 +10,30 @@ import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
 @Module({
   controllers: [CrawlerController],
   providers: [
-    CrawlJobService,
-    OsmIngestionService,
+    // Deduplication — used internally by OsmIngestionService
     DeduplicationService,
-    {
-      provide: INJECT_TOKENS.OSM_PROVIDER,
-      useClass: OsmProvider,
-    },
+
+    // Repository — bound to ICrawlerRepository via token
     {
       provide: INJECT_TOKENS.CRAWLER_REPOSITORY,
       useClass: CrawlerRepository,
     },
+
+    // Data Provider — OSM Overpass API
+    {
+      provide: INJECT_TOKENS.OSM_PROVIDER,
+      useClass: OsmProvider,
+    },
+
+    // Ingestion Service — implements IIngestionService
+    // Swap useClass here to change provider without touching CrawlJobService (OCP)
+    {
+      provide: INJECT_TOKENS.OSM_INGESTION_SERVICE,
+      useClass: OsmIngestionService,
+    },
+
+    // Orchestration service — depends on IIngestionService (DIP)
+    CrawlJobService,
   ],
   exports: [CrawlJobService],
 })

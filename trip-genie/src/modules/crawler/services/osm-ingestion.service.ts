@@ -2,10 +2,12 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { INJECT_TOKENS } from '../../../common/constants/inject-tokens';
 import { ICrawlerRepository } from '../interfaces/crawler-repository.interface';
 import { ICrawlerProvider } from '../interfaces/provider.interface';
+import { IIngestionService } from '../interfaces/ingestion.interface';
 import { DeduplicationService } from './deduplication.service';
+import { CrawlJobStatus, CrawlProviderName, DataCoverageStatus, PlaceStatus } from '../../../common/enums/crawler.enum';
 
 @Injectable()
-export class OsmIngestionService {
+export class OsmIngestionService implements IIngestionService {
   private readonly logger = new Logger(OsmIngestionService.name);
 
   constructor(
@@ -26,11 +28,11 @@ export class OsmIngestionService {
     const area = await this.crawlerRepo.getAreaById(areaId);
     if (!area || !area.bboxMinLat) {
       this.logger.error(`Area ${areaId} invalid or missing bbox`);
-      await this.crawlerRepo.updateCrawlJob(jobId, { status: 'FAILED' });
+      await this.crawlerRepo.updateCrawlJob(jobId, { status: CrawlJobStatus.FAILED });
       return;
     }
 
-    await this.crawlerRepo.updateCrawlJob(jobId, { status: 'RUNNING' });
+    await this.crawlerRepo.updateCrawlJob(jobId, { status: CrawlJobStatus.RUNNING });
 
     try {
       const places = await this.provider.fetchByBbox(
@@ -44,6 +46,7 @@ export class OsmIngestionService {
 
       let insertedCount = 0;
       let duplicateCount = 0;
+      let errorCount = 0;
       let processedItems = 0;
 
       await this.crawlerRepo.updateCrawlJob(jobId, { totalItems: places.length });
@@ -56,7 +59,6 @@ export class OsmIngestionService {
           if (!catId) continue;
 
           const existingPlaceId = await this.deduplicationService.findDuplicate(place);
-
           let finalPlaceId: string | null = existingPlaceId;
 
           if (!existingPlaceId) {
@@ -66,13 +68,13 @@ export class OsmIngestionService {
               description: place.description,
               latitude: place.latitude,
               longitude: place.longitude,
-              address: place.address,
+              address: place.address ?? '',
               categoryId: catId,
               areaId: area.id,
               tags: place.tags,
-              status: 'ACTIVE',
+              status: PlaceStatus.ACTIVE,
             });
-            finalPlaceId = newPlace.id;
+            finalPlaceId = newPlace.id as string;
             insertedCount++;
           } else {
             duplicateCount++;
@@ -94,43 +96,54 @@ export class OsmIngestionService {
               lastSyncedAt: new Date(),
             });
           } else {
-            await this.crawlerRepo.updatePlaceSource(existingSource.id, {
+            await this.crawlerRepo.updatePlaceSource(existingSource.id as string, {
               rawData: place.sourceData,
               lastSyncedAt: new Date(),
             });
           }
 
+          // Flush progress to DB every 50 items to reduce write amplification
           if (processedItems % 50 === 0) {
             await this.crawlerRepo.updateCrawlJob(jobId, {
               processedItems,
               insertedCount,
               duplicateCount,
+              errorCount,
             });
           }
         } catch (err) {
-          this.logger.error(`Error processing item ${place.externalId}: ${err.message}`);
+          errorCount++;
+          const message = err instanceof Error ? err.message : String(err);
+          this.logger.error(`Error processing OSM node ${place.externalId}: ${message}`);
         }
       }
 
       await this.crawlerRepo.updateCrawlJob(jobId, {
-        status: 'COMPLETED',
+        status: CrawlJobStatus.COMPLETED,
         processedItems,
         insertedCount,
         duplicateCount,
+        errorCount,
         completedAt: new Date(),
       });
 
+      // Update data_coverage cache for this area
       const activeCount = await this.crawlerRepo.countActivePlacesByArea(area.id);
       await this.crawlerRepo.upsertDataCoverage(area.id, {
         placeCount: activeCount,
-        status: 'PARTIAL',
+        status: DataCoverageStatus.PARTIAL,
         lastCrawledAt: new Date(),
       });
+
+      this.logger.log(
+        `Job ${jobId} completed: inserted=${insertedCount}, dupes=${duplicateCount}, errors=${errorCount}`,
+      );
     } catch (error) {
-      this.logger.error(`Job ${jobId} failed: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Job ${jobId} failed: ${message}`);
       await this.crawlerRepo.updateCrawlJob(jobId, {
-        status: 'FAILED',
-        lastError: error.message,
+        status: CrawlJobStatus.FAILED,
+        lastError: message,
         completedAt: new Date(),
       });
     }

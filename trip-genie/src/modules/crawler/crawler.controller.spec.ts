@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
 import { CrawlerController } from './crawler.controller';
 import { CrawlJobService } from './services/crawl-job.service';
 
@@ -14,39 +15,39 @@ describe('CrawlerController', () => {
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CrawlerController],
-      providers: [
-        {
-          provide: CrawlJobService,
-          useValue: crawlJobService,
-        },
-      ],
+      providers: [{ provide: CrawlJobService, useValue: crawlJobService }],
     }).compile();
 
     controller = module.get<CrawlerController>(CrawlerController);
   });
 
-  it('should be defined', () => {
-    expect(controller).toBeDefined();
-  });
+  it('should be defined', () => expect(controller).toBeDefined());
 
   describe('POST /crawler/trigger', () => {
-    it('should trigger a crawl job and return job info', async () => {
-      const mockResult = { message: 'Crawl job started', jobId: 'job-1', area: 'Da Nang' };
+    it('should return TriggerCrawlResponseDto on success', async () => {
+      const mockResult = { message: 'Crawl job started successfully', jobId: 'job-1', area: 'Da Nang' };
       crawlJobService.triggerRegionCrawl.mockResolvedValue(mockResult);
 
-      const dto = { areaId: 1 };
-      const req = { user: { id: 'user-1' } };
-
-      const result = await controller.triggerCrawl(dto, req);
+      const result = await controller.triggerCrawl(
+        { areaId: 1 },
+        { user: { id: 'user-1', role: 'ADMIN' } },
+      );
 
       expect(result).toEqual(mockResult);
-      expect(crawlJobService.triggerRegionCrawl).toHaveBeenCalledWith(dto, 'user-1');
+      expect(crawlJobService.triggerRegionCrawl).toHaveBeenCalledWith({ areaId: 1 }, 'user-1');
+    });
+
+    it('should propagate NotFoundException when area not found', async () => {
+      crawlJobService.triggerRegionCrawl.mockRejectedValue(new NotFoundException('Area not found'));
+      await expect(
+        controller.triggerCrawl({ areaId: 999 }, { user: { id: 'user-1', role: 'ADMIN' } }),
+      ).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('GET /crawler/jobs/:id', () => {
-    it('should return job status', async () => {
-      const mockJob = { id: 'job-1', status: 'COMPLETED', processedItems: 100 };
+    it('should return CrawlJobStatusDto on success', async () => {
+      const mockJob = { id: 'job-1', status: 'COMPLETED', processedItems: 100, insertedCount: 80 };
       crawlJobService.getJobStatus.mockResolvedValue(mockJob);
 
       const result = await controller.getJobStatus('job-1');
@@ -55,10 +56,9 @@ describe('CrawlerController', () => {
       expect(crawlJobService.getJobStatus).toHaveBeenCalledWith('job-1');
     });
 
-    it('should throw error if job not found', async () => {
-      crawlJobService.getJobStatus.mockRejectedValue(new Error('Job not found'));
-
-      await expect(controller.getJobStatus('invalid-id')).rejects.toThrow('Job not found');
+    it('should propagate NotFoundException when job not found', async () => {
+      crawlJobService.getJobStatus.mockRejectedValue(new NotFoundException('Job not found'));
+      await expect(controller.getJobStatus('invalid-id')).rejects.toThrow(NotFoundException);
     });
   });
 });

@@ -1,101 +1,132 @@
 import { Injectable, Logger } from '@nestjs/common';
-import axios from 'axios';
-import { ICrawlerProvider, NormalizedPlace, OsmNode } from '../interfaces/provider.interface';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const unorm = require('unorm') as typeof import('unorm');
+import axios, { AxiosInstance } from 'axios';
+import { ConfigService } from '@nestjs/config';
+import { ICrawlerProvider, NormalizedPlace } from '../interfaces/provider.interface';
+import { OsmCategorySlug, CrawlProviderName } from '../../../common/enums/crawler.enum';
+import { normalizeVietnamese } from '../../../common/utils/string.util';
+
+/** Maps OSM amenity/tourism/historic tags to internal category slugs */
+const OSM_TAG_TO_CATEGORY: Record<string, OsmCategorySlug> = {
+  'amenity:restaurant': OsmCategorySlug.RESTAURANT,
+  'amenity:cafe': OsmCategorySlug.CAFE,
+  'amenity:bar': OsmCategorySlug.BAR_PUB,
+  'amenity:pub': OsmCategorySlug.BAR_PUB,
+  'tourism:hotel': OsmCategorySlug.HOTEL,
+  'tourism:hostel': OsmCategorySlug.HOTEL,
+  'tourism:museum': OsmCategorySlug.ATTRACTION,
+  'tourism:attraction': OsmCategorySlug.ATTRACTION,
+  'tourism:viewpoint': OsmCategorySlug.ATTRACTION,
+};
 
 @Injectable()
 export class OsmProvider implements ICrawlerProvider {
   private readonly logger = new Logger(OsmProvider.name);
-  private readonly overpassUrl = 'https://overpass-api.de/api/interpreter';
+  private readonly overpassUrl: string;
+  private readonly httpClient: AxiosInstance;
+
+  constructor(private readonly configService: ConfigService) {
+    this.overpassUrl = this.configService.get<string>(
+      'OVERPASS_API_URL',
+      'https://overpass-api.de/api/interpreter',
+    );
+    this.httpClient = axios.create({
+      timeout: 30_000, // 30 seconds — Overpass can be slow
+    });
+  }
 
   async fetchByBbox(
     minLat: number,
     maxLat: number,
     minLng: number,
     maxLng: number,
-    categories: string[] = [],
   ): Promise<NormalizedPlace[]> {
     this.logger.log(`Fetching OSM data for bbox [${minLat}, ${minLng}, ${maxLat}, ${maxLng}]`);
-    
-    // Build query. Simplified for now to fetch basic tourist amenities
-    // Normally we map internal categories to OSM tags.
-    const query = `
-      [out:json][timeout:25];
-      (
-        node["amenity"~"restaurant|cafe|bar|pub"](${minLat},${minLng},${maxLat},${maxLng});
-        node["tourism"~"hotel|museum|attraction|viewpoint"](${minLat},${minLng},${maxLat},${maxLng});
-        node["historic"](${minLat},${minLng},${maxLat},${maxLng});
-      );
-      out body;
-    `;
+
+    const query = this.buildOverpassQuery(minLat, maxLat, minLng, maxLng);
 
     try {
-      const response = await axios.post(this.overpassUrl, query, {
+      const response = await this.httpClient.post(this.overpassUrl, query, {
         headers: { 'Content-Type': 'text/plain' },
       });
 
-      const elements = response.data.elements || [];
+      const elements: any[] = response.data.elements || [];
       this.logger.log(`Received ${elements.length} raw elements from OSM`);
 
-      const results: NormalizedPlace[] = [];
-      for (const el of elements) {
-        if (!el.tags || !el.tags.name) continue; // Skip nameless places
-
-        const categorySlug = this.mapOsmTagsToCategory(el.tags);
-        if (!categorySlug) continue;
-
-        results.push({
-          externalId: el.id.toString(),
-          provider: 'osm',
-          name: el.tags.name,
-          nameNormalized: this.normalizeString(el.tags.name),
-          latitude: el.lat,
-          longitude: el.lon,
-          address: this.formatAddress(el.tags),
-          description: el.tags.description || null,
-          categorySlug,
-          tags: this.extractTags(el.tags),
-          sourceData: el,
-        });
-      }
-
-      return results;
+      return elements
+        .filter((el) => el.tags?.name) // Skip nameless places
+        .map((el) => this.toNormalizedPlace(el))
+        .filter((place): place is NormalizedPlace => place !== null);
     } catch (error) {
-      this.logger.error(`Error fetching from Overpass API: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Error fetching from Overpass API: ${message}`);
       throw error;
     }
   }
 
-  private mapOsmTagsToCategory(tags: Record<string, string>): string | null {
-    if (tags.amenity === 'restaurant') return 'nha-hang';
-    if (tags.amenity === 'cafe') return 'ca-phe';
-    if (tags.amenity === 'bar' || tags.amenity === 'pub') return 'bar-pub';
-    if (tags.tourism === 'hotel' || tags.tourism === 'hostel') return 'khach-san';
-    if (tags.tourism === 'museum' || tags.tourism === 'attraction') return 'diem-tham-quan';
-    if (tags.historic) return 'di-tich';
-    return null; // Ignore others
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
+
+  private buildOverpassQuery(
+    minLat: number,
+    maxLat: number,
+    minLng: number,
+    maxLng: number,
+  ): string {
+    const bbox = `${minLat},${minLng},${maxLat},${maxLng}`;
+    return `
+      [out:json][timeout:25];
+      (
+        node["amenity"~"restaurant|cafe|bar|pub"](${bbox});
+        node["tourism"~"hotel|hostel|museum|attraction|viewpoint"](${bbox});
+        node["historic"](${bbox});
+      );
+      out body;
+    `;
   }
 
-  private normalizeString(str: string): string {
-    return unorm
-      .nfd(str)
-      .replace(/[\u0300-\u036f]/g, '')
-      .toLowerCase()
-      .trim();
+  private toNormalizedPlace(el: any): NormalizedPlace | null {
+    const categorySlug = this.mapOsmTagsToCategory(el.tags);
+    if (!categorySlug) return null;
+
+    return {
+      externalId: String(el.id),
+      provider: CrawlProviderName.OSM,
+      name: el.tags.name as string,
+      nameNormalized: normalizeVietnamese(el.tags.name as string),
+      latitude: el.lat as number,
+      longitude: el.lon as number,
+      address: this.formatAddress(el.tags),
+      description: (el.tags.description as string) || null,
+      categorySlug,
+      tags: this.extractTags(el.tags),
+      sourceData: el,
+    };
+  }
+
+  private mapOsmTagsToCategory(tags: Record<string, string>): OsmCategorySlug | null {
+    if (tags.amenity) {
+      const mapped = OSM_TAG_TO_CATEGORY[`amenity:${tags.amenity}`];
+      if (mapped) return mapped;
+    }
+    if (tags.tourism) {
+      const mapped = OSM_TAG_TO_CATEGORY[`tourism:${tags.tourism}`];
+      if (mapped) return mapped;
+    }
+    if (tags.historic) return OsmCategorySlug.HISTORICAL;
+    return null;
   }
 
   private formatAddress(tags: Record<string, string>): string | null {
-    const parts = [];
+    const parts: string[] = [];
     if (tags['addr:housenumber']) parts.push(tags['addr:housenumber']);
     if (tags['addr:street']) parts.push(tags['addr:street']);
     if (tags['addr:city']) parts.push(tags['addr:city']);
-    
     return parts.length > 0 ? parts.join(', ') : null;
   }
 
   private extractTags(osmTags: Record<string, string>): string[] {
-    const tags = [];
+    const tags: string[] = [];
     if (osmTags.cuisine) {
       tags.push(...osmTags.cuisine.split(';').map((t) => t.trim().toLowerCase()));
     }

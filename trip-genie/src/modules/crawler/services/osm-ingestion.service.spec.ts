@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { OsmIngestionService } from './osm-ingestion.service';
 import { DeduplicationService } from './deduplication.service';
 import { INJECT_TOKENS } from '../../../common/constants/inject-tokens';
+import { CrawlJobStatus, DataCoverageStatus, PlaceStatus } from '../../../common/enums/crawler.enum';
 
 describe('OsmIngestionService', () => {
   let service: OsmIngestionService;
@@ -18,12 +19,9 @@ describe('OsmIngestionService', () => {
     bboxMaxLng: 108.36,
   };
 
-  const mockJob = {
-    id: 'job-1',
-    status: 'PENDING',
-  };
+  const mockJob = { id: 'job-1', status: CrawlJobStatus.PENDING };
 
-  const mockNormalizedPlace = {
+  const mockPlace = {
     externalId: 'osm-1',
     provider: 'osm',
     name: 'Test Restaurant',
@@ -51,58 +49,37 @@ describe('OsmIngestionService', () => {
       upsertDataCoverage: jest.fn().mockResolvedValue({}),
     };
 
-    osmProvider = {
-      fetchByBbox: jest.fn().mockResolvedValue([mockNormalizedPlace]),
-    };
-
-    deduplicationService = {
-      findDuplicate: jest.fn().mockResolvedValue(null), // No duplicate
-    };
+    osmProvider = { fetchByBbox: jest.fn().mockResolvedValue([mockPlace]) };
+    deduplicationService = { findDuplicate: jest.fn().mockResolvedValue(null) };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OsmIngestionService,
-        {
-          provide: INJECT_TOKENS.OSM_PROVIDER,
-          useValue: osmProvider,
-        },
-        {
-          provide: INJECT_TOKENS.CRAWLER_REPOSITORY,
-          useValue: crawlerRepo,
-        },
-        {
-          provide: DeduplicationService,
-          useValue: deduplicationService,
-        },
+        { provide: INJECT_TOKENS.OSM_PROVIDER, useValue: osmProvider },
+        { provide: INJECT_TOKENS.CRAWLER_REPOSITORY, useValue: crawlerRepo },
+        { provide: DeduplicationService, useValue: deduplicationService },
       ],
     }).compile();
 
     service = module.get<OsmIngestionService>(OsmIngestionService);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
+  it('should be defined', () => expect(service).toBeDefined());
 
-  it('should mark job as FAILED if job not found', async () => {
+  it('should return early if job not found', async () => {
     crawlerRepo.getCrawlJobById.mockResolvedValue(null);
-
     await service.processArea('job-99', 1);
-
     expect(crawlerRepo.updateCrawlJob).not.toHaveBeenCalled();
   });
 
-  it('should mark job as FAILED if area has no bbox', async () => {
-    crawlerRepo.getAreaById.mockResolvedValue({ id: 1, name: 'NoBox', bboxMinLat: null });
-
+  it('should mark FAILED if area has no bbox', async () => {
+    crawlerRepo.getAreaById.mockResolvedValue({ id: 1, name: 'X', bboxMinLat: null });
     await service.processArea('job-1', 1);
-
-    expect(crawlerRepo.updateCrawlJob).toHaveBeenCalledWith('job-1', { status: 'FAILED' });
+    expect(crawlerRepo.updateCrawlJob).toHaveBeenCalledWith('job-1', { status: CrawlJobStatus.FAILED });
   });
 
-  it('should INSERT new place when no duplicate found', async () => {
+  it('should INSERT new place and source when no duplicate found', async () => {
     deduplicationService.findDuplicate.mockResolvedValue(null);
-    // findPlaceSourceByExternal returns null so createPlaceSource is called
     crawlerRepo.findPlaceSourceByExternal.mockResolvedValue(null);
 
     await service.processArea('job-1', 1);
@@ -113,19 +90,18 @@ describe('OsmIngestionService', () => {
         nameNormalized: 'test restaurant',
         categoryId: 1,
         areaId: 1,
-        status: 'ACTIVE',
+        status: PlaceStatus.ACTIVE,
       }),
     );
     expect(crawlerRepo.createPlaceSource).toHaveBeenCalled();
     expect(crawlerRepo.updateCrawlJob).toHaveBeenCalledWith(
       'job-1',
-      expect.objectContaining({ status: 'COMPLETED', insertedCount: 1, duplicateCount: 0 }),
+      expect.objectContaining({ status: CrawlJobStatus.COMPLETED, insertedCount: 1, duplicateCount: 0 }),
     );
   });
 
-  it('should skip INSERT when duplicate found', async () => {
+  it('should skip INSERT and count duplicate when duplicate found', async () => {
     deduplicationService.findDuplicate.mockResolvedValue('existing-place-id');
-    // Even for duplicate, we still check+create source so mock returns null here
     crawlerRepo.findPlaceSourceByExternal.mockResolvedValue(null);
 
     await service.processArea('job-1', 1);
@@ -133,27 +109,35 @@ describe('OsmIngestionService', () => {
     expect(crawlerRepo.createPlace).not.toHaveBeenCalled();
     expect(crawlerRepo.updateCrawlJob).toHaveBeenCalledWith(
       'job-1',
-      expect.objectContaining({ status: 'COMPLETED', insertedCount: 0, duplicateCount: 1 }),
+      expect.objectContaining({ status: CrawlJobStatus.COMPLETED, insertedCount: 0, duplicateCount: 1 }),
     );
   });
 
-  it('should update data_coverage after processing', async () => {
-    await service.processArea('job-1', 1);
-
-    expect(crawlerRepo.upsertDataCoverage).toHaveBeenCalledWith(
-      1,
-      expect.objectContaining({ status: 'PARTIAL' }),
-    );
-  });
-
-  it('should mark job FAILED on provider error', async () => {
-    osmProvider.fetchByBbox.mockRejectedValue(new Error('Overpass timeout'));
+  it('should increment errorCount when a single item fails', async () => {
+    deduplicationService.findDuplicate.mockRejectedValue(new Error('DB timeout'));
 
     await service.processArea('job-1', 1);
 
     expect(crawlerRepo.updateCrawlJob).toHaveBeenCalledWith(
       'job-1',
-      expect.objectContaining({ status: 'FAILED' }),
+      expect.objectContaining({ status: CrawlJobStatus.COMPLETED, errorCount: 1 }),
+    );
+  });
+
+  it('should update data_coverage with PARTIAL status', async () => {
+    await service.processArea('job-1', 1);
+    expect(crawlerRepo.upsertDataCoverage).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({ status: DataCoverageStatus.PARTIAL }),
+    );
+  });
+
+  it('should mark FAILED and record lastError on provider error', async () => {
+    osmProvider.fetchByBbox.mockRejectedValue(new Error('Overpass timeout'));
+    await service.processArea('job-1', 1);
+    expect(crawlerRepo.updateCrawlJob).toHaveBeenCalledWith(
+      'job-1',
+      expect.objectContaining({ status: CrawlJobStatus.FAILED, lastError: 'Overpass timeout' }),
     );
   });
 });

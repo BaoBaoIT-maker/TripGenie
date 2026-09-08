@@ -1,8 +1,10 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { INJECT_TOKENS } from '../../../common/constants/inject-tokens';
 import { ICrawlerRepository } from '../interfaces/crawler-repository.interface';
-import { OsmIngestionService } from './osm-ingestion.service';
+import { IIngestionService } from '../interfaces/ingestion.interface';
 import { TriggerRegionCrawlDto } from '../dto/trigger-region-crawl.dto';
+import { CrawlJobStatusDto, TriggerCrawlResponseDto } from '../dto/crawl-job-response.dto';
+import { CrawlJobStatus, CrawlJobType, CrawlProviderName } from '../../../common/enums/crawler.enum';
 
 @Injectable()
 export class CrawlJobService {
@@ -11,43 +13,53 @@ export class CrawlJobService {
   constructor(
     @Inject(INJECT_TOKENS.CRAWLER_REPOSITORY)
     private readonly crawlerRepo: ICrawlerRepository,
-    private readonly osmIngestionService: OsmIngestionService,
+    /**
+     * Injected via OSM_INGESTION_SERVICE token.
+     * CrawlJobService depends on IIngestionService abstraction (DIP).
+     * Swapping to PasGoIngestionService requires zero changes here (OCP).
+     */
+    @Inject(INJECT_TOKENS.OSM_INGESTION_SERVICE)
+    private readonly ingestionService: IIngestionService,
   ) {}
 
-  async triggerRegionCrawl(dto: TriggerRegionCrawlDto, userId: string): Promise<any> {
+  async triggerRegionCrawl(
+    dto: TriggerRegionCrawlDto,
+    userId: string,
+  ): Promise<TriggerCrawlResponseDto> {
     const area = await this.crawlerRepo.getAreaById(dto.areaId);
     if (!area) {
-      throw new Error(`Area ${dto.areaId} not found`);
+      throw new NotFoundException(`Area with id ${dto.areaId} not found`);
     }
 
-    // Create Job Record
     const job = await this.crawlerRepo.createCrawlJob({
       areaId: dto.areaId,
-      jobType: 'REGION_CRAWL',
-      provider: 'osm',
-      status: 'PENDING',
+      jobType: CrawlJobType.REGION_CRAWL,
+      provider: CrawlProviderName.OSM,
+      status: CrawlJobStatus.PENDING,
       createdBy: userId,
     });
 
-    this.logger.log(`Created Job ${job.id} for Area ${area.name}`);
+    this.logger.log(`Created crawl job ${job.id} for area "${area.name}"`);
 
-    // Fire and forget (in a real app, this goes to BullMQ)
-    this.osmIngestionService.processArea(job.id, area.id).catch((err) => {
-      this.logger.error(`Background job error: ${err.message}`);
+    // Fire-and-forget: hand off to ingestion pipeline.
+    // In production this will be replaced by a BullMQ enqueue call.
+    this.ingestionService.processArea(job.id as string, area.id as number).catch((err) => {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.error(`Background job ${job.id} threw: ${message}`);
     });
 
     return {
-      message: 'Crawl job started',
-      jobId: job.id,
-      area: area.name,
+      message: 'Crawl job started successfully',
+      jobId: job.id as string,
+      area: area.name as string,
     };
   }
 
-  async getJobStatus(jobId: string): Promise<any> {
+  async getJobStatus(jobId: string): Promise<CrawlJobStatusDto> {
     const job = await this.crawlerRepo.getCrawlJobById(jobId);
     if (!job) {
-      throw new Error('Job not found');
+      throw new NotFoundException(`Crawl job "${jobId}" not found`);
     }
-    return job;
+    return job as CrawlJobStatusDto;
   }
 }

@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { MailService } from './services/mail.service';
+import { TokenBlacklistService } from './services/token-blacklist.service';
 import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
 
 describe('AuthService', () => {
@@ -12,6 +13,8 @@ describe('AuthService', () => {
   let mockJwtService: any;
   let mockConfigService: any;
   let mockMailService: any;
+  let mockRedisClient: any;
+  let mockTokenBlacklistService: any;
 
   beforeEach(async () => {
     mockUsersRepository = {
@@ -40,23 +43,30 @@ describe('AuthService', () => {
       sendOtpEmail: jest.fn().mockResolvedValue(true),
     };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AuthService,
-        { provide: INJECT_TOKENS.USER_REPOSITORY, useValue: mockUsersRepository },
-        { provide: JwtService, useValue: mockJwtService },
-        { provide: ConfigService, useValue: mockConfigService },
-        { provide: MailService, useValue: mockMailService },
-      ],
-    }).compile();
-
-    authService = module.get<AuthService>(AuthService);
-    // Mock internal redisClient methods
-    (authService as any).redisClient = {
+    mockRedisClient = {
       set: jest.fn().mockResolvedValue('OK'),
       get: jest.fn().mockResolvedValue('123456'),
       del: jest.fn().mockResolvedValue(1),
     };
+
+    mockTokenBlacklistService = {
+      revokeAccessToken: jest.fn().mockResolvedValue(undefined),
+      isBlacklisted: jest.fn().mockResolvedValue(false),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AuthService,
+        { provide: INJECT_TOKENS.USER_REPOSITORY, useValue: mockUsersRepository },
+        { provide: 'REDIS_CLIENT', useValue: mockRedisClient },
+        { provide: JwtService, useValue: mockJwtService },
+        { provide: ConfigService, useValue: mockConfigService },
+        { provide: MailService, useValue: mockMailService },
+        { provide: TokenBlacklistService, useValue: mockTokenBlacklistService },
+      ],
+    }).compile();
+
+    authService = module.get<AuthService>(AuthService);
   });
 
   describe('register', () => {

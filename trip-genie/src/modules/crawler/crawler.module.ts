@@ -3,15 +3,18 @@ import { CrawlerController } from './crawler.controller';
 import { CrawlJobService } from './services/crawl-job.service';
 import { OsmIngestionService } from './services/osm-ingestion.service';
 import { DeduplicationService } from './services/deduplication.service';
+import { PlaceEnrichmentService } from './services/place-enrichment.service';
 import { OsmProvider } from './providers/osm.provider';
+import { FoursquareProvider } from './providers/foursquare.provider';
+import { WikimediaProvider } from './providers/wikimedia.provider';
 import { CrawlerRepository } from './crawler.repository';
 import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
 
 @Module({
   controllers: [CrawlerController],
   providers: [
-    // Deduplication — used internally by OsmIngestionService
     DeduplicationService,
+    PlaceEnrichmentService,
 
     // Repository — bound to ICrawlerRepository via token
     {
@@ -19,22 +22,28 @@ import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
       useClass: CrawlerRepository,
     },
 
-    // Data Provider — OSM Overpass API
+    // Data Providers — OSM, Foursquare, Wikimedia
     {
       provide: INJECT_TOKENS.OSM_PROVIDER,
       useClass: OsmProvider,
     },
+    {
+      provide: INJECT_TOKENS.FOURSQUARE_PROVIDER,
+      useClass: FoursquareProvider,
+    },
+    {
+      provide: INJECT_TOKENS.WIKIMEDIA_PROVIDER,
+      useClass: WikimediaProvider,
+    },
 
     // Ingestion Service — implements IIngestionService
-    // Swap useClass here to change provider without touching CrawlJobService (OCP)
     {
       provide: INJECT_TOKENS.OSM_INGESTION_SERVICE,
       useClass: OsmIngestionService,
     },
 
-    // Orchestration service — depends on IIngestionService (DIP)
     CrawlJobService,
   ],
-  exports: [CrawlJobService],
+  exports: [CrawlJobService, PlaceEnrichmentService],
 })
 export class CrawlerModule {}

@@ -61,12 +61,54 @@ export class CrawlerRepository implements ICrawlerRepository {
     `;
   }
 
+  async getPlaceById(id: string): Promise<any | null> {
+    return this.prisma.place.findUnique({
+      where: { id },
+    });
+  }
+
+  async getUnenrichedPlacesByArea(areaId: number, limit: number = 50): Promise<any[]> {
+    return this.prisma.place.findMany({
+      where: {
+        areaId,
+        status: PlaceStatus.ACTIVE,
+        deletedAt: null,
+        OR: [
+          { ratingAvg: null as any },
+          { priceLevel: null as any },
+          { openingHours: null as any },
+        ],
+      },
+      take: limit,
+    });
+  }
+
+  async updatePlace(id: string, data: any): Promise<any> {
+    return this.prisma.place.update({
+      where: { id },
+      data: {
+        ...(data.name && { name: data.name }),
+        ...(data.nameNormalized && { nameNormalized: data.nameNormalized }),
+        ...(data.description !== undefined && { description: data.description }),
+        ...(data.address !== undefined && { address: data.address }),
+        ...(data.phone !== undefined && { phone: data.phone }),
+        ...(data.website !== undefined && { website: data.website }),
+        ...(data.openingHours !== undefined && { openingHours: data.openingHours }),
+        ...(data.priceLevel !== undefined && { priceLevel: data.priceLevel }),
+        ...(data.ratingAvg !== undefined && { ratingAvg: data.ratingAvg }),
+        ...(data.ratingCount !== undefined && { ratingCount: data.ratingCount }),
+        ...(data.tags && { tags: data.tags }),
+      },
+    });
+  }
+
   async createPlace(data: CreatePlaceInput): Promise<any> {
     // Raw query needed for PostGIS geometry type
     const result = await this.prisma.$queryRaw`
       INSERT INTO places (
         id, name, name_normalized, description, latitude, longitude,
-        location, address, category_id, area_id, status, tags
+        location, address, category_id, area_id, status, tags,
+        phone, website, opening_hours
       )
       VALUES (
         uuid_generate_v4(),
@@ -80,7 +122,10 @@ export class CrawlerRepository implements ICrawlerRepository {
         ${data.categoryId},
         ${data.areaId},
         ${data.status}::place_status_enum,
-        ${data.tags}
+        ${data.tags},
+        ${data.phone ?? null},
+        ${data.website ?? null},
+        ${data.openingHours ? JSON.stringify(data.openingHours) : null}::jsonb
       )
       RETURNING *;
     `;

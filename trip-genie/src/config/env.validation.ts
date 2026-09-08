@@ -40,6 +40,10 @@ export const envValidationSchema = Joi.object({
   CLOUDINARY_API_KEY: Joi.string().optional().allow(''),
   CLOUDINARY_API_SECRET: Joi.string().optional().allow(''),
 
+  // Crawler & External POI APIs
+  OVERPASS_API_URL: Joi.string().optional().allow(''),
+  FOURSQUARE_API_KEY: Joi.string().optional().allow(''),
+
   // Email
   EMAIL_HOST: Joi.string().optional().allow(''),
   EMAIL_PORT: Joi.number().optional(),

@@ -29,3 +29,9 @@ export const aiConfig = registerAs('ai', () => ({
   geminiApiKey: process.env.GEMINI_API_KEY,
   geminiModel: process.env.GEMINI_MODEL || 'gemini-2.5-flash',
 }));
+
+export const crawlerConfig = registerAs('crawler', () => ({
+  overpassApiUrl: process.env.OVERPASS_API_URL || 'https://overpass-api.de/api/interpreter',
+  foursquareApiKey: process.env.FOURSQUARE_API_KEY,
+  dedupRadiusMeters: parseInt(process.env.DEDUP_RADIUS_METERS || '50', 10),
+}));

@@ -2,10 +2,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { CrawlerController } from './crawler.controller';
 import { CrawlJobService } from './services/crawl-job.service';
+import { PlaceEnrichmentService } from './services/place-enrichment.service';
 
 describe('CrawlerController', () => {
   let controller: CrawlerController;
   let crawlJobService: any;
+  let placeEnrichmentService: any;
 
   beforeEach(async () => {
     crawlJobService = {
@@ -13,9 +15,16 @@ describe('CrawlerController', () => {
       getJobStatus: jest.fn(),
     };
 
+    placeEnrichmentService = {
+      enrichPlacesByArea: jest.fn().mockResolvedValue({ processed: 10, enriched: 8 }),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CrawlerController],
-      providers: [{ provide: CrawlJobService, useValue: crawlJobService }],
+      providers: [
+        { provide: CrawlJobService, useValue: crawlJobService },
+        { provide: PlaceEnrichmentService, useValue: placeEnrichmentService },
+      ],
     }).compile();
 
     controller = module.get<CrawlerController>(CrawlerController);
@@ -42,6 +51,19 @@ describe('CrawlerController', () => {
       await expect(
         controller.triggerCrawl({ areaId: 999 }, { user: { id: 'user-1', role: 'ADMIN' } }),
       ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('POST /crawler/enrich', () => {
+    it('should trigger enrichment for area and return results', async () => {
+      const result = await controller.triggerEnrichment({ areaId: 1, limit: 10 });
+
+      expect(result).toEqual({
+        message: 'Enrichment pipeline completed for area 1',
+        processed: 10,
+        enriched: 8,
+      });
+      expect(placeEnrichmentService.enrichPlacesByArea).toHaveBeenCalledWith(1, 10);
     });
   });
 

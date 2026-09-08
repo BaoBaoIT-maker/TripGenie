@@ -73,6 +73,9 @@ export class OsmIngestionService implements IIngestionService {
               areaId: area.id,
               tags: place.tags,
               status: PlaceStatus.ACTIVE,
+              phone: place.phone,
+              website: place.website,
+              openingHours: place.openingHours,
             });
             finalPlaceId = newPlace.id as string;
             insertedCount++;

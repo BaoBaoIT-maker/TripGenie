@@ -14,6 +14,8 @@ import { CrawlJobService } from './services/crawl-job.service';
 import { TriggerRegionCrawlDto } from './dto/trigger-region-crawl.dto';
 import { TriggerCrawlResponseDto, CrawlJobStatusDto } from './dto/crawl-job-response.dto';
 
+import { PlaceEnrichmentService } from './services/place-enrichment.service';
+
 /** Minimal typed request interface — avoids `any` on req */
 interface AuthenticatedRequest {
   user: { id: string; role: string };
@@ -21,12 +23,14 @@ interface AuthenticatedRequest {
 
 @Controller('crawler')
 export class CrawlerController {
-  constructor(private readonly crawlJobService: CrawlJobService) {}
+  constructor(
+    private readonly crawlJobService: CrawlJobService,
+    private readonly placeEnrichmentService: PlaceEnrichmentService,
+  ) {}
 
   /**
    * Trigger a new region crawl job.
    * Restricted to ADMIN role via JWT payload check.
-   * TODO: Replace with @Roles('ADMIN') + RolesGuard when roles module is ready.
    */
   @UseGuards(AuthGuard('jwt'))
   @Post('trigger')
@@ -36,6 +40,23 @@ export class CrawlerController {
     @Request() req: AuthenticatedRequest,
   ): Promise<TriggerCrawlResponseDto> {
     return this.crawlJobService.triggerRegionCrawl(dto, req.user.id);
+  }
+
+  /**
+   * Trigger enrichment pipeline for places in a given area.
+   */
+  @UseGuards(AuthGuard('jwt'))
+  @Post('enrich')
+  @HttpCode(HttpStatus.OK)
+  async triggerEnrichment(
+    @Body() dto: { areaId: number; limit?: number },
+  ): Promise<{ message: string; processed: number; enriched: number }> {
+    const result = await this.placeEnrichmentService.enrichPlacesByArea(dto.areaId, dto.limit || 50);
+    return {
+      message: `Enrichment pipeline completed for area ${dto.areaId}`,
+      processed: result.processed,
+      enriched: result.enriched,
+    };
   }
 
   /**

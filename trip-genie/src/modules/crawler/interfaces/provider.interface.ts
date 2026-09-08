@@ -16,6 +16,11 @@ export interface NormalizedPlace {
   description: string | null;
   categorySlug: string;
   tags: string[];
+  phone?: string | null;
+  website?: string | null;
+  openingHours?: string | null;
+  wikidata?: string | null;
+  image?: string | null;
   sourceData: Record<string, any>;
 }
 

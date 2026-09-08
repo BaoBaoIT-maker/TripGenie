@@ -89,17 +89,24 @@ export class OsmProvider implements ICrawlerProvider {
     const categorySlug = this.mapOsmTagsToCategory(el.tags);
     if (!categorySlug) return null;
 
+    const tags = el.tags || {};
+
     return {
       externalId: String(el.id),
       provider: CrawlProviderName.OSM,
-      name: el.tags.name as string,
-      nameNormalized: normalizeVietnamese(el.tags.name as string),
+      name: tags.name as string,
+      nameNormalized: normalizeVietnamese(tags.name as string),
       latitude: el.lat as number,
       longitude: el.lon as number,
-      address: this.formatAddress(el.tags),
-      description: (el.tags.description as string) || null,
+      address: this.formatAddress(tags),
+      description: (tags.description as string) || null,
       categorySlug,
-      tags: this.extractTags(el.tags),
+      tags: this.extractTags(tags),
+      phone: tags.phone || tags['contact:phone'] || null,
+      website: tags.website || tags['contact:website'] || null,
+      openingHours: tags.opening_hours || null,
+      wikidata: tags.wikidata || null,
+      image: tags.image || tags.wikimedia_commons || null,
       sourceData: el,
     };
   }

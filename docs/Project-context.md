@@ -125,14 +125,15 @@ Khi hoàn thành bất kỳ module nào, **BẮT BUỘC** thực hiện quy trì
 - [x] **SOLID Contracts** — `ICrawlerProvider`, `ICrawlerRepository`, `IIngestionService`, `IEnrichmentProvider` (Strategy Pattern)
 - [x] **CrawlerRepository** — Prisma-based data access layer với raw PostGIS spatial queries (`ST_DWithin`), bổ sung `updatePlace`, `getUnenrichedPlacesByArea`
 - [x] **OsmProvider Upgrade** — Tích hợp Overpass API với ConfigService (URL, 30s timeout), trích xuất trực tiếp `phone`, `website`, `opening_hours`, `wikidata`, `image` tags từ OSM
-- [x] **FoursquareProvider** — Tích hợp Foursquare Places API v3 với `FOURSQUARE_API_KEY`, làm giàu Rating (0-10 -> 0-5), Review Count, Price Level (1-4), Hours, Phone, Website, Photos
+- [x] **FoursquareProvider** — Tích hợp Foursquare Places API v3 với `FOURSQUARE_API_KEY`, làm giàu Rating (0-10 -> 0-5), `reviewCount`, `budgetLevel` Enum (`LOW`, `MEDIUM`, `HIGH`, `LUXURY`), Hours, Phone, Website, Photos
 - [x] **WikimediaProvider** — Tích hợp Wikipedia REST API (Free 100%, no key), kéo ảnh nét cao & bài thuyết minh tiếng Việt từ `wikidata` ID hoặc tên địa điểm du lịch
-- [x] **PlaceEnrichmentService** — Quản lý luồng làm giàu dữ liệu an toàn (Safe Partial Update Pattern), tuyệt đối không đè `null` hay xóa dữ liệu OSM gốc
+- [x] **PlaceEnrichmentService** — Cấu trúc Chain of Responsibility tiêm mảng `ENRICHMENT_PROVIDERS[]` (Plug-and-Play), tự động lưu mảng ảnh vào bảng `place_images` và cập nhật `imageCount`, trích xuất `wikidata` ID từ `place_sources`
+- [x] **TriggerEnrichmentDto** — Validate `areaId` (@IsInt, @Min(1)) và `limit` (@IsOptional, @Min(1), @Max(100))
 - [x] **DeduplicationService** — Chống cào lặp 2 tầng (Exact `provider+externalId` lookup + Spatial `ST_DWithin(50m)` & lexical similarity)
 - [x] **OsmIngestionService** — Implementation của `IIngestionService`, xử lý vòng lặp cào dữ liệu, ghi log tiến độ mỗi 50 items, tăng `errorCount`, upsert `data_coverage`
 - [x] **CrawlJobService** — Quản lý tạo job & trigger cào ngầm phụ thuộc `IIngestionService` abstraction qua `INJECT_TOKENS.OSM_INGESTION_SERVICE`
 - [x] **CrawlerController** — Endpoints: `POST /crawler/trigger` (HTTP 202 Accepted), `POST /crawler/enrich` (Kích hoạt enrich theo khu vực), `GET /crawler/jobs/:id`
-- [x] **CrawlerModule** — Đăng ký DI tokens `CRAWLER_REPOSITORY`, `OSM_PROVIDER`, `FOURSQUARE_PROVIDER`, `WIKIMEDIA_PROVIDER`, `OSM_INGESTION_SERVICE`
+- [x] **CrawlerModule** — Đăng ký DI tokens `CRAWLER_REPOSITORY`, `OSM_PROVIDER`, `ENRICHMENT_PROVIDERS` (mảng Plug & Play), `OSM_INGESTION_SERVICE`
 - [x] **Unit Tests** — 12 Test Suites (43/43 tests PASS 100%): `deduplication.service.spec.ts`, `osm-ingestion.service.spec.ts`, `foursquare.provider.spec.ts`, `wikimedia.provider.spec.ts`, `place-enrichment.service.spec.ts`, `crawler.controller.spec.ts`
 
 ### TODO — PHASE 4: Places & Search API (Tiếp theo)

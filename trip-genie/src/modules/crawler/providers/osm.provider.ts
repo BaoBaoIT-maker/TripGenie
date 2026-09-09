@@ -5,17 +5,31 @@ import { ICrawlerProvider, NormalizedPlace } from '../interfaces/provider.interf
 import { OsmCategorySlug, CrawlProviderName } from '../../../common/enums/crawler.enum';
 import { normalizeVietnamese } from '../../../common/utils/string.util';
 
-/** Maps OSM amenity/tourism/historic tags to internal category slugs */
+/** Maps OSM amenity/tourism/historic/natural/leisure tags to internal category slugs */
 const OSM_TAG_TO_CATEGORY: Record<string, OsmCategorySlug> = {
   'amenity:restaurant': OsmCategorySlug.RESTAURANT,
   'amenity:cafe': OsmCategorySlug.CAFE,
   'amenity:bar': OsmCategorySlug.BAR_PUB,
   'amenity:pub': OsmCategorySlug.BAR_PUB,
+  'amenity:nightclub': OsmCategorySlug.BAR_PUB,
+  'amenity:fast_food': OsmCategorySlug.STREET_FOOD,
+  'amenity:food_court': OsmCategorySlug.STREET_FOOD,
+  'amenity:marketplace': OsmCategorySlug.MARKET,
   'tourism:hotel': OsmCategorySlug.HOTEL,
   'tourism:hostel': OsmCategorySlug.HOTEL,
+  'tourism:guest_house': OsmCategorySlug.HOTEL,
   'tourism:museum': OsmCategorySlug.ATTRACTION,
   'tourism:attraction': OsmCategorySlug.ATTRACTION,
   'tourism:viewpoint': OsmCategorySlug.ATTRACTION,
+  'tourism:theme_park': OsmCategorySlug.ATTRACTION,
+  'tourism:beach': OsmCategorySlug.BEACH,
+  'natural:beach': OsmCategorySlug.BEACH,
+  'leisure:spa': OsmCategorySlug.SPA,
+  'leisure:water_park': OsmCategorySlug.ATTRACTION,
+  'leisure:sports_centre': OsmCategorySlug.SPORT,
+  'leisure:fitness_centre': OsmCategorySlug.SPORT,
+  'shop:mall': OsmCategorySlug.SHOPPING,
+  'shop:supermarket': OsmCategorySlug.SHOPPING,
 };
 
 @Injectable()
@@ -75,11 +89,14 @@ export class OsmProvider implements ICrawlerProvider {
   ): string {
     const bbox = `${minLat},${minLng},${maxLat},${maxLng}`;
     return `
-      [out:json][timeout:25];
+      [out:json][timeout:45][maxsize:50000000];
       (
-        node["amenity"~"restaurant|cafe|bar|pub"](${bbox});
-        node["tourism"~"hotel|hostel|museum|attraction|viewpoint"](${bbox});
+        node["amenity"~"restaurant|cafe|bar|pub|nightclub|fast_food|food_court|marketplace"](${bbox});
+        node["tourism"~"hotel|hostel|guest_house|museum|attraction|viewpoint|theme_park|beach"](${bbox});
         node["historic"](${bbox});
+        node["natural"~"beach"](${bbox});
+        node["leisure"~"spa|water_park|sports_centre|fitness_centre"](${bbox});
+        node["shop"~"mall|supermarket"](${bbox});
       );
       out body;
     `;
@@ -121,6 +138,18 @@ export class OsmProvider implements ICrawlerProvider {
       if (mapped) return mapped;
     }
     if (tags.historic) return OsmCategorySlug.HISTORICAL;
+    if (tags.natural) {
+      const mapped = OSM_TAG_TO_CATEGORY[`natural:${tags.natural}`];
+      if (mapped) return mapped;
+    }
+    if (tags.leisure) {
+      const mapped = OSM_TAG_TO_CATEGORY[`leisure:${tags.leisure}`];
+      if (mapped) return mapped;
+    }
+    if (tags.shop) {
+      const mapped = OSM_TAG_TO_CATEGORY[`shop:${tags.shop}`];
+      if (mapped) return mapped;
+    }
     return null;
   }
 

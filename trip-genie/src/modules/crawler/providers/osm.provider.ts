@@ -44,7 +44,10 @@ export class OsmProvider implements ICrawlerProvider {
       'https://overpass-api.de/api/interpreter',
     );
     this.httpClient = axios.create({
-      timeout: 30_000, // 30 seconds — Overpass can be slow
+      timeout: 45_000, // 45 seconds — Overpass can be slow
+      headers: {
+        'User-Agent': 'TripGenieBot/1.0 (https://tripgenie.app; contact@tripgenie.app)',
+      },
     });
   }
 
@@ -59,9 +62,13 @@ export class OsmProvider implements ICrawlerProvider {
     const query = this.buildOverpassQuery(minLat, maxLat, minLng, maxLng);
 
     try {
-      const response = await this.httpClient.post(this.overpassUrl, query, {
-        headers: { 'Content-Type': 'text/plain' },
-      });
+      const response = await this.httpClient.post(
+        this.overpassUrl,
+        `data=${encodeURIComponent(query)}`,
+        {
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        },
+      );
 
       const elements: any[] = response.data.elements || [];
       this.logger.log(`Received ${elements.length} raw elements from OSM`);

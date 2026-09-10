@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { TravelArea, Category, PlaceSource, CrawlJob, DataCoverage } from '@prisma/client';
+import { TravelArea, Category, PlaceSource, CrawlJob, DataCoverage, Prisma } from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import {
   ICrawlerRepository,
@@ -76,8 +76,8 @@ export class CrawlerRepository implements ICrawlerRepository {
         deletedAt: null,
         OR: [
           { ratingAvg: 0 },
-          { priceLevel: null as any },
-          { openingHours: null as any },
+          { priceLevel: null },
+          { openingHours: { equals: Prisma.DbNull } },
         ],
       },
       include: { sources: true, images: true },
@@ -231,21 +231,15 @@ export class CrawlerRepository implements ICrawlerRepository {
     });
   }
 
-  async upsertDataCoverage(areaId: number, data: UpsertCoverageInput): Promise<DataCoverage> {
-    return this.prisma.dataCoverage.upsert({
-      where: { areaId },
-      create: {
-        areaId,
-        placeCount: data.placeCount,
-        status: data.status as any,
-        lastCrawledAt: data.lastCrawledAt,
-      },
-      update: {
-        placeCount: data.placeCount,
-        status: data.status as any,
-        lastCrawledAt: data.lastCrawledAt,
-      },
-    });
+  async upsertDataCoverage(areaId: number, data: UpsertCoverageInput): Promise<any> {
+    return this.prisma.$executeRaw`
+      INSERT INTO data_coverage (area_id, place_count, status, last_crawled_at)
+      VALUES (${areaId}, ${data.placeCount}, ${data.status}::coverage_status_enum, ${data.lastCrawledAt})
+      ON CONFLICT (area_id) DO UPDATE SET
+        place_count = EXCLUDED.place_count,
+        status = EXCLUDED.status,
+        last_crawled_at = EXCLUDED.last_crawled_at;
+    `;
   }
 
   async countActivePlacesByArea(areaId: number): Promise<number> {

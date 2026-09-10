@@ -22,8 +22,12 @@ import Redis from 'ioredis';
         const port = configService.get<number>('REDIS_PORT', 6379);
 
         const client = redisUrl?.startsWith('redis')
-          ? new Redis(redisUrl, { lazyConnect: true })
-          : new Redis({ host, port, lazyConnect: true });
+          ? new Redis(redisUrl, { lazyConnect: true, maxRetriesPerRequest: 3 })
+          : new Redis({ host, port, lazyConnect: true, maxRetriesPerRequest: 3 });
+
+        client.on('error', (err) => {
+          // Prevent unhandled error event crash on Redis connection errors
+        });
 
         client.connect().catch(() => {
           // Connection errors are non-fatal — services degrade gracefully

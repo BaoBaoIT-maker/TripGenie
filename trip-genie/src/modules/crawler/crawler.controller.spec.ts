@@ -1,13 +1,14 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
+import { getQueueToken } from '@nestjs/bullmq';
 import { CrawlerController } from './crawler.controller';
 import { CrawlJobService } from './services/crawl-job.service';
-import { PlaceEnrichmentService } from './services/place-enrichment.service';
+import { CrawlerQueueName } from '../../common/enums/crawler.enum';
 
 describe('CrawlerController', () => {
   let controller: CrawlerController;
   let crawlJobService: any;
-  let placeEnrichmentService: any;
+  let enrichQueue: any;
 
   beforeEach(async () => {
     crawlJobService = {
@@ -15,15 +16,15 @@ describe('CrawlerController', () => {
       getJobStatus: jest.fn(),
     };
 
-    placeEnrichmentService = {
-      enrichPlacesByArea: jest.fn().mockResolvedValue({ processed: 10, enriched: 8 }),
+    enrichQueue = {
+      add: jest.fn().mockResolvedValue({ id: 'enrich-job-1' }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       controllers: [CrawlerController],
       providers: [
         { provide: CrawlJobService, useValue: crawlJobService },
-        { provide: PlaceEnrichmentService, useValue: placeEnrichmentService },
+        { provide: getQueueToken(CrawlerQueueName.ENRICH), useValue: enrichQueue },
       ],
     }).compile();
 
@@ -55,15 +56,18 @@ describe('CrawlerController', () => {
   });
 
   describe('POST /crawler/enrich', () => {
-    it('should trigger enrichment for area and return results', async () => {
+    it('should push enrichment job to BullMQ queue and return jobId', async () => {
       const result = await controller.triggerEnrichment({ areaId: 1, limit: 10 });
 
       expect(result).toEqual({
-        message: 'Enrichment pipeline completed for area 1',
-        processed: 10,
-        enriched: 8,
+        message: 'Enrichment job queued for area 1',
+        jobId: 'enrich-job-1',
       });
-      expect(placeEnrichmentService.enrichPlacesByArea).toHaveBeenCalledWith(1, 10);
+      expect(enrichQueue.add).toHaveBeenCalledWith(
+        'area-enrich',
+        { areaId: 1, limit: 10 },
+        expect.any(Object),
+      );
     });
   });
 

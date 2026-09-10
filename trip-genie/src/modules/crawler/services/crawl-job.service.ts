@@ -1,10 +1,11 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { INJECT_TOKENS } from '../../../common/constants/inject-tokens';
 import { ICrawlerRepository } from '../interfaces/crawler-repository.interface';
-import { IIngestionService } from '../interfaces/ingestion.interface';
 import { TriggerRegionCrawlDto } from '../dto/trigger-region-crawl.dto';
 import { CrawlJobStatusDto, TriggerCrawlResponseDto } from '../dto/crawl-job-response.dto';
-import { CrawlJobStatus, CrawlJobType, CrawlProviderName } from '../../../common/enums/crawler.enum';
+import { CrawlJobStatus, CrawlJobType, CrawlProviderName, CrawlerQueueName } from '../../../common/enums/crawler.enum';
 
 @Injectable()
 export class CrawlJobService {
@@ -13,13 +14,8 @@ export class CrawlJobService {
   constructor(
     @Inject(INJECT_TOKENS.CRAWLER_REPOSITORY)
     private readonly crawlerRepo: ICrawlerRepository,
-    /**
-     * Injected via OSM_INGESTION_SERVICE token.
-     * CrawlJobService depends on IIngestionService abstraction (DIP).
-     * Swapping to PasGoIngestionService requires zero changes here (OCP).
-     */
-    @Inject(INJECT_TOKENS.OSM_INGESTION_SERVICE)
-    private readonly ingestionService: IIngestionService,
+    @InjectQueue(CrawlerQueueName.CRAWL)
+    private readonly crawlQueue: Queue,
   ) {}
 
   async triggerRegionCrawl(
@@ -39,17 +35,26 @@ export class CrawlJobService {
       createdBy: userId,
     });
 
-    this.logger.log(`Created crawl job ${job.id} for area "${area.name}"`);
+    this.logger.log(`Created crawl job ${job.id} for area "${area.name}". Pushing to BullMQ queue...`);
 
-    // Fire-and-forget: hand off to ingestion pipeline.
-    // In production this will be replaced by a BullMQ enqueue call.
-    this.ingestionService.processArea(job.id as string, area.id as number).catch((err) => {
-      const message = err instanceof Error ? err.message : String(err);
-      this.logger.error(`Background job ${job.id} threw: ${message}`);
-    });
+    // Hand off to BullMQ Queue Worker with auto-retry options (5 attempts, exponential backoff)
+    await this.crawlQueue.add(
+      'region-crawl',
+      { jobId: job.id, areaId: dto.areaId },
+      {
+        jobId: job.id, // Use same UUID as database record
+        attempts: 5,
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
+        },
+        removeOnComplete: { count: 100 },
+        removeOnFail: { count: 500 },
+      },
+    );
 
     return {
-      message: 'Crawl job started successfully',
+      message: 'Crawl job started successfully via BullMQ Queue',
       jobId: job.id as string,
       area: area.name as string,
     };

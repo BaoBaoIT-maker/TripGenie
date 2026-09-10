@@ -94,7 +94,7 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "transformIgnorePatterns": [
-      "node_modules/(?!(@nestjs/jwt|@nestjs/passport|@nestjs/config)/)"
+      "node_modules/(?!(@nestjs/jwt|@nestjs/passport|@nestjs/config|@nestjs/bullmq|@nestjs/bull-shared|bullmq)/)"
     ],
     "moduleNameMapper": {
       "^@/(.*)$": "<rootDir>/$1"

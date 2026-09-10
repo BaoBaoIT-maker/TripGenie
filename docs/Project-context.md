@@ -135,6 +135,7 @@ Khi hoàn thành bất kỳ module nào, **BẮT BUỘC** thực hiện quy trì
 - [x] **CrawlerController** — Endpoints: `POST /crawler/trigger` (HTTP 202 Accepted), `POST /crawler/enrich` (Kích hoạt enrich theo khu vực), `GET /crawler/jobs/:id`
 - [x] **CrawlerModule** — Đăng ký DI tokens `CRAWLER_REPOSITORY`, `OSM_PROVIDER`, `ENRICHMENT_PROVIDERS` (mảng Plug & Play), `OSM_INGESTION_SERVICE`
 - [x] **Unit Tests** — 12 Test Suites (43/43 tests PASS 100%): `deduplication.service.spec.ts`, `osm-ingestion.service.spec.ts`, `foursquare.provider.spec.ts`, `wikimedia.provider.spec.ts`, `place-enrichment.service.spec.ts`, `crawler.controller.spec.ts`
+- [x] **BullMQ Queue Workers** — Tích hợp `CrawlProcessor` (`@Processor('crawl-queue')`) & `EnrichProcessor` (`@Processor('enrich-queue')`), hỗ trợ **Auto-Retry 5 lần với Exponential Backoff (5s, 10s, 20s...)** khi rớt mạng/sập kết nối, đẩy job qua Redis Queue độc lập.
 - [x] **Thực thi Cào Thực Tế (Đà Nẵng)** — Cào thành công **2,124 địa điểm thực tế** tại Đà Nẵng (Bbox: 15.97-16.16, 107.98-108.36), phân loại vào 11 danh mục (930 Cafe, 541 Nhà hàng, 390 Khách sạn, 90 Bar/Pub, 68 Ăn vặt, 37 Điểm tham quan...), bóc tách giờ mở cửa (302), phone (247), website (126).
 
 ### TODO — PHASE 4: Places & Search API (Tiếp theo)

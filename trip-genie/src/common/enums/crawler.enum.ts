@@ -54,3 +54,8 @@ export enum OsmCategorySlug {
   SPA = 'spa',
   MARKET = 'cho-sieu-thi',
 }
+
+export enum CrawlerQueueName {
+  CRAWL = 'crawl-queue',
+  ENRICH = 'enrich-queue',
+}

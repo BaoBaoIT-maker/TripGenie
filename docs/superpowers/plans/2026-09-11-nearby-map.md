@@ -647,7 +647,7 @@ git commit -m "feat(map): query places for nearby map"
 - Consumes: `NearbyPlace`, `MapCoordinate`, `MapRadiusKm`, `MapViewport`, selection callbacks.
 - Produces: default-exported `VietMap`, named `VietMapLoader`, DOM factories `createPlaceMarkerElement`/`createMapPopupElement`, and `MapControls`.
 
-- [ ] **Step 1: Write failing DOM-factory and missing-key tests**
+- [x] **Step 1: Write failing DOM-factory and missing-key tests**
 
 The test must assert behavior visible to the app, not VietMap internals:
 
@@ -688,19 +688,19 @@ it("keeps a result-compatible fallback when the key is missing", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify missing modules**
+- [x] **Step 2: Run the test and verify missing modules**
 
 Run `npm test -- ../test/features/map/components/VietMap.test.tsx`.
 
 Expected: FAIL because map component modules do not exist.
 
-- [ ] **Step 3: Implement safe marker and popup DOM factories**
+- [x] **Step 3: Implement safe marker and popup DOM factories**
 
 `PlaceMarker.ts` creates a `<button type="button">`, uses `textContent` only, sets `data-active`, applies TripTailor orange/white marker classes, and calls `onSelect(place.id)`. Never insert place data with `innerHTML`.
 
 `MapPopup.ts` creates DOM nodes with `document.createElement`, sets text using `textContent`, and uses an anchor whose `href` is `/places/${slug}`. Include name, address, category, rating, and `formatDistanceKm(distanceKm)`.
 
-- [ ] **Step 4: Implement the control overlay**
+- [x] **Step 4: Implement the control overlay**
 
 `MapControls` renders three icon buttons with tooltips/accessibility labels: `Phóng to`, `Thu nhỏ`, and `Vị trí của tôi`. Use `Button` with `size="icon"`, a minimum `size-11`, and props:
 
@@ -713,7 +713,7 @@ interface MapControlsProps {
 }
 ```
 
-- [ ] **Step 5: Implement the browser-only VietMap lifecycle**
+- [x] **Step 5: Implement the browser-only VietMap lifecycle**
 
 In `VietMap.tsx`, add `"use client"`, import VietMap classes, create the map once in an effect, and clean up every marker, popup, listener, and the map on unmount. Use the installed v6+ style URL:
 
@@ -739,7 +739,7 @@ onViewportChange({
 
 Render the map container, `MapControls`, and an `aria-live="polite"` map status. Capture SDK/style errors and show an overlay reading `Không thể tải bản đồ. Danh sách địa điểm vẫn có thể sử dụng.`.
 
-- [ ] **Step 6: Add the dynamic loader boundary**
+- [x] **Step 6: Add the dynamic loader boundary**
 
 ```tsx
 "use client";
@@ -763,7 +763,7 @@ export function VietMapLoader(props: VietMapProps) {
 
 Import `VietMapProps` from `@/features/map/types` in both files; do not redeclare it inside a component.
 
-- [ ] **Step 7: Import SDK CSS globally and correct environment guidance**
+- [x] **Step 7: Import SDK CSS globally and correct environment guidance**
 
 Add this global stylesheet import to `frontend/src/app/layout.tsx` directly after `./globals.css`:
 
@@ -779,13 +779,13 @@ NEXT_PUBLIC_VIETMAP_API_KEY=your_domain_restricted_vietmap_key_here
 
 Remove the stale `NEXT_PUBLIC_VIETMAP_STYLE_URL=https://maps.vietmap.vn/api/maps/light/styles.json` line because the installed package documents the v6+ `/maps/styles/lm/style.json?apikey=...` URL.
 
-- [ ] **Step 8: Run map component tests**
+- [x] **Step 8: Run map component tests**
 
 Run `npm test -- ../test/features/map/components/VietMap.test.tsx`.
 
 Expected: DOM factory, missing-key, and control tests PASS. If the test imports `VietMap.tsx`, mock `@vietmap/vietmap-gl-js` before the import; jsdom must not instantiate WebGL.
 
-- [ ] **Step 9: Commit the renderer**
+- [x] **Step 9: Commit the renderer**
 
 ```bash
 git add frontend/src/components/map/VietMapLoader.tsx frontend/src/components/map/VietMap.tsx frontend/src/components/map/PlaceMarker.ts frontend/src/components/map/MapPopup.ts frontend/src/components/map/MapControls.tsx frontend/src/app/layout.tsx frontend/.env.example test/features/map/components/VietMap.test.tsx

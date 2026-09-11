@@ -48,6 +48,14 @@ export interface PlannerInvitation {
   createdAt: string;
 }
 
+export interface InviteCandidate {
+  id: string;
+  displayName: string;
+  email: string;
+  avatarUrl?: string;
+  isOnline?: boolean;
+}
+
 export interface Planner {
   id: string;
   title: string;

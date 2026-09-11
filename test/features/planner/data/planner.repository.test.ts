@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { plannerRepository } from "./planner.repository";
+import { plannerRepository } from "@/features/planner/data/planner.repository";
 import { Planner } from "@/types/planner";
 
 const generatedPlanner: Planner = {

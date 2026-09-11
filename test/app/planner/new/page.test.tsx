@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import NewPlannerPage from "./page";
+import NewPlannerPage from "@/app/planner/new/page";
 import { plannerService } from "@/services/planner.service";
 import { Planner } from "@/types/planner";
 

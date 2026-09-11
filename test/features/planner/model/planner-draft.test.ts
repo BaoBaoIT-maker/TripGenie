@@ -6,7 +6,7 @@ import {
   upsertPlannerItem,
   removePlannerItem,
   getInviteConflict,
-} from "./planner-draft";
+} from "@/features/planner/model/planner-draft";
 import { Planner, PlannerItem } from "@/types/planner";
 import { MOCK_PLACES } from "@/mocks/data/places";
 

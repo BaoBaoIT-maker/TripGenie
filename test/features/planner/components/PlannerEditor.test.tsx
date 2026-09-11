@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { PlannerEditor } from "./PlannerEditor";
+import { PlannerEditor } from "@/features/planner/components/PlannerEditor";
 import {
   usePlannerQuery,
   useUpdatePlannerMutation,
   useCreatePlannerInvitationMutation,
   useUpdateMockInvitationStatusMutation,
-} from "../hooks/use-planner";
-import { usePlannerDraftStore } from "../stores/planner-draft-store";
+} from "@/features/planner/hooks/use-planner";
+import { usePlannerDraftStore } from "@/features/planner/stores/planner-draft-store";
 import { Planner } from "@/types/planner";
 import { plannerService } from "@/services/planner.service";
 import { MOCK_PLACES } from "@/mocks/data/places";
@@ -18,7 +18,7 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
 }));
 
-vi.mock("../hooks/use-planner", () => ({
+vi.mock("@/features/planner/hooks/use-planner", () => ({
   usePlannerQuery: vi.fn(),
   useUpdatePlannerMutation: vi.fn(),
   useCreatePlannerInvitationMutation: vi.fn(),

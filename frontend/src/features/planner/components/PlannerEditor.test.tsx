@@ -11,6 +11,7 @@ import {
 import { usePlannerDraftStore } from "../stores/planner-draft-store";
 import { Planner } from "@/types/planner";
 import { plannerService } from "@/services/planner.service";
+import { MOCK_PLACES } from "@/mocks/data/places";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -240,15 +241,11 @@ const plannerWithItems: Planner = {
           id: "item-1",
           placeId: "place-1",
           place: {
+            ...MOCK_PLACES[0],
             id: "place-1",
             name: "Cafe Túi Mơ To",
             slug: "cafe-tui-mo-to",
-            category: "cafe",
-            rating: 4.8,
-            reviewCount: 100,
             address: "Hẻm 31 Sào Nam",
-            coverImage: "https://example.com/place1.jpg",
-            coordinates: { lat: 11.9, lng: 108.4 },
           },
           startTime: "08:30",
           endTime: "10:00",
@@ -261,15 +258,11 @@ const plannerWithItems: Planner = {
           id: "item-2",
           placeId: "place-2",
           place: {
+            ...MOCK_PLACES[1],
             id: "place-2",
             name: "Dinh 1 Bảo Đại",
             slug: "dinh-1",
-            category: "sightseeing",
-            rating: 4.5,
-            reviewCount: 80,
             address: "Đà Lạt",
-            coverImage: "https://example.com/place2.jpg",
-            coordinates: { lat: 11.9, lng: 108.4 },
           },
           startTime: "10:30",
           endTime: "12:30",

@@ -20,8 +20,8 @@ import { Input } from "@/components/ui/input";
 const plannerItemSchema = z.object({
   startTime: z.string().min(1, "Vui lòng nhập giờ bắt đầu"),
   endTime: z.string().optional(),
-  durationMinutes: z.coerce.number().min(0, "Thời lượng không được âm"),
-  estimatedCost: z.coerce.number().min(0, "Chi phí không được âm"),
+  durationMinutes: z.number({ message: "Vui lòng nhập số" }).min(0, "Thời lượng không được âm"),
+  estimatedCost: z.number({ message: "Vui lòng nhập số" }).min(0, "Chi phí không được âm"),
   note: z.string().optional(),
 });
 
@@ -168,7 +168,7 @@ export function PlannerItemDialog({
                 id="stop-duration"
                 type="number"
                 min={0}
-                {...register("durationMinutes")}
+                {...register("durationMinutes", { valueAsNumber: true })}
                 className="h-10 text-xs rounded-xl"
               />
               {errors.durationMinutes && (
@@ -190,7 +190,7 @@ export function PlannerItemDialog({
                 type="number"
                 min={0}
                 step={10000}
-                {...register("estimatedCost")}
+                {...register("estimatedCost", { valueAsNumber: true })}
                 className="h-10 text-xs rounded-xl"
               />
               {errors.estimatedCost && (

@@ -8,18 +8,9 @@ import {
   getInviteConflict,
 } from "./planner-draft";
 import { Planner, PlannerItem } from "@/types/planner";
+import { MOCK_PLACES } from "@/mocks/data/places";
 
-const mockPlace = {
-  id: "place-1",
-  name: "Cafe Túi Mơ To",
-  slug: "cafe-tui-mo-to",
-  category: "cafe" as const,
-  rating: 4.8,
-  reviewCount: 120,
-  address: "Đà Lạt",
-  coverImage: "https://example.com/image.jpg",
-  coordinates: { lat: 11.9, lng: 108.4 },
-};
+const mockPlace = MOCK_PLACES[0];
 
 const plannerWithWrongOrdersAndTotals: Planner = {
   id: "p-1",

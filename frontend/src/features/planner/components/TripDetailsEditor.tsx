@@ -23,8 +23,8 @@ const tripDetailsSchema = z
     description: z.string().optional(),
     startDate: z.string().min(1, "Vui lòng chọn ngày bắt đầu"),
     endDate: z.string().min(1, "Vui lòng chọn ngày kết thúc"),
-    people: z.coerce.number().min(1, "Số người tối thiểu là 1"),
-    budget: z.coerce.number().min(0, "Ngân sách không được âm"),
+    people: z.number({ message: "Vui lòng nhập số" }).min(1, "Số người tối thiểu là 1"),
+    budget: z.number({ message: "Vui lòng nhập số" }).min(0, "Ngân sách không được âm"),
     style: z.string().optional(),
     coverImage: z.string().optional(),
   })
@@ -234,7 +234,7 @@ export function TripDetailsEditor({ planner, onPatch }: TripDetailsEditorProps) 
               id="trip-people"
               type="number"
               min={1}
-              {...register("people")}
+              {...register("people", { valueAsNumber: true })}
               className="h-10 rounded-xl text-xs font-medium"
             />
             {errors.people && (
@@ -254,7 +254,7 @@ export function TripDetailsEditor({ planner, onPatch }: TripDetailsEditorProps) 
               type="number"
               min={0}
               step={100000}
-              {...register("budget")}
+              {...register("budget", { valueAsNumber: true })}
               className="h-10 rounded-xl text-xs font-medium"
             />
             {errors.budget && (

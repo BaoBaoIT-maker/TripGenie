@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import type { NearbyPlace } from "./types";
 import { formatDistanceKm } from "./lib/map-filter";
 import { cn } from "@/lib/utils";
@@ -42,18 +43,20 @@ export function MapPlaceCard({
       >
         <div className="relative size-20 shrink-0 overflow-hidden rounded-lg bg-muted">
           {place.images?.[0] ? (
-            <img
+            <Image
               src={place.images[0]}
               alt={place.name}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-              loading="lazy"
+              fill
+              sizes="80px"
+              className="object-cover transition-transform duration-300 group-hover:scale-105"
+              unoptimized
             />
           ) : (
             <div className="flex h-full w-full items-center justify-center bg-muted text-xs text-muted-foreground">
               Không có ảnh
             </div>
           )}
-          <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-xs">
+          <span className="absolute bottom-1 right-1 z-10 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-white backdrop-blur-xs">
             {formatDistanceKm(distanceKm)}
           </span>
         </div>

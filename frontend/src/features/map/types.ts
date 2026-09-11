@@ -1,4 +1,5 @@
 import type { Place, PlaceCategory } from "@/types/place";
+export type { Place, PlaceCategory };
 
 export const MAP_RADIUS_OPTIONS = [1, 3, 5, 10, 20] as const;
 export type MapRadiusKm = (typeof MAP_RADIUS_OPTIONS)[number];

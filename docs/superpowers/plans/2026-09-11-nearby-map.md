@@ -1120,7 +1120,7 @@ git commit -m "feat(map): expose nearby map route"
 - Consumes: complete `/map` feature.
 - Produces: verified production-ready mock map UI.
 
-- [ ] **Step 1: Run all map tests together**
+- [x] **Step 1: Run all map tests together**
 
 ```bash
 npm test -- ../test/features/map ../test/app/map/page.test.tsx ../test/components/common/map-navigation.test.tsx
@@ -1128,7 +1128,7 @@ npm test -- ../test/features/map ../test/app/map/page.test.tsx ../test/component
 
 Expected: all map, route, and navigation tests PASS.
 
-- [ ] **Step 2: Run the complete test suite**
+- [x] **Step 2: Run the complete test suite**
 
 ```bash
 npm test
@@ -1136,7 +1136,7 @@ npm test
 
 Expected: all existing planner tests and all new map tests PASS.
 
-- [ ] **Step 3: Run lint**
+- [x] **Step 3: Run lint**
 
 ```bash
 npm run lint
@@ -1144,7 +1144,7 @@ npm run lint
 
 Expected: exit code 0 with no new warnings in map files.
 
-- [ ] **Step 4: Run a production build**
+- [x] **Step 4: Run a production build**
 
 ```bash
 npm run build
@@ -1152,7 +1152,7 @@ npm run build
 
 Expected: exit code 0; `/map` is listed successfully and there is no missing Suspense boundary, `window is not defined`, hydration, or CSS import error.
 
-- [ ] **Step 5: Test the missing-key fallback**
+- [x] **Step 5: Test the missing-key fallback**
 
 Temporarily run without `NEXT_PUBLIC_VIETMAP_API_KEY`, open `/map`, and verify:
 
@@ -1164,7 +1164,7 @@ Temporarily run without `NEXT_PUBLIC_VIETMAP_API_KEY`, open `/map`, and verify:
 
 Do not commit a real key.
 
-- [ ] **Step 6: Test geolocation outcomes and responsive behavior**
+- [x] **Step 6: Test geolocation outcomes and responsive behavior**
 
 With `npm run dev`, use browser permission controls to test both Allow and Block. Verify:
 
@@ -1180,7 +1180,7 @@ With `npm run dev`, use browser permission controls to test both Allow and Block
 - mobile controls do not overlap the fixed BottomNav.
 ```
 
-- [ ] **Step 7: Inspect the final diff and commit verification fixes only if needed**
+- [x] **Step 7: Inspect the final diff and commit verification fixes only if needed**
 
 ```bash
 git status --short
@@ -1201,13 +1201,13 @@ If no fixes were required, do not create an empty commit.
 
 ## Final Acceptance Checklist
 
-- [ ] `/map` is a Server Component route with a Suspense boundary.
-- [ ] VietMap is loaded through a Client Component dynamic import with `ssr: false`.
-- [ ] Radius options are exactly 1/3/5/10/20 km and default to 5 km.
-- [ ] Current location succeeds or falls back clearly to TP. Hồ Chí Minh.
-- [ ] URL is the only durable filter source; Zustand contains only transient interaction state.
-- [ ] Marker, popup, card, address, distance, and result count stay synchronized.
-- [ ] Empty, loading, query-error, location-error, missing-key, and SDK-error states are usable.
-- [ ] Desktop and mobile navigation expose `/map` without exceeding five mobile items.
-- [ ] No routing, clustering, geocoding, backend work, or real key entered the change.
-- [ ] Focused tests, full tests, lint, and production build pass.
+- [x] `/map` is a Server Component route with a Suspense boundary.
+- [x] VietMap is loaded through a Client Component dynamic import with `ssr: false`.
+- [x] Radius options are exactly 1/3/5/10/20 km and default to 5 km.
+- [x] Current location succeeds or falls back clearly to TP. Hồ Chí Minh.
+- [x] URL is the only durable filter source; Zustand contains only transient interaction state.
+- [x] Marker, popup, card, address, distance, and result count stay synchronized.
+- [x] Empty, loading, query-error, location-error, missing-key, and SDK-error states are usable.
+- [x] Desktop and mobile navigation expose `/map` without exceeding five mobile items.
+- [x] No routing, clustering, geocoding, backend work, or real key entered the change.
+- [x] Focused tests, full tests, lint, and production build pass.

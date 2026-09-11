@@ -28,6 +28,13 @@ export default function VietMap({
   const apiKey = process.env.NEXT_PUBLIC_VIETMAP_API_KEY || "";
   const style = `https://maps.vietmap.vn/maps/styles/lm/style.json?apikey=${encodeURIComponent(apiKey)}`;
 
+  const onViewportChangeRef = useRef(onViewportChange);
+  const initialCenterRef = useRef(center);
+
+  useEffect(() => {
+    onViewportChangeRef.current = onViewportChange;
+  }, [onViewportChange]);
+
   // Map initialization
   useEffect(() => {
     if (!containerRef.current) return;
@@ -36,13 +43,13 @@ export default function VietMap({
       const map = new vietmapgl.Map({
         container: containerRef.current,
         style,
-        center: [center.longitude, center.latitude],
+        center: [initialCenterRef.current.longitude, initialCenterRef.current.latitude],
         zoom: DEFAULT_MAP_ZOOM,
       });
 
       map.on("moveend", () => {
         const c = map.getCenter();
-        onViewportChange({
+        onViewportChangeRef.current({
           latitude: c.lat,
           longitude: c.lng,
           zoom: map.getZoom(),
@@ -51,7 +58,7 @@ export default function VietMap({
 
       map.on("error", (e) => {
         console.error("VietMap error:", e);
-        setHasError(true);
+        setTimeout(() => setHasError(true), 0);
       });
 
       mapRef.current = map;
@@ -68,9 +75,9 @@ export default function VietMap({
       };
     } catch (err) {
       console.error("Failed to initialize VietMap:", err);
-      setHasError(true);
+      setTimeout(() => setHasError(true), 0);
     }
-  }, []);
+  }, [style]);
 
   // Update markers
   useEffect(() => {
@@ -102,7 +109,6 @@ export default function VietMap({
   }, [places, selectedPlaceId, hoveredPlaceId, onSelectPlace]);
 
   // Fit bounds when center, radius or place list changes
-  const placeIdsKey = places.map((p) => p.place.id).join(",");
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -120,7 +126,7 @@ export default function VietMap({
       maxZoom: 15,
       duration: 500,
     });
-  }, [center.latitude, center.longitude, radiusKm, placeIdsKey]);
+  }, [center.latitude, center.longitude, radiusKm, places]);
 
   // Handle selected place popup and camera flyTo
   useEffect(() => {

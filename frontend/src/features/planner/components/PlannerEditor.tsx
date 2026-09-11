@@ -20,6 +20,7 @@ import { usePlannerQuery, useUpdatePlannerMutation } from "../hooks/use-planner"
 import { usePlannerDraftStore } from "../stores/planner-draft-store";
 import { TripDetailsEditor } from "./TripDetailsEditor";
 import { BudgetSummary } from "./BudgetSummary";
+import { ItineraryEditor } from "./ItineraryEditor";
 import { normalizePlanner } from "../model/planner-draft";
 
 interface PlannerEditorProps {
@@ -37,7 +38,7 @@ export function PlannerEditor({
   const { data: serverPlanner, isLoading, isError, refetch } = usePlannerQuery(plannerId);
   const updateMutation = useUpdatePlannerMutation();
 
-  const { draft, isDirty, load, patch, markSaved } = usePlannerDraftStore();
+  const { draft, isDirty, load, patch, replace, markSaved } = usePlannerDraftStore();
   const [showUnsavedPrompt, setShowUnsavedPrompt] = useState(false);
 
   useEffect(() => {
@@ -190,7 +191,12 @@ export function PlannerEditor({
         {/* Left Column: Trip details and Itinerary */}
         <div className="lg:col-span-8 space-y-8">
           <TripDetailsEditor planner={currentPlanner} onPatch={patch} />
-          {childrenItinerary}
+          {childrenItinerary || (
+            <ItineraryEditor
+              planner={currentPlanner}
+              onUpdateDraft={replace}
+            />
+          )}
         </div>
 
         {/* Right Column: Sticky Budget and Companions */}

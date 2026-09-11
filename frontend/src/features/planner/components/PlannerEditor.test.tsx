@@ -212,3 +212,165 @@ describe("PlannerEditor editor lifecycle", () => {
     expect(screen.getByText(/Bạn có thay đổi chưa lưu/i)).toBeInTheDocument();
   });
 });
+
+const plannerWithItems: Planner = {
+  ...mockPlanner,
+  estimatedTotalCost: 300000,
+  days: [
+    {
+      day: 1,
+      date: "2026-10-01",
+      dayTotalCost: 300000,
+      items: [
+        {
+          id: "item-1",
+          placeId: "place-1",
+          place: {
+            id: "place-1",
+            name: "Cafe Túi Mơ To",
+            slug: "cafe-tui-mo-to",
+            category: "cafe",
+            rating: 4.8,
+            reviewCount: 100,
+            address: "Hẻm 31 Sào Nam",
+            coverImage: "https://example.com/place1.jpg",
+            coordinates: { lat: 11.9, lng: 108.4 },
+          },
+          startTime: "08:30",
+          endTime: "10:00",
+          durationMinutes: 90,
+          estimatedCost: 100000,
+          note: "Cafe ngắm hoa cúc",
+          order: 1,
+        },
+        {
+          id: "item-2",
+          placeId: "place-2",
+          place: {
+            id: "place-2",
+            name: "Dinh 1 Bảo Đại",
+            slug: "dinh-1",
+            category: "sightseeing",
+            rating: 4.5,
+            reviewCount: 80,
+            address: "Đà Lạt",
+            coverImage: "https://example.com/place2.jpg",
+            coordinates: { lat: 11.9, lng: 108.4 },
+          },
+          startTime: "10:30",
+          endTime: "12:30",
+          durationMinutes: 120,
+          estimatedCost: 200000,
+          note: "Tham quan dinh",
+          order: 2,
+        },
+      ],
+    },
+    {
+      day: 2,
+      date: "2026-10-02",
+      dayTotalCost: 0,
+      items: [],
+    },
+  ],
+};
+
+describe("PlannerEditor itinerary", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    usePlannerDraftStore.getState().reset();
+    vi.mocked(useUpdatePlannerMutation).mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useUpdatePlannerMutation>);
+  });
+
+  it("renders itinerary cards with places, times and costs", () => {
+    vi.mocked(usePlannerQuery).mockReturnValue({
+      data: plannerWithItems,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof usePlannerQuery>);
+
+    render(<PlannerEditor plannerId="planner-test-1" />);
+
+    expect(screen.getByText("Cafe Túi Mơ To")).toBeInTheDocument();
+    expect(screen.getByText("Dinh 1 Bảo Đại")).toBeInTheDocument();
+    expect(screen.getByText(/100.000đ/)).toBeInTheDocument();
+    expect(screen.getByText(/200.000đ/)).toBeInTheDocument();
+  });
+
+  it("shows empty day state when switching to an empty day", async () => {
+    vi.mocked(usePlannerQuery).mockReturnValue({
+      data: plannerWithItems,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof usePlannerQuery>);
+
+    const user = userEvent.setup();
+    render(<PlannerEditor plannerId="planner-test-1" />);
+
+    const day2Tab = screen.getByRole("tab", { name: /Ngày 2/i });
+    await user.click(day2Tab);
+
+    expect(screen.getByText(/Chưa có địa điểm nào trong ngày này/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Tìm địa điểm mới/i })).toBeInTheDocument();
+  });
+
+  it("edits stop fields and recalculates totals", async () => {
+    vi.mocked(usePlannerQuery).mockReturnValue({
+      data: plannerWithItems,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof usePlannerQuery>);
+
+    const user = userEvent.setup();
+    render(<PlannerEditor plannerId="planner-test-1" />);
+
+    const editBtns = screen.getAllByRole("button", { name: /Chỉnh sửa điểm dừng/i });
+    await user.click(editBtns[0]);
+
+    expect(screen.getByText(/Chỉnh sửa điểm dừng/i)).toBeInTheDocument();
+    const costInput = screen.getByLabelText(/Chi phí ước tính/i);
+    await user.clear(costInput);
+    await user.type(costInput, "250000");
+
+    const saveStopBtn = screen.getByRole("button", { name: /Cập nhật điểm dừng/i });
+    await user.click(saveStopBtn);
+
+    const store = usePlannerDraftStore.getState();
+    expect(store.draft?.days[0].items[0].estimatedCost).toBe(250000);
+    expect(store.draft?.days[0].dayTotalCost).toBe(450000);
+    expect(store.draft?.estimatedTotalCost).toBe(450000);
+    expect(store.isDirty).toBe(true);
+  });
+
+  it("deletes a stop after confirmation dialog", async () => {
+    vi.mocked(usePlannerQuery).mockReturnValue({
+      data: plannerWithItems,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof usePlannerQuery>);
+
+    const user = userEvent.setup();
+    render(<PlannerEditor plannerId="planner-test-1" />);
+
+    const deleteBtns = screen.getAllByRole("button", { name: /Xóa điểm dừng/i });
+    await user.click(deleteBtns[0]);
+
+    expect(screen.getByText(/Xác nhận xóa điểm dừng/i)).toBeInTheDocument();
+    const confirmDeleteBtn = screen.getByRole("button", { name: /Xóa/i });
+    await user.click(confirmDeleteBtn);
+
+    const store = usePlannerDraftStore.getState();
+    expect(store.draft?.days[0].items).toHaveLength(1);
+    expect(store.draft?.days[0].items[0].id).toBe("item-2");
+    expect(store.draft?.days[0].items[0].order).toBe(1);
+    expect(store.draft?.days[0].dayTotalCost).toBe(200000);
+    expect(store.isDirty).toBe(true);
+  });
+});

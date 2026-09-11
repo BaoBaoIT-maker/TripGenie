@@ -130,7 +130,7 @@ export interface VietMapProps {
 - Consumes: `Place` and `PlaceCategory` from `@/types/place`; Turf `point` and `distance`.
 - Produces: `MapCoordinate`, `MapRadiusKm`, `MapFilters`, `NearbyPlace`, `MapViewport`, `VietMapProps`, `MAP_RADIUS_OPTIONS`, `DEFAULT_MAP_CENTER`, `CITY_CENTERS`, `filterNearbyPlaces`, and `formatDistanceKm`.
 
-- [ ] **Step 1: Write the failing distance/filter tests**
+- [x] **Step 1: Write the failing distance/filter tests**
 
 Create `test/features/map/lib/map-filter.test.ts` with local place fixtures so the test does not depend on the large mock-data file:
 
@@ -200,7 +200,7 @@ describe("filterNearbyPlaces", () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify the missing-module failure**
+- [x] **Step 2: Run the test and verify the missing-module failure**
 
 Run:
 
@@ -210,7 +210,7 @@ npm test -- ../test/features/map/lib/map-filter.test.ts
 
 Expected: FAIL because `@/features/map/lib/map-filter` does not exist.
 
-- [ ] **Step 3: Add exact map types and configuration**
+- [x] **Step 3: Add exact map types and configuration**
 
 Create `frontend/src/features/map/types.ts` using the Public Interfaces block. Create `map-config.ts`:
 
@@ -229,7 +229,7 @@ export const CITY_CENTERS: Record<string, MapCoordinate> = {
 };
 ```
 
-- [ ] **Step 4: Implement the pure Turf filter**
+- [x] **Step 4: Implement the pure Turf filter**
 
 Create `frontend/src/features/map/lib/map-filter.ts`:
 
@@ -267,13 +267,13 @@ export function formatDistanceKm(value: number): string {
 }
 ```
 
-- [ ] **Step 5: Run the focused test**
+- [x] **Step 5: Run the focused test**
 
 Run `npm test -- ../test/features/map/lib/map-filter.test.ts`.
 
 Expected: 3 tests PASS.
 
-- [ ] **Step 6: Commit the domain layer**
+- [x] **Step 6: Commit the domain layer**
 
 ```bash
 git add frontend/src/features/map/types.ts frontend/src/features/map/map-config.ts frontend/src/features/map/lib/map-filter.ts test/features/map/lib/map-filter.test.ts
@@ -293,7 +293,7 @@ git commit -m "feat(map): add nearby place filtering"
 - Consumes: `MapFilters`, `ParsedMapQuery`, `DEFAULT_MAP_CENTER`, `MAP_RADIUS_OPTIONS`, `CITY_CENTERS`.
 - Produces: `parseMapSearchParams(searchParams): ParsedMapQuery`, `mergeMapSearchParams(current, filters): string`, and `useMapFilters(): { filters; hasExplicitCenter; replaceFilters }`.
 
-- [ ] **Step 1: Write failing URL parsing and merging tests**
+- [x] **Step 1: Write failing URL parsing and merging tests**
 
 Create `test/features/map/lib/map-query.test.ts`:
 
@@ -336,13 +336,13 @@ describe("map query", () => {
 });
 ```
 
-- [ ] **Step 2: Verify the missing-module failure**
+- [x] **Step 2: Verify the missing-module failure**
 
 Run `npm test -- ../test/features/map/lib/map-query.test.ts`.
 
 Expected: FAIL because `map-query.ts` does not exist.
 
-- [ ] **Step 3: Implement schema-backed query parsing**
+- [x] **Step 3: Implement schema-backed query parsing**
 
 Create `frontend/src/features/map/lib/map-query.ts`. Use Zod coercion, latitude bounds `-90..90`, longitude bounds `-180..180`, and an enum for allowed radii. Reject missing or blank coordinates before coercion so they cannot become numeric zero. Validate city against `all` plus the four keys in `CITY_CENTERS`, and validate category against the exact `PlaceCategory` union plus `all`. The essential shape is:
 
@@ -377,7 +377,7 @@ export function parseMapSearchParams(params: URLSearchParams): ParsedMapQuery {
 
 `mergeMapSearchParams` must clone the current params, set all six map fields, serialize coordinates with at most six decimals, and return `params.toString()`.
 
-- [ ] **Step 4: Implement the navigation hook**
+- [x] **Step 4: Implement the navigation hook**
 
 Create `use-map-filters.ts` as a Client hook:
 
@@ -399,13 +399,13 @@ export function useMapFilters() {
 }
 ```
 
-- [ ] **Step 5: Run focused tests**
+- [x] **Step 5: Run focused tests**
 
 Run `npm test -- ../test/features/map/lib/map-query.test.ts`.
 
 Expected: 3 tests PASS.
 
-- [ ] **Step 6: Commit URL filters**
+- [x] **Step 6: Commit URL filters**
 
 ```bash
 git add frontend/src/features/map/lib/map-query.ts frontend/src/features/map/hooks/use-map-filters.ts test/features/map/lib/map-query.test.ts
@@ -426,7 +426,7 @@ git commit -m "feat(map): persist filters in the URL"
 - Consumes: `MapCoordinate`, `MapViewport`, `DEFAULT_MAP_CENTER`.
 - Produces: `useGeolocation(): { status; coordinate; message; requestLocation }` and `useSearchStore` actions `selectPlace`, `hoverPlace`, `setViewport`, `resetMapInteraction`.
 
-- [ ] **Step 1: Write failing store tests**
+- [x] **Step 1: Write failing store tests**
 
 ```ts
 import { beforeEach, describe, expect, it } from "vitest";
@@ -445,7 +445,7 @@ describe("useSearchStore", () => {
 });
 ```
 
-- [ ] **Step 2: Write failing geolocation tests**
+- [x] **Step 2: Write failing geolocation tests**
 
 Use `renderHook`, `act`, and a configurable `navigator.geolocation` mock. Cover success and denial:
 
@@ -485,7 +485,7 @@ it("falls back after permission denial", async () => {
 
 Also test `navigator.geolocation` missing. Use the browser API's `timeout: 8000`; do not create a second custom timer.
 
-- [ ] **Step 3: Verify both test files fail**
+- [x] **Step 3: Verify both test files fail**
 
 Run:
 
@@ -495,7 +495,7 @@ npm test -- ../test/features/map/hooks/use-geolocation.test.ts ../test/features/
 
 Expected: FAIL because both modules are missing.
 
-- [ ] **Step 4: Implement the Zustand store**
+- [x] **Step 4: Implement the Zustand store**
 
 ```ts
 import { create } from "zustand";
@@ -522,7 +522,7 @@ export const useSearchStore = create<SearchState>((set) => ({
 }));
 ```
 
-- [ ] **Step 5: Implement the geolocation state machine**
+- [x] **Step 5: Implement the geolocation state machine**
 
 Use the exact statuses `"idle" | "pending" | "success" | "fallback"`. `requestLocation` sets pending, calls `getCurrentPosition`, maps success to the browser coordinate, and maps missing API or error to `DEFAULT_MAP_CENTER`. Use `{ enableHighAccuracy: false, maximumAge: 300000, timeout: 8000 }`. Supply Vietnamese messages and keep the callback stable with `useCallback`.
 
@@ -536,13 +536,13 @@ const fallback = (reason: string) => {
 };
 ```
 
-- [ ] **Step 6: Run the focused tests**
+- [x] **Step 6: Run the focused tests**
 
 Run the command from Step 3.
 
 Expected: all geolocation and store tests PASS.
 
-- [ ] **Step 7: Commit location/state support**
+- [x] **Step 7: Commit location/state support**
 
 ```bash
 git add frontend/src/features/map/hooks/use-geolocation.ts frontend/src/stores/search-store.ts test/features/map/hooks/use-geolocation.test.ts test/features/map/stores/search-store.test.ts

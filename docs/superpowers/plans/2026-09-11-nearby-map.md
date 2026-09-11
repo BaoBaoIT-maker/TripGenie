@@ -809,7 +809,7 @@ git commit -m "feat(map): render VietMap places and controls"
 - Consumes: all Tasks 1–5 public interfaces, `usePlacesQuery`, `useMapFilters`, `useGeolocation`, and `useSearchStore`.
 - Produces: client UI composed by `/map`.
 
-- [ ] **Step 1: Write failing filter-control tests**
+- [x] **Step 1: Write failing filter-control tests**
 
 Render `MapFilters` with controlled `filters` and `onChange`. Assert the radius controls are accessible and emit complete next filter values:
 
@@ -842,7 +842,7 @@ it("moves the center when a city is selected", async () => {
 
 Also assert category chips wrap (`flex-wrap`) and keyword input is labelled `Tìm địa điểm`.
 
-- [ ] **Step 2: Write failing result interaction tests**
+- [x] **Step 2: Write failing result interaction tests**
 
 ```ts
 const nearbyPlace: NearbyPlace = {
@@ -871,7 +871,7 @@ it("synchronizes focus and click without hijacking the detail link", async () =>
 
 For zero results, assert buttons `Mở rộng đến 10 km` and `Xóa bộ lọc` call their callbacks.
 
-- [ ] **Step 3: Write the failing orchestration test**
+- [x] **Step 3: Write the failing orchestration test**
 
 Mock `VietMapLoader`, hooks, and the store. Verify filtered data is passed to both map and results, a stale selected ID is cleared, location success updates URL filters, and map absence does not hide results. The key assertion is:
 
@@ -901,7 +901,7 @@ it("passes the same nearby set to the map and result list", () => {
 });
 ```
 
-- [ ] **Step 4: Run all three tests and observe failure**
+- [x] **Step 4: Run all three tests and observe failure**
 
 ```bash
 npm test -- ../test/features/map/components/MapFilters.test.tsx ../test/features/map/components/MapResults.test.tsx ../test/features/map/components/MapExplorer.test.tsx
@@ -909,7 +909,7 @@ npm test -- ../test/features/map/components/MapFilters.test.tsx ../test/features
 
 Expected: FAIL because the feature components do not exist.
 
-- [ ] **Step 5: Implement the filter toolbar**
+- [x] **Step 5: Implement the filter toolbar**
 
 `MapFilters` is controlled and never stores a second filter copy. Props:
 
@@ -924,7 +924,7 @@ interface MapFiltersProps {
 
 Use `Input` for keyword, `Select` for city, and wraparound buttons for category/radius. Selecting a known city applies `CITY_CENTERS[city]`. Emit keyword, city, category, and radius changes immediately; `router.replace` prevents these edits from adding browser-history entries, and this avoids maintaining a second local filter copy. Radius button labels follow `Trong bán kính ${radius} km`.
 
-- [ ] **Step 6: Implement compact map result cards**
+- [x] **Step 6: Implement compact map result cards**
 
 `MapPlaceCard` renders image, name, address, category, rating, formatted distance, and the detail link. Use this exact prop contract:
 
@@ -957,7 +957,7 @@ interface MapResultsProps {
 
 Render a result summary `N địa điểm trong bán kính X km`, a responsive three-column grid on desktop, and horizontal snap cards on small screens. The empty state exposes the two exact actions tested above.
 
-- [ ] **Step 7: Implement `MapExplorer` orchestration**
+- [x] **Step 7: Implement `MapExplorer` orchestration**
 
 Add `"use client"`. Read URL filters through `useMapFilters`, data through `usePlacesQuery`, location through `useGeolocation`, and selection/hover/viewport through `useSearchStore`. The core data flow is:
 
@@ -990,13 +990,13 @@ Declare `const appliedLocationRef = useRef<string | null>(null)` before the effe
 
 Render query loading/error states, geolocation fallback notice with retry, `MapFilters`, `VietMapLoader`, and `MapResults`. On `Mở rộng đến 10 km`, set radius to 10 while preserving other filters. On `Xóa bộ lọc`, preserve the current center, set radius 5, and clear city/category/keyword.
 
-- [ ] **Step 8: Run component tests**
+- [x] **Step 8: Run component tests**
 
 Run the command from Step 4.
 
 Expected: filter, result, empty-state, location, and synchronization tests PASS without loading the real SDK.
 
-- [ ] **Step 9: Commit the feature UI**
+- [x] **Step 9: Commit the feature UI**
 
 ```bash
 git add frontend/src/features/map/MapFilters.tsx frontend/src/features/map/MapPlaceCard.tsx frontend/src/features/map/MapResults.tsx frontend/src/features/map/MapExplorer.tsx test/features/map/components/MapFilters.test.tsx test/features/map/components/MapResults.test.tsx test/features/map/components/MapExplorer.test.tsx

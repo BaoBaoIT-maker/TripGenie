@@ -16,12 +16,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { usePlannerQuery, useUpdatePlannerMutation } from "../hooks/use-planner";
+import {
+  usePlannerQuery,
+  useUpdatePlannerMutation,
+  useCreatePlannerInvitationMutation,
+  useUpdateMockInvitationStatusMutation,
+} from "../hooks/use-planner";
 import { usePlannerDraftStore } from "../stores/planner-draft-store";
 import { TripDetailsEditor } from "./TripDetailsEditor";
 import { BudgetSummary } from "./BudgetSummary";
 import { ItineraryEditor } from "./ItineraryEditor";
+import { CompanionPanel } from "./CompanionPanel";
+import { InviteCompanionDialog } from "./InviteCompanionDialog";
 import { normalizePlanner } from "../model/planner-draft";
+import { InviteCandidate } from "@/types/planner";
 
 interface PlannerEditorProps {
   plannerId: string;
@@ -37,9 +45,12 @@ export function PlannerEditor({
   const router = useRouter();
   const { data: serverPlanner, isLoading, isError, refetch } = usePlannerQuery(plannerId);
   const updateMutation = useUpdatePlannerMutation();
+  const createInviteMutation = useCreatePlannerInvitationMutation();
+  const updateMockStatusMutation = useUpdateMockInvitationStatusMutation();
 
   const { draft, isDirty, load, patch, replace, markSaved } = usePlannerDraftStore();
   const [showUnsavedPrompt, setShowUnsavedPrompt] = useState(false);
+  const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (serverPlanner && (!draft || draft.id !== plannerId)) {
@@ -129,6 +140,43 @@ export function PlannerEditor({
     }
   };
 
+  const handleSendInvite = async (
+    candidate: InviteCandidate,
+    permission: "viewer" | "editor"
+  ) => {
+    try {
+      const inv = await createInviteMutation.mutateAsync({
+        plannerId,
+        input: { userId: candidate.id, permission },
+      });
+      patch({
+        invitations: [...(currentPlanner.invitations || []), inv],
+      });
+      toast.success("Đã gửi lời mời thành công!");
+    } catch {
+      toast.error("Gửi lời mời thất bại, vui lòng thử lại!");
+    }
+  };
+
+  const handleUpdateCompanionStatus = async (
+    invitationId: string,
+    status: "accepted" | "declined"
+  ) => {
+    try {
+      const updated = await updateMockStatusMutation.mutateAsync({
+        plannerId,
+        invitationId,
+        status,
+      });
+      replace(updated);
+      toast.success(
+        status === "accepted" ? "Đã chấp nhận lời mời!" : "Đã từ chối lời mời!"
+      );
+    } catch {
+      toast.error("Thao tác thất bại, vui lòng thử lại!");
+    }
+  };
+
   return (
     <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8 pb-24">
       {/* Top Header & Actions */}
@@ -202,7 +250,13 @@ export function PlannerEditor({
         {/* Right Column: Sticky Budget and Companions */}
         <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-6">
           <BudgetSummary planner={currentPlanner} />
-          {childrenCompanions}
+          {childrenCompanions || (
+            <CompanionPanel
+              planner={currentPlanner}
+              onOpenInvite={() => setInviteDialogOpen(true)}
+              onUpdateStatus={handleUpdateCompanionStatus}
+            />
+          )}
         </div>
       </div>
 
@@ -242,6 +296,14 @@ export function PlannerEditor({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Invite Companion Dialog */}
+      <InviteCompanionDialog
+        open={inviteDialogOpen}
+        onOpenChange={setInviteDialogOpen}
+        planner={currentPlanner}
+        onInvite={handleSendInvite}
+      />
     </div>
   );
 }

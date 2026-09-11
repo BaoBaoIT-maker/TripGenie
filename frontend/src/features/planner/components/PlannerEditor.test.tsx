@@ -2,9 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PlannerEditor } from "./PlannerEditor";
-import { usePlannerQuery, useUpdatePlannerMutation } from "../hooks/use-planner";
+import {
+  usePlannerQuery,
+  useUpdatePlannerMutation,
+  useCreatePlannerInvitationMutation,
+  useUpdateMockInvitationStatusMutation,
+} from "../hooks/use-planner";
 import { usePlannerDraftStore } from "../stores/planner-draft-store";
 import { Planner } from "@/types/planner";
+import { plannerService } from "@/services/planner.service";
 
 const push = vi.fn();
 vi.mock("next/navigation", () => ({
@@ -14,6 +20,14 @@ vi.mock("next/navigation", () => ({
 vi.mock("../hooks/use-planner", () => ({
   usePlannerQuery: vi.fn(),
   useUpdatePlannerMutation: vi.fn(),
+  useCreatePlannerInvitationMutation: vi.fn(),
+  useUpdateMockInvitationStatusMutation: vi.fn(),
+}));
+
+vi.mock("@/services/planner.service", () => ({
+  plannerService: {
+    searchInviteCandidates: vi.fn(),
+  },
 }));
 
 const mockPlanner: Planner = {
@@ -372,5 +386,174 @@ describe("PlannerEditor itinerary", () => {
     expect(store.draft?.days[0].items[0].order).toBe(1);
     expect(store.draft?.days[0].dayTotalCost).toBe(200000);
     expect(store.isDirty).toBe(true);
+  });
+});
+
+const plannerWithCompanions: Planner = {
+  ...mockPlanner,
+  members: [
+    {
+      userId: "user-current",
+      displayName: "Trọng Phúc",
+      email: "phuc@example.com",
+      role: "owner",
+    },
+    {
+      userId: "user-lan",
+      displayName: "Lan Nguyễn",
+      email: "lan@example.com",
+      role: "editor",
+    },
+  ],
+  invitations: [
+    {
+      id: "inv-1",
+      plannerId: "planner-test-1",
+      invitee: {
+        userId: "user-minh",
+        displayName: "Minh Trần",
+        email: "minh@example.com",
+        role: "viewer",
+      },
+      permission: "viewer",
+      status: "pending",
+      createdAt: "2026-10-01T00:00:00Z",
+    },
+  ],
+};
+
+describe("PlannerEditor invitation", () => {
+  const createInviteMutate = vi.fn();
+  const updateStatusMutate = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    usePlannerDraftStore.getState().reset();
+
+    vi.mocked(useUpdatePlannerMutation).mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useUpdatePlannerMutation>);
+
+    vi.mocked(useCreatePlannerInvitationMutation).mockReturnValue({
+      mutateAsync: createInviteMutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof useCreatePlannerInvitationMutation>);
+
+    vi.mocked(useUpdateMockInvitationStatusMutation).mockReturnValue({
+      mutateAsync: updateStatusMutate,
+      isPending: false,
+    } as unknown as ReturnType<typeof useUpdateMockInvitationStatusMutation>);
+  });
+
+  it("renders owner, members, and pending invitations", () => {
+    vi.mocked(usePlannerQuery).mockReturnValue({
+      data: plannerWithCompanions,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof usePlannerQuery>);
+
+    render(<PlannerEditor plannerId="planner-test-1" />);
+
+    expect(screen.getByText("Lan Nguyễn")).toBeInTheDocument();
+    expect(screen.getByText("Minh Trần")).toBeInTheDocument();
+    expect(screen.getByText(/Đang chờ phản hồi/i)).toBeInTheDocument();
+  });
+
+  it("opens invitation dialog, searches candidates and detects conflict", async () => {
+    vi.mocked(usePlannerQuery).mockReturnValue({
+      data: plannerWithCompanions,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof usePlannerQuery>);
+
+    vi.mocked(plannerService.searchInviteCandidates).mockResolvedValue([
+      {
+        id: "user-lan",
+        displayName: "Lan Nguyễn",
+        email: "lan@example.com",
+      },
+      {
+        id: "user-quynh",
+        displayName: "Quỳnh Như",
+        email: "quynh@example.com",
+      },
+    ]);
+
+    const user = userEvent.setup();
+    render(<PlannerEditor plannerId="planner-test-1" />);
+
+    const openInviteBtn = screen.getByRole("button", { name: /Mời bạn cùng đi/i });
+    await user.click(openInviteBtn);
+
+    expect(screen.getByText(/Mời bạn đồng hành/i)).toBeInTheDocument();
+
+    const searchInput = screen.getByPlaceholderText(/Tìm theo tên hoặc email/i);
+    await user.type(searchInput, "quynh");
+
+    await waitFor(() => {
+      expect(screen.getByText("Quỳnh Như")).toBeInTheDocument();
+    });
+  });
+
+  it("submits invitation for valid candidate", async () => {
+    vi.mocked(usePlannerQuery).mockReturnValue({
+      data: plannerWithCompanions,
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof usePlannerQuery>);
+
+    vi.mocked(plannerService.searchInviteCandidates).mockResolvedValue([
+      {
+        id: "user-quynh",
+        displayName: "Quỳnh Như",
+        email: "quynh@example.com",
+      },
+    ]);
+
+    createInviteMutate.mockResolvedValueOnce({
+      id: "inv-new",
+      plannerId: "planner-test-1",
+      invitee: {
+        userId: "user-quynh",
+        displayName: "Quỳnh Như",
+        email: "quynh@example.com",
+        role: "editor",
+      },
+      permission: "editor",
+      status: "pending",
+      createdAt: "2026-10-01T00:00:00Z",
+    });
+
+    const user = userEvent.setup();
+    render(<PlannerEditor plannerId="planner-test-1" />);
+
+    await user.click(screen.getByRole("button", { name: /Mời bạn cùng đi/i }));
+
+    const searchInput = screen.getByPlaceholderText(/Tìm theo tên hoặc email/i);
+    await user.type(searchInput, "quynh");
+
+    await waitFor(() => {
+      expect(screen.getByText("Quỳnh Như")).toBeInTheDocument();
+    });
+
+    // Select candidate
+    await user.click(screen.getByText("Quỳnh Như"));
+
+    // Send invite
+    const sendBtn = screen.getByRole("button", { name: /Gửi lời mời/i });
+    await user.click(sendBtn);
+
+    await waitFor(() => {
+      expect(createInviteMutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          plannerId: "planner-test-1",
+          input: expect.objectContaining({ userId: "user-quynh" }),
+        })
+      );
+    });
   });
 });

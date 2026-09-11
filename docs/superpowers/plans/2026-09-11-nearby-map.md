@@ -1018,7 +1018,7 @@ git commit -m "feat(map): add nearby map explorer interface"
 - Consumes: `MapExplorer`.
 - Produces: public `/map` route and desktop/mobile entry points.
 
-- [ ] **Step 1: Write failing route test**
+- [x] **Step 1: Write failing route test**
 
 Mock `MapExplorer` so the Server Component is tested without browser APIs:
 
@@ -1032,7 +1032,7 @@ it("renders the nearby map route shell", () => {
 });
 ```
 
-- [ ] **Step 2: Write failing navigation tests**
+- [x] **Step 2: Write failing navigation tests**
 
 Mock `usePathname` to return `/map`. Assert desktop and mobile navigation each expose a link named `Bản đồ` with `href="/map"`, and that it receives the active style. The mobile test must also assert there are still exactly five primary items.
 
@@ -1054,7 +1054,7 @@ it("keeps five mobile items and replaces saved items with map", () => {
 });
 ```
 
-- [ ] **Step 3: Run the tests and verify failure**
+- [x] **Step 3: Run the tests and verify failure**
 
 ```bash
 npm test -- ../test/app/map/page.test.tsx ../test/components/common/map-navigation.test.tsx
@@ -1062,7 +1062,7 @@ npm test -- ../test/app/map/page.test.tsx ../test/components/common/map-navigati
 
 Expected: FAIL because the route and links are absent.
 
-- [ ] **Step 4: Create the Server Component route**
+- [x] **Step 4: Create the Server Component route**
 
 ```tsx
 import { Suspense } from "react";
@@ -1090,19 +1090,19 @@ export default function MapPage() {
 }
 ```
 
-- [ ] **Step 5: Add desktop and mobile navigation**
+- [x] **Step 5: Add desktop and mobile navigation**
 
 In `Navbar.tsx`, import `Map` from Lucide and insert `{ href: "/map", label: "Bản đồ", icon: Map }` after Explore.
 
 In `BottomNav.tsx`, import `Map`, replace the existing `/collections` item with `{ href: "/map", label: "Bản đồ", icon: Map }`, and leave Home, Explore, Planner, and Profile unchanged. Do not remove the collections page or desktop bookmark shortcut.
 
-- [ ] **Step 6: Run route/navigation tests**
+- [x] **Step 6: Run route/navigation tests**
 
 Run the command from Step 3.
 
 Expected: all tests PASS and the route page itself contains no `"use client"` directive.
 
-- [ ] **Step 7: Commit the entry points**
+- [x] **Step 7: Commit the entry points**
 
 ```bash
 git add frontend/src/app/map/page.tsx frontend/src/components/common/Navbar.tsx frontend/src/components/common/BottomNav.tsx test/app/map/page.test.tsx test/components/common/map-navigation.test.tsx

@@ -561,7 +561,7 @@ git commit -m "feat(map): add location fallback and map state"
 - Consumes: `placeService.getPlaces()` and the existing `Place` model.
 - Produces: `placeKeys.all`, `placeKeys.list()`, and `usePlacesQuery()`.
 
-- [ ] **Step 1: Write the failing query-hook test**
+- [x] **Step 1: Write the failing query-hook test**
 
 Wrap `renderHook` with a fresh `QueryClientProvider`, mock `placeService.getPlaces`, and assert the hook returns the service result:
 
@@ -584,13 +584,13 @@ it("loads places through placeService", async () => {
 });
 ```
 
-- [ ] **Step 2: Verify the missing-hook failure**
+- [x] **Step 2: Verify the missing-hook failure**
 
 Run `npm test -- ../test/features/map/hooks/use-places.test.tsx`.
 
 Expected: FAIL because `use-places.ts` does not exist.
 
-- [ ] **Step 3: Add the shared query hook**
+- [x] **Step 3: Add the shared query hook**
 
 ```ts
 import { useQuery } from "@tanstack/react-query";
@@ -606,7 +606,7 @@ export function usePlacesQuery() {
 }
 ```
 
-- [ ] **Step 4: Verify the existing service boundary stays stable**
+- [x] **Step 4: Verify the existing service boundary stays stable**
 
 Inspect `frontend/src/services/place.service.ts` and confirm its no-argument `getPlaces()` returns all existing mock places. Do not modify the service or mock records in this task; URL filters and geographic derivation remain in the map feature. Preserve this existing behavior:
 
@@ -614,7 +614,7 @@ Inspect `frontend/src/services/place.service.ts` and confirm its no-argument `ge
 if (!params) return places;
 ```
 
-- [ ] **Step 5: Run focused and domain tests**
+- [x] **Step 5: Run focused and domain tests**
 
 ```bash
 npm test -- ../test/features/map/hooks/use-places.test.tsx ../test/features/map/lib/map-filter.test.ts
@@ -622,7 +622,7 @@ npm test -- ../test/features/map/hooks/use-places.test.tsx ../test/features/map/
 
 Expected: PASS, and existing `Place` types compile.
 
-- [ ] **Step 6: Commit the query hook**
+- [x] **Step 6: Commit the query hook**
 
 ```bash
 git add frontend/src/features/map/hooks/use-places.ts test/features/map/hooks/use-places.test.tsx

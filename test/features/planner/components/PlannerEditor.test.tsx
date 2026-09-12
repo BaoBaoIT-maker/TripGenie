@@ -282,6 +282,32 @@ const plannerWithItems: Planner = {
   ],
 };
 
+const emptyManualPlanner: Planner = {
+  ...mockPlanner,
+  id: "manual-plan-empty",
+  style: "Tự thiết kế",
+  estimatedTotalCost: 0,
+  days: [
+    { day: 1, date: "2026-10-01", items: [], dayTotalCost: 0 },
+    { day: 2, date: "2026-10-02", items: [], dayTotalCost: 0 },
+  ],
+};
+
+function prepareEmptyManualPlanner(planner: Planner = emptyManualPlanner) {
+  vi.clearAllMocks();
+  usePlannerDraftStore.getState().reset();
+  vi.mocked(useUpdatePlannerMutation).mockReturnValue({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  } as unknown as ReturnType<typeof useUpdatePlannerMutation>);
+  vi.mocked(usePlannerQuery).mockReturnValue({
+    data: planner,
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  } as unknown as ReturnType<typeof usePlannerQuery>);
+}
+
 describe("PlannerEditor itinerary", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -290,6 +316,60 @@ describe("PlannerEditor itinerary", () => {
       mutateAsync: vi.fn(),
       isPending: false,
     } as unknown as ReturnType<typeof useUpdatePlannerMutation>);
+  });
+
+  it("empty manual itinerary guides the user to the first place", async () => {
+    prepareEmptyManualPlanner();
+    render(<PlannerEditor plannerId="manual-plan-empty" />);
+
+    expect(screen.getByText("Lịch trình của bạn đang trống")).toBeInTheDocument();
+    expect(screen.getByText(/Chọn địa điểm có sẵn/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Chọn địa điểm đầu tiên" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Thêm địa điểm vào ngày này" })).toBeInTheDocument();
+  });
+
+  it("empty manual itinerary opens existing place search from the first-place CTA", async () => {
+    prepareEmptyManualPlanner();
+    const user = userEvent.setup();
+    render(<PlannerEditor plannerId="manual-plan-empty" />);
+    await user.click(screen.getByRole("button", { name: "Chọn địa điểm đầu tiên" }));
+    expect(screen.getByRole("dialog", { name: /Tìm kiếm địa điểm/i })).toBeInTheDocument();
+  });
+
+  it("empty manual itinerary adds the selected existing place to the active day", async () => {
+    prepareEmptyManualPlanner();
+    const user = userEvent.setup();
+    render(<PlannerEditor plannerId="manual-plan-empty" />);
+
+    await user.click(screen.getByRole("tab", { name: /Ngày 2/i }));
+    await user.click(screen.getByRole("button", { name: "Chọn địa điểm đầu tiên" }));
+    await user.click(await screen.findByText(MOCK_PLACES[0].name));
+    await user.click(screen.getByRole("button", { name: "Thêm vào lịch trình" }));
+
+    await waitFor(() => {
+      const draft = usePlannerDraftStore.getState().draft;
+      expect(draft?.days[0].items).toHaveLength(0);
+      expect(draft?.days[1].items).toHaveLength(1);
+      expect(draft?.days[1].items[0].placeId).toBe(MOCK_PLACES[0].id);
+    });
+    expect(screen.queryByText("Lịch trình của bạn đang trống")).not.toBeInTheDocument();
+  });
+
+  it("empty manual itinerary creates no item when search is canceled", async () => {
+    prepareEmptyManualPlanner();
+    const user = userEvent.setup();
+    render(<PlannerEditor plannerId="manual-plan-empty" />);
+    await user.click(screen.getByRole("button", { name: "Chọn địa điểm đầu tiên" }));
+    await user.keyboard("{Escape}");
+
+    expect(usePlannerDraftStore.getState().draft?.days.every((day) => day.items.length === 0)).toBe(true);
+  });
+
+  it("empty manual onboarding stays hidden once any day has a stop", () => {
+    prepareEmptyManualPlanner(plannerWithItems);
+    render(<PlannerEditor plannerId="planner-test-1" />);
+    expect(screen.queryByText("Lịch trình của bạn đang trống")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Thêm địa điểm" })).toBeInTheDocument();
   });
 
   it("renders itinerary cards with places, times and costs", () => {
@@ -322,8 +402,8 @@ describe("PlannerEditor itinerary", () => {
     const day2Tab = screen.getByRole("tab", { name: /Ngày 2/i });
     await user.click(day2Tab);
 
-    expect(screen.getByText(/Chưa có địa điểm nào trong ngày này/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Tìm địa điểm mới/i })).toBeInTheDocument();
+    expect(screen.getByText(/Ngày 2 chưa có địa điểm/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Thêm địa điểm vào ngày này/i })).toBeInTheDocument();
   });
 
   it("edits stop fields and recalculates totals", async () => {

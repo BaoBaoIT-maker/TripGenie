@@ -15,7 +15,7 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Plus, Calendar, MapPin } from "lucide-react";
+import { Plus, Calendar, MapPin, MapPinPlus } from "lucide-react";
 import { Planner, PlannerItem } from "@/types/planner";
 import { Place } from "@/types/place";
 import {
@@ -72,6 +72,7 @@ export function ItineraryEditor({
   );
 
   const days = planner.days || [];
+  const isPlannerEmpty = days.every((day) => (day.items?.length ?? 0) === 0);
   const currentDay = days.find((d) => d.day === activeDayNumber) || days[0];
   const items = currentDay?.items || [];
 
@@ -141,6 +142,32 @@ export function ItineraryEditor({
 
   return (
     <div className="space-y-6">
+      {isPlannerEmpty && (
+        <section
+          className="rounded-2xl border border-primary/20 bg-primary/5 p-5 sm:p-6"
+          aria-labelledby="empty-planner-title"
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <h2 id="empty-planner-title" className="text-lg font-bold">
+                Lịch trình của bạn đang trống
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Chọn địa điểm có sẵn để bắt đầu xây dựng chuyến đi theo cách của bạn.
+              </p>
+            </div>
+            <Button
+              type="button"
+              onClick={handleOpenSearch}
+              className="min-h-11 shrink-0 gap-2 rounded-xl"
+            >
+              <MapPinPlus aria-hidden="true" className="size-4" />
+              Chọn địa điểm đầu tiên
+            </Button>
+          </div>
+        </section>
+      )}
+
       {/* Day Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
         {days.map((day) => {
@@ -205,10 +232,10 @@ export function ItineraryEditor({
                     <MapPin className="size-8 opacity-40" />
                   </div>
                   <p className="text-sm font-semibold text-foreground">
-                    Chưa có địa điểm nào trong ngày này
+                    Ngày {activeDayNumber} chưa có địa điểm
                   </p>
                   <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                    Bắt đầu xây dựng lịch trình bằng cách bấm nút tìm địa điểm mới bên dưới.
+                    Chọn một địa điểm có sẵn rồi bổ sung thời gian, chi phí và ghi chú.
                   </p>
                 </div>
               ) : (
@@ -231,7 +258,7 @@ export function ItineraryEditor({
                 className="w-full h-12 rounded-2xl border-2 border-dashed border-border/80 hover:border-primary/80 hover:bg-primary/5 text-muted-foreground hover:text-primary gap-2 text-xs font-bold transition-all cursor-pointer"
               >
                 <Plus className="size-4" />
-                <span>Tìm địa điểm mới</span>
+                <span>{items.length === 0 ? "Thêm địa điểm vào ngày này" : "Thêm địa điểm"}</span>
               </Button>
             </div>
           </SortableContext>

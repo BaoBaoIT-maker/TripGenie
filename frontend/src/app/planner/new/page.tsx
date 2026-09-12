@@ -25,6 +25,7 @@ import { LoadingState } from "@/components/common/LoadingState";
 import { toast } from "sonner";
 import { AiPlannerInput } from "@/types/planner";
 import { plannerService } from "@/services/planner.service";
+import { ManualPlannerForm } from "@/features/planner/components/ManualPlannerForm";
 
 const SAMPLE_COVERS = [
   "https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=1000&auto=format&fit=crop&q=80",
@@ -68,13 +69,6 @@ function NewPlannerContent() {
   const switchMode = (newMode: "ai" | "manual") => {
     setCurrentMode(newMode);
     window.history.replaceState(null, "", `/planner/new?mode=${newMode}`);
-    if (newMode === "ai") {
-      setTitle("Du lịch Sài Gòn");
-      setDescription("Cùng bạn bè du lịch sài gòn. Khám phá các góc cafe chill và thưởng thức ẩm thực đường phố.");
-    } else {
-      setTitle("Khám phá ẩm thực Sài Gòn cuối tuần");
-      setDescription("Lên danh sách các quán ăn ngon và điểm check-in view đẹp ở trung tâm TP.HCM.");
-    }
   };
 
   const handleGenerate = async (e: React.FormEvent) => {
@@ -128,7 +122,7 @@ function NewPlannerContent() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8 pb-20">
+    <div className="max-w-[1536px] mx-auto w-full px-4 py-8 sm:px-6 lg:px-8 xl:px-10 space-y-8 pb-20">
       {/* Top Breadcrumb & Navigation */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
         <Link
@@ -136,7 +130,7 @@ function NewPlannerContent() {
           className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="size-4" />
-          <span>Quay lại Quản lý Lịch trình</span>
+          <span>Quay lại</span>
         </Link>
 
         {/* Mode Switcher Tabs */}
@@ -144,6 +138,7 @@ function NewPlannerContent() {
           <button
             type="button"
             onClick={() => switchMode("ai")}
+            aria-pressed={isAiMode}
             className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
               isAiMode
                 ? "bg-primary text-primary-foreground shadow-xs"
@@ -151,12 +146,13 @@ function NewPlannerContent() {
             }`}
           >
             <Sparkles className="size-3.5" />
-            <span>AI Lập kế hoạch</span>
+            <span>Tạo bằng AI</span>
           </button>
 
           <button
             type="button"
             onClick={() => switchMode("manual")}
+            aria-pressed={!isAiMode}
             className={`flex items-center gap-1.5 rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
               !isAiMode
                 ? "bg-primary text-primary-foreground shadow-xs"
@@ -164,7 +160,7 @@ function NewPlannerContent() {
             }`}
           >
             <PenTool className="size-3.5" />
-            <span>Lập thủ công</span>
+            <span>Tự thiết kế</span>
           </button>
         </div>
       </div>
@@ -172,16 +168,18 @@ function NewPlannerContent() {
       {/* Main Header */}
       <div className="space-y-1">
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-heading text-foreground">
-          Thông tin chuyến đi
+          {isAiMode ? "Thông tin chuyến đi" : "Tạo chuyến đi thủ công"}
         </h1>
-        <p className="text-xs sm:text-sm text-muted-foreground max-w-2xl">
-          Tên, mô tả, ngày đi và ảnh bìa sẽ được đưa vào brief ban đầu để{" "}
-          {isAiMode ? "AI tạo khung lịch trình tối ưu" : "bạn tự do sắp xếp điểm đến"}.
+        <p className="text-xs sm:text-sm text-muted-foreground">
+          {isAiMode
+            ? "Nhập thông tin cơ bản cho chuyến đi của bạn."
+            : "Khởi tạo chuyến đi trước, sau đó tự thêm và sắp xếp địa điểm theo ý bạn."}
         </p>
       </div>
 
       {/* 2 Columns Form Layout (Matching Screenshot 1) */}
-      <form onSubmit={handleGenerate} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      {isAiMode && (
+        <form onSubmit={handleGenerate} className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* ─────────────────────────────────────────────────────────────
             LEFT COLUMN (Col 1-7): THÔNG TIN CHUYẾN ĐI & ẢNH BÌA
         ───────────────────────────────────────────────────────────── */}
@@ -518,18 +516,20 @@ function NewPlannerContent() {
               {isAiMode ? (
                 <>
                   <Sparkles className="size-4" />
-                  <span>{isSubmitting ? "Đang tạo lịch trình..." : "✨ Tạo lịch trình với AI"}</span>
+                  <span>{isSubmitting ? "Đang tạo lịch trình..." : "Tạo lịch trình với AI"}</span>
                 </>
               ) : (
                 <>
                   <PenTool className="size-4" />
-                  <span>{isSubmitting ? "Đang tạo lịch trình..." : "Bắt đầu lên lịch trình"}</span>
+                  <span>{isSubmitting ? "Đang tạo lịch trình..." : "Tạo lịch trình"}</span>
                 </>
               )}
             </Button>
           </div>
         </div>
       </form>
+      )}
+      {!isAiMode && <ManualPlannerForm coverOptions={SAMPLE_COVERS} />}
     </div>
   );
 }
@@ -538,7 +538,7 @@ export default function NewPlannerPage() {
   return (
     <Suspense
       fallback={
-        <div className="mx-auto max-w-7xl px-4 py-16">
+        <div className="max-w-[1536px] mx-auto w-full px-4 py-16 sm:px-6 lg:px-8 xl:px-10">
           <LoadingState message="Đang tải mẫu lịch trình..." />
         </div>
       }

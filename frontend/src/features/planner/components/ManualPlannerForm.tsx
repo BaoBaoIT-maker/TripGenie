@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { FilePlus2, MapPinPlus, ListOrdered, Calendar, MapPin, Users, DollarSign } from "lucide-react";
@@ -40,11 +40,15 @@ export function ManualPlannerForm({ coverOptions }: ManualPlannerFormProps) {
     register,
     handleSubmit,
     setValue,
-    watch,
+    control,
     formState: { errors },
   } = form;
 
-  const selectedCover = watch("coverImage");
+  const selectedCover = useWatch({
+    control,
+    name: "coverImage",
+    defaultValue: coverOptions[0] || "",
+  });
 
   const onSubmit = handleSubmit(async (input) => {
     try {

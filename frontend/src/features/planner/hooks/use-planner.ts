@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { plannerService } from "@/services/planner.service";
-import { Planner, UpdatePlannerInput } from "@/types/planner";
+import { Planner, UpdatePlannerInput, ManualPlannerInput } from "@/types/planner";
+import { MOCK_PLANNERS } from "@/mocks/data/planners";
+import { normalizePlanner } from "../model/planner-draft";
 
 export const plannerKeys = {
   all: ["planners"] as const,
@@ -31,6 +33,17 @@ export function useCreatePlannerMutation() {
     onSuccess: (created) => {
       queryClient.invalidateQueries({ queryKey: plannerKeys.all });
       queryClient.setQueryData(plannerKeys.detail(created.id), created);
+    },
+  });
+}
+
+export function useCreateManualPlannerMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ManualPlannerInput) => plannerService.createManualPlanner(input),
+    onSuccess: (created) => {
+      queryClient.setQueryData(plannerKeys.detail(created.id), created);
+      queryClient.invalidateQueries({ queryKey: plannerKeys.lists() });
     },
   });
 }

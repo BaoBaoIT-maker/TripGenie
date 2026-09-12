@@ -1,6 +1,7 @@
 import {
   Planner,
   AiPlannerInput,
+  ManualPlannerInput,
   UpdatePlannerInput,
   PlannerInvitation,
   InviteCandidate,
@@ -9,11 +10,11 @@ import {
 } from "@/types/planner";
 import { plannerRepository } from "@/features/planner/data/planner.repository";
 import { normalizePlanner, getInviteConflict } from "@/features/planner/model/planner-draft";
+import { buildManualPlanner } from "@/features/planner/model/manual-planner";
 import { MOCK_USERS, CURRENT_USER } from "@/mocks/data/users";
 import { MOCK_PLACES } from "@/mocks/data/places";
 
 function getDaysBetween(startDateStr: string, endDateStr: string): string[] {
-  const dates: string[] = [];
   const start = new Date(startDateStr);
   const end = new Date(endDateStr);
 
@@ -40,6 +41,20 @@ export const plannerService = {
   },
 
   async createPlanner(planner: Planner): Promise<Planner> {
+    return plannerRepository.create(planner);
+  },
+
+  async createManualPlanner(input: ManualPlannerInput): Promise<Planner> {
+    const now = new Date();
+    const id = `manual-plan-${now.getTime()}-${Math.random().toString(36).slice(2, 8)}`;
+    const owner = {
+      userId: CURRENT_USER.id,
+      displayName: CURRENT_USER.displayName,
+      email: CURRENT_USER.email,
+      avatarUrl: CURRENT_USER.avatarUrl,
+      role: "owner" as const,
+    };
+    const planner = buildManualPlanner(input, owner, id, now);
     return plannerRepository.create(planner);
   },
 

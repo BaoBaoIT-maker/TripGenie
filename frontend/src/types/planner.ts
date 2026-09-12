@@ -100,6 +100,17 @@ export interface AiPlannerInput {
   coverImage: string;
 }
 
+export interface ManualPlannerInput {
+  title: string;
+  description?: string;
+  destination: string;
+  startDate: string;
+  endDate: string;
+  budget: number;
+  people: number;
+  coverImage: string;
+}
+
 export type UpdatePlannerInput = Omit<Planner, "id" | "createdAt">;
 
 export interface AiProposalChange {

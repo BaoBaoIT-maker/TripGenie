@@ -84,10 +84,10 @@ Khi hoàn thành bất kỳ module nào, **BẮT BUỘC** thực hiện quy trì
 
 ---
 
-## 6. Database Schema (v5 — Source of Truth: `docs/DB.md`)
+## 6. Database Schema (v5 — Source of Truth: `docs/backend/database.md`)
 
 - **29 bảng**, **15 enums**, **5 triggers**, **1 view** (`active_places`), **6 extensions** (`uuid-ossp`, `postgis`, `vector`, `pg_trgm`, `citext`, `unaccent`).
-- **Prisma Schema**: `backend/prisma/schema.prisma` khớp 100% với `docs/DB.md` v5.
+- **Prisma Schema**: `backend/prisma/schema.prisma` khớp 100% với `docs/backend/database.md` v5.
 
 ---
 
@@ -163,7 +163,7 @@ Khi hoàn thành bất kỳ module nào, **BẮT BUỘC** thực hiện quy trì
 
 | File | Mục đích |
 |------|---------|
-| `docs/DB.md` | Schema SQL v5 — Nguồn sự thật duy nhất |
-| `docs/ARCHITECTURE.md` | Architecture overview đầy đủ (27 sections) |
-| `docs/Project-context.md` | File này — Living memory của dự án |
+| `docs/backend/database.md` | Schema SQL v5 — Nguồn sự thật duy nhất |
+| `docs/architecture/system-architecture.md` | Architecture overview đầy đủ (27 sections) |
+| `docs/architecture/project-context.md` | File này — Living memory của dự án |
 

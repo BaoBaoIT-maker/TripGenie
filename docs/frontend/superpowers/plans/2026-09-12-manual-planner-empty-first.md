@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16.3.1 App Router, React 19.2.8, TypeScript, React Hook Form 7.85, Zod 4.4, TanStack Query 5.101, Zustand 5, date-fns 4.4, Tailwind CSS, shadcn/Base UI, Lucide React, Vitest 5, Testing Library.
 
-**Spec:** `docs/superpowers/specs/2026-09-12-manual-planner-empty-first-design.md`
+**Spec:** `docs/frontend/superpowers/specs/2026-09-12-manual-planner-empty-first-design.md`
 
 ## Global Constraints
 
@@ -27,7 +27,7 @@
 - Use Lucide icons, semantic theme tokens, visible focus states, and at least 44 px interaction targets.
 - Verify responsive behavior at 375, 768, 1024, and 1440 px.
 - Follow TDD: add one failing behavior, observe the intended failure, implement the minimum, rerun the focused test, then commit the task.
-- Run npm commands from `frontend`; test files remain under repository-root `test/` because `frontend/vitest.config.ts` includes `../test/**/*`.
+- Run npm commands from `frontend`; test files remain under repository-root `test/frontend/` because `frontend/vitest.config.ts` includes `../test/frontend/frontend/**/*`.
 
 ## File Structure
 
@@ -201,7 +201,7 @@ describe("getDefaultManualPlannerDates", () => {
 Run:
 
 ```bash
-npm test -- ../test/features/planner/model/manual-planner.test.ts
+npm test -- ../test/frontend/features/planner/model/manual-planner.test.ts
 ```
 
 Expected: FAIL because `manual-planner.ts` and `ManualPlannerInput` do not exist.
@@ -319,7 +319,7 @@ export function buildManualPlanner(
 
 - [ ] **Step 6: Run the factory tests**
 
-Run `npm test -- ../test/features/planner/model/manual-planner.test.ts`.
+Run `npm test -- ../test/frontend/features/planner/model/manual-planner.test.ts`.
 
 Expected: all factory/default-date tests PASS.
 
@@ -477,7 +477,7 @@ it("stores the created detail and invalidates planner lists", async () => {
 - [ ] **Step 3: Run both tests and verify failure**
 
 ```bash
-npm test -- ../test/services/planner.service.test.ts ../test/features/planner/hooks/use-planner.test.tsx
+npm test -- ../test/frontend/services/planner.service.test.ts ../test/frontend/features/planner/hooks/use-planner.test.tsx
 ```
 
 Expected: FAIL because `createManualPlanner` and `useCreateManualPlannerMutation` do not exist.
@@ -649,7 +649,7 @@ it("retains values and allows retry when creation fails", async () => {
 
 - [ ] **Step 3: Run the form test and verify failure**
 
-Run `npm test -- ../test/features/planner/components/ManualPlannerForm.test.tsx`.
+Run `npm test -- ../test/frontend/features/planner/components/ManualPlannerForm.test.tsx`.
 
 Expected: FAIL because `ManualPlannerForm` does not exist.
 
@@ -714,7 +714,7 @@ Submit button:
 
 - [ ] **Step 6: Run the focused form test**
 
-Run `npm test -- ../test/features/planner/components/ManualPlannerForm.test.tsx`.
+Run `npm test -- ../test/frontend/features/planner/components/ManualPlannerForm.test.tsx`.
 
 Expected: approved fields, exclusions, validation, success navigation, and failure retention PASS.
 
@@ -789,7 +789,7 @@ it("renders the reduced manual flow and never invokes AI generation", async () =
 
 - [ ] **Step 3: Run page tests and observe failure**
 
-Run `npm test -- ../test/app/planner/new/page.test.tsx`.
+Run `npm test -- ../test/frontend/app/planner/new/page.test.tsx`.
 
 Expected: manual test FAIL because the page still renders shared AI fields/calls; existing AI test remains PASS.
 
@@ -828,7 +828,7 @@ AI mode keeps its existing heading, helper copy, CTA, generation, persistence, a
 - [ ] **Step 6: Run page and form regression tests**
 
 ```bash
-npm test -- ../test/app/planner/new/page.test.tsx ../test/features/planner/components/ManualPlannerForm.test.tsx
+npm test -- ../test/frontend/app/planner/new/page.test.tsx ../test/frontend/features/planner/components/ManualPlannerForm.test.tsx
 ```
 
 Expected: manual and AI creation tests PASS. Manual submit causes no AI calls.
@@ -948,7 +948,7 @@ it("empty manual onboarding stays hidden once any day has a stop", () => {
 - [ ] **Step 3: Run the itinerary tests and verify failure**
 
 ```bash
-npm test -- ../test/features/planner/components/PlannerEditor.test.tsx -t "empty manual"
+npm test -- ../test/frontend/features/planner/components/PlannerEditor.test.tsx -t "empty manual"
 ```
 
 The new test names contain `empty manual`, so this filter runs only the new tests. Expected: FAIL because the global CTA/copy and context-aware labels are absent.
@@ -1015,7 +1015,7 @@ Do not alter `handleSelectPlaceFromSearch`, `handleSaveItem`, `upsertPlannerItem
 - [ ] **Step 7: Run new and existing itinerary tests**
 
 ```bash
-npm test -- ../test/features/planner/components/PlannerEditor.test.tsx -t "empty manual|itinerary"
+npm test -- ../test/frontend/features/planner/components/PlannerEditor.test.tsx -t "empty manual|itinerary"
 ```
 
 Expected: onboarding, first-place dialog, existing item rendering/edit/delete, cost recalculation, and empty-day switching tests PASS.
@@ -1044,7 +1044,7 @@ git commit -m "feat(planner): guide empty manual itineraries"
 - [ ] **Step 1: Run all targeted manual-planner tests**
 
 ```bash
-npm test -- ../test/features/planner/model/manual-planner.test.ts ../test/services/planner.service.test.ts ../test/features/planner/hooks/use-planner.test.tsx ../test/features/planner/components/ManualPlannerForm.test.tsx ../test/app/planner/new/page.test.tsx ../test/features/planner/components/PlannerEditor.test.tsx
+npm test -- ../test/frontend/features/planner/model/manual-planner.test.ts ../test/frontend/services/planner.service.test.ts ../test/frontend/features/planner/hooks/use-planner.test.tsx ../test/frontend/features/planner/components/ManualPlannerForm.test.tsx ../test/frontend/app/planner/new/page.test.tsx ../test/frontend/features/planner/components/PlannerEditor.test.tsx
 ```
 
 Expected: all manual domain, service, mutation, form, route, and editor tests PASS.

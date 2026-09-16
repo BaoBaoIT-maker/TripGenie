@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16.3.1 App Router, React 19.2.8, TypeScript, Tailwind CSS, shadcn/Base UI primitives, TanStack Query 5, Zustand 5, Zod 4, Turf.js 7.4, VietMap GL JS 7.0.0-pre.1, Vitest 5, Testing Library.
 
-**Spec:** `docs/superpowers/specs/2026-09-11-nearby-map-design.md`
+**Spec:** `docs/frontend/superpowers/specs/2026-09-11-nearby-map-design.md`
 
 ## Global Constraints
 
@@ -205,7 +205,7 @@ describe("filterNearbyPlaces", () => {
 Run:
 
 ```bash
-npm test -- ../test/features/map/lib/map-filter.test.ts
+npm test -- ../test/frontend/features/map/lib/map-filter.test.ts
 ```
 
 Expected: FAIL because `@/features/map/lib/map-filter` does not exist.
@@ -269,7 +269,7 @@ export function formatDistanceKm(value: number): string {
 
 - [x] **Step 5: Run the focused test**
 
-Run `npm test -- ../test/features/map/lib/map-filter.test.ts`.
+Run `npm test -- ../test/frontend/features/map/lib/map-filter.test.ts`.
 
 Expected: 3 tests PASS.
 
@@ -338,7 +338,7 @@ describe("map query", () => {
 
 - [x] **Step 2: Verify the missing-module failure**
 
-Run `npm test -- ../test/features/map/lib/map-query.test.ts`.
+Run `npm test -- ../test/frontend/features/map/lib/map-query.test.ts`.
 
 Expected: FAIL because `map-query.ts` does not exist.
 
@@ -401,7 +401,7 @@ export function useMapFilters() {
 
 - [x] **Step 5: Run focused tests**
 
-Run `npm test -- ../test/features/map/lib/map-query.test.ts`.
+Run `npm test -- ../test/frontend/features/map/lib/map-query.test.ts`.
 
 Expected: 3 tests PASS.
 
@@ -490,7 +490,7 @@ Also test `navigator.geolocation` missing. Use the browser API's `timeout: 8000`
 Run:
 
 ```bash
-npm test -- ../test/features/map/hooks/use-geolocation.test.ts ../test/features/map/stores/search-store.test.ts
+npm test -- ../test/frontend/features/map/hooks/use-geolocation.test.ts ../test/frontend/features/map/stores/search-store.test.ts
 ```
 
 Expected: FAIL because both modules are missing.
@@ -586,7 +586,7 @@ it("loads places through placeService", async () => {
 
 - [x] **Step 2: Verify the missing-hook failure**
 
-Run `npm test -- ../test/features/map/hooks/use-places.test.tsx`.
+Run `npm test -- ../test/frontend/features/map/hooks/use-places.test.tsx`.
 
 Expected: FAIL because `use-places.ts` does not exist.
 
@@ -617,7 +617,7 @@ if (!params) return places;
 - [x] **Step 5: Run focused and domain tests**
 
 ```bash
-npm test -- ../test/features/map/hooks/use-places.test.tsx ../test/features/map/lib/map-filter.test.ts
+npm test -- ../test/frontend/features/map/hooks/use-places.test.tsx ../test/frontend/features/map/lib/map-filter.test.ts
 ```
 
 Expected: PASS, and existing `Place` types compile.
@@ -690,7 +690,7 @@ it("keeps a result-compatible fallback when the key is missing", () => {
 
 - [x] **Step 2: Run the test and verify missing modules**
 
-Run `npm test -- ../test/features/map/components/VietMap.test.tsx`.
+Run `npm test -- ../test/frontend/features/map/components/VietMap.test.tsx`.
 
 Expected: FAIL because map component modules do not exist.
 
@@ -781,7 +781,7 @@ Remove the stale `NEXT_PUBLIC_VIETMAP_STYLE_URL=https://maps.vietmap.vn/api/maps
 
 - [x] **Step 8: Run map component tests**
 
-Run `npm test -- ../test/features/map/components/VietMap.test.tsx`.
+Run `npm test -- ../test/frontend/features/map/components/VietMap.test.tsx`.
 
 Expected: DOM factory, missing-key, and control tests PASS. If the test imports `VietMap.tsx`, mock `@vietmap/vietmap-gl-js` before the import; jsdom must not instantiate WebGL.
 
@@ -904,7 +904,7 @@ it("passes the same nearby set to the map and result list", () => {
 - [x] **Step 4: Run all three tests and observe failure**
 
 ```bash
-npm test -- ../test/features/map/components/MapFilters.test.tsx ../test/features/map/components/MapResults.test.tsx ../test/features/map/components/MapExplorer.test.tsx
+npm test -- ../test/frontend/features/map/components/MapFilters.test.tsx ../test/frontend/features/map/components/MapResults.test.tsx ../test/frontend/features/map/components/MapExplorer.test.tsx
 ```
 
 Expected: FAIL because the feature components do not exist.
@@ -1057,7 +1057,7 @@ it("keeps five mobile items and replaces saved items with map", () => {
 - [x] **Step 3: Run the tests and verify failure**
 
 ```bash
-npm test -- ../test/app/map/page.test.tsx ../test/components/common/map-navigation.test.tsx
+npm test -- ../test/frontend/app/map/page.test.tsx ../test/frontend/components/common/map-navigation.test.tsx
 ```
 
 Expected: FAIL because the route and links are absent.
@@ -1123,7 +1123,7 @@ git commit -m "feat(map): expose nearby map route"
 - [x] **Step 1: Run all map tests together**
 
 ```bash
-npm test -- ../test/features/map ../test/app/map/page.test.tsx ../test/components/common/map-navigation.test.tsx
+npm test -- ../test/frontend/features/map ../test/frontend/app/map/page.test.tsx ../test/frontend/components/common/map-navigation.test.tsx
 ```
 
 Expected: all map, route, and navigation tests PASS.

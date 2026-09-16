@@ -260,7 +260,7 @@ knowledge_documents  [MỚI — cần thêm]
 
 ## 4. Database Schema
 
-> **Nguồn thực tế:** Schema hiện có trong [`docs/DB.md`](./DB.md)  
+> **Nguồn thực tế:** Schema hiện có trong [`docs/backend/database.md`](../backend/database.md)
 > Section này gồm 4 phần: (4.1) schema hiện tại đúng với DB.md, (4.2) phân tích, (4.3) migration bổ sung, (4.4) bảng trạng thái.
 
 ---

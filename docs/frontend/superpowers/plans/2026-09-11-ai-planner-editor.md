@@ -8,7 +8,7 @@
 
 **Tech Stack:** Next.js 16.3.1 App Router, React 19, TypeScript, Tailwind CSS, shadcn/Base UI, Zustand, TanStack Query, React Hook Form, Zod, `@dnd-kit`, Vitest, Testing Library.
 
-**Spec:** `docs/superpowers/specs/2026-09-11-ai-planner-editor-design.md`
+**Spec:** `docs/frontend/superpowers/specs/2026-09-11-ai-planner-editor-design.md`
 
 ## Global Constraints
 

@@ -104,9 +104,9 @@ export function MapFilters({
             title="Sử dụng vị trí hiện tại"
           >
             {locating ? (
-              <Loader2 className="size-4 animate-spin text-orange-600" />
+              <Loader2 className="size-4 animate-spin text-primary" />
             ) : (
-              <LocateFixed className="size-4 text-orange-600" />
+              <LocateFixed className="size-4 text-primary" />
             )}
             <span className="hidden md:inline text-xs font-medium">Vị trí của tôi</span>
           </Button>
@@ -133,7 +133,7 @@ export function MapFilters({
                 onClick={() => handleRadiusChange(radius)}
                 className={
                   isSelected
-                    ? "bg-orange-600 text-white hover:bg-orange-700 font-medium"
+                    ? "bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-xs"
                     : "hover:bg-muted font-normal"
                 }
               >
@@ -159,9 +159,9 @@ export function MapFilters({
               variant={isSelected ? "secondary" : "ghost"}
               size="xs"
               onClick={() => handleCategoryChange(value)}
-              className={`rounded-full px-3 text-xs ${
+              className={`rounded-full px-3 text-xs transition-colors ${
                 isSelected
-                  ? "bg-orange-100 text-orange-800 hover:bg-orange-200 dark:bg-orange-950 dark:text-orange-200 font-medium"
+                  ? "bg-primary/15 text-primary hover:bg-primary/25 dark:bg-primary/25 dark:text-primary font-semibold shadow-2xs"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >

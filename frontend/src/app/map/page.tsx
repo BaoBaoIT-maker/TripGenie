@@ -10,13 +10,13 @@ export const metadata: Metadata = {
 
 export default function MapPage() {
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-4 py-8 sm:px-6 lg:px-8">
-      <header className="space-y-2">
-        <h1 className="font-heading text-3xl font-bold tracking-tight sm:text-4xl">
+    <div className="max-w-[1536px] mx-auto w-full space-y-6 px-4 py-8 sm:px-6 lg:px-8 xl:px-10">
+      <header className="space-y-1">
+        <h1 className="font-heading text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
           Bản đồ địa điểm
         </h1>
-        <p className="text-sm text-muted-foreground">
-          Chọn bán kính để khám phá địa điểm và địa chỉ phù hợp quanh bạn.
+        <p className="text-xs sm:text-sm text-muted-foreground">
+          Khám phá các điểm đến và trải nghiệm quanh bạn.
         </p>
       </header>
       <Suspense

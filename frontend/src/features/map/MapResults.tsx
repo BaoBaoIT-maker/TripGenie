@@ -29,7 +29,7 @@ export function MapResults({
   if (places.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed bg-muted/20 p-8 text-center">
-        <div className="flex size-12 items-center justify-center rounded-full bg-orange-100 text-orange-600 dark:bg-orange-950/50">
+        <div className="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary dark:bg-primary/20">
           <MapPinOff className="size-6" />
         </div>
         <h3 className="mt-4 text-base font-semibold text-foreground">
@@ -44,7 +44,7 @@ export function MapResults({
             variant="default"
             size="sm"
             onClick={onExpandRadius}
-            className="bg-orange-600 text-white hover:bg-orange-700"
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
           >
             Mở rộng đến 10 km
           </Button>
@@ -65,7 +65,7 @@ export function MapResults({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-foreground">
-          <span className="font-bold text-orange-600">{places.length}</span> địa điểm trong bán kính {radiusKm} km
+          <span className="font-bold text-primary">{places.length}</span> địa điểm trong bán kính {radiusKm} km
         </p>
       </div>
 

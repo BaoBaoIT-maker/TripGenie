@@ -54,9 +54,9 @@ export function MapControls({
         title="Vị trí của tôi"
       >
         {locating ? (
-          <Loader2 className="size-5 animate-spin text-orange-600" />
+          <Loader2 className="size-5 animate-spin text-primary" />
         ) : (
-          <LocateFixed className="size-5 text-orange-600" />
+          <LocateFixed className="size-5 text-primary" />
         )}
       </Button>
     </div>

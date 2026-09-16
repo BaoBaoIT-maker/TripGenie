@@ -12,12 +12,12 @@ export function createMapPopupElement(nearbyPlace: NearbyPlace): HTMLDivElement 
   header.className = "flex items-center justify-between gap-2 text-xs";
 
   const categorySpan = document.createElement("span");
-  categorySpan.className = "font-medium text-orange-600";
+  categorySpan.className = "font-medium text-primary";
   categorySpan.textContent = place.categoryLabel || place.category;
   header.appendChild(categorySpan);
 
   const distanceSpan = document.createElement("span");
-  distanceSpan.className = "rounded bg-orange-100 px-1.5 py-0.5 font-semibold text-orange-800 text-xs";
+  distanceSpan.className = "rounded bg-primary/10 px-1.5 py-0.5 font-semibold text-primary text-xs";
   distanceSpan.textContent = formatDistanceKm(distanceKm);
   header.appendChild(distanceSpan);
 
@@ -46,7 +46,7 @@ export function createMapPopupElement(nearbyPlace: NearbyPlace): HTMLDivElement 
   // Link to details
   const link = document.createElement("a");
   link.href = `/places/${place.slug}`;
-  link.className = "inline-flex items-center justify-center w-full rounded-md bg-orange-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-700 transition-colors mt-1";
+  link.className = "inline-flex items-center justify-center w-full rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors mt-1";
   link.textContent = "Xem chi tiết";
   container.appendChild(link);
 

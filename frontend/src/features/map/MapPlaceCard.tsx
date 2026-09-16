@@ -27,8 +27,8 @@ export function MapPlaceCard({
     <div
       className={cn(
         "group relative flex flex-col justify-between overflow-hidden rounded-xl border bg-card text-card-foreground transition-all duration-200 shadow-xs",
-        selected && "ring-2 ring-orange-500 shadow-md border-orange-200",
-        hovered && !selected && "shadow-md -translate-y-0.5 border-orange-200/60"
+        selected && "ring-2 ring-primary shadow-md border-primary/40",
+        hovered && !selected && "shadow-md -translate-y-0.5 border-primary/30"
       )}
       onPointerEnter={() => onHover(place.id)}
       onPointerLeave={() => onHover(null)}
@@ -39,7 +39,7 @@ export function MapPlaceCard({
         onClick={() => onSelect(place.id)}
         onFocus={() => onHover(place.id)}
         onBlur={() => onHover(null)}
-        className="flex w-full cursor-pointer items-start gap-3 p-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-orange-500 rounded-xl"
+        className="flex w-full cursor-pointer items-start gap-3 p-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl"
       >
         <div className="relative size-20 shrink-0 overflow-hidden rounded-lg bg-muted">
           {place.images?.[0] ? (
@@ -64,7 +64,7 @@ export function MapPlaceCard({
         <div className="flex flex-1 flex-col justify-between min-w-0">
           <div>
             <div className="flex items-center justify-between gap-1">
-              <span className="truncate text-[11px] font-medium text-orange-600">
+              <span className="truncate text-[11px] font-medium text-primary">
                 {place.categoryLabel || place.category}
               </span>
               {place.rating ? (
@@ -81,7 +81,7 @@ export function MapPlaceCard({
             </p>
           </div>
 
-          <div className="mt-2 text-xs font-semibold text-orange-600">
+          <div className="mt-2 text-xs font-semibold text-primary">
             Cách bạn {formatDistanceKm(distanceKm)}
           </div>
         </div>
@@ -90,7 +90,7 @@ export function MapPlaceCard({
       <div className="flex items-center justify-end border-t border-border/50 px-3 py-1.5 bg-muted/20">
         <Link
           href={`/places/${place.slug}`}
-          className="text-xs font-medium text-muted-foreground transition-colors hover:text-orange-600 focus:text-orange-600 outline-none"
+          className="text-xs font-medium text-muted-foreground transition-colors hover:text-primary focus:text-primary outline-none"
         >
           Xem chi tiết &rarr;
         </Link>

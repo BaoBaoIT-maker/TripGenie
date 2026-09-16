@@ -9,7 +9,6 @@ import {
   CalendarDays,
   Bookmark,
   Users,
-  Search,
   User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,7 +27,7 @@ export function Navbar() {
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/70 bg-background/90 backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <div className="flex h-16 w-full items-center justify-between px-4 sm:px-6 lg:px-8 xl:px-12">
         {/* Left: Brand Logo & Desktop Nav Links */}
         <div className="flex items-center gap-6 lg:gap-8">
           <Link
@@ -77,17 +76,6 @@ export function Navbar() {
 
         {/* Right Actions: Desktop / Tablet */}
         <div className="hidden md:flex items-center gap-2.5 lg:gap-3">
-          {/* Quick Search Trigger */}
-          <Link href="/explore">
-            <Button
-              variant="outline"
-              size="sm"
-              className="gap-2 text-muted-foreground hover:text-foreground rounded-full px-3.5 h-9 bg-muted/40 border-border/80"
-            >
-              <Search className="size-3.5 text-muted-foreground" />
-              <span className="text-xs">Tìm địa điểm...</span>
-            </Button>
-          </Link>
 
           {/* Bookmark / Saved Items */}
           <Link href="/collections">

@@ -284,4 +284,102 @@ export class PlacesRepository implements IPlaceRepository {
       },
     });
   }
+
+  async upsertPlaceEmbedding(
+    placeId: string,
+    contentText: string,
+    embedding: number[],
+    modelName: string,
+  ): Promise<void> {
+    const vectorString = `[${embedding.join(',')}]`;
+    await this.prisma.$executeRaw`
+      INSERT INTO place_embeddings (place_id, content_text, embedding, model_name, updated_at)
+      VALUES (
+        ${placeId}::uuid,
+        ${contentText},
+        ${vectorString}::vector,
+        ${modelName},
+        NOW()
+      )
+      ON CONFLICT (place_id) DO UPDATE SET
+        content_text = EXCLUDED.content_text,
+        embedding = EXCLUDED.embedding,
+        model_name = EXCLUDED.model_name,
+        updated_at = NOW();
+    `;
+  }
+
+  async searchSemantic(
+    vector: number[],
+    limit: number = 10,
+    areaId?: number,
+    minSimilarity: number = 0.3,
+  ): Promise<any[]> {
+    const vectorString = `[${vector.join(',')}]`;
+    const areaCondition = areaId !== undefined ? `AND p.area_id = ${Number(areaId)}` : '';
+
+    const sql = `
+      SELECT
+        p.id,
+        p.name,
+        p.description,
+        p.address,
+        p.district,
+        p.city,
+        p.latitude,
+        p.longitude,
+        p.price_level,
+        p.opening_hours,
+        p.phone,
+        p.website,
+        p.rating_avg,
+        p.review_count,
+        p.image_count,
+        c.id AS category_id,
+        c.name AS category_name,
+        c.name_vi AS category_name_vi,
+        c.slug AS category_slug,
+        c.icon_url AS category_icon_url,
+        a.id AS area_id,
+        a.name AS area_name,
+        a.name_vi AS area_name_vi,
+        a.slug AS area_slug,
+        (
+          SELECT pi.image_url FROM place_images pi
+          WHERE pi.place_id = p.id
+          ORDER BY pi.is_primary DESC, pi.display_order ASC, pi.created_at ASC
+          LIMIT 1
+        ) AS primary_image,
+        NULL AS distance_meters,
+        ROUND((1 - (pe.embedding <=> $1::vector))::numeric, 4) AS similarity_score
+      FROM place_embeddings pe
+      JOIN places p ON pe.place_id = p.id
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN travel_areas a ON p.area_id = a.id
+      WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
+        ${areaCondition}
+        AND (1 - (pe.embedding <=> $1::vector)) >= $2
+      ORDER BY pe.embedding <=> $1::vector ASC
+      LIMIT $3;
+    `;
+
+    return this.prisma.$queryRawUnsafe<any[]>(sql, vectorString, minSimilarity, limit);
+  }
+
+  async findPlacesWithoutEmbedding(limit: number = 50, areaId?: number): Promise<any[]> {
+    return this.prisma.place.findMany({
+      where: {
+        status: 'ACTIVE',
+        deletedAt: null,
+        embedding: null,
+        ...(areaId !== undefined ? { areaId } : {}),
+      },
+      include: {
+        category: true,
+        area: true,
+      },
+      take: limit,
+      orderBy: { ratingAvg: 'desc' },
+    });
+  }
 }

@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { PlacesService } from './places.service';
 import { IPlaceRepository } from './interfaces/place-repository.interface';
+import { IEmbeddingService } from './interfaces/embedding-service.interface';
 import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
 import { BudgetLevel } from '@prisma/client';
 import { PlaceSortBy, SortOrder } from '../../common/enums/places.enum';
@@ -9,6 +10,7 @@ import { PlaceSortBy, SortOrder } from '../../common/enums/places.enum';
 describe('PlacesService', () => {
   let service: PlacesService;
   let repository: jest.Mocked<IPlaceRepository>;
+  let embeddingService: jest.Mocked<IEmbeddingService>;
 
   const mockRawPlaceRow = {
     id: 'a0000000-0000-0000-0000-000000000001',
@@ -38,6 +40,7 @@ describe('PlacesService', () => {
     area_slug: 'da-nang',
     primary_image: 'https://images.tripgenie.app/artcoffee-cover.jpg',
     distance_meters: 350,
+    similarity_score: 0.895,
     full_count: 1,
   };
 
@@ -48,6 +51,14 @@ describe('PlacesService', () => {
       findById: jest.fn(),
       findCategories: jest.fn(),
       findTravelAreas: jest.fn(),
+      searchSemantic: jest.fn(),
+      upsertPlaceEmbedding: jest.fn(),
+      findPlacesWithoutEmbedding: jest.fn(),
+    };
+
+    const mockEmbedding: jest.Mocked<IEmbeddingService> = {
+      generateEmbedding: jest.fn().mockResolvedValue(new Array(1536).fill(0.01)),
+      getModelName: jest.fn().mockReturnValue('models/gemini-embedding-2'),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -57,11 +68,16 @@ describe('PlacesService', () => {
           provide: INJECT_TOKENS.PLACE_REPOSITORY,
           useValue: mockRepo,
         },
+        {
+          provide: INJECT_TOKENS.EMBEDDING_SERVICE,
+          useValue: mockEmbedding,
+        },
       ],
     }).compile();
 
     service = module.get<PlacesService>(PlacesService);
     repository = module.get(INJECT_TOKENS.PLACE_REPOSITORY);
+    embeddingService = module.get(INJECT_TOKENS.EMBEDDING_SERVICE);
   });
 
   it('should be defined', () => {
@@ -99,7 +115,7 @@ describe('PlacesService', () => {
       const closedPlaceRow = {
         ...mockRawPlaceRow,
         id: 'a0000000-0000-0000-0000-000000000002',
-        opening_hours: '03:00-04:00', // Unlikely to be open
+        opening_hours: '03:00-04:00',
       };
 
       repository.searchPlaces.mockResolvedValue({
@@ -114,6 +130,58 @@ describe('PlacesService', () => {
 
       expect(repository.searchPlaces).toHaveBeenCalledTimes(1);
       expect(result.items.every((p) => p.isOpenNow === true)).toBe(true);
+    });
+  });
+
+  describe('searchSemantic', () => {
+    it('should generate vector from text query and return places with similarityScore', async () => {
+      repository.searchSemantic.mockResolvedValue([mockRawPlaceRow]);
+
+      const result = await service.searchSemantic({
+        query: 'quán cafe view biển yên tĩnh',
+        areaId: 1,
+        limit: 5,
+        minSimilarity: 0.5,
+      });
+
+      expect(embeddingService.generateEmbedding).toHaveBeenCalledWith('quán cafe view biển yên tĩnh');
+      expect(repository.searchSemantic).toHaveBeenCalledWith(
+        expect.any(Array),
+        5,
+        1,
+        0.5,
+      );
+      expect(result).toHaveLength(1);
+      expect(result[0].similarityScore).toBe(0.895);
+    });
+  });
+
+  describe('syncEmbeddings', () => {
+    it('should generate and save embeddings for places missing them', async () => {
+      const mockUnembeddedPlace = {
+        id: 'p-1',
+        name: 'Mỳ Quảng 1A',
+        address: '1A Hải Phòng, Đà Nẵng',
+        description: 'Mỳ quảng truyền thống ngon',
+        tags: ['my-quang', 'an-sang'],
+        category: { name: 'Nha hang', nameVi: 'Nhà hàng' },
+      };
+
+      repository.findPlacesWithoutEmbedding.mockResolvedValue([mockUnembeddedPlace]);
+
+      const result = await service.syncEmbeddings({ limit: 10, areaId: 1 });
+
+      expect(repository.findPlacesWithoutEmbedding).toHaveBeenCalledWith(10, 1);
+      expect(embeddingService.generateEmbedding).toHaveBeenCalledTimes(1);
+      expect(repository.upsertPlaceEmbedding).toHaveBeenCalledWith(
+        'p-1',
+        expect.stringContaining('Mỳ Quảng 1A'),
+        expect.any(Array),
+        'models/gemini-embedding-2',
+      );
+      expect(result.processed).toBe(1);
+      expect(result.succeeded).toBe(1);
+      expect(result.failed).toBe(0);
     });
   });
 

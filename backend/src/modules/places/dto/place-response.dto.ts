@@ -51,6 +51,7 @@ export class PlaceItemDto {
   primaryImage: string | null;
   category: PlaceCategoryDto | null;
   area: PlaceAreaDto | null;
+  similarityScore?: number | null;
 }
 
 export class PlaceDetailDto extends PlaceItemDto {

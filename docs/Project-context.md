@@ -87,7 +87,7 @@ Khi hoàn thành bất kỳ module nào, **BẮT BUỘC** thực hiện quy trì
 ## 6. Database Schema (v5 — Source of Truth: `docs/DB.md`)
 
 - **29 bảng**, **15 enums**, **5 triggers**, **1 view** (`active_places`), **6 extensions** (`uuid-ossp`, `postgis`, `vector`, `pg_trgm`, `citext`, `unaccent`).
-- **Prisma Schema**: `trip-genie/prisma/schema.prisma` khớp 100% với `docs/DB.md` v5.
+- **Prisma Schema**: `backend/prisma/schema.prisma` khớp 100% với `docs/DB.md` v5.
 
 ---
 

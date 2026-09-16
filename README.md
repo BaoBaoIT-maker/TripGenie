@@ -7,8 +7,8 @@ TripGenie is a full-stack tourism discovery and itinerary-planning platform. It 
 | Path | Purpose |
 | --- | --- |
 | `frontend/` | Next.js 16, React 19, TypeScript, Tailwind CSS, TanStack Query, Zustand, VietMap |
-| `trip-genie/` | NestJS 11 API, Prisma, PostgreSQL/PostGIS, Redis, BullMQ |
-| `test/` | Frontend unit and component tests |
+| `backend/` | NestJS 11 API, Prisma, PostgreSQL/PostGIS, Redis, BullMQ |
+| `test/` | Frontend and backend test suites |
 | `docs/` | Product specifications and implementation plans |
 
 ## Current features
@@ -44,13 +44,13 @@ The frontend is available at `http://localhost:3000`.
 ## Backend setup
 
 ```bash
-cd trip-genie
+cd backend
 npm install
 npx prisma generate
 docker compose up -d
 ```
 
-Copy `trip-genie/.env.example` to `trip-genie/.env`. When the frontend is also running locally, set the backend `PORT` to `3001` and start the API:
+Copy `backend/.env.example` to `backend/.env`. When the frontend is also running locally, set the backend `PORT` to `3001` and start the API:
 
 ```bash
 npm run start:dev
@@ -72,7 +72,7 @@ npm run build
 Backend:
 
 ```bash
-cd trip-genie
+cd backend
 npm test
 npm run build
 ```

@@ -102,7 +102,7 @@ Cho phép API và Crawler Worker **chia sẻ types, database schema, config** m�
 ### Cấu trúc thư mục
 
 ```
-trip-genie/
+backend/
 │
 ├── apps/
 │   ├── api/                          # NestJS HTTP API

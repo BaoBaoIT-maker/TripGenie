@@ -4,9 +4,9 @@ import path from "path";
 export default defineConfig({
   test: {
     environment: "jsdom",
-    setupFiles: ["../test/setup.ts"],
+    setupFiles: ["../test/frontend/setup.ts"],
     globals: true,
-    include: ["../test/**/*.{test,spec}.{ts,tsx}"],
+    include: ["../test/frontend/**/*.{test,spec}.{ts,tsx}"],
   },
   server: {
     fs: {

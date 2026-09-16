@@ -41,7 +41,9 @@ describe("MapFilters", () => {
       />
     );
     await user.click(screen.getByRole("combobox", { name: /Thành phố/i }));
-    await user.click(screen.getByRole("option", { name: "TP. Hồ Chí Minh" }));
+    await user.click(
+      await screen.findByRole("option", { name: "TP. Hồ Chí Minh" })
+    );
     expect(onChange).toHaveBeenCalledWith({
       ...filters,
       ...CITY_CENTERS["TP. Hồ Chí Minh"],

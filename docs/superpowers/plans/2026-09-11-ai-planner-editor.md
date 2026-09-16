@@ -82,7 +82,7 @@
 - Produces: `removePlannerItem(planner: Planner, itemId: string): Planner`
 - Produces: `getInviteConflict(planner: Planner, currentUserId: string, candidateUserId: string): "self" | "member" | "pending" | null`
 
-- [ ] **Step 1: Install and configure the test runner**
+- [x] **Step 1: Install and configure the test runner**
 
 Run from `frontend/`:
 
@@ -101,7 +101,7 @@ Add scripts:
 
 Configure Vitest with `environment: "jsdom"`, `setupFiles: ["./src/test/setup.ts"]`, and the existing `@` alias mapped to `frontend/src`.
 
-- [ ] **Step 2: Extend planner types without weakening existing types**
+- [x] **Step 2: Extend planner types without weakening existing types**
 
 Add these exact domain types and required planner fields:
 
@@ -150,7 +150,7 @@ export type UpdatePlannerInput = Omit<Planner, "id" | "createdAt">;
 
 Add `description`, `status`, `members`, `invitations`, `createdAt`, and `updatedAt` to `Planner`. Add an `order` value to every constructed `PlannerItem`; do not suppress type errors with `any`.
 
-- [ ] **Step 3: Write failing pure-domain tests**
+- [x] **Step 3: Write failing pure-domain tests**
 
 Test these exact outcomes:
 
@@ -183,17 +183,17 @@ it.each([
 });
 ```
 
-- [ ] **Step 4: Run tests and verify the intended failures**
+- [x] **Step 4: Run tests and verify the intended failures**
 
 Run: `npm test -- src/features/planner/model/planner-draft.test.ts`
 
 Expected: FAIL because the domain helper module and extended types are not implemented.
 
-- [ ] **Step 5: Implement the pure helpers**
+- [x] **Step 5: Implement the pure helpers**
 
 Use immutable array operations. `normalizePlanner` must recalculate `order`, `dayTotalCost`, and `estimatedTotalCost`; every mutating helper must return `normalizePlanner(updatedPlanner)`.
 
-- [ ] **Step 6: Run unit tests and quality checks**
+- [x] **Step 6: Run unit tests and quality checks**
 
 Run:
 
@@ -204,7 +204,7 @@ npm run lint
 
 Expected: planner-domain tests PASS and lint has no new errors.
 
-- [ ] **Step 7: Commit the domain foundation**
+- [x] **Step 7: Commit the domain foundation**
 
 ```bash
 git add frontend/package.json frontend/package-lock.json frontend/vitest.config.ts frontend/src/test/setup.ts frontend/src/types/planner.ts frontend/src/features/planner/model
@@ -229,7 +229,7 @@ git commit -m "feat(planner): add editable planner domain model"
 - Produces: `plannerService.generateAiPlanner/createPlanner/getPlanners/getPlannerById/updatePlanner/searchInviteCandidates/createPlannerInvitation/updateMockInvitationStatus`
 - Produces: `usePlannersQuery`, `usePlannerQuery`, `useCreatePlannerMutation`, `useUpdatePlannerMutation`, `useCreatePlannerInvitationMutation`, `useUpdateMockInvitationStatusMutation`
 
-- [ ] **Step 1: Write failing repository tests**
+- [x] **Step 1: Write failing repository tests**
 
 Use the storage key `triptailor:planners:v1` and cover:
 
@@ -254,33 +254,33 @@ it("falls back to seeded planners when stored JSON is invalid", async () => {
 });
 ```
 
-- [ ] **Step 2: Verify repository tests fail**
+- [x] **Step 2: Verify repository tests fail**
 
 Run: `npm test -- src/features/planner/data/planner.repository.test.ts`
 
 Expected: FAIL because `plannerRepository` does not exist.
 
-- [ ] **Step 3: Implement repository merge and migration rules**
+- [x] **Step 3: Implement repository merge and migration rules**
 
 Store `{ version: 1, planners: Planner[] }`. On first read, merge seeded planners and legacy `triptailor_user_planners` entries by ID, preferring user entries. Do not clear either key automatically. Return cloned normalized records so consumers cannot mutate repository state by reference.
 
-- [ ] **Step 4: Add mock account records**
+- [x] **Step 4: Add mock account records**
 
 Create at least six `InviteCandidate` records with stable IDs, Vietnamese display names, non-sensitive example-domain emails such as `lan@example.com`, avatars, and online/offline status. Mark the current mock user as `user-current` so self-invite validation is deterministic.
 
-- [ ] **Step 5: Implement service methods and query hooks**
+- [x] **Step 5: Implement service methods and query hooks**
 
 `generateAiPlanner(input)` must create a populated planner with a unique ID, one `PlannerDay` per inclusive date, and two or more `MOCK_PLACES` distributed across days. It returns the planner but does not navigate. `createPlanner` and `updatePlanner` own persistence. Search matches normalized display name or email and returns an empty array for queries shorter than two trimmed characters.
 
 Mutation success handlers must invalidate `['planners']` and `['planner', plannerId]` as appropriate.
 
-- [ ] **Step 6: Run repository and domain tests**
+- [x] **Step 6: Run repository and domain tests**
 
 Run: `npm test -- src/features/planner`
 
 Expected: all planner tests PASS.
 
-- [ ] **Step 7: Commit repository and services**
+- [x] **Step 7: Commit repository and services**
 
 ```bash
 git add frontend/src/features/planner/data frontend/src/features/planner/hooks frontend/src/mocks/data/users.ts frontend/src/mocks/data/planners.ts frontend/src/services/planner.service.ts
@@ -299,7 +299,7 @@ git commit -m "feat(planner): persist mock planner drafts"
 - Consumes: `AiPlannerInput`, `plannerService.generateAiPlanner`, `plannerService.createPlanner`
 - Produces: navigation to `/planner/${created.id}/edit`
 
-- [ ] **Step 1: Write the failing AI submission test**
+- [x] **Step 1: Write the failing AI submission test**
 
 Mock `generateAiPlanner` to return `{ id: "planner-generated-1", ... }`, mock `createPlanner` to return the same record, submit the form, and assert:
 
@@ -312,17 +312,17 @@ expect(plannerService.createPlanner).toHaveBeenCalledWith(expect.objectContainin
 expect(push).toHaveBeenCalledWith("/planner/planner-generated-1/edit");
 ```
 
-- [ ] **Step 2: Verify the test fails for the hard-coded route**
+- [x] **Step 2: Verify the test fails for the hard-coded route**
 
 Run: `npm test -- src/app/planner/new/page.test.tsx -t "generated id"`
 
 Expected: FAIL because the page currently routes to `/planner/planner-saigon-foodie`.
 
-- [ ] **Step 3: Replace direct storage and hard-coded navigation**
+- [x] **Step 3: Replace direct storage and hard-coded navigation**
 
 Build one `AiPlannerInput` from the validated form, await generation and creation, then call `router.push(`/planner/${created.id}/edit`)`. Preserve entered values on failure and show an error toast. Keep the submit button disabled and labelled “Đang tạo lịch trình...” while pending.
 
-- [ ] **Step 4: Run the focused test and lint**
+- [x] **Step 4: Run the focused test and lint**
 
 Run:
 
@@ -333,7 +333,7 @@ npm run lint
 
 Expected: PASS and no new lint errors.
 
-- [ ] **Step 5: Commit generation flow**
+- [x] **Step 5: Commit generation flow**
 
 ```bash
 git add frontend/src/app/planner/new/page.tsx frontend/src/app/planner/new/page.test.tsx
@@ -356,17 +356,17 @@ git commit -m "fix(planner): open generated planner editor"
 - Consumes: `usePlannerQuery`, `useUpdatePlannerMutation`, `normalizePlanner`
 - Produces: `usePlannerDraftStore` with `draft`, `isDirty`, `load`, `patch`, `replace`, `markSaved`, `reset`
 
-- [ ] **Step 1: Write failing editor lifecycle tests**
+- [x] **Step 1: Write failing editor lifecycle tests**
 
 Cover loading, not found, error/retry, metadata dirty state, save failure retaining the draft, save success clearing dirty state, and preview navigation. Assert the save button is disabled while clean or invalid.
 
-- [ ] **Step 2: Verify lifecycle tests fail**
+- [x] **Step 2: Verify lifecycle tests fail**
 
 Run: `npm test -- src/features/planner/components/PlannerEditor.test.tsx -t "editor lifecycle"`
 
 Expected: FAIL because the editor route and components do not exist.
 
-- [ ] **Step 3: Add the Server Component route boundary**
+- [x] **Step 3: Add the Server Component route boundary**
 
 Implement the Next.js 16 dynamic route pattern:
 
@@ -385,17 +385,17 @@ export default async function PlannerEditPage({ params }: PageProps<"/planner/[i
 }
 ```
 
-- [ ] **Step 4: Implement draft lifecycle and responsive shell**
+- [x] **Step 4: Implement draft lifecycle and responsive shell**
 
 Load query data once per planner ID into the draft store. Render header actions, trip form, itinerary slot, sticky desktop sidebar, budget, and companion slot. Use a two-column `lg:grid-cols-12` layout and stack at smaller sizes.
 
 Use React Hook Form plus Zod for metadata validation: trimmed non-empty title/destination, `people >= 1`, `budget >= 0`, and `endDate >= startDate`. Form changes call `patch` and mark dirty.
 
-- [ ] **Step 5: Implement honest save and preview behavior**
+- [x] **Step 5: Implement honest save and preview behavior**
 
 Save calls `updatePlanner(planner.id, normalizePlanner(draft))`. Show saving state, clear dirty only with the returned saved planner, and keep the draft on failure. Preview routes to `/planner/${id}` only when clean; when dirty, open a dialog with “Tiếp tục chỉnh sửa”, “Bỏ thay đổi”, and “Lưu rồi xem trước”.
 
-- [ ] **Step 6: Run lifecycle tests and lint**
+- [x] **Step 6: Run lifecycle tests and lint**
 
 Run:
 
@@ -406,7 +406,7 @@ npm run lint
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit the editor shell**
+- [x] **Step 7: Commit the editor shell**
 
 ```bash
 git add frontend/src/app/planner/[id]/edit frontend/src/features/planner/stores frontend/src/features/planner/components/PlannerEditor.tsx frontend/src/features/planner/components/TripDetailsEditor.tsx frontend/src/features/planner/components/BudgetSummary.tsx frontend/src/features/planner/components/PlannerEditor.test.tsx
@@ -429,29 +429,29 @@ git commit -m "feat(planner): add persistent editor workspace"
 - Consumes: pure draft helpers from Task 1 and `placeService.getPlaces`
 - Produces: accessible within-day reorder, cross-day move, add/edit/delete stop actions
 
-- [ ] **Step 1: Write failing itinerary interaction tests**
+- [x] **Step 1: Write failing itinerary interaction tests**
 
 Cover reorder, moving an item to another day, editing time/cost/note, deletion confirmation, empty day state, and adding a searched place. Assert recalculated orders and totals rather than only checking toast text.
 
-- [ ] **Step 2: Verify interaction tests fail**
+- [x] **Step 2: Verify interaction tests fail**
 
 Run: `npm test -- src/features/planner/components/PlannerEditor.test.tsx -t "itinerary"`
 
 Expected: FAIL because itinerary editor components are absent.
 
-- [ ] **Step 3: Implement accessible DnD**
+- [x] **Step 3: Implement accessible DnD**
 
 Use `DndContext`, `PointerSensor`, `KeyboardSensor`, `useSensors`, `closestCenter`, `SortableContext`, `verticalListSortingStrategy`, and `sortableKeyboardCoordinates`. Put drag listeners only on a labelled drag handle. Encode the source day and item ID in draggable data; encode the target day in day containers so `onDragEnd` can call the correct pure helper.
 
-- [ ] **Step 4: Implement itinerary card and edit dialog**
+- [x] **Step 4: Implement itinerary card and edit dialog**
 
 Render image, place details, day, times, duration, cost, note, edit, and delete. The Zod schema requires `endTime > startTime`, `durationMinutes >= 0`, `estimatedCost >= 0`, and a valid day number. Confirm before deletion.
 
-- [ ] **Step 5: Implement the end-of-day place search action**
+- [x] **Step 5: Implement the end-of-day place search action**
 
 Place a dashed full-width “Tìm địa điểm mới” button after every day list, including empty days. Debounce queries by 250–350 ms. Render skeleton, retryable error, “Không tìm thấy địa điểm phù hợp”, and result rows. After selection, open `PlannerItemDialog` prefilled with that place and the active day; add only after schedule validation succeeds.
 
-- [ ] **Step 6: Run interaction tests and lint**
+- [x] **Step 6: Run interaction tests and lint**
 
 Run:
 
@@ -462,7 +462,7 @@ npm run lint
 
 Expected: PASS.
 
-- [ ] **Step 7: Commit itinerary editing**
+- [x] **Step 7: Commit itinerary editing**
 
 ```bash
 git add frontend/src/features/planner/components/ItineraryEditor.tsx frontend/src/features/planner/components/SortablePlannerItem.tsx frontend/src/features/planner/components/PlannerItemDialog.tsx frontend/src/features/planner/components/PlaceSearchDialog.tsx frontend/src/features/planner/components/PlannerEditor.tsx frontend/src/features/planner/components/PlannerEditor.test.tsx
@@ -483,25 +483,25 @@ git commit -m "feat(planner): edit and reorder itinerary stops"
 - Consumes: `searchInviteCandidates`, `createPlannerInvitation`, `updateMockInvitationStatus`, `getInviteConflict`
 - Produces: searchable mock-account invitation UI with `viewer` and `editor` permissions
 
-- [ ] **Step 1: Write failing invitation tests**
+- [x] **Step 1: Write failing invitation tests**
 
 Test query shorter than two characters, matching name/email, viewer/editor selection, pending result display, duplicate/self/member rejection, accepted transition moving a person into members, declined transition removing the active pending state, and mutation error recovery.
 
-- [ ] **Step 2: Verify invitation tests fail**
+- [x] **Step 2: Verify invitation tests fail**
 
 Run: `npm test -- src/features/planner/components/PlannerEditor.test.tsx -t "invitation"`
 
 Expected: FAIL because invitation components are absent.
 
-- [ ] **Step 3: Implement companion panel**
+- [x] **Step 3: Implement companion panel**
 
 Show owner and accepted members as avatars with visible role labels. Show pending invitations with name, email, permission, and status text. The primary action opens the invite dialog. Keep “Chấp nhận giả lập” and “Từ chối giả lập” visibly labelled as mock-test controls.
 
-- [ ] **Step 4: Implement invitation dialog**
+- [x] **Step 4: Implement invitation dialog**
 
 Use a labelled search field, 300 ms debounce, result radio selection, and a permission select with `Có thể xem` and `Có thể chỉnh sửa`. Before mutation, call `getInviteConflict`; show specific inline Vietnamese messages for self, existing member, and pending invitation. Disable submit until one valid account and permission are selected.
 
-- [ ] **Step 5: Run invitation tests and lint**
+- [x] **Step 5: Run invitation tests and lint**
 
 Run:
 
@@ -512,7 +512,7 @@ npm run lint
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit invitation flow**
+- [x] **Step 6: Commit invitation flow**
 
 ```bash
 git add frontend/src/features/planner/components/CompanionPanel.tsx frontend/src/features/planner/components/InviteCompanionDialog.tsx frontend/src/features/planner/components/PlannerEditor.tsx frontend/src/features/planner/components/PlannerEditor.test.tsx
@@ -532,15 +532,15 @@ git commit -m "feat(planner): add mock account invitations"
 - Consumes: repository-backed query hooks and saved planner records
 - Produces: consistent list, preview, edit, reload, and generated-planner behavior
 
-- [ ] **Step 1: Replace direct planner-list storage access**
+- [x] **Step 1: Replace direct planner-list storage access**
 
 Use `usePlannersQuery`; render loading, error/retry, empty, and success states. User-created planners and seed planners must remain addressable by ID. Link owned planner cards to preview and expose an edit action to `/planner/${id}/edit`.
 
-- [ ] **Step 2: Make detail route a saved-data preview**
+- [x] **Step 2: Make detail route a saved-data preview**
 
 Load by route ID through the query/service boundary. Remove the fake save button and local-only editor actions from the preview. Add “Chỉnh sửa chuyến đi” linking to `/planner/${id}/edit`. Keep sharing as a separate preview action.
 
-- [ ] **Step 3: Run all automated checks**
+- [x] **Step 3: Run all automated checks**
 
 Run from `frontend/`:
 
@@ -552,19 +552,19 @@ npm run build
 
 Expected: all tests PASS, lint exits 0, and Next.js production build completes successfully.
 
-- [ ] **Step 4: Verify the AI-to-editor flow in the browser**
+- [x] **Step 4: Verify the AI-to-editor flow in the browser**
 
 At `http://localhost:3000/planner/new?mode=ai`, submit a valid trip and verify the URL becomes `/planner/{new-id}/edit`, the same title/dates appear, and populated itinerary cards render. Confirm there are no new console errors.
 
-- [ ] **Step 5: Verify editing and persistence**
+- [x] **Step 5: Verify editing and persistence**
 
 At desktop width, reorder within one day, move a stop to another day, edit its time/cost/note, add a searched mock place, invite a mock account as editor, simulate acceptance, and save. Reload and verify all changes persist. Open preview and verify it displays saved data without editor controls.
 
-- [ ] **Step 6: Verify responsive and accessible behavior**
+- [x] **Step 6: Verify responsive and accessible behavior**
 
 Repeat core checks at 375, 768, 1024, and 1440 px. Verify no horizontal overflow, sticky sidebar only where appropriate, dialogs fit the viewport, day tabs scroll, keyboard focus is visible, drag handles are keyboard-operable, and invitation/save state is conveyed with text as well as color.
 
-- [ ] **Step 7: Review the final diff for scope and user changes**
+- [x] **Step 7: Review the final diff for scope and user changes**
 
 Run:
 
@@ -576,7 +576,7 @@ git diff -- frontend
 
 Confirm no pre-existing user changes were deleted or overwritten and no unrelated files changed.
 
-- [ ] **Step 8: Commit integration fixes**
+- [x] **Step 8: Commit integration fixes**
 
 ```bash
 git add frontend/src/app/planner frontend/src/features/planner frontend/src/services/planner.service.ts frontend/src/types/planner.ts frontend/src/mocks/data frontend/package.json frontend/package-lock.json frontend/vitest.config.ts frontend/src/test/setup.ts

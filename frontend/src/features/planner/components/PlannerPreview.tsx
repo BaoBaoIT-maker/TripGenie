@@ -38,7 +38,7 @@ export function PlannerPreview({ plannerId }: PlannerPreviewProps) {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-16">
+      <div className="max-w-[1536px] mx-auto w-full px-4 py-16 sm:px-6 lg:px-8 xl:px-10">
         <LoadingState message="Đang tải kế hoạch chuyến đi..." />
       </div>
     );
@@ -46,7 +46,7 @@ export function PlannerPreview({ plannerId }: PlannerPreviewProps) {
 
   if (isError || !planner) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-16">
+      <div className="max-w-[1536px] mx-auto w-full px-4 py-16 sm:px-6 lg:px-8 xl:px-10">
         <EmptyState
           title="Không tìm thấy lịch trình"
           description="Lịch trình này không tồn tại hoặc đã bị xóa."
@@ -81,7 +81,7 @@ export function PlannerPreview({ plannerId }: PlannerPreviewProps) {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 space-y-8 pb-20">
+    <div className="max-w-[1536px] mx-auto w-full px-4 py-6 sm:px-6 lg:px-8 xl:px-10 space-y-8 pb-20">
       {/* TOP TOOLBAR: BREADCRUMB & ACTIONS */}
       <div className="flex flex-wrap items-center justify-between gap-4 text-xs border-b border-border pb-4">
         <Link

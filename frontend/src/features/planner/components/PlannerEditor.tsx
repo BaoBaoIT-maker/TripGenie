@@ -60,7 +60,7 @@ export function PlannerEditor({
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+      <div className="max-w-[1536px] mx-auto w-full px-4 py-16 sm:px-6 lg:px-8 xl:px-10">
         <LoadingState message="Đang tải thông tin chuyến đi..." />
       </div>
     );
@@ -68,7 +68,7 @@ export function PlannerEditor({
 
   if (isError) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+      <div className="max-w-[1536px] mx-auto w-full px-4 py-16 sm:px-6 lg:px-8 xl:px-10">
         <div className="rounded-3xl border border-destructive/20 bg-destructive/5 p-8 text-center space-y-4">
           <div className="flex justify-center text-destructive">
             <AlertCircle className="size-10" />
@@ -87,7 +87,7 @@ export function PlannerEditor({
 
   if (!serverPlanner && !draft) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+      <div className="max-w-[1536px] mx-auto w-full px-4 py-16 sm:px-6 lg:px-8 xl:px-10">
         <EmptyState
           title="Không tìm thấy lịch trình"
           description="Lịch trình bạn đang tìm kiếm không tồn tại hoặc đã bị xóa."
@@ -178,7 +178,7 @@ export function PlannerEditor({
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 space-y-8 pb-24">
+    <div className="max-w-[1536px] mx-auto w-full px-4 py-8 sm:px-6 lg:px-8 xl:px-10 space-y-8 pb-24">
       {/* Top Header & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
         <div className="flex items-center gap-3">

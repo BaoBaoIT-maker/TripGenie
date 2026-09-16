@@ -7,6 +7,7 @@ import { RedisModule } from './database/redis.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { CrawlerModule } from './modules/crawler/crawler.module';
+import { PlacesModule } from './modules/places/places.module';
 import { appConfig, databaseConfig, jwtConfig, redisConfig, aiConfig, crawlerConfig } from './config';
 import { envValidationSchema } from './config/env.validation';
 
@@ -22,6 +23,7 @@ import { envValidationSchema } from './config/env.validation';
     AuthModule,
     UsersModule,
     CrawlerModule,
+    PlacesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

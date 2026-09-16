@@ -138,13 +138,24 @@ Khi hoàn thành bất kỳ module nào, **BẮT BUỘC** thực hiện quy trì
 - [x] **BullMQ Queue Workers** — Tích hợp `CrawlProcessor` (`@Processor('crawl-queue')`) & `EnrichProcessor` (`@Processor('enrich-queue')`), hỗ trợ **Auto-Retry 5 lần với Exponential Backoff (5s, 10s, 20s...)** khi rớt mạng/sập kết nối, đẩy job qua Redis Queue độc lập.
 - [x] **Thực thi Cào Thực Tế (Đà Nẵng)** — Cào thành công **2,124 địa điểm thực tế** tại Đà Nẵng (Bbox: 15.97-16.16, 107.98-108.36), phân loại vào 11 danh mục (930 Cafe, 541 Nhà hàng, 390 Khách sạn, 90 Bar/Pub, 68 Ăn vặt, 37 Điểm tham quan...), bóc tách giờ mở cửa (302), phone (247), website (126).
 
-### TODO — PHASE 4: Places & Search API (Tiếp theo)
+### DONE — PHASE 4: Places & Search Engine Module
 
-- [ ] Place Detail API (`GET /places/:id` — thông tin chi tiết địa điểm, hình ảnh, nguồn cào)
-- [ ] Spatial & Hybrid Search API (`GET /places/search` — PostGIS + pgvector + pg_trgm)
-- [ ] User Profile Management API (`GET /users/me`, `PATCH /users/me`)
-- [ ] User Preferences API (`GET /users/preferences`, `PUT /users/preferences`)
-- [ ] Unit & E2E Tests cho Places Module
+- [x] **PlacesRepository** — Triển khai `IPlaceRepository` với PostGIS spatial indexing (`ST_DWithin`, `ST_Distance(..., true)`), Dynamic SQL Parameterized Builder an toàn chống SQL injection.
+- [x] **PlacesService** — Nghiệp vụ lọc đa tiêu chí theo Form Frontend (keyword, areaId, categorySlugs, budgetLevels, minRating, openNow, pagination, sorting), DTO mapping, và tính toán giờ mở cửa (`checkIsOpenNow`).
+- [x] **PlacesController** — Cung cấp 5 endpoints RESTful công khai:
+  - `GET /api/v1/places/search`: Tìm kiếm & lọc đa tiêu chí theo Form bộ lọc Frontend.
+  - `GET /api/v1/places/nearby`: Tìm kiếm địa điểm xung quanh vị trí GPS bằng PostGIS spatial radius.
+  - `GET /api/v1/places/categories`: Danh sách 15 categories kèm số lượng địa điểm thực tế (`placeCount`).
+  - `GET /api/v1/places/travel-areas`: Danh sách 12 travel areas kèm bounding box GPS.
+  - `GET /api/v1/places/:id`: Chi tiết 1 địa điểm (UUID) kèm mảng hình ảnh gallery và nguồn dữ liệu.
+- [x] **Unit Tests & Real DB Integration Tests** — 18/18 Unit Tests PASS 100% (`places.service.spec.ts`, `places.controller.spec.ts`) và test thực tế trên **2,124 địa điểm Đà Nẵng** trong PostgreSQL trả về kết quả chính xác trong vài miligiây.
+
+### TODO — PHASE 5: Personalized Itinerary Planner AI (Tiếp theo)
+
+- [ ] Itinerary Database Entities & Repository (`itineraries`, `itinerary_days`, `itinerary_items`)
+- [ ] AI Itinerary Generator Service (Tích hợp Gemini 2.5 Flash + Structured Output tạo lịch trình cá nhân hóa dựa trên gu du lịch, ngân sách và POIs thực tế từ DB)
+- [ ] Route & Distance Optimization giữa các điểm đến
+- [ ] Itinerary CRUD & Management APIs (Lưu, đổi điểm đến, chia sẻ lịch trình)
 
 ---
 

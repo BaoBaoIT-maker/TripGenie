@@ -24,6 +24,7 @@ function getDaysBetween(startDateStr: string, endDateStr: string): string[] {
   }
 
   const curr = new Date(start);
+  const dates: string[] = [];
   while (curr <= end) {
     dates.push(curr.toISOString().split("T")[0]);
     curr.setDate(curr.getDate() + 1);

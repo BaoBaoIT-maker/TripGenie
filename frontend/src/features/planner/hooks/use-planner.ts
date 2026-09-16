@@ -14,6 +14,8 @@ export function usePlannersQuery() {
   return useQuery({
     queryKey: plannerKeys.lists(),
     queryFn: () => plannerService.getPlanners(),
+    initialData: () => MOCK_PLANNERS.map(normalizePlanner),
+    initialDataUpdatedAt: 0,
   });
 }
 
@@ -21,6 +23,11 @@ export function usePlannerQuery(id: string) {
   return useQuery({
     queryKey: plannerKeys.detail(id),
     queryFn: () => plannerService.getPlannerById(id),
+    initialData: () => {
+      const seed = MOCK_PLANNERS.find((p) => p.id === id);
+      return seed ? normalizePlanner(seed) : undefined;
+    },
+    initialDataUpdatedAt: 0,
     enabled: Boolean(id),
   });
 }

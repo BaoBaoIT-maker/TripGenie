@@ -34,8 +34,17 @@ function loadFromStorage(): Planner[] {
   if (raw) {
     try {
       const parsed: StoredData = JSON.parse(raw);
-      if (parsed && Array.isArray(parsed.planners)) {
-        return parsed.planners.map(normalizePlanner);
+      if (parsed && Array.isArray(parsed.planners) && parsed.planners.length > 0) {
+        const map = new Map<string, Planner>();
+        for (const seed of MOCK_PLANNERS) {
+          map.set(seed.id, normalizePlanner(seed));
+        }
+        for (const item of parsed.planners) {
+          if (item && item.id) {
+            map.set(item.id, normalizePlanner(item));
+          }
+        }
+        return Array.from(map.values());
       }
     } catch {
       // Invalid JSON, fall back to seeded + legacy

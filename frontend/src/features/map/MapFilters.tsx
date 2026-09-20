@@ -112,6 +112,7 @@ export function MapFilters({
       longitude: DEFAULT_MAP_CENTER.longitude,
       openNow: false,
       priceLevels: [],
+      maxPriceVnd: null,
       minRating: null,
       sortBy: "distance",
       page: 1,
@@ -154,7 +155,9 @@ export function MapFilters({
           <div className="w-[170px]">
             <Select value={filters.areaSlug} onValueChange={handleAreaChange}>
               <SelectTrigger aria-label="Vùng du lịch" className="h-10 text-xs">
-                <SelectValue placeholder="Chọn tỉnh / TP" />
+                <SelectValue placeholder="Chọn tỉnh / TP">
+                  {(val) => areas.find((a) => a.slug === val)?.name || "Chọn tỉnh / TP"}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {areas.map((area) => (

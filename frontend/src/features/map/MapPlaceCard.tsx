@@ -138,6 +138,14 @@ export function MapPlaceCard({
                   Đóng cửa
                 </span>
               )}
+              {place.priceLevel && (
+                <span className="text-[10px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 px-1.5 py-0.5 rounded-full">
+                  {place.priceLevel === 1 && "≤ 100k đ"}
+                  {place.priceLevel === 2 && "100k - 300k đ"}
+                  {place.priceLevel === 3 && "300k - 800k đ"}
+                  {place.priceLevel === 4 && "> 800k đ"}
+                </span>
+              )}
             </div>
 
             {/* Place Title */}

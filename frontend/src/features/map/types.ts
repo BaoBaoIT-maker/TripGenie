@@ -22,6 +22,7 @@ export interface DiscoveryFilters extends MapCoordinate {
   radiusKm: RadiusKm;
   openNow: boolean;
   priceLevels: number[]; // 1, 2, 3, 4
+  maxPriceVnd?: number | null;
   minRating: number | null;
   sortBy: SortKey;
   page: number;

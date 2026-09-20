@@ -53,6 +53,12 @@ export function parseMapSearchParams(params: URLSearchParams): ParsedMapQuery {
   const openNow = rawOpenNow === "true";
 
   const priceLevels = parsePriceLevels(params.get("priceLevels"));
+  const rawMaxPrice = params.get("maxPrice") ?? params.get("maxPriceVnd");
+  const parsedMaxPrice = rawMaxPrice ? parseInt(rawMaxPrice, 10) : null;
+  const maxPriceVnd =
+    parsedMaxPrice !== null && !Number.isNaN(parsedMaxPrice) && parsedMaxPrice > 0
+      ? parsedMaxPrice
+      : null;
 
   const rawMinRating = params.get("minRating");
   const parsedMinRating = rawMinRating ? parseFloat(rawMinRating) : null;
@@ -80,6 +86,7 @@ export function parseMapSearchParams(params: URLSearchParams): ParsedMapQuery {
       longitude: longitude ?? DEFAULT_MAP_CENTER.longitude,
       openNow,
       priceLevels,
+      maxPriceVnd,
       minRating,
       sortBy,
       page,
@@ -130,6 +137,12 @@ export function mergeMapSearchParams(
     params.set("priceLevels", filters.priceLevels.join(","));
   } else {
     params.delete("priceLevels");
+  }
+
+  if (filters.maxPriceVnd) {
+    params.set("maxPrice", filters.maxPriceVnd.toString());
+  } else {
+    params.delete("maxPrice");
   }
 
   if (filters.minRating !== null && filters.minRating !== undefined) {

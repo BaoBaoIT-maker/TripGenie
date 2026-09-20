@@ -110,8 +110,18 @@ export const mapDiscoveryService = {
         return false;
       }
 
-      // Price levels filter
-      if (filters.priceLevels && filters.priceLevels.length > 0) {
+      // Price levels & maxPriceVnd filter
+      if (filters.maxPriceVnd && filters.maxPriceVnd > 0) {
+        if (filters.maxPriceVnd <= 100000 && place.priceLevel !== null && place.priceLevel > 1) {
+          return false;
+        }
+        if (filters.maxPriceVnd <= 300000 && place.priceLevel !== null && place.priceLevel > 2) {
+          return false;
+        }
+        if (filters.maxPriceVnd <= 800000 && place.priceLevel !== null && place.priceLevel > 3) {
+          return false;
+        }
+      } else if (filters.priceLevels && filters.priceLevels.length > 0) {
         if (place.priceLevel === null || !filters.priceLevels.includes(place.priceLevel)) {
           return false;
         }

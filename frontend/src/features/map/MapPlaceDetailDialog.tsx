@@ -164,8 +164,12 @@ export function MapPlaceDetailDialog({
                     </span>
                     <span>({place.reviewCount} đánh giá)</span>
                     {place.priceLevel && (
-                      <span className="font-semibold text-foreground ml-2">
-                        {"$".repeat(place.priceLevel)}
+                      <span className="font-medium text-emerald-700 dark:text-emerald-300 ml-2">
+                        • Mức giá:{" "}
+                        {place.priceLevel === 1 && "≤ 100.000 đ (Bình dân)"}
+                        {place.priceLevel === 2 && "100.000 đ - 300.000 đ (Vừa phải)"}
+                        {place.priceLevel === 3 && "300.000 đ - 800.000 đ (Cao cấp)"}
+                        {place.priceLevel === 4 && "> 800.000 đ (Sang trọng)"}
                       </span>
                     )}
                   </div>

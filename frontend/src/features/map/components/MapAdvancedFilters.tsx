@@ -17,40 +17,46 @@ export interface MapAdvancedFiltersProps {
   onReset: () => void;
 }
 
+const RATING_LABELS: Record<string, string> = {
+  all: "Tất cả đánh giá",
+  "3": "Từ 3.0★",
+  "4": "Từ 4.0★",
+  "4.5": "Từ 4.5★",
+};
+
+const SORT_LABELS: Record<string, string> = {
+  distance: "Gần nhất",
+  rating: "Đánh giá cao",
+  reviews: "Nhiều đánh giá",
+};
+
 export function MapAdvancedFilters({
   filters,
   onChange,
   onReset,
 }: MapAdvancedFiltersProps) {
-  const isPriceSelected = (level: 1 | 2 | 3) => {
-    if (!filters.priceLevels || filters.priceLevels.length === 0) return false;
-    if (level === 1) return filters.priceLevels.includes(1);
-    if (level === 2) return filters.priceLevels.includes(2);
-    if (level === 3) return filters.priceLevels.includes(3) || filters.priceLevels.includes(4);
-    return false;
-  };
+  // Current price ceiling (defaults to 1.000.000 for "Tất cả mức")
+  const currentPrice = filters.maxPriceVnd ?? 1000000;
 
-  const togglePriceLevel = (level: 1 | 2 | 3) => {
-    const current = new Set<number>(filters.priceLevels || []);
-    if (level === 1) {
-      if (current.has(1)) current.delete(1);
-      else current.add(1);
-    } else if (level === 2) {
-      if (current.has(2)) current.delete(2);
-      else current.add(2);
-    } else if (level === 3) {
-      if (current.has(3) || current.has(4)) {
-        current.delete(3);
-        current.delete(4);
-      } else {
-        current.add(3);
-        current.add(4);
-      }
+  const handlePriceSliderChange = (newPrice: number) => {
+    if (newPrice >= 1000000) {
+      onChange({
+        maxPriceVnd: null,
+        priceLevels: [],
+        page: 1,
+      });
+    } else {
+      let levels: number[] = [1];
+      if (newPrice > 100000) levels = [1, 2];
+      if (newPrice > 300000) levels = [1, 2, 3];
+      if (newPrice > 800000) levels = [1, 2, 3, 4];
+
+      onChange({
+        maxPriceVnd: newPrice,
+        priceLevels: levels,
+        page: 1,
+      });
     }
-    onChange({
-      priceLevels: Array.from(current),
-      page: 1,
-    });
   };
 
   const handleRatingChange = (val: string | null) => {
@@ -82,75 +88,57 @@ export function MapAdvancedFilters({
         <span>Đang mở cửa</span>
       </button>
 
-      {/* Budget bands: $, $$, $$$ */}
-      <div className="inline-flex items-center rounded-lg border border-border/70 bg-card p-0.5">
-        <span className="px-2 font-medium text-muted-foreground">Giá:</span>
-        <button
-          type="button"
-          onClick={() => togglePriceLevel(1)}
-          className={`rounded px-2 py-1 font-semibold transition-all ${
-            isPriceSelected(1)
-              ? "bg-primary text-primary-foreground shadow-2xs"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-          title="Bình dân"
-        >
-          $
-        </button>
-        <button
-          type="button"
-          onClick={() => togglePriceLevel(2)}
-          className={`rounded px-2 py-1 font-semibold transition-all ${
-            isPriceSelected(2)
-              ? "bg-primary text-primary-foreground shadow-2xs"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-          title="Vừa phải"
-        >
-          $$
-        </button>
-        <button
-          type="button"
-          onClick={() => togglePriceLevel(3)}
-          className={`rounded px-2 py-1 font-semibold transition-all ${
-            isPriceSelected(3)
-              ? "bg-primary text-primary-foreground shadow-2xs"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-          title="Cao cấp"
-        >
-          $$$
-        </button>
+      {/* Price Slider: Horizontal drag bar with VND amount */}
+      <div className="inline-flex items-center gap-2 rounded-lg border border-border/70 bg-card px-2.5 py-1 text-xs">
+        <span className="font-medium text-muted-foreground whitespace-nowrap">Giá:</span>
+        <input
+          type="range"
+          min={50000}
+          max={1000000}
+          step={50000}
+          value={currentPrice}
+          onChange={(e) => handlePriceSliderChange(Number(e.target.value))}
+          className="h-1.5 w-24 sm:w-28 cursor-pointer appearance-none rounded-lg bg-muted accent-primary"
+          aria-label="Kéo chọn mức giá tối đa"
+          title="Kéo chọn mức giá tối đa"
+        />
+        <span className="font-semibold text-primary min-w-[70px] text-right whitespace-nowrap">
+          {currentPrice >= 1000000 ? "Tất cả mức" : `≤ ${currentPrice.toLocaleString("vi-VN")} đ`}
+        </span>
       </div>
 
       {/* Min rating select */}
-      <div className="w-[115px]">
+      <div className="w-[125px]">
         <Select
           value={filters.minRating !== null ? String(filters.minRating) : "all"}
           onValueChange={handleRatingChange}
         >
           <SelectTrigger aria-label="Đánh giá" className="h-8 text-xs">
-            <SelectValue placeholder="Đánh giá" />
+            <SelectValue placeholder="Đánh giá">
+              {(val) => RATING_LABELS[val] || "Tất cả đánh giá"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Mọi đánh giá</SelectItem>
-            <SelectItem value="3">⭐ 3.0+ trở lên</SelectItem>
-            <SelectItem value="4">⭐ 4.0+ trở lên</SelectItem>
-            <SelectItem value="4.5">⭐ 4.5+ xuất sắc</SelectItem>
+            <SelectItem value="all">Tất cả đánh giá</SelectItem>
+            <SelectItem value="3">⭐ Từ 3.0★ trở lên</SelectItem>
+            <SelectItem value="4">⭐ Từ 4.0★ trở lên</SelectItem>
+            <SelectItem value="4.5">⭐ Từ 4.5★ xuất sắc</SelectItem>
           </SelectContent>
         </Select>
       </div>
 
       {/* Sort select */}
-      <div className="w-[160px]">
+      <div className="w-[130px]">
         <Select value={filters.sortBy} onValueChange={handleSortChange}>
           <SelectTrigger aria-label="Sắp xếp theo" className="h-8 text-xs">
-            <SelectValue placeholder="Sắp xếp" />
+            <SelectValue placeholder="Sắp xếp">
+              {(val) => SORT_LABELS[val] || "Gần nhất"}
+            </SelectValue>
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="distance">Gần vị trí nhất</SelectItem>
+            <SelectItem value="distance">Gần nhất</SelectItem>
             <SelectItem value="rating">Đánh giá cao nhất</SelectItem>
-            <SelectItem value="reviews">Nhiều nhận xét nhất</SelectItem>
+            <SelectItem value="reviews">Nhiều đánh giá nhất</SelectItem>
           </SelectContent>
         </Select>
       </div>

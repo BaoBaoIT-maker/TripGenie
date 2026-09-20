@@ -1,6 +1,7 @@
 "use client";
 
-import { Search, LocateFixed, Loader2 } from "lucide-react";
+import { useState, useEffect, useTransition } from "react";
+import { Search, LocateFixed, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,119 +11,192 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { MapFilters as MapFiltersType, MapRadiusKm, PlaceCategory } from "./types";
-import { MAP_RADIUS_OPTIONS } from "./types";
-import { CITY_CENTERS } from "./map-config";
+import type {
+  DiscoveryArea,
+  DiscoveryCategory,
+  DiscoveryFilters,
+  RadiusKm,
+  SearchMode,
+} from "./types";
+import { MAP_RADIUS_OPTIONS, DEFAULT_MAP_CENTER } from "./map-config";
+import { MapSearchTabs } from "./components/MapSearchTabs";
+import { MapQuickCategories } from "./components/MapQuickCategories";
+import { MapAdvancedFilters } from "./components/MapAdvancedFilters";
 
 export interface MapFiltersProps {
-  filters: MapFiltersType;
-  onChange: (filters: MapFiltersType) => void;
+  filters: DiscoveryFilters;
+  areas?: DiscoveryArea[];
+  categories?: DiscoveryCategory[];
+  onChange: (filters: DiscoveryFilters) => void;
   onUseCurrentLocation: () => void;
   locating: boolean;
 }
 
-const CATEGORY_OPTIONS: { value: PlaceCategory | "all"; label: string }[] = [
-  { value: "all", label: "Tất cả" },
-  { value: "cafe", label: "Cà phê" },
-  { value: "restaurant", label: "Nhà hàng" },
-  { value: "sightseeing", label: "Tham quan" },
-  { value: "nature", label: "Thiên nhiên" },
-  { value: "entertainment", label: "Giải trí" },
-  { value: "culture", label: "Văn hóa" },
-  { value: "nightlife", label: "Về đêm" },
-  { value: "relaxation", label: "Thư giãn" },
-];
-
 export function MapFilters({
   filters,
+  areas = [],
+  categories = [],
   onChange,
   onUseCurrentLocation,
   locating,
 }: MapFiltersProps) {
-  const handleCityChange = (city: string | null) => {
-    if (!city) return;
-    if (city === "all") {
-      onChange({ ...filters, city: "all" });
-    } else if (city in CITY_CENTERS) {
-      onChange({
-        ...filters,
-        ...CITY_CENTERS[city as keyof typeof CITY_CENTERS],
-        city,
-      });
-    }
+  const [keywordInput, setKeywordInput] = useState(filters.keyword || "");
+  const [, startTransition] = useTransition();
+
+  useEffect(() => {
+    setKeywordInput(filters.keyword || "");
+  }, [filters.keyword]);
+
+  // Debounce keyword update
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (keywordInput !== (filters.keyword || "")) {
+        startTransition(() => {
+          onChange({
+            ...filters,
+            keyword: keywordInput,
+            page: 1,
+          });
+        });
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [keywordInput, filters, onChange]);
+
+  const handleModeChange = (mode: SearchMode) => {
+    onChange({
+      ...filters,
+      mode,
+      page: 1,
+    });
   };
 
-  const handleRadiusChange = (radius: MapRadiusKm) => {
-    onChange({ ...filters, maxDistanceKm: radius });
+  const handleAreaChange = (areaSlug: string | null) => {
+    if (!areaSlug) return;
+    const selectedArea = areas.find((a) => a.slug === areaSlug);
+    onChange({
+      ...filters,
+      areaSlug,
+      latitude: selectedArea?.latitude ?? DEFAULT_MAP_CENTER.latitude,
+      longitude: selectedArea?.longitude ?? DEFAULT_MAP_CENTER.longitude,
+      page: 1,
+    });
   };
 
-  const handleCategoryChange = (category: PlaceCategory | "all") => {
-    onChange({ ...filters, category });
+  const handleRadiusChange = (radiusKm: RadiusKm) => {
+    onChange({
+      ...filters,
+      radiusKm,
+      page: 1,
+    });
+  };
+
+  const handleCategoryChange = (categorySlug: string) => {
+    onChange({
+      ...filters,
+      categorySlug,
+      page: 1,
+    });
+  };
+
+  const handleResetFilters = () => {
+    onChange({
+      mode: "keyword",
+      areaSlug: "da-nang",
+      keyword: "",
+      categorySlug: "all",
+      radiusKm: 5,
+      latitude: DEFAULT_MAP_CENTER.latitude,
+      longitude: DEFAULT_MAP_CENTER.longitude,
+      openNow: false,
+      priceLevels: [],
+      minRating: null,
+      sortBy: "distance",
+      page: 1,
+    });
   };
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl border bg-card p-4 shadow-xs">
-      {/* Top row: search input, city select, current location */}
+      {/* Dual Search Tabs (Keyword vs AI Demo) */}
+      <MapSearchTabs mode={filters.mode} onModeChange={handleModeChange} />
+
+      {/* Main Search Row: Keyword input, Area dropdown, GPS Button */}
       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
         <div className="relative flex-1">
           <label htmlFor="map-keyword-search" className="sr-only">
             Tìm địa điểm
           </label>
-          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          {filters.mode === "ai" ? (
+            <Sparkles className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-amber-500 animate-pulse" />
+          ) : (
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          )}
           <Input
             id="map-keyword-search"
             type="search"
-            placeholder="Tìm theo tên, địa chỉ, loại hình..."
-            value={filters.keyword}
-            onChange={(e) => onChange({ ...filters, keyword: e.target.value })}
-            className="pl-9"
+            placeholder={
+              filters.mode === "ai"
+                ? "Nhập nhu cầu tự nhiên: 'quán cafe yên tĩnh làm việc gần biển', 'quán hải sản tươi ngon rẻ'..."
+                : "Tìm theo tên địa điểm, món ăn, địa chỉ..."
+            }
+            value={keywordInput}
+            onChange={(e) => setKeywordInput(e.target.value)}
+            className={`pl-9 h-10 ${
+              filters.mode === "ai" ? "border-amber-500/40 focus-visible:ring-amber-500" : ""
+            }`}
           />
         </div>
 
         <div className="flex items-center gap-2">
-          <Select value={filters.city} onValueChange={handleCityChange}>
-            <SelectTrigger aria-label="Thành phố" className="w-[160px]">
-              <SelectValue placeholder="Chọn thành phố" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Tất cả thành phố</SelectItem>
-              <SelectItem value="TP. Hồ Chí Minh">TP. Hồ Chí Minh</SelectItem>
-              <SelectItem value="Đà Lạt">Đà Lạt</SelectItem>
-              <SelectItem value="Ninh Bình">Ninh Bình</SelectItem>
-              <SelectItem value="Phú Quốc">Phú Quốc</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="w-[170px]">
+            <Select value={filters.areaSlug} onValueChange={handleAreaChange}>
+              <SelectTrigger aria-label="Vùng du lịch" className="h-10 text-xs">
+                <SelectValue placeholder="Chọn tỉnh / TP" />
+              </SelectTrigger>
+              <SelectContent>
+                {areas.map((area) => (
+                  <SelectItem key={area.slug} value={area.slug}>
+                    {area.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           <Button
             type="button"
-            variant="outline"
+            variant={filters.areaSlug === "quanh-toi" ? "default" : "outline"}
             size="default"
             onClick={onUseCurrentLocation}
             disabled={locating}
-            className="gap-1.5 shrink-0"
-            aria-label="Vị trí của tôi"
-            title="Sử dụng vị trí hiện tại"
+            className="gap-1.5 shrink-0 h-10 px-3.5"
+            aria-label="Tìm quanh đây"
+            title="Sử dụng GPS tìm địa điểm quanh bạn"
           >
             {locating ? (
-              <Loader2 className="size-4 animate-spin text-primary" />
+              <Loader2 className="size-4 animate-spin text-primary-foreground" />
             ) : (
-              <LocateFixed className="size-4 text-primary" />
+              <LocateFixed className="size-4 text-emerald-600 dark:text-emerald-400" />
             )}
-            <span className="hidden md:inline text-xs font-medium">Vị trí của tôi</span>
+            <span className="text-xs font-semibold">Tìm quanh đây</span>
           </Button>
         </div>
       </div>
 
-      {/* Middle row: Radius options */}
-      <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t">
-        <span className="text-xs font-medium text-muted-foreground mr-1">Bán kính:</span>
-        <div
-          role="group"
-          aria-label="Bán kính"
-          className="flex flex-wrap items-center gap-1.5"
-        >
+      {/* Quick Category Chips Bar */}
+      <MapQuickCategories
+        categories={categories}
+        selectedSlug={filters.categorySlug}
+        onSelectCategory={handleCategoryChange}
+      />
+
+      {/* Radius options */}
+      <div className="flex flex-wrap items-center gap-2 pt-2 border-t text-xs">
+        <span className="font-medium text-muted-foreground mr-1">Bán kính:</span>
+        <div role="group" aria-label="Bán kính" className="flex flex-wrap items-center gap-1.5">
           {MAP_RADIUS_OPTIONS.map((radius) => {
-            const isSelected = filters.maxDistanceKm === radius;
+            const isSelected = filters.radiusKm === radius;
             return (
               <Button
                 key={radius}
@@ -134,7 +208,7 @@ export function MapFilters({
                 className={
                   isSelected
                     ? "bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-xs"
-                    : "hover:bg-muted font-normal"
+                    : "hover:bg-muted font-normal text-muted-foreground hover:text-foreground"
                 }
               >
                 {`${radius} km`}
@@ -144,32 +218,12 @@ export function MapFilters({
         </div>
       </div>
 
-      {/* Bottom row: Category chips */}
-      <div
-        role="group"
-        aria-label="Danh mục"
-        className="flex flex-wrap items-center gap-1.5 pt-1 border-t"
-      >
-        {CATEGORY_OPTIONS.map(({ value, label }) => {
-          const isSelected = filters.category === value;
-          return (
-            <Button
-              key={value}
-              type="button"
-              variant={isSelected ? "secondary" : "ghost"}
-              size="xs"
-              onClick={() => handleCategoryChange(value)}
-              className={`rounded-full px-3 text-xs transition-colors ${
-                isSelected
-                  ? "bg-primary/15 text-primary hover:bg-primary/25 dark:bg-primary/25 dark:text-primary font-semibold shadow-2xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {label}
-            </Button>
-          );
-        })}
-      </div>
+      {/* Advanced Filters: OpenNow, Budget, Rating, Sort, Reset */}
+      <MapAdvancedFilters
+        filters={filters}
+        onChange={(updated) => onChange({ ...filters, ...updated, page: 1 })}
+        onReset={handleResetFilters}
+      />
     </div>
   );
 }

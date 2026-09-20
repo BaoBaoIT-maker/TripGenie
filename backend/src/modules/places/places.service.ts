@@ -1,8 +1,10 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
 import { IPlaceRepository } from './interfaces/place-repository.interface';
+import { IEmbeddingService } from './interfaces/embedding-service.interface';
 import { SearchPlacesDto } from './dto/search-places.dto';
 import { NearbyPlacesDto } from './dto/nearby-places.dto';
+import { SemanticSearchDto, SyncEmbeddingsDto } from './dto/semantic-search.dto';
 import {
   PaginatedPlacesResponseDto,
   PlaceDetailDto,
@@ -18,6 +20,8 @@ export class PlacesService {
   constructor(
     @Inject(INJECT_TOKENS.PLACE_REPOSITORY)
     private readonly placeRepo: IPlaceRepository,
+    @Inject(INJECT_TOKENS.EMBEDDING_SERVICE)
+    private readonly embeddingService: IEmbeddingService,
   ) {}
 
   /**
@@ -55,6 +59,67 @@ export class PlacesService {
   async getNearbyPlaces(dto: NearbyPlacesDto): Promise<PlaceItemDto[]> {
     const rawItems = await this.placeRepo.findNearby(dto);
     return rawItems.map((row) => this.mapToPlaceItemDto(row));
+  }
+
+  /**
+   * Natural language semantic search using Gemini Vector Embeddings & pgvector.
+   */
+  async searchSemantic(dto: SemanticSearchDto): Promise<PlaceItemDto[]> {
+    this.logger.log(`Generating embedding for semantic query: "${dto.query}"`);
+    const vector = await this.embeddingService.generateEmbedding(dto.query);
+
+    const rawItems = await this.placeRepo.searchSemantic(
+      vector,
+      dto.limit || 10,
+      dto.areaId,
+      dto.minSimilarity || 0.3,
+    );
+
+    return rawItems.map((row) => {
+      const dtoItem = this.mapToPlaceItemDto(row);
+      dtoItem.similarityScore = Number(row.similarity_score) || null;
+      return dtoItem;
+    });
+  }
+
+  /**
+   * Generates and stores vector embeddings for places without embeddings.
+   */
+  async syncEmbeddings(
+    dto: SyncEmbeddingsDto,
+  ): Promise<{ processed: number; succeeded: number; failed: number }> {
+    const limit = dto.limit || 50;
+    const places = await this.placeRepo.findPlacesWithoutEmbedding(limit, dto.areaId);
+
+    this.logger.log(`Syncing vector embeddings for ${places.length} places...`);
+    let succeeded = 0;
+    let failed = 0;
+
+    for (const place of places) {
+      try {
+        const categoryName = place.category?.nameVi || place.category?.name || '';
+        const tags = Array.isArray(place.tags) ? place.tags.join(', ') : '';
+        const contentText = `${place.name}. Danh mục: ${categoryName}. Địa chỉ: ${place.address}. ${place.description || ''} ${tags}`.trim();
+
+        const vector = await this.embeddingService.generateEmbedding(contentText);
+        await this.placeRepo.upsertPlaceEmbedding(
+          place.id,
+          contentText,
+          vector,
+          this.embeddingService.getModelName(),
+        );
+        succeeded++;
+      } catch (err: any) {
+        failed++;
+        this.logger.warn(`Failed to sync embedding for place "${place.name}": ${err.message}`);
+      }
+    }
+
+    return {
+      processed: places.length,
+      succeeded,
+      failed,
+    };
   }
 
   /**
@@ -205,6 +270,10 @@ export class PlacesService {
       openingHours: (row.opening_hours as Record<string, unknown>) || null,
       isOpenNow: this.checkIsOpenNow(row.opening_hours),
       primaryImage: row.primary_image || null,
+      similarityScore:
+        row.similarity_score !== null && row.similarity_score !== undefined
+          ? Number(row.similarity_score)
+          : null,
       category: row.category_id
         ? {
             id: row.category_id,

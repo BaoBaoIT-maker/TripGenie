@@ -50,6 +50,8 @@ describe('PlacesController', () => {
       getCategories: jest.fn(),
       getTravelAreas: jest.fn(),
       getPlaceById: jest.fn(),
+      searchSemantic: jest.fn(),
+      syncEmbeddings: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -170,6 +172,32 @@ describe('PlacesController', () => {
 
       expect(service.getPlaceById).toHaveBeenCalledWith(mockPlaceItem.id);
       expect(result).toEqual(mockDetail);
+    });
+  });
+
+  describe('GET /places/semantic-search', () => {
+    it('should call placesService.searchSemantic with dto', async () => {
+      const mockResult = [{ ...mockPlaceItem, similarityScore: 0.88 }];
+      service.searchSemantic.mockResolvedValue(mockResult);
+
+      const dto = { query: 'quán cafe đẹp', areaId: 1, limit: 10 };
+      const result = await controller.searchSemantic(dto);
+
+      expect(service.searchSemantic).toHaveBeenCalledWith(dto);
+      expect(result).toEqual(mockResult);
+    });
+  });
+
+  describe('POST /places/sync-embeddings', () => {
+    it('should call placesService.syncEmbeddings with dto', async () => {
+      const mockSyncResult = { processed: 10, succeeded: 10, failed: 0 };
+      service.syncEmbeddings.mockResolvedValue(mockSyncResult);
+
+      const dto = { batchSize: 10, areaId: 1 };
+      const result = await controller.syncEmbeddings(dto);
+
+      expect(service.syncEmbeddings).toHaveBeenCalledWith(dto);
+      expect(result).toEqual(mockSyncResult);
     });
   });
 });

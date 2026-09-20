@@ -1,6 +1,8 @@
 import {
   Controller,
   Get,
+  Post,
+  Body,
   Param,
   Query,
   HttpCode,
@@ -10,6 +12,7 @@ import {
 import { PlacesService } from './places.service';
 import { SearchPlacesDto } from './dto/search-places.dto';
 import { NearbyPlacesDto } from './dto/nearby-places.dto';
+import { SemanticSearchDto, SyncEmbeddingsDto } from './dto/semantic-search.dto';
 import {
   PaginatedPlacesResponseDto,
   PlaceDetailDto,
@@ -35,6 +38,18 @@ export class PlacesController {
   }
 
   /**
+   * Natural language semantic search using Gemini Vector Embeddings & pgvector.
+   * Public endpoint.
+   */
+  @Get('semantic-search')
+  @HttpCode(HttpStatus.OK)
+  async searchSemantic(
+    @Query() dto: SemanticSearchDto,
+  ): Promise<PlaceItemDto[]> {
+    return this.placesService.searchSemantic(dto);
+  }
+
+  /**
    * Quick endpoint to find nearby places using GPS coordinates.
    * Public endpoint.
    */
@@ -44,6 +59,17 @@ export class PlacesController {
     @Query() dto: NearbyPlacesDto,
   ): Promise<PlaceItemDto[]> {
     return this.placesService.getNearbyPlaces(dto);
+  }
+
+  /**
+   * Sync and generate vector embeddings for places without embeddings.
+   */
+  @Post('sync-embeddings')
+  @HttpCode(HttpStatus.OK)
+  async syncEmbeddings(
+    @Body() dto: SyncEmbeddingsDto,
+  ): Promise<{ processed: number; succeeded: number; failed: number }> {
+    return this.placesService.syncEmbeddings(dto);
   }
 
   /**

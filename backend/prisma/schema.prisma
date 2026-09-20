@@ -147,6 +147,24 @@ enum ReportStatus {
   @@map("report_status_enum")
 }
 
+enum ProposalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("proposal_status_enum")
+}
+
+enum ReportTargetType {
+  PLACE
+  REVIEW
+  POST
+  COMMENT
+  USER
+
+  @@map("report_target_type_enum")
+}
+
 // =============================================================================
 // MODELS
 // =============================================================================
@@ -280,6 +298,8 @@ model Place {
   imageCount     Int          @default(0) @map("image_count")
   tags           String[]     @default([])
   attributes     Json         @default("{}")
+  // Spatial point geography(Point, 4326) managed via PostGIS and init.sql triggers
+  location       Unsupported("geography(Point, 4326)")?
   status         PlaceStatus  @default(ACTIVE)
   mergedInto     String?      @map("merged_into") @db.Uuid
   deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz
@@ -301,6 +321,9 @@ model Place {
   proposals        GroupPlaceProposal[]
   crawlJobs        CrawlJob[]
 
+  @@index([areaId])
+  @@index([categoryId])
+  @@index([status])
   @@map("places")
 }
 
@@ -321,6 +344,7 @@ model PlaceImage {
   place    Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
   uploader User? @relation("UserUploadedImages", fields: [uploadedBy], references: [id])
 
+  @@index([placeId])
   @@map("place_images")
 }
 
@@ -328,6 +352,8 @@ model PlaceEmbedding {
   id           String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   placeId      String   @unique @map("place_id") @db.Uuid
   contentText  String   @map("content_text")
+  // Vector 1536 dims managed via pgvector extension and init.sql; indexed via HNSW
+  embedding    Unsupported("vector(1536)")?
   modelName    String?  @map("model_name") @db.VarChar(100)
   modelVersion String?  @map("model_version") @db.VarChar(50)
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
@@ -375,6 +401,8 @@ model PlaceReview {
   place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, placeId], map: "unique_user_place_review")
+  @@index([placeId])
+  @@index([userId])
   @@map("place_reviews")
 }
 
@@ -392,6 +420,7 @@ model Collection {
   user   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   places CollectionPlace[]
 
+  @@index([userId])
   @@map("collections")
 }
 
@@ -440,6 +469,9 @@ model Itinerary {
   post         CommunityPost?
   chatSessions AiChatSession[]
 
+  @@index([creatorId])
+  @@index([areaId])
+  @@index([status])
   @@map("itineraries")
 }
 
@@ -462,6 +494,8 @@ model ItineraryDestination {
   itinerary Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
   place     Place     @relation(fields: [placeId], references: [id], onDelete: Cascade)
 
+  @@index([itineraryId, dayNumber])
+  @@index([placeId])
   @@map("itinerary_destinations")
 }
 
@@ -494,11 +528,13 @@ model GroupMember {
 }
 
 model GroupPlaceProposal {
-  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  tripGroupId String   @map("trip_group_id") @db.Uuid
-  placeId     String   @map("place_id") @db.Uuid
-  proposedBy  String   @map("proposed_by") @db.Uuid
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id            String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tripGroupId   String         @map("trip_group_id") @db.Uuid
+  placeId       String         @map("place_id") @db.Uuid
+  proposedBy    String         @map("proposed_by") @db.Uuid
+  status        ProposalStatus @default(PENDING)
+  destinationId String?        @map("destination_id") @db.Uuid
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz
 
   tripGroup TripGroup        @relation(fields: [tripGroupId], references: [id], onDelete: Cascade)
   place     Place            @relation(fields: [placeId], references: [id], onDelete: Cascade)
@@ -506,6 +542,7 @@ model GroupPlaceProposal {
   votes     GroupPlaceVote[]
 
   @@unique([tripGroupId, placeId], map: "unique_group_place_proposal")
+  @@index([tripGroupId, status])
   @@map("group_place_proposals")
 }
 
@@ -555,6 +592,7 @@ model AiChatMessage {
 
   session AiChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
+  @@index([sessionId, createdAt])
   @@map("ai_chat_messages")
 }
 
@@ -576,6 +614,8 @@ model CommunityPost {
   likes     PostLike[]
   comments  PostComment[]
 
+  @@index([userId])
+  @@index([createdAt])
   @@map("community_posts")
 }
 
@@ -602,25 +642,29 @@ model PostComment {
   post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
   user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@index([postId])
+  @@index([userId])
   @@map("post_comments")
 }
 
 model ContentReport {
-  id             String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  reportedBy     String       @map("reported_by") @db.Uuid
-  targetType     String       @map("target_type") @db.VarChar(50)
-  targetId       String       @map("target_id") @db.Uuid
-  reportType     ReportType   @map("report_type")
+  id             String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  reportedBy     String           @map("reported_by") @db.Uuid
+  targetType     ReportTargetType @map("target_type")
+  targetId       String           @map("target_id") @db.Uuid
+  reportType     ReportType       @map("report_type")
   description    String?
-  status         ReportStatus @default(PENDING)
-  reviewedBy     String?      @map("reviewed_by") @db.Uuid
-  reviewedAt     DateTime?    @map("reviewed_at") @db.Timestamptz
-  resolutionNote String?      @map("resolution_note")
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  status         ReportStatus     @default(PENDING)
+  reviewedBy     String?          @map("reviewed_by") @db.Uuid
+  reviewedAt     DateTime?        @map("reviewed_at") @db.Timestamptz
+  resolutionNote String?          @map("resolution_note")
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
 
   reporter User  @relation("UserReported", fields: [reportedBy], references: [id], onDelete: Cascade)
   reviewer User? @relation("AdminReviewedReports", fields: [reviewedBy], references: [id])
 
+  @@index([status])
+  @@index([targetType, targetId])
   @@map("content_reports")
 }
 
@@ -668,6 +712,8 @@ model CrawlJob {
   place   Place?      @relation(fields: [placeId], references: [id])
   creator User?       @relation("UserCrawlJobs", fields: [createdBy], references: [id])
 
+  @@index([status])
+  @@index([jobType])
   @@map("crawl_jobs")
 }
 
@@ -697,12 +743,15 @@ model KnowledgeChunk {
   documentId String   @map("document_id") @db.Uuid
   chunkIndex Int      @map("chunk_index")
   content    String
+  // Vector 1536 dims managed via pgvector extension for RAG retrieval
+  embedding  Unsupported("vector(1536)")?
   modelName  String?  @map("model_name") @db.VarChar(100)
   metadata   Json     @default("{}")
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
+  @@index([documentId])
   @@map("knowledge_chunks")
 }
 
@@ -723,5 +772,7 @@ model AuditLog {
 
   actor User @relation(fields: [actorId], references: [id], onDelete: Cascade)
 
+  @@index([actorId, createdAt])
+  @@index([targetType, targetId])
   @@map("audit_logs")
 }

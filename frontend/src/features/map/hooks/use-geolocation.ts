@@ -2,9 +2,8 @@
 
 import { useState, useCallback } from "react";
 import type { MapCoordinate } from "../types";
-import { DEFAULT_MAP_CENTER } from "../map-config";
 
-export type GeolocationStatus = "idle" | "pending" | "success" | "fallback";
+export type GeolocationStatus = "idle" | "pending" | "success" | "error";
 
 export interface GeolocationState {
   status: GeolocationStatus;
@@ -20,13 +19,13 @@ export function useGeolocation() {
   });
 
   const requestLocation = useCallback(() => {
-    setState((prev) => ({ ...prev, status: "pending" }));
+    setState((prev) => ({ ...prev, status: "pending", message: null }));
 
     if (typeof window === "undefined" || !navigator.geolocation) {
       setState({
-        status: "fallback",
-        coordinate: DEFAULT_MAP_CENTER,
-        message: "Trình duyệt không hỗ trợ định vị vị trí. Đang hiển thị khu vực trung tâm TP. Hồ Chí Minh.",
+        status: "error",
+        coordinate: null,
+        message: "Trình duyệt của bạn không hỗ trợ định vị vị trí.",
       });
       return;
     }
@@ -44,18 +43,31 @@ export function useGeolocation() {
       },
       (error) => {
         let reason = "Không thể lấy vị trí hiện tại.";
-        if (error.code === error.PERMISSION_DENIED) {
-          reason = "Bạn đã từ chối quyền truy cập vị trí.";
-        } else if (error.code === error.TIMEOUT) {
-          reason = "Quá thời gian chờ lấy vị trí.";
-        } else if (error.code === error.POSITION_UNAVAILABLE) {
-          reason = "Vị trí hiện tại không khả dụng.";
+        const isPermissionDenied =
+          error.code === 1 ||
+          (typeof GeolocationPositionError !== "undefined" &&
+            error.code === GeolocationPositionError.PERMISSION_DENIED);
+        const isTimeout =
+          error.code === 3 ||
+          (typeof GeolocationPositionError !== "undefined" &&
+            error.code === GeolocationPositionError.TIMEOUT);
+        const isUnavailable =
+          error.code === 2 ||
+          (typeof GeolocationPositionError !== "undefined" &&
+            error.code === GeolocationPositionError.POSITION_UNAVAILABLE);
+
+        if (isPermissionDenied) {
+          reason = "Bạn đã từ chối quyền truy cập vị trí. Hãy bật định vị trên trình duyệt để tìm địa điểm quanh bạn.";
+        } else if (isTimeout) {
+          reason = "Quá thời gian chờ lấy vị trí từ thiết bị.";
+        } else if (isUnavailable) {
+          reason = "Vị trí GPS hiện tại không khả dụng.";
         }
 
         setState({
-          status: "fallback",
-          coordinate: DEFAULT_MAP_CENTER,
-          message: `${reason} Đang hiển thị khu vực trung tâm TP. Hồ Chí Minh.`,
+          status: "error",
+          coordinate: null,
+          message: reason,
         });
       },
       {

@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 import { useGeolocation } from "@/features/map/hooks/use-geolocation";
-import { DEFAULT_MAP_CENTER } from "@/features/map/map-config";
 
 interface GeolocationCallbacks {
   success: PositionCallback;
@@ -19,35 +18,30 @@ function installGeolocationMock(run: (callbacks: GeolocationCallbacks) => void) 
 }
 
 describe("useGeolocation", () => {
-  it("returns the browser coordinate on success", async () => {
+  it("starts in idle state without requesting permission automatically", () => {
+    const { result } = renderHook(() => useGeolocation());
+    expect(result.current.status).toBe("idle");
+    expect(result.current.coordinate).toBeNull();
+  });
+
+  it("returns the browser coordinate on user request success", async () => {
     installGeolocationMock(({ success }) =>
-      success({ coords: { latitude: 10.8, longitude: 106.7 } } as GeolocationPosition)
+      success({ coords: { latitude: 16.0544, longitude: 108.2022 } } as GeolocationPosition)
     );
     const { result } = renderHook(() => useGeolocation());
     act(() => result.current.requestLocation());
     await waitFor(() => expect(result.current.status).toBe("success"));
-    expect(result.current.coordinate).toEqual({ latitude: 10.8, longitude: 106.7 });
+    expect(result.current.coordinate).toEqual({ latitude: 16.0544, longitude: 108.2022 });
   });
 
-  it("falls back after permission denial", async () => {
+  it("sets error status on permission denial without overwriting coordinate or falling back silently", async () => {
     installGeolocationMock(({ error }) =>
       error({ code: 1, message: "denied" } as GeolocationPositionError)
     );
     const { result } = renderHook(() => useGeolocation());
     act(() => result.current.requestLocation());
-    await waitFor(() => expect(result.current.status).toBe("fallback"));
-    expect(result.current.coordinate).toEqual(DEFAULT_MAP_CENTER);
-    expect(result.current.message).toMatch(/TP\. Hồ Chí Minh/i);
-  });
-
-  it("falls back when geolocation API is unavailable", async () => {
-    Object.defineProperty(navigator, "geolocation", {
-      configurable: true,
-      value: undefined,
-    });
-    const { result } = renderHook(() => useGeolocation());
-    act(() => result.current.requestLocation());
-    await waitFor(() => expect(result.current.status).toBe("fallback"));
-    expect(result.current.coordinate).toEqual(DEFAULT_MAP_CENTER);
+    await waitFor(() => expect(result.current.status).toBe("error"));
+    expect(result.current.coordinate).toBeNull();
+    expect(result.current.message).toMatch(/từ chối quyền/i);
   });
 });

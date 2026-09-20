@@ -1,8 +1,12 @@
-import type { NearbyPlace } from "@/features/map/types";
+import type { DiscoveryPlace, NearbyPlace } from "@/features/map/types";
 import { formatDistanceKm } from "@/features/map/lib/map-filter";
 
-export function createMapPopupElement(nearbyPlace: NearbyPlace): HTMLDivElement {
-  const { place, distanceKm } = nearbyPlace;
+export function createMapPopupElement(
+  item: NearbyPlace | DiscoveryPlace,
+  onOpenDetail?: (placeId: string) => void
+): HTMLDivElement {
+  const place = "place" in item ? item.place : item;
+  const distanceKm = "distanceKm" in item ? item.distanceKm : undefined;
 
   const container = document.createElement("div");
   container.className = "p-3 max-w-xs space-y-2 text-sm font-sans";
@@ -16,10 +20,12 @@ export function createMapPopupElement(nearbyPlace: NearbyPlace): HTMLDivElement 
   categorySpan.textContent = place.categoryLabel || place.category;
   header.appendChild(categorySpan);
 
-  const distanceSpan = document.createElement("span");
-  distanceSpan.className = "rounded bg-primary/10 px-1.5 py-0.5 font-semibold text-primary text-xs";
-  distanceSpan.textContent = formatDistanceKm(distanceKm);
-  header.appendChild(distanceSpan);
+  if (distanceKm !== undefined && distanceKm !== null) {
+    const distanceSpan = document.createElement("span");
+    distanceSpan.className = "rounded bg-primary/10 px-1.5 py-0.5 font-semibold text-primary text-xs";
+    distanceSpan.textContent = formatDistanceKm(distanceKm);
+    header.appendChild(distanceSpan);
+  }
 
   container.appendChild(header);
 
@@ -48,6 +54,12 @@ export function createMapPopupElement(nearbyPlace: NearbyPlace): HTMLDivElement 
   link.href = `/places/${place.slug}`;
   link.className = "inline-flex items-center justify-center w-full rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors mt-1";
   link.textContent = "Xem chi tiết";
+  if (onOpenDetail) {
+    link.addEventListener("click", (e) => {
+      e.preventDefault();
+      onOpenDetail(place.id);
+    });
+  }
   container.appendChild(link);
 
   return container;

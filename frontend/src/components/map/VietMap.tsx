@@ -88,18 +88,19 @@ export default function VietMap({
     markersRef.current = [];
 
     const newMarkers: vietmapgl.Marker[] = [];
-    places.forEach((np) => {
-      const isSelected = np.place.id === selectedPlaceId;
-      const isHovered = np.place.id === hoveredPlaceId;
+    places.forEach((item: any) => {
+      const place = "place" in item ? item.place : item;
+      const isSelected = place.id === selectedPlaceId;
+      const isHovered = place.id === hoveredPlaceId;
 
-      const el = createPlaceMarkerElement(np, {
+      const el = createPlaceMarkerElement(item, {
         selected: isSelected,
         hovered: isHovered,
         onSelect: onSelectPlace,
       });
 
       const marker = new vietmapgl.Marker({ element: el })
-        .setLngLat([np.place.longitude, np.place.latitude])
+        .setLngLat([place.longitude, place.latitude])
         .addTo(map);
 
       newMarkers.push(marker);
@@ -117,8 +118,9 @@ export default function VietMap({
       [center.longitude, center.latitude],
       [center.longitude, center.latitude]
     );
-    places.forEach((np) => {
-      bounds.extend([np.place.longitude, np.place.latitude]);
+    places.forEach((item: any) => {
+      const place = "place" in item ? item.place : item;
+      bounds.extend([place.longitude, place.latitude]);
     });
 
     map.fitBounds(bounds, {
@@ -140,22 +142,27 @@ export default function VietMap({
 
     if (!selectedPlaceId) return;
 
-    const selectedPlace = places.find((p) => p.place.id === selectedPlaceId);
-    if (!selectedPlace) return;
+    const selectedItem = places.find((item: any) => {
+      const place = "place" in item ? item.place : item;
+      return place.id === selectedPlaceId;
+    });
+    if (!selectedItem) return;
+
+    const place = "place" in selectedItem ? selectedItem.place : selectedItem;
 
     map.flyTo({
-      center: [selectedPlace.place.longitude, selectedPlace.place.latitude],
+      center: [place.longitude, place.latitude],
       zoom: 15,
       duration: 600,
     });
 
-    const popupEl = createMapPopupElement(selectedPlace);
+    const popupEl = createMapPopupElement(selectedItem);
     const popup = new vietmapgl.Popup({
       offset: 24,
       closeButton: true,
       closeOnClick: false,
     })
-      .setLngLat([selectedPlace.place.longitude, selectedPlace.place.latitude])
+      .setLngLat([place.longitude, place.latitude])
       .setDOMContent(popupEl)
       .addTo(map);
 

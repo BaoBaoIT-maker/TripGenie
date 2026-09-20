@@ -1,4 +1,4 @@
-import type { NearbyPlace } from "@/features/map/types";
+import type { DiscoveryPlace, NearbyPlace } from "@/features/map/types";
 
 export interface PlaceMarkerOptions {
   selected?: boolean;
@@ -6,13 +6,30 @@ export interface PlaceMarkerOptions {
   onSelect?: (placeId: string) => void;
 }
 
+const CATEGORY_EMOJI_MAP: Record<string, string> = {
+  "ca-phe": "☕",
+  "nha-hang": "🍜",
+  "bai-bien": "🏖️",
+  "diem-tham-quan": "🏛️",
+  "khach-san": "🏨",
+  "bar-pub": "🍸",
+  "an-vat": "🍢",
+  cafe: "☕",
+  restaurant: "🍜",
+  sightseeing: "🏛️",
+  nature: "🌿",
+  entertainment: "🎡",
+};
+
 export function createPlaceMarkerElement(
-  nearbyPlace: NearbyPlace,
+  item: NearbyPlace | DiscoveryPlace,
   options: PlaceMarkerOptions = {}
 ): HTMLButtonElement {
+  const place = "place" in item ? item.place : item;
+
   const button = document.createElement("button");
   button.type = "button";
-  button.setAttribute("aria-label", `Xem ${nearbyPlace.place.name} trên bản đồ`);
+  button.setAttribute("aria-label", `Xem ${place.name} trên bản đồ`);
   button.dataset.active = options.selected ? "true" : "false";
 
   button.className = [
@@ -26,13 +43,13 @@ export function createPlaceMarkerElement(
 
   const icon = document.createElement("span");
   icon.className = "flex items-center justify-center text-xs font-bold pointer-events-none select-none";
-  icon.textContent = "📍";
+  icon.textContent = CATEGORY_EMOJI_MAP[place.category] || "📍";
   button.appendChild(icon);
 
   if (options.onSelect) {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      options.onSelect!(nearbyPlace.place.id);
+      options.onSelect!(place.id);
     });
   }
 

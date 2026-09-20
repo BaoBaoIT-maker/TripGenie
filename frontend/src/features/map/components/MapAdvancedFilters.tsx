@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect, useCallback } from "react";
 import { Clock, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -30,34 +31,64 @@ const SORT_LABELS: Record<string, string> = {
   reviews: "Nhiều đánh giá",
 };
 
+const MIN_PRICE = 50000;
+const MAX_PRICE = 1000000;
+const STEP_PRICE = 25000;
+
 export function MapAdvancedFilters({
   filters,
   onChange,
   onReset,
 }: MapAdvancedFiltersProps) {
-  // Current price ceiling (defaults to 1.000.000 for "Tất cả mức")
-  const currentPrice = filters.maxPriceVnd ?? 1000000;
+  // Local state for 60fps buttery-smooth dragging
+  const [localPrice, setLocalPrice] = useState(filters.maxPriceVnd ?? MAX_PRICE);
+  const [prevPropPrice, setPrevPropPrice] = useState(filters.maxPriceVnd);
 
-  const handlePriceSliderChange = (newPrice: number) => {
-    if (newPrice >= 1000000) {
-      onChange({
-        maxPriceVnd: null,
-        priceLevels: [],
-        page: 1,
-      });
-    } else {
-      let levels: number[] = [1];
-      if (newPrice > 100000) levels = [1, 2];
-      if (newPrice > 300000) levels = [1, 2, 3];
-      if (newPrice > 800000) levels = [1, 2, 3, 4];
+  if (filters.maxPriceVnd !== prevPropPrice) {
+    setPrevPropPrice(filters.maxPriceVnd);
+    setLocalPrice(filters.maxPriceVnd ?? MAX_PRICE);
+  }
 
-      onChange({
-        maxPriceVnd: newPrice,
-        priceLevels: levels,
-        page: 1,
-      });
-    }
-  };
+  const flushPriceChange = useCallback(
+    (val: number) => {
+      if (val >= MAX_PRICE) {
+        onChange({
+          maxPriceVnd: null,
+          priceLevels: [],
+          page: 1,
+        });
+      } else {
+        let levels: number[] = [1];
+        if (val > 100000) levels = [1, 2];
+        if (val > 300000) levels = [1, 2, 3];
+        if (val > 800000) levels = [1, 2, 3, 4];
+
+        onChange({
+          maxPriceVnd: val,
+          priceLevels: levels,
+          page: 1,
+        });
+      }
+    },
+    [onChange]
+  );
+
+  // Debounced propagation to parent query while actively dragging
+  useEffect(() => {
+    const targetPrice = filters.maxPriceVnd ?? MAX_PRICE;
+    if (localPrice === targetPrice) return;
+
+    const timer = setTimeout(() => {
+      flushPriceChange(localPrice);
+    }, 120);
+
+    return () => clearTimeout(timer);
+  }, [localPrice, filters.maxPriceVnd, flushPriceChange]);
+
+  const percentage = Math.min(
+    100,
+    Math.max(0, ((localPrice - MIN_PRICE) / (MAX_PRICE - MIN_PRICE)) * 100)
+  );
 
   const handleRatingChange = (val: string | null) => {
     if (!val || val === "all") {
@@ -89,21 +120,27 @@ export function MapAdvancedFilters({
       </button>
 
       {/* Price Slider: Horizontal drag bar with VND amount */}
-      <div className="inline-flex items-center gap-2 rounded-lg border border-border/70 bg-card px-2.5 py-1 text-xs">
-        <span className="font-medium text-muted-foreground whitespace-nowrap">Giá:</span>
+      <div className="inline-flex items-center gap-2 rounded-lg border border-border/70 bg-card px-2.5 py-1 text-xs shadow-2xs">
+        <span className="font-medium text-muted-foreground whitespace-nowrap">Mức giá:</span>
         <input
           type="range"
-          min={50000}
-          max={1000000}
-          step={50000}
-          value={currentPrice}
-          onChange={(e) => handlePriceSliderChange(Number(e.target.value))}
-          className="h-1.5 w-24 sm:w-28 cursor-pointer appearance-none rounded-lg bg-muted accent-primary"
+          min={MIN_PRICE}
+          max={MAX_PRICE}
+          step={STEP_PRICE}
+          value={localPrice}
+          onChange={(e) => setLocalPrice(Number(e.target.value))}
+          onPointerUp={() => flushPriceChange(localPrice)}
+          onTouchEnd={() => flushPriceChange(localPrice)}
+          onKeyUp={() => flushPriceChange(localPrice)}
+          className="price-slider-input h-2 w-28 sm:w-32 cursor-pointer appearance-none rounded-full transition-all"
+          style={{
+            background: `linear-gradient(to right, var(--primary) 0%, var(--primary) ${percentage}%, var(--muted) ${percentage}%, var(--muted) 100%)`,
+          }}
           aria-label="Kéo chọn mức giá tối đa"
           title="Kéo chọn mức giá tối đa"
         />
-        <span className="font-semibold text-primary min-w-[70px] text-right whitespace-nowrap">
-          {currentPrice >= 1000000 ? "Tất cả mức" : `≤ ${currentPrice.toLocaleString("vi-VN")} đ`}
+        <span className="font-semibold text-primary min-w-[76px] text-right whitespace-nowrap tabular-nums">
+          {localPrice >= MAX_PRICE ? "Tất cả mức" : `≤ ${localPrice.toLocaleString("vi-VN")} đ`}
         </span>
       </div>
 

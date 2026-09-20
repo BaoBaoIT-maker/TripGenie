@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { PlaceCategory } from "@/types/place";
 import type {
   DiscoveryFilters,
   ParsedMapQuery,
@@ -85,7 +86,7 @@ export function parseMapSearchParams(params: URLSearchParams): ParsedMapQuery {
       // Compatibility
       maxDistanceKm: radiusKm,
       city: areaSlug,
-      category: categorySlug as any,
+      category: categorySlug as PlaceCategory | "all",
     },
   };
 }

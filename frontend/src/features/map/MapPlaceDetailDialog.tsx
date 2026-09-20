@@ -19,7 +19,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,27 +37,39 @@ export function MapPlaceDetailDialog({
   onOpenChange,
 }: MapPlaceDetailDialogProps) {
   const [place, setPlace] = useState<DiscoveryPlace | null>(null);
-  const [loading, setLoading] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
   const [actionFeedback, setActionFeedback] = useState<string | null>(null);
 
+  const loading = Boolean(open && placeId && (!place || place.id !== placeId));
+
   useEffect(() => {
+    let active = true;
     if (open && placeId) {
-      setLoading(true);
       mapDiscoveryService
         .getPlaceById(placeId)
         .then((data) => {
-          setPlace(data);
-          setLoading(false);
+          if (active) {
+            setPlace(data);
+          }
         })
         .catch(() => {
-          setLoading(false);
+          if (active) {
+            setPlace(null);
+          }
         });
-    } else {
+    }
+    return () => {
+      active = false;
+    };
+  }, [open, placeId]);
+
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (!nextOpen) {
       setPlace(null);
       setActionFeedback(null);
     }
-  }, [open, placeId]);
+    onOpenChange(nextOpen);
+  };
 
   const toggleFavorite = () => {
     setIsFavorite(!isFavorite);
@@ -76,7 +87,7 @@ export function MapPlaceDetailDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto p-0 rounded-2xl">
         {loading ? (
           <div className="p-8 text-center text-muted-foreground">Đang tải thông tin địa điểm...</div>

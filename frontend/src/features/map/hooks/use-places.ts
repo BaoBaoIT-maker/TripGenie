@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { mapDiscoveryService } from "../services/map-discovery.service";
 import type { DiscoveryFilters } from "../types";
-import { placeService } from "@/services/place.service";
 
 export const discoveryKeys = {
   all: ["discovery-places"] as const,
@@ -16,15 +15,10 @@ export const placeKeys = {
   list: () => [...placeKeys.all, "list"] as const,
 };
 
-export function usePlacesQuery(filters?: DiscoveryFilters) {
+export function usePlacesQuery(filters: DiscoveryFilters) {
   return useQuery({
-    queryKey: filters ? discoveryKeys.search(filters) : placeKeys.list(),
-    queryFn: () => {
-      if (filters) {
-        return mapDiscoveryService.searchPlaces(filters);
-      }
-      return placeService.getPlaces();
-    },
+    queryKey: discoveryKeys.search(filters),
+    queryFn: () => mapDiscoveryService.searchPlaces(filters),
   });
 }
 

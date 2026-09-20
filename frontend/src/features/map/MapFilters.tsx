@@ -41,11 +41,13 @@ export function MapFilters({
   locating,
 }: MapFiltersProps) {
   const [keywordInput, setKeywordInput] = useState(filters.keyword || "");
+  const [prevKeyword, setPrevKeyword] = useState(filters.keyword || "");
   const [, startTransition] = useTransition();
 
-  useEffect(() => {
+  if (filters.keyword !== prevKeyword) {
+    setPrevKeyword(filters.keyword || "");
     setKeywordInput(filters.keyword || "");
-  }, [filters.keyword]);
+  }
 
   // Debounce keyword update
   useEffect(() => {

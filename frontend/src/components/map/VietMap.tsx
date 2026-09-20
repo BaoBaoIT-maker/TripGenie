@@ -88,7 +88,7 @@ export default function VietMap({
     markersRef.current = [];
 
     const newMarkers: vietmapgl.Marker[] = [];
-    places.forEach((item: any) => {
+    places.forEach((item) => {
       const place = "place" in item ? item.place : item;
       const isSelected = place.id === selectedPlaceId;
       const isHovered = place.id === hoveredPlaceId;
@@ -118,7 +118,7 @@ export default function VietMap({
       [center.longitude, center.latitude],
       [center.longitude, center.latitude]
     );
-    places.forEach((item: any) => {
+    places.forEach((item) => {
       const place = "place" in item ? item.place : item;
       bounds.extend([place.longitude, place.latitude]);
     });
@@ -142,7 +142,7 @@ export default function VietMap({
 
     if (!selectedPlaceId) return;
 
-    const selectedItem = places.find((item: any) => {
+    const selectedItem = places.find((item) => {
       const place = "place" in item ? item.place : item;
       return place.id === selectedPlaceId;
     });

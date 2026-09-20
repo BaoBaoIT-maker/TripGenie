@@ -49,7 +49,7 @@ export function MapExplorer() {
         page: 1,
       });
     }
-  }, [geolocation.status, geolocation.coordinate]);
+  }, [geolocation.status, geolocation.coordinate, filters, replaceFilters]);
 
   const handleUseCurrentLocation = () => {
     requestLocation();

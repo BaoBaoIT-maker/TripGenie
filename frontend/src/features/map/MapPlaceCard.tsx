@@ -5,7 +5,6 @@ import Image from "next/image";
 import { Star, Heart, Sparkles, MapPin } from "lucide-react";
 import type { DiscoveryPlace, NearbyPlace } from "./types";
 import { formatDistanceKm } from "./lib/map-filter";
-import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 export interface MapPlaceCardProps {

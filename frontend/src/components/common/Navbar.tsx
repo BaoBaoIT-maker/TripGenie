@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Compass,
-  Map,
   MapPin,
   CalendarDays,
   Bookmark,
@@ -17,7 +16,6 @@ import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
   { href: "/explore", label: "Khám phá", icon: Compass },
-  { href: "/map", label: "Bản đồ", icon: Map },
   { href: "/planner", label: "Lịch trình", icon: CalendarDays },
   { href: "/community", label: "Cộng đồng", icon: Users },
 ];
@@ -39,7 +37,7 @@ export function Navbar() {
             </div>
             <div className="flex flex-col">
               <span className="text-lg font-bold leading-tight tracking-tight font-heading">
-                TripTailor
+                TripGenie
               </span>
               <span className="text-[10px] font-medium text-muted-foreground tracking-wider uppercase">
                 Du lịch cá nhân hóa

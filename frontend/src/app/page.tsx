@@ -6,17 +6,43 @@ import { SectionHeader } from "@/components/common/SectionHeader";
 import { PlaceGrid } from "@/components/place/PlaceGrid";
 import { PlannerCard } from "@/components/planner/PlannerCard";
 import { PostCard } from "@/components/community/PostCard";
+import { placeService } from "@/services/place.service";
 import { EXPERIENCE_THEMES } from "@/mocks/data/categories";
 import { MOCK_PLACES } from "@/mocks/data/places";
 import { MOCK_PLANNERS } from "@/mocks/data/planners";
 import { MOCK_COMMUNITY_POSTS } from "@/mocks/data/community";
 
-export default function HomePage() {
-  // Categorized Place subsets
-  const featuredPlaces = MOCK_PLACES.filter((p) => p.featured);
-  const couplePlaces = MOCK_PLACES.filter((p) => p.suitableFor.includes("couple"));
-  const familyPlaces = MOCK_PLACES.filter((p) => p.suitableFor.includes("family"));
-  const cafePlaces = MOCK_PLACES.filter((p) => p.category === "cafe");
+// Revalidate homepage at most every 120 seconds (ISR)
+export const revalidate = 120;
+
+export default async function HomePage() {
+  // Concurrently fetch real places from Backend API on the server (0ms client delay)
+  const [featuredRes, coupleRes, familyRes, cafeRes] = await Promise.all([
+    placeService.searchPlaces({ limit: 4, sortBy: "rating" }).catch(() => null),
+    placeService.searchPlaces({ limit: 3, suitableFor: "couple" }).catch(() => null),
+    placeService.searchPlaces({ limit: 3, suitableFor: "family" }).catch(() => null),
+    placeService.searchPlaces({ limit: 3, categorySlugs: ["ca-phe"] }).catch(() => null),
+  ]);
+
+  const featuredPlaces =
+    featuredRes?.places && featuredRes.places.length > 0
+      ? featuredRes.places
+      : MOCK_PLACES.filter((p) => p.featured);
+
+  const couplePlaces =
+    coupleRes?.places && coupleRes.places.length > 0
+      ? coupleRes.places
+      : MOCK_PLACES.filter((p) => p.suitableFor.includes("couple"));
+
+  const familyPlaces =
+    familyRes?.places && familyRes.places.length > 0
+      ? familyRes.places
+      : MOCK_PLACES.filter((p) => p.suitableFor.includes("family"));
+
+  const cafePlaces =
+    cafeRes?.places && cafeRes.places.length > 0
+      ? cafeRes.places
+      : MOCK_PLACES.filter((p) => p.category === "cafe");
 
   return (
     <div className="flex flex-col gap-16 sm:gap-20 pb-16">
@@ -81,7 +107,7 @@ export default function HomePage() {
               <span>🧭 Khám phá</span>
             </Link>
             <Link
-              href="/map"
+              href="/explore?view=split"
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-colors border border-white/15"
             >
               <span>🗺️ Bản đồ lân cận</span>

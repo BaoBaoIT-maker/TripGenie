@@ -3,9 +3,11 @@ import { PlacesController } from './places.controller';
 import { PlacesService } from './places.service';
 import { PlacesRepository } from './places.repository';
 import { GeminiEmbeddingService } from './services/gemini-embedding.service';
+import { GeoModule } from '../geo/geo.module';
 import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
 
 @Module({
+  imports: [GeoModule],
   controllers: [PlacesController],
   providers: [
     PlacesService,

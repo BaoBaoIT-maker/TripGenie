@@ -71,16 +71,29 @@ export class CrawlerRepository implements ICrawlerRepository {
   async getUnenrichedPlacesByArea(areaId: number, limit: number = 50): Promise<any[]> {
     return this.prisma.place.findMany({
       where: {
-        areaId,
+        OR: [
+          { areaId },
+          { area: { parentId: areaId } },
+        ],
         status: PlaceStatus.ACTIVE,
         deletedAt: null,
-        OR: [
-          { ratingAvg: 0 },
-          { priceLevel: null },
-          { openingHours: { equals: Prisma.DbNull } },
+        AND: [
+          {
+            OR: [
+              { imageCount: 0 },
+              { ratingAvg: 0 },
+              { priceLevel: null },
+              { description: null },
+              { openingHours: { equals: Prisma.DbNull } },
+            ],
+          },
         ],
       },
-      include: { sources: true, images: true },
+      include: { sources: true, images: true, category: true, area: true },
+      orderBy: [
+        { imageCount: 'asc' },
+        { ratingAvg: 'asc' },
+      ],
       take: limit,
     });
   }

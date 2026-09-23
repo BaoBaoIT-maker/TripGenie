@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useEffect } from "react";
+import { use, useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -16,6 +16,9 @@ import {
   ArrowLeft,
   Users,
   Lightbulb,
+  Camera,
+  Compass,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +31,8 @@ import { placeService } from "@/services/place.service";
 import { Place } from "@/types/place";
 import { MOCK_PLACES } from "@/mocks/data/places";
 import { toast } from "sonner";
+import { useGeolocation } from "@/features/map/hooks/use-geolocation";
+import { routingService } from "@/services/routing.service";
 
 interface PlaceDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -56,6 +61,25 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
   });
   const [loading, setLoading] = useState(!initialPlace);
   const [isSaved, setIsSaved] = useState(false);
+  const [mainImgError, setMainImgError] = useState(false);
+  const [failedThumbnails, setFailedThumbnails] = useState<Record<number, boolean>>({});
+
+  // Geolocation for direct distance and directions
+  const { coordinate: userLocation, requestLocation, locating } = useGeolocation();
+
+  useEffect(() => {
+    if (!userLocation) {
+      requestLocation();
+    }
+  }, [userLocation, requestLocation]);
+
+  const directDistanceKm = useMemo(() => {
+    if (!userLocation || !place?.latitude || !place?.longitude) return null;
+    return routingService.calculateDirectDistanceKm(userLocation, {
+      latitude: place.latitude,
+      longitude: place.longitude,
+    });
+  }, [userLocation, place?.latitude, place?.longitude]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -151,30 +175,53 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 rounded-3xl overflow-hidden">
         {/* Main Cover Photo (Span 8) */}
         <div className="lg:col-span-8 relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden bg-muted rounded-2xl">
-          <Image
-            src={place.coverImage}
-            alt={place.name}
-            fill
-            priority
-            sizes="(max-width: 1024px) 100vw, 66vw"
-            className="object-cover"
-          />
+          {place.coverImage && !mainImgError ? (
+            <Image
+              src={place.coverImage}
+              alt={place.name}
+              fill
+              priority
+              sizes="(max-width: 1024px) 100vw, 66vw"
+              className="object-cover"
+              onError={() => setMainImgError(true)}
+            />
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-muted/60 text-center">
+              <div className="size-16 rounded-full bg-background shadow-xs flex items-center justify-center text-muted-foreground mb-3">
+                <Camera className="size-8 text-muted-foreground/70" />
+              </div>
+              <h3 className="text-base font-semibold text-foreground">
+                Chưa có ảnh thực tế cho {place.name}
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                Hình ảnh thực tế sẽ sớm được cập nhật từ cộng đồng du lịch TripGenie.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Side Thumbnails (Span 4) */}
         <div className="lg:col-span-4 grid grid-cols-2 lg:grid-cols-1 gap-4">
-          {place.images.slice(1, 3).map((img, idx) => (
+          {(place.images.length > 1 ? place.images.slice(1, 3) : [null, null]).map((img, idx) => (
             <div
               key={idx}
               className="relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden rounded-2xl bg-muted"
             >
-              <Image
-                src={img}
-                alt={`${place.name} - ${idx + 1}`}
-                fill
-                sizes="(max-width: 1024px) 50vw, 33vw"
-                className="object-cover"
-              />
+              {img && !failedThumbnails[idx] ? (
+                <Image
+                  src={img}
+                  alt={`${place.name} - ${idx + 1}`}
+                  fill
+                  sizes="(max-width: 1024px) 50vw, 33vw"
+                  className="object-cover"
+                  onError={() => setFailedThumbnails((prev) => ({ ...prev, [idx]: true }))}
+                />
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/40 p-3 text-center">
+                  <Camera className="size-6 text-muted-foreground/50 mb-1" />
+                  <span className="text-[11px] text-muted-foreground">Ảnh #{idx + 2} (Trống)</span>
+                </div>
+              )}
             </div>
           ))}
         </div>
@@ -220,6 +267,15 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
                 <MapPin className="size-3.5 text-primary" />
                 {place.address}
               </span>
+              {directDistanceKm !== null && directDistanceKm > 0 && (
+                <>
+                  <span>•</span>
+                  <span className="inline-flex items-center gap-1 font-semibold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full text-xs">
+                    <span>📍 Cách bạn ~{routingService.formatDistanceKm(directDistanceKm)}</span>
+                    <span className="text-[11px] text-muted-foreground font-normal">(đường chim bay)</span>
+                  </span>
+                </>
+              )}
             </div>
           </div>
 
@@ -329,8 +385,82 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
               )}
             </div>
 
+            {/* Distance & Directions Box */}
+            <div className="rounded-2xl border border-primary/25 bg-primary/5 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-primary uppercase tracking-wider flex items-center gap-1.5">
+                  <Compass className="size-4 text-primary" />
+                  <span>Khoảng cách & Chỉ đường</span>
+                </span>
+                {userLocation ? (
+                  <span className="text-[11px] font-bold text-foreground bg-background/90 px-2 py-0.5 rounded-md border border-border/60 shadow-2xs">
+                    ~{directDistanceKm ? routingService.formatDistanceKm(directDistanceKm) : "0 km"}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={requestLocation}
+                    disabled={locating}
+                    className="text-[11px] font-semibold text-primary hover:underline"
+                  >
+                    {locating ? "Đang định vị..." : "Bật vị trí"}
+                  </button>
+                )}
+              </div>
+
+              {userLocation && directDistanceKm !== null ? (
+                <div className="space-y-1.5 text-xs text-muted-foreground">
+                  <div className="flex items-center justify-between">
+                    <span>Đường chim bay:</span>
+                    <strong className="text-foreground font-semibold">
+                      ~{routingService.formatDistanceKm(directDistanceKm)}
+                    </strong>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Ước tính di chuyển:</span>
+                    <span className="text-foreground font-semibold text-emerald-600 dark:text-emerald-400">
+                      🏍️ ~{routingService.formatDurationMinutes(routingService.estimateDurationMinutes(directDistanceKm, "motorcycle"))}
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                  Bật quyền vị trí trên trình duyệt để biết khoảng cách từ bạn đến đây và chỉ đường đi.
+                </p>
+              )}
+
+              {/* Action Buttons for Directions */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <Link
+                  href={`/explore?view=split&areaId=${place.city || "all"}&selected=${place.id}`}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-xs"
+                >
+                  <Compass className="size-3.5" />
+                  <span>Trên bản đồ</span>
+                </Link>
+
+                <a
+                  href={
+                    userLocation
+                      ? routingService.getGoogleMapsDirectionsUrl(
+                          userLocation,
+                          { latitude: place.latitude, longitude: place.longitude },
+                          "motorcycle"
+                        )
+                      : `https://www.google.com/maps/dir/?api=1&destination=${place.latitude},${place.longitude}`
+                  }
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-border bg-background px-3 py-2 text-xs font-semibold text-foreground hover:bg-muted transition-colors"
+                >
+                  <span>Google Maps</span>
+                  <ExternalLink className="size-3" />
+                </a>
+              </div>
+            </div>
+
             {/* Action Buttons */}
-            <div className="space-y-2.5 pt-2">
+            <div className="space-y-2.5 pt-1">
               <Button
                 onClick={handleAddToPlanner}
                 className="w-full h-11 font-bold gap-2 rounded-xl bg-primary text-primary-foreground shadow-xs"

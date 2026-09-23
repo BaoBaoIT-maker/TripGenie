@@ -9,7 +9,7 @@ const MOBILE_NAV_ITEMS = [
   { href: "/", label: "Trang chủ", icon: Home },
   { href: "/explore", label: "Khám phá", icon: Compass },
   { href: "/planner", label: "Lịch trình", icon: CalendarDays },
-  { href: "/map", label: "Bản đồ", icon: Map },
+  { href: "/explore?view=split", label: "Bản đồ", icon: Map },
   { href: "/profile", label: "Cá nhân", icon: User },
 ];
 
@@ -21,10 +21,13 @@ export function BottomNav() {
       <nav className="flex h-15 items-center justify-around px-2">
         {MOBILE_NAV_ITEMS.map((item) => {
           const Icon = item.icon;
+          const isSplitMap = item.href.includes("view=split");
           const isActive =
             item.href === "/"
               ? pathname === "/"
-              : pathname.startsWith(item.href);
+              : isSplitMap
+                ? pathname === "/explore"
+                : pathname.startsWith(item.href);
 
           return (
             <Link

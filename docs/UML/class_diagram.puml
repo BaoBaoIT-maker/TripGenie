@@ -1,0 +1,572 @@
+@startuml TripGenie_ClassDiagram
+
+skinparam classAttributeIconSize 0
+skinparam classFontStyle bold
+skinparam shadowing true
+skinparam linetype polyline
+skinparam backgroundColor White
+skinparam roundcorner 8
+
+skinparam class {
+    BackgroundColor #DDEEFF
+    BorderColor #336699
+    HeaderBackgroundColor #336699
+    FontColor White
+    AttributeFontColor #111111
+    BorderThickness 1.5
+}
+
+skinparam enum {
+    BackgroundColor #FDECEA
+    BorderColor #C0392B
+    HeaderBackgroundColor #C0392B
+    FontColor White
+    AttributeFontColor #111111
+}
+
+title TripGenie – Class Diagram
+
+' =====================================================================
+' ENUMS
+' =====================================================================
+enum UserRole {
+    ADMIN
+    USER
+}
+
+enum AuthProvider {
+    LOCAL
+    GOOGLE
+    FACEBOOK
+    GITHUB
+}
+
+enum BudgetLevel {
+    LOW
+    MEDIUM
+    HIGH
+    LUXURY
+}
+
+enum AreaType {
+    COUNTRY
+    PROVINCE
+    CITY
+    DISTRICT
+    ZONE
+}
+
+enum PlaceStatus {
+    PENDING
+    ACTIVE
+    INACTIVE
+    DUPLICATE
+}
+
+enum ItineraryStatus {
+    DRAFT
+    PUBLISHED
+    ARCHIVED
+}
+
+enum GroupRole {
+    OWNER
+    EDITOR
+    VIEWER
+}
+
+enum ProposalStatus {
+    PENDING
+    APPROVED
+    REJECTED
+}
+
+enum ChatSender {
+    USER
+    AGENT
+    TOOL
+}
+
+enum ReportType {
+    SPAM
+    INAPPROPRIATE
+    FALSE_INFO
+    COPYRIGHT
+    OTHER
+}
+
+enum ReportStatus {
+    PENDING
+    REVIEWING
+    RESOLVED
+    DISMISSED
+}
+
+enum ReportTargetType {
+    PLACE
+    REVIEW
+    POST
+    COMMENT
+    USER
+}
+
+enum CrawlJobType {
+    REGION_CRAWL
+    PLACE_SYNC
+    EMBEDDING_GEN
+}
+
+enum CrawlJobStatus {
+    PENDING
+    RUNNING
+    COMPLETED
+    FAILED
+    CANCELLED
+}
+
+enum SyncStatus {
+    OK
+    STALE
+    ERROR
+    PENDING
+}
+
+enum CoverageStatus {
+    COMPLETE
+    PARTIAL
+    NOT_COVERED
+    STALE
+}
+
+enum AuditAction {
+    CREATE
+    UPDATE
+    DELETE
+    APPROVE
+    REJECT
+    BAN
+    UNBAN
+    TRIGGER_CRAWL
+    CANCEL_CRAWL
+}
+
+' =====================================================================
+' USER & IDENTITY
+' =====================================================================
+class User {
+    -UUID id
+    -String email
+    -String fullName
+    -String passwordHash
+    -UserRole role
+    +getDisplayName() : String
+    +isAdmin() : boolean
+}
+
+class UserIdentity {
+    -UUID id
+    -UUID userId
+    -AuthProvider provider
+    -String providerUserId
+}
+
+class UserPreference {
+    -UUID userId
+    -BudgetLevel budgetLevel
+    -String[] preferredCategories
+    -String[] travelStyle
+    -String[] dietaryRestrictions
+}
+
+' =====================================================================
+' PLACE & GEOGRAPHY
+' =====================================================================
+class TravelArea {
+    -Int id
+    -String name
+    -String nameVi
+    -String slug
+    -AreaType type
+    -Int parentId
+    +containsPoint(lat: Float, lng: Float) : boolean
+}
+
+class Category {
+    -Int id
+    -String name
+    -String nameVi
+    -String slug
+    -String iconUrl
+    -Int parentId
+    -Int sortOrder
+    +isRootCategory() : boolean
+}
+
+class Place {
+    -UUID id
+    -String name
+    -String description
+    -String address
+    -Float latitude
+    -Float longitude
+    -Geography location
+    -PlaceStatus status
+    -BudgetLevel priceLevel
+    -Float ratingAvg
+    -Int reviewCount
+    -Json openingHours
+    -String phone
+    -String website
+    -String[] tags
+    +isOpenNow() : boolean
+    +getCoordinate() : Point
+}
+
+class PlaceImage {
+    -UUID id
+    -UUID placeId
+    -String imageUrl
+    -String thumbnailUrl
+    -Boolean isPrimary
+    -Int displayOrder
+    -String caption
+}
+
+class PlaceReview {
+    -UUID id
+    -UUID userId
+    -UUID placeId
+    -Int rating
+    -String title
+    -String comment
+    -DateTime visitedAt
+    -Int helpfulCount
+    +isRecent() : boolean
+}
+
+class PlaceEmbedding {
+    -UUID id
+    -UUID placeId
+    -String contentText
+    -Vector(1536) embedding
+    -String modelName
+    +computeCosineSimilarity(query: Vector) : Float
+}
+
+class PlaceSource {
+    -UUID id
+    -UUID placeId
+    -String provider
+    -String externalId
+    -SyncStatus syncStatus
+    -DateTime lastSyncedAt
+    -Int syncAttemptCount
+    -Float sourceRating
+    +needsResync() : boolean
+}
+
+' =====================================================================
+' COLLECTION & ITINERARY
+' =====================================================================
+class Collection {
+    -UUID id
+    -UUID userId
+    -String title
+    -String description
+    -Boolean isPublic
+    +getPlaceCount() : Integer
+}
+
+class CollectionPlace {
+    -UUID collectionId
+    -UUID placeId
+    -String notes
+    -DateTime addedAt
+}
+
+class Itinerary {
+    -UUID id
+    -UUID creatorId
+    -String title
+    -String destination
+    -Int areaId
+    -DateTime startDate
+    -DateTime endDate
+    -Decimal totalBudget
+    -BudgetLevel budgetLevel
+    -ItineraryStatus status
+    -Boolean isPublic
+    -Boolean isAiGenerated
+    -Int totalPlaces
+    +getDurationDays() : Integer
+    +isPublished() : boolean
+}
+
+class ItineraryDestination {
+    -UUID id
+    -UUID itineraryId
+    -UUID placeId
+    -Int dayNumber
+    -Decimal visitOrder
+    -DateTime startTime
+    -DateTime endTime
+    -Int estimatedDurationMinutes
+    -String notes
+    +getFormattedTimeRange() : String
+}
+
+' =====================================================================
+' GROUP TRIP
+' =====================================================================
+class TripGroup {
+    -UUID id
+    -UUID itineraryId
+    -String name
+    -String inviteCode
+    -Int maxMembers
+    +generateInviteCode() : String
+    +isFull() : boolean
+}
+
+class GroupMember {
+    -UUID tripGroupId
+    -UUID userId
+    -GroupRole role
+    -DateTime joinedAt
+    +isOwner() : boolean
+    +canEdit() : boolean
+}
+
+class GroupPlaceProposal {
+    -UUID id
+    -UUID tripGroupId
+    -UUID placeId
+    -UUID proposedBy
+    -ProposalStatus status
+    -UUID destinationId
+    +getVoteCount() : Integer
+    +isApproved() : boolean
+}
+
+class GroupPlaceVote {
+    -UUID proposalId
+    -UUID userId
+    -DateTime createdAt
+}
+
+' =====================================================================
+' AI CHAT
+' =====================================================================
+class AiChatSession {
+    -UUID id
+    -UUID userId
+    -String title
+    -UUID linkedItineraryId
+    -String contextCity
+    -Int messageCount
+    +needsSummarization() : boolean
+}
+
+class AiChatMessage {
+    -UUID id
+    -UUID sessionId
+    -ChatSender sender
+    -String content
+    -Json toolCalls
+    -Json toolResults
+    -Int tokenCount
+    -String modelName
+    +isToolCall() : boolean
+}
+
+' =====================================================================
+' COMMUNITY
+' =====================================================================
+class CommunityPost {
+    -UUID id
+    -UUID userId
+    -UUID itineraryId
+    -String title
+    -String caption
+    -Int likeCount
+    -Int commentCount
+    -Int cloneCount
+    +incrementLikeCount() : void
+}
+
+class PostLike {
+    -UUID postId
+    -UUID userId
+    -DateTime createdAt
+}
+
+class PostComment {
+    -UUID id
+    -UUID postId
+    -UUID userId
+    -String content
+    +isDeleted() : boolean
+}
+
+class ContentReport {
+    -UUID id
+    -UUID reportedBy
+    -ReportTargetType targetType
+    -UUID targetId
+    -ReportType reportType
+    -String description
+    -ReportStatus status
+    -UUID reviewedBy
+    +isResolved() : boolean
+}
+
+' =====================================================================
+' DATA INFRASTRUCTURE
+' =====================================================================
+class DataCoverage {
+    -Int areaId
+    -Int placeCount
+    -CoverageStatus status
+    -DateTime lastCrawledAt
+    +isStale() : boolean
+    +getCoveragePercent() : Float
+}
+
+class CrawlJob {
+    -UUID id
+    -CrawlJobType jobType
+    -CrawlJobStatus status
+    -Int areaId
+    -UUID placeId
+    -String provider
+    -Int priority
+    -Int totalItems
+    -Int processedItems
+    -Int retryCount
+    -Int maxRetries
+    +getProgressPercent() : Float
+    +canRetry() : boolean
+}
+
+class KnowledgeDocument {
+    -UUID id
+    -String title
+    -String sourceType
+    -String sourceUrl
+    -String language
+    -Int areaId
+    -Boolean isProcessed
+    -Int chunkCount
+    +needsProcessing() : boolean
+}
+
+class KnowledgeChunk {
+    -UUID id
+    -UUID documentId
+    -Int chunkIndex
+    -String content
+    -Vector(1536) embedding
+    +computeSimilarity(query: Vector) : Float
+}
+
+class AuditLog {
+    -UUID id
+    -UUID actorId
+    -UserRole actorRole
+    -AuditAction action
+    -String targetType
+    -UUID targetId
+    -String ipAddress
+    +getSummary() : String
+}
+
+' =====================================================================
+' RELATIONSHIPS
+' =====================================================================
+User "1" *-- "0..*" UserIdentity : authenticates via >
+User "1" *-- "0..1" UserPreference : has >
+
+TravelArea "0..1" o-- "0..*" TravelArea : parent / children >
+Category "0..1" o-- "0..*" Category : parent / children >
+TravelArea "1" o-- "0..*" Place : located in >
+Category "0..1" o-- "0..*" Place : categorized by >
+User "0..1" o-- "0..*" Place : created by >
+Place "1" *-- "0..*" PlaceImage : has >
+Place "1" *-- "0..*" PlaceReview : receives >
+User "1" o-- "0..*" PlaceReview : writes >
+Place "1" *-- "0..1" PlaceEmbedding : has vector >
+Place "1" *-- "0..*" PlaceSource : synced from >
+
+User "1" o-- "0..*" Collection : owns >
+Collection "1" *-- "0..*" CollectionPlace : contains >
+Place "1" o-- "0..*" CollectionPlace : saved in >
+User "1" o-- "0..*" Itinerary : creates >
+TravelArea "0..1" o-- "0..*" Itinerary : targets area >
+Itinerary "0..1" o-- "0..*" Itinerary : cloned from >
+Itinerary "1" *-- "0..*" ItineraryDestination : contains >
+Place "1" o-- "0..*" ItineraryDestination : visited at >
+
+Itinerary "1" *-- "0..1" TripGroup : shared as group >
+TripGroup "1" *-- "0..*" GroupMember : has >
+User "1" o-- "0..*" GroupMember : joins >
+TripGroup "1" *-- "0..*" GroupPlaceProposal : proposes >
+User "1" o-- "0..*" GroupPlaceProposal : proposed by >
+Place "1" o-- "0..*" GroupPlaceProposal : refers to >
+GroupPlaceProposal "1" *-- "0..*" GroupPlaceVote : voted by >
+User "1" o-- "0..*" GroupPlaceVote : votes >
+
+User "1" o-- "0..*" AiChatSession : owns >
+Itinerary "0..1" o-- "0..*" AiChatSession : linked to >
+AiChatSession "1" *-- "0..*" AiChatMessage : contains >
+
+User "1" o-- "0..*" CommunityPost : publishes >
+Itinerary "1" *-- "0..1" CommunityPost : shared as >
+CommunityPost "1" *-- "0..*" PostLike : liked by >
+User "1" o-- "0..*" PostLike : likes >
+CommunityPost "1" *-- "0..*" PostComment : has >
+User "1" o-- "0..*" PostComment : writes >
+User "1" o-- "0..*" ContentReport : files >
+User "0..1" o-- "0..*" ContentReport : reviews >
+
+TravelArea "1" *-- "0..1" DataCoverage : tracks >
+TravelArea "0..1" o-- "0..*" CrawlJob : scoped to >
+Place "0..1" o-- "0..*" CrawlJob : target of >
+User "0..1" o-- "0..*" CrawlJob : triggered by >
+TravelArea "0..1" o-- "0..*" KnowledgeDocument : about >
+KnowledgeDocument "1" *-- "0..*" KnowledgeChunk : split into >
+User "1" o-- "0..*" AuditLog : performs >
+
+' =====================================================================
+' ENUM DEPENDENCIES
+' =====================================================================
+User ..> UserRole
+UserIdentity ..> AuthProvider
+UserPreference ..> BudgetLevel
+TravelArea ..> AreaType
+Place ..> PlaceStatus
+Place ..> BudgetLevel
+Itinerary ..> ItineraryStatus
+Itinerary ..> BudgetLevel
+GroupMember ..> GroupRole
+GroupPlaceProposal ..> ProposalStatus
+AiChatMessage ..> ChatSender
+ContentReport ..> ReportType
+ContentReport ..> ReportStatus
+ContentReport ..> ReportTargetType
+CrawlJob ..> CrawlJobType
+CrawlJob ..> CrawlJobStatus
+PlaceSource ..> SyncStatus
+DataCoverage ..> CoverageStatus
+AuditLog ..> AuditAction
+AuditLog ..> UserRole
+
+' =====================================================================
+' LAYOUT FIX
+' =====================================================================
+KnowledgeDocument -[hidden]d- AuditLog
+CrawlJob -[hidden]r- KnowledgeDocument
+DataCoverage -[hidden]d- CrawlJob
+UserIdentity -[hidden]r- UserPreference
+PostLike -[hidden]r- PostComment
+
+@enduml

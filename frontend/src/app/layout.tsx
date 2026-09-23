@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
-import "@vietmap/vietmap-gl-js/dist/vietmap-gl.css";
+import "maplibre-gl/dist/maplibre-gl.css";
 import { Providers } from "./providers";
 import { Navbar } from "@/components/common/Navbar";
 import { Footer } from "@/components/common/Footer";
@@ -25,7 +25,7 @@ const playfair = Playfair_Display({
 });
 
 export const metadata: Metadata = {
-  title: "TripTailor - Khám phá và lập kế hoạch du lịch cá nhân hóa",
+  title: "TripGenie - Khám phá và lập kế hoạch du lịch cá nhân hóa",
   description: "Hệ thống khám phá địa điểm du lịch và hỗ trợ lập kế hoạch trải nghiệm cá nhân hóa",
 };
 

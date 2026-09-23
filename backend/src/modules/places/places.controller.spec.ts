@@ -52,6 +52,7 @@ describe('PlacesController', () => {
       getPlaceById: jest.fn(),
       searchSemantic: jest.fn(),
       syncEmbeddings: jest.fn(),
+      searchPlacesGeoJson: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -92,6 +93,23 @@ describe('PlacesController', () => {
 
       expect(service.searchPlaces).toHaveBeenCalledWith(dto);
       expect(result).toEqual(mockResult);
+    });
+  });
+
+  describe('GET /places/geojson', () => {
+    it('should return GeoJSON FeatureCollection', async () => {
+      const mockGeoJson = {
+        type: 'FeatureCollection' as const,
+        features: [],
+        metadata: { total: 0, count: 0 },
+      };
+      service.searchPlacesGeoJson.mockResolvedValue(mockGeoJson);
+
+      const dto: SearchPlacesDto = { areaId: 1 };
+      const result = await controller.searchPlacesGeoJson(dto);
+
+      expect(service.searchPlacesGeoJson).toHaveBeenCalledWith(dto);
+      expect(result).toEqual(mockGeoJson);
     });
   });
 

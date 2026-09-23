@@ -51,7 +51,6 @@ export default function PlannerListPage() {
     (p) =>
       p.members?.some((m) => m.userId === "user-current") ||
       p.authorName?.includes("Của bạn") ||
-      p.authorName?.includes("Trọng Phúc") ||
       !p.authorName?.includes("AI")
   );
 

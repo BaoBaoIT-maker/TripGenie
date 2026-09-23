@@ -80,6 +80,7 @@ export function useGeolocation() {
 
   return {
     ...state,
+    locating: state.status === "pending",
     requestLocation,
   };
 }

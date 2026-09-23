@@ -148,7 +148,15 @@ Khi hoàn thành bất kỳ module nào, **BẮT BUỘC** thực hiện quy trì
   - `GET /api/v1/places/categories`: Danh sách 15 categories kèm số lượng địa điểm thực tế (`placeCount`).
   - `GET /api/v1/places/travel-areas`: Danh sách 12 travel areas kèm bounding box GPS.
   - `GET /api/v1/places/:id`: Chi tiết 1 địa điểm (UUID) kèm mảng hình ảnh gallery và nguồn dữ liệu.
-- [x] **Unit Tests & Real DB Integration Tests** — 18/18 Unit Tests PASS 100% (`places.service.spec.ts`, `places.controller.spec.ts`) và test thực tế trên **2,124 địa điểm Đà Nẵng** trong PostgreSQL trả về kết quả chính xác trong vài miligiây.
+- [x] **Semantic Vector Search (AI Natural Language)**:
+  - **Google Gemini Embedding 2**: Tích hợp `models/gemini-embedding-2` cấu hình chuẩn `outputDimensionality: 1536` khớp hoàn hảo với cột `VECTOR(1536)` trong PostgreSQL.
+  - **HNSW Index Optimization**: Tạo chỉ mục HNSW (`idx_place_embeddings_hnsw` với `vector_cosine_ops`) trên bảng `place_embeddings`, đảm bảo tốc độ tìm kiếm khoảng cách Cosine $O(\log N)$ cực nhanh.
+  - **SOLID Abstraction**: Thiết kế `IEmbeddingService` & `GeminiEmbeddingService` tuân thủ Dependency Inversion, đăng ký qua token `INJECT_TOKENS.EMBEDDING_SERVICE`.
+  - **Endpoints**:
+    - `GET /api/v1/places/semantic-search`: Tìm kiếm ngữ nghĩa tự nhiên thông minh, tính điểm tương đồng Cosine $\text{similarityScore} = 1 - (\text{embedding} \Leftrightarrow \text{query\_vector})$.
+    - `POST /api/v1/places/sync-embeddings`: Tác vụ nền đồng bộ nhúng vector cho các địa điểm chưa có embedding.
+  - **Kiểm thử thực tế (Real Tests)**: Test trực tiếp các câu query tự nhiên tiếng Việt trên dữ liệu thực tế Đà Nẵng (quán cafe yên tĩnh làm việc đạt 71.89%, ẩm thực đặc sản chợ đêm đạt 72.93%, điểm tham quan cảnh đẹp đạt 69.26%).
+- [x] **Unit Tests & Real DB Integration Tests** — 22/22 Unit Tests PASS 100% (`places.service.spec.ts`, `places.controller.spec.ts`) và test thực tế trên **2,124 địa điểm Đà Nẵng** trong PostgreSQL trả về kết quả chính xác trong vài miligiây.
 
 ### TODO — PHASE 5: Personalized Itinerary Planner AI (Tiếp theo)
 

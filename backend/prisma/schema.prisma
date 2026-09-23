@@ -245,6 +245,9 @@ model TravelArea {
   bboxMaxLat Float?   @map("bbox_max_lat")
   bboxMinLng Float?   @map("bbox_min_lng")
   bboxMaxLng Float?   @map("bbox_max_lng")
+  code       String?  @db.VarChar(20)
+  oldNames   String[] @default([]) @map("old_names")
+  boundary   Unsupported("geography(MultiPolygon, 4326)")?
   isActive   Boolean  @default(true) @map("is_active")
 
   parent      TravelArea?         @relation("TravelAreaParent", fields: [parentId], references: [id])
@@ -281,13 +284,12 @@ model Place {
   description    String?
   categoryId     Int?         @map("category_id")
   areaId         Int?         @map("area_id")
-  address        String
-  district       String?      @db.VarChar(100)
-  city           String?      @db.VarChar(100)
-  province       String?      @db.VarChar(100)
-  country        String?      @default("Vietnam") @db.VarChar(50)
-  latitude       Float
-  longitude      Float
+  address           String
+  addressNormalized String?      @map("address_normalized") @db.VarChar(500)
+  latitude          Float
+  longitude         Float
+  addressVerified   Boolean      @default(false) @map("address_verified")
+  coordinateSource  String?      @default("unknown") @map("coordinate_source") @db.VarChar(50)
   priceRange     Json?        @map("price_range")
   priceLevel     BudgetLevel? @map("price_level")
   openingHours   Json?        @map("opening_hours")

@@ -108,4 +108,6 @@ export interface VietMapProps {
   onViewportChange: (viewport: MapViewport) => void;
   onRequestCurrentLocation: () => void;
   locating: boolean;
+  selectedProvinceName?: string | null;
+  userLocation?: MapCoordinate | null;
 }

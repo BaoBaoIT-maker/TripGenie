@@ -2,6 +2,8 @@ import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
 import { IPlaceRepository } from './interfaces/place-repository.interface';
 import { IEmbeddingService } from './interfaces/embedding-service.interface';
+import { GeoJsonService } from '../geo/services/geojson.service';
+import { GeoJsonFeatureCollection, PlaceGeoInput } from '../geo/interfaces/geo.interface';
 import { SearchPlacesDto } from './dto/search-places.dto';
 import { NearbyPlacesDto } from './dto/nearby-places.dto';
 import { SemanticSearchDto, SyncEmbeddingsDto } from './dto/semantic-search.dto';
@@ -22,6 +24,7 @@ export class PlacesService {
     private readonly placeRepo: IPlaceRepository,
     @Inject(INJECT_TOKENS.EMBEDDING_SERVICE)
     private readonly embeddingService: IEmbeddingService,
+    private readonly geoJsonService: GeoJsonService,
   ) {}
 
   /**
@@ -51,6 +54,45 @@ export class PlacesService {
         totalPages,
       },
     };
+  }
+
+  /**
+   * Search places and return RFC 7946 compliant GeoJSON FeatureCollection.
+   */
+  async searchPlacesGeoJson(dto: SearchPlacesDto): Promise<GeoJsonFeatureCollection> {
+    const limit = dto.limit ? Math.min(dto.limit, 500) : 100;
+    const { items: rawItems, total } = await this.placeRepo.searchPlaces({
+      ...dto,
+      limit,
+    });
+
+    const geoInputs: PlaceGeoInput[] = rawItems.map((row) => ({
+      id: row.id,
+      name: row.name,
+      address: row.address,
+      addressNormalized: row.address_normalized || row.address,
+      latitude: Number(row.latitude),
+      longitude: Number(row.longitude),
+      ratingAvg: row.rating_avg ? Number(row.rating_avg) : null,
+      reviewCount: row.review_count ? Number(row.review_count) : null,
+      priceLevel: row.price_level || null,
+      category: row.category_id
+        ? { id: row.category_id, name: row.category_name_vi || row.category_name }
+        : null,
+      area: row.area_id
+        ? { id: row.area_id, name: row.area_name_vi || row.area_name }
+        : null,
+      distanceMeters:
+        row.distance_meters !== null && row.distance_meters !== undefined
+          ? Math.round(Number(row.distance_meters))
+          : null,
+    }));
+
+    return this.geoJsonService.buildFeatureCollection(geoInputs, {
+      total,
+      count: geoInputs.length,
+      page: dto.page || 1,
+    });
   }
 
   /**
@@ -98,8 +140,12 @@ export class PlacesService {
     for (const place of places) {
       try {
         const categoryName = place.category?.nameVi || place.category?.name || '';
-        const tags = Array.isArray(place.tags) ? place.tags.join(', ') : '';
-        const contentText = `${place.name}. Danh mục: ${categoryName}. Địa chỉ: ${place.address}. ${place.description || ''} ${tags}`.trim();
+        const areaName = place.area?.nameVi || place.area?.name || '';
+        const address = place.addressNormalized || place.address || '';
+        const tags = Array.isArray(place.tags) && place.tags.length > 0 ? `Đặc trưng: ${place.tags.join(', ')}.` : '';
+        const desc = place.description ? `Mô tả: ${place.description}.` : '';
+        const areaPart = areaName ? `Khu vực: ${areaName}.` : '';
+        const contentText = `${place.name}. Danh mục: ${categoryName}. Địa chỉ: ${address}. ${areaPart} ${desc} ${tags}`.trim().replace(/\s+/g, ' ');
 
         const vector = await this.embeddingService.generateEmbedding(contentText);
         await this.placeRepo.upsertPlaceEmbedding(

@@ -60,6 +60,12 @@ export class SearchPlacesDto {
   categorySlugs?: string[];
 
   @IsOptional()
+  @Transform(transformStringArray)
+  @IsArray()
+  @IsString({ each: true })
+  amenities?: string[];
+
+  @IsOptional()
   @Type(() => Number)
   @IsLatitude()
   lat?: number;

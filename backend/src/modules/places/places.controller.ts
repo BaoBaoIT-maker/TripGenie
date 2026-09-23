@@ -13,6 +13,7 @@ import { PlacesService } from './places.service';
 import { SearchPlacesDto } from './dto/search-places.dto';
 import { NearbyPlacesDto } from './dto/nearby-places.dto';
 import { SemanticSearchDto, SyncEmbeddingsDto } from './dto/semantic-search.dto';
+import { GeoJsonFeatureCollection } from '../geo/interfaces/geo.interface';
 import {
   PaginatedPlacesResponseDto,
   PlaceDetailDto,
@@ -35,6 +36,18 @@ export class PlacesController {
     @Query() dto: SearchPlacesDto,
   ): Promise<PaginatedPlacesResponseDto> {
     return this.placesService.searchPlaces(dto);
+  }
+
+  /**
+   * Search places and return as standard RFC 7946 GeoJSON FeatureCollection.
+   * Public endpoint for interactive map rendering.
+   */
+  @Get('geojson')
+  @HttpCode(HttpStatus.OK)
+  async searchPlacesGeoJson(
+    @Query() dto: SearchPlacesDto,
+  ): Promise<GeoJsonFeatureCollection> {
+    return this.placesService.searchPlacesGeoJson(dto);
   }
 
   /**

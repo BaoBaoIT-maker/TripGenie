@@ -1,4 +1,4 @@
-﻿-- =============================================================================
+-- =============================================================================
 -- TRIPGENIE â€” DATABASE SCHEMA (v4)
 -- Cáº­p nháº­t theo quyáº¿t Ä‘á»‹nh design review:
 --   [NEW]    ThÃªm group_role_enum ('OWNER', 'EDITOR', 'VIEWER')
@@ -111,12 +111,14 @@ CREATE TABLE travel_areas (
     -- [MED] CHECK: bbox há»£p lá»‡ náº¿u cÃ³
     CONSTRAINT chk_bbox_lat CHECK (bbox_min_lat IS NULL OR (bbox_min_lat >= -90  AND bbox_max_lat <= 90  AND bbox_min_lat < bbox_max_lat)),
     CONSTRAINT chk_bbox_lng CHECK (bbox_min_lng IS NULL OR (bbox_min_lng >= -180 AND bbox_max_lng <= 180 AND bbox_min_lng < bbox_max_lng)),
-    boundary     GEOGRAPHY(POLYGON, 4326),
+    boundary     GEOGRAPHY(MULTIPOLYGON, 4326),
+    code         VARCHAR(20),
+    old_names    TEXT[] DEFAULT '{}',
     is_active    BOOLEAN DEFAULT true
 );
 
 -- =============================================================================
--- 5. PHÃ‚N Há»† Äá»ŠA ÄIá»‚M & VECTOR SEARCH (PLACES & RAG DATA)
+-- 5. PHÃ‚N Há»† Ä á»ŠA Ä Iá»‚M & VECTOR SEARCH (PLACES & RAG DATA)
 -- =============================================================================
 
 CREATE TABLE categories (
@@ -138,15 +140,13 @@ CREATE TABLE places (
     category_id     INT REFERENCES categories(id) ON DELETE SET NULL,
     area_id         INT REFERENCES travel_areas(id) ON DELETE SET NULL,
 
-    -- Äá»‹a chá»‰ text â€” derive tá»« area_id nhÆ°ng giá»¯ láº¡i Ä‘á»ƒ display
-    -- [HIGH] KhÃ´ng cÃ³ DEFAULT 'Há»“ ChÃ­ Minh' â€” crawler PHáº¢I set Ä‘Ãºng giÃ¡ trá»‹
-    address         TEXT NOT NULL,
-    district        VARCHAR(100),
-    city            VARCHAR(100),
-    province        VARCHAR(100),
-    country         VARCHAR(50) DEFAULT 'Vietnam',
+    -- Ä á»‹a chá»‰ text
+    address            TEXT NOT NULL,
+    address_normalized VARCHAR(500),
+    address_verified   BOOLEAN DEFAULT false,
+    coordinate_source  VARCHAR(50) DEFAULT 'unknown',
 
-    -- Tá»a Ä‘á»™
+    -- Tá» a Ä‘á»™
     -- [INTENTIONAL] Constraint giá»›i háº¡n lÃ£nh thá»• Viá»‡t Nam â€” quyáº¿t Ä‘á»‹nh product scope cÃ³ chá»§ Ä‘Ã­ch.
     -- Scope hiá»‡n táº¡i: Vietnam-only. Náº¿u má»Ÿ rá»™ng SEA: ALTER TABLE DROP CONSTRAINT (1 dÃ²ng migration).
     -- lat 8.0â€“23.5 (CÃ  Mau â†’ LÅ©ng CÃº), lng 102.0â€“110.0 (biÃªn giá»›i TÃ¢y â†’ HoÃ ng Sa)

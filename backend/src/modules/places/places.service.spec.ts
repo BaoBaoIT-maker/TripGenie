@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { PlacesService } from './places.service';
+import { GeoJsonService } from '../geo/services/geojson.service';
 import { IPlaceRepository } from './interfaces/place-repository.interface';
 import { IEmbeddingService } from './interfaces/embedding-service.interface';
 import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
@@ -64,6 +65,7 @@ describe('PlacesService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PlacesService,
+        GeoJsonService,
         {
           provide: INJECT_TOKENS.PLACE_REPOSITORY,
           useValue: mockRepo,
@@ -349,6 +351,28 @@ describe('PlacesService', () => {
     it('should support object with openNow or is_open boolean', () => {
       expect(service.checkIsOpenNow({ openNow: true })).toBe(true);
       expect(service.checkIsOpenNow({ is_open: false })).toBe(false);
+    });
+  });
+
+  describe('searchPlacesGeoJson', () => {
+    it('should return RFC 7946 FeatureCollection with correct coordinates [lng, lat]', async () => {
+      repository.searchPlaces.mockResolvedValue({
+        items: [mockRawPlaceRow],
+        total: 1,
+      });
+
+      const result = await service.searchPlacesGeoJson({ limit: 10 });
+
+      expect(result.type).toBe('FeatureCollection');
+      expect(result.features).toHaveLength(1);
+      expect(result.features[0].geometry.type).toBe('Point');
+      expect(result.features[0].geometry.coordinates).toEqual([
+        mockRawPlaceRow.longitude,
+        mockRawPlaceRow.latitude,
+      ]);
+      expect(result.features[0].properties.name).toBe(mockRawPlaceRow.name);
+      expect(result.features[0].properties.id).toBe(mockRawPlaceRow.id);
+      expect(result.metadata).toEqual({ total: 1, count: 1, page: 1 });
     });
   });
 });

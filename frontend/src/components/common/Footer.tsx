@@ -12,7 +12,7 @@ export function Footer() {
               <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
                 <MapPin className="size-4" />
               </div>
-              <span className="text-lg font-bold">TripTailor</span>
+              <span className="text-lg font-bold">TripGenie</span>
             </Link>
             <p className="text-xs text-muted-foreground leading-relaxed max-w-sm">
               Hệ thống khám phá địa điểm du lịch và hỗ trợ lập kế hoạch trải nghiệm cá nhân hóa với bản đồ tương tác và AI.
@@ -79,7 +79,7 @@ export function Footer() {
         </div>
 
         <div className="border-t border-border/60 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
-          <p>© 2026 TripTailor. All rights reserved.</p>
+          <p>© 2026 TripGenie. All rights reserved.</p>
           <div className="flex items-center gap-1">
             <span>Xây dựng với</span>
             <Heart className="size-3.5 fill-red-500 text-red-500 inline" />

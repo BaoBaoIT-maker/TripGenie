@@ -48,15 +48,17 @@ export interface Place {
   longitude: number;
   rating: number;
   reviewCount: number;
-  priceLevel: 1 | 2 | 3 | 4; // 1: < 50k, 2: 50k-150k, 3: 150k-500k, 4: > 500k
-  priceRangeText: string; // "45.000đ - 90.000đ"
+  priceLevel?: 1 | 2 | 3 | 4; // 1: < 50k, 2: 50k-150k, 3: 150k-500k, 4: > 500k
+  priceRangeText?: string;
   images: string[];
   coverImage: string;
+  phone?: string;
+  website?: string;
   tags: string[];
   suitableFor: SuitableAudience[];
   styles: TravelStyle[];
   matchScore?: number; // Ví dụ: 95 (%)
-  matchReason?: string; // "Vì bạn thích Cafe chill và view thung lũng"
-  openingHoursText?: string; // "07:00 - 22:30 hàng ngày"
+  matchReason?: string;
+  openingHoursText?: string;
   featured?: boolean;
 }

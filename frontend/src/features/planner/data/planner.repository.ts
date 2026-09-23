@@ -2,8 +2,9 @@ import { Planner, UpdatePlannerInput } from "@/types/planner";
 import { normalizePlanner } from "../model/planner-draft";
 import { MOCK_PLANNERS } from "@/mocks/data/planners";
 
-const STORAGE_KEY = "triptailor:planners:v1";
-const LEGACY_STORAGE_KEY = "triptailor_user_planners";
+const STORAGE_KEY = "tripgenie:planners:v1";
+const LEGACY_STORAGE_KEY = "tripgenie_user_planners";
+const OLD_LEGACY_STORAGE_KEY = "triptailor:planners:v1";
 
 interface StoredData {
   version: 1;
@@ -30,7 +31,7 @@ function loadFromStorage(): Planner[] {
     return MOCK_PLANNERS.map(normalizePlanner);
   }
 
-  const raw = storage.getItem(STORAGE_KEY);
+  const raw = storage.getItem(STORAGE_KEY) || storage.getItem(OLD_LEGACY_STORAGE_KEY);
   if (raw) {
     try {
       const parsed: StoredData = JSON.parse(raw);

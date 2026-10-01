@@ -7,6 +7,12 @@ export interface Coordinate {
   longitude: number;
 }
 
+export interface RouteWaypoint {
+  id: string;
+  name: string;
+  coordinate: Coordinate;
+}
+
 export interface RouteResult {
   distanceKm: number;
   durationMinutes: number;
@@ -14,6 +20,8 @@ export interface RouteResult {
   mode: RouteVehicleMode;
   origin: Coordinate;
   destination: Coordinate;
+  waypoints?: Coordinate[];
+  legs?: Array<{ distanceKm: number; durationMinutes: number }>;
   fallback?: boolean;
 }
 
@@ -158,24 +166,30 @@ export function estimateDurationMinutes(
 }
 
 /**
- * Gọi API OSRM để lấy tuyến đường thực tế (GeoJSON) theo phương tiện
+ * Gọi API OSRM để lấy tuyến đường nhiều chặng (GeoJSON) theo phương tiện
  */
-export async function fetchRoute(
-  origin: Coordinate,
-  destination: Coordinate,
+export async function fetchMultiStopRoute(
+  points: Coordinate[],
   mode: RouteVehicleMode = "motorcycle"
 ): Promise<RouteResult> {
+  if (!points || points.length < 2) {
+    throw new Error("Tuyến đường cần ít nhất 2 điểm tọa độ");
+  }
+
   const config = VEHICLE_MODES[mode] || VEHICLE_MODES.motorcycle;
   const profile = config.osrmProfile;
 
-  // OSRM format: /route/v1/{profile}/{lon1},{lat1};{lon2},{lat2}?overview=full&geometries=geojson
-  const url = `https://router.project-osrm.org/route/v1/${profile}/${origin.longitude},${origin.latitude};${destination.longitude},${destination.latitude}?overview=full&geometries=geojson`;
+  // Format: /route/v1/{profile}/{lng1},{lat1};{lng2},{lat2};{lng3},{lat3}...
+  const coordsString = points
+    .map((p) => `${p.longitude},${p.latitude}`)
+    .join(";");
+  const url = `https://router.project-osrm.org/route/v1/${profile}/${coordsString}?overview=full&geometries=geojson`;
 
   try {
     const res = await fetch(url, {
       method: "GET",
       headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(6000), // Timeout sau 6 giây
+      signal: AbortSignal.timeout(7000), // Timeout sau 7 giây
     });
 
     if (!res.ok) {
@@ -189,46 +203,62 @@ export async function fetchRoute(
 
     const primaryRoute = data.routes[0];
     const distanceKm = primaryRoute.distance / 1000;
-    // Public OSRM server always returns driving duration, so we calculate exact mode duration
     const durationMinutes = computeRealisticDurationMinutes(distanceKm, mode);
+    const legs = primaryRoute.legs?.map((leg: { distance: number }) => ({
+      distanceKm: leg.distance / 1000,
+      durationMinutes: computeRealisticDurationMinutes(leg.distance / 1000, mode),
+    }));
 
     return {
       distanceKm,
       durationMinutes,
       geometry: primaryRoute.geometry as GeoJSON.LineString,
       mode,
-      origin,
-      destination,
+      origin: points[0],
+      destination: points[points.length - 1],
+      waypoints: points,
+      legs,
     };
   } catch (err) {
     console.warn("OSRM routing unavailable or timed out, generating geometric fallback route:", err);
 
-    // Fallback mượt mà: Đường thẳng với ước tính cự ly Turf
-    const directKm = calculateDirectDistanceKm(origin, destination);
-    const estimatedKm = directKm * 1.25; // tính toán độ cong đường
-    const durationMin = computeRealisticDurationMinutes(estimatedKm, mode);
+    let totalEstimatedKm = 0;
+    for (let i = 0; i < points.length - 1; i++) {
+      const segKm = calculateDirectDistanceKm(points[i], points[i + 1]) * 1.25;
+      totalEstimatedKm += segKm;
+    }
+    const durationMin = computeRealisticDurationMinutes(totalEstimatedKm, mode);
 
     return {
-      distanceKm: estimatedKm,
+      distanceKm: totalEstimatedKm,
       durationMinutes: durationMin,
       geometry: {
         type: "LineString",
-        coordinates: [
-          [origin.longitude, origin.latitude],
-          [destination.longitude, destination.latitude],
-        ],
+        coordinates: points.map((p) => [p.longitude, p.latitude]),
       },
       mode,
-      origin,
-      destination,
+      origin: points[0],
+      destination: points[points.length - 1],
+      waypoints: points,
       fallback: true,
     };
   }
 }
 
 /**
+ * Gọi API OSRM cho tuyến đường 2 điểm (tương thích ngược hoàn toàn)
+ */
+export async function fetchRoute(
+  origin: Coordinate,
+  destination: Coordinate,
+  mode: RouteVehicleMode = "motorcycle"
+): Promise<RouteResult> {
+  return fetchMultiStopRoute([origin, destination], mode);
+}
+
+/**
  * Tạo URL mở điều hướng trên Google Maps
- * Nếu không truyền origin, Google Maps tự động dùng vị trí hiện tại thật của điện thoại/máy tính
+ * Hỗ trợ 2 điểm thông thường
  */
 export function getGoogleMapsDirectionsUrl(
   origin: Coordinate | null,
@@ -247,6 +277,47 @@ export function getGoogleMapsDirectionsUrl(
   return `https://www.google.com/maps/dir/?api=1&destination=${destQuery}&travelmode=${travelMode}`;
 }
 
+/**
+ * Tạo URL mở điều hướng đa chặng trên Google Maps với tham số waypoints
+ */
+export function getGoogleMapsMultiStopUrl(
+  stops: { coordinate: Coordinate; name?: string }[],
+  mode: RouteVehicleMode = "motorcycle"
+): string {
+  if (!stops || stops.length === 0) return "https://www.google.com/maps";
+  const travelMode = VEHICLE_MODES[mode]?.googleMapsMode || "two_wheeler";
+
+  if (stops.length === 1) {
+    const p = stops[0];
+    return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+      p.name || `${p.coordinate.latitude},${p.coordinate.longitude}`
+    )}`;
+  }
+
+  const origin = stops[0];
+  const destination = stops[stops.length - 1];
+
+  // ALWAYS use exact coordinates for origin to prevent Google Maps from interpreting "Trung tâm thành phố" as HCMC or other cities!
+  const originQuery = `${origin.coordinate.latitude},${origin.coordinate.longitude}`;
+  const destQuery = destination.name && !destination.name.startsWith("Điểm ")
+    ? encodeURIComponent(destination.name)
+    : `${destination.coordinate.latitude},${destination.coordinate.longitude}`;
+
+  let url = `https://www.google.com/maps/dir/?api=1&origin=${originQuery}&destination=${destQuery}&travelmode=${travelMode}`;
+  if (stops.length > 2) {
+    const waypoints = stops
+      .slice(1, -1)
+      .map((p) =>
+        p.name
+          ? encodeURIComponent(p.name)
+          : `${p.coordinate.latitude},${p.coordinate.longitude}`
+      )
+      .join("|");
+    url += `&waypoints=${waypoints}`;
+  }
+  return url;
+}
+
 export const routingService = {
   calculateDirectDistanceKm,
   formatDistanceKm,
@@ -255,6 +326,8 @@ export const routingService = {
   computeRealisticDurationMinutes,
   getAllModesEstimates,
   fetchRoute,
+  fetchMultiStopRoute,
   getGoogleMapsDirectionsUrl,
+  getGoogleMapsMultiStopUrl,
   VEHICLE_MODES,
 };

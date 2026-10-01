@@ -24,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { RatingStars } from "@/components/common/RatingStars";
 import { PlaceCard } from "@/components/place/PlaceCard";
+import { PhotoContributeModal } from "@/components/place/PhotoContributeModal";
 import { SectionHeader } from "@/components/common/SectionHeader";
 import { LoadingState } from "@/components/common/LoadingState";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -61,6 +62,7 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
   });
   const [loading, setLoading] = useState(!initialPlace);
   const [isSaved, setIsSaved] = useState(false);
+  const [isContributePhotoOpen, setIsContributePhotoOpen] = useState(false);
   const [mainImgError, setMainImgError] = useState(false);
   const [failedThumbnails, setFailedThumbnails] = useState<Record<number, boolean>>({});
 
@@ -83,12 +85,16 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
 
   useEffect(() => {
     let isCancelled = false;
+    setMainImgError(false);
+    setFailedThumbnails({});
 
     async function loadData() {
       try {
         const data = await placeService.getPlaceBySlug(initialSlug);
         if (!isCancelled && data) {
           setPlace(data);
+          setMainImgError(false);
+          setFailedThumbnails({});
           const related = await placeService.getRelatedPlaces(data.id, 3);
           if (!isCancelled) {
             setRelatedPlaces(related);
@@ -174,17 +180,29 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
       {/* Main Hero Gallery */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 rounded-3xl overflow-hidden">
         {/* Main Cover Photo (Span 8) */}
-        <div className="lg:col-span-8 relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden bg-muted rounded-2xl">
+        <div className="lg:col-span-8 relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden bg-muted rounded-2xl group">
           {place.coverImage && !mainImgError ? (
-            <Image
-              src={place.coverImage}
-              alt={place.name}
-              fill
-              priority
-              sizes="(max-width: 1024px) 100vw, 66vw"
-              className="object-cover"
-              onError={() => setMainImgError(true)}
-            />
+            <>
+              <Image
+                src={place.coverImage}
+                alt={place.name}
+                fill
+                priority
+                unoptimized={place.coverImage.includes("wikimedia.org") || place.coverImage.includes("wikipedia.org")}
+                sizes="(max-width: 1024px) 100vw, 66vw"
+                className="object-cover"
+                onError={() => setMainImgError(true)}
+              />
+              <button
+                type="button"
+                onClick={() => setIsContributePhotoOpen(true)}
+                className="absolute bottom-3 right-3 z-10 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-background/85 hover:bg-background backdrop-blur-md shadow-md text-xs font-semibold text-foreground transition-all border border-border/50 hover:scale-105 active:scale-95 cursor-pointer"
+                title="Đóng góp ảnh thực tế cho địa điểm này"
+              >
+                <Camera className="size-3.5 text-primary" />
+                <span>Đóng góp ảnh</span>
+              </button>
+            </>
           ) : (
             <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-muted/60 text-center">
               <div className="size-16 rounded-full bg-background shadow-xs flex items-center justify-center text-muted-foreground mb-3">
@@ -196,6 +214,16 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
               <p className="text-xs text-muted-foreground mt-1 max-w-sm">
                 Hình ảnh thực tế sẽ sớm được cập nhật từ cộng đồng du lịch TripGenie.
               </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsContributePhotoOpen(true)}
+                className="mt-3.5 gap-1.5 text-xs font-semibold rounded-xl border-primary/40 text-primary hover:bg-primary/10 shadow-xs cursor-pointer"
+              >
+                <Camera className="size-3.5" />
+                <span>Đóng góp ảnh ngay</span>
+              </Button>
             </div>
           )}
         </div>
@@ -212,15 +240,21 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
                   src={img}
                   alt={`${place.name} - ${idx + 1}`}
                   fill
+                  unoptimized={img.includes("wikimedia.org") || img.includes("wikipedia.org")}
                   sizes="(max-width: 1024px) 50vw, 33vw"
                   className="object-cover"
                   onError={() => setFailedThumbnails((prev) => ({ ...prev, [idx]: true }))}
                 />
               ) : (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted/40 p-3 text-center">
-                  <Camera className="size-6 text-muted-foreground/50 mb-1" />
-                  <span className="text-[11px] text-muted-foreground">Ảnh #{idx + 2} (Trống)</span>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsContributePhotoOpen(true)}
+                  className="absolute inset-0 flex flex-col items-center justify-center bg-muted/40 p-3 text-center hover:bg-muted/70 transition-colors cursor-pointer group w-full h-full"
+                  title="Nhấn để đóng góp thêm ảnh"
+                >
+                  <Camera className="size-6 text-muted-foreground/50 mb-1 group-hover:text-primary group-hover:scale-110 transition-all" />
+                  <span className="text-[11px] text-muted-foreground group-hover:text-primary font-medium">+ Thêm ảnh</span>
+                </button>
               )}
             </div>
           ))}
@@ -502,6 +536,16 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
                   <span>Chia sẻ</span>
                 </Button>
               </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsContributePhotoOpen(true)}
+                className="w-full h-9 text-xs font-semibold gap-1.5 rounded-xl border-dashed border-border hover:border-primary/50 text-muted-foreground hover:text-foreground"
+              >
+                <Camera className="size-3.5 text-primary" />
+                <span>Đóng góp ảnh thực tế</span>
+              </Button>
             </div>
           </div>
         </div>
@@ -524,6 +568,13 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
           </div>
         </section>
       )}
+
+      {/* Contribute Photo Dialog */}
+      <PhotoContributeModal
+        place={place}
+        open={isContributePhotoOpen}
+        onOpenChange={setIsContributePhotoOpen}
+      />
     </div>
   );
 }

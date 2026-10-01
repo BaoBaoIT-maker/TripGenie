@@ -69,9 +69,19 @@ export class PaginationMetaDto {
   totalPages: number;
 }
 
+export class GeocodedLocationDto {
+  lat: number;
+  lng: number;
+  displayName: string;
+}
+
 export class PaginatedPlacesResponseDto {
   items: PlaceItemDto[];
   meta: PaginationMetaDto;
+  /** Present when query was resolved via geocoding (lat/lng or address). */
+  geocoded?: GeocodedLocationDto;
+  /** True when items are semantic fallback results, not exact keyword matches. */
+  isFallback?: boolean;
 }
 
 export class CategoryItemDto {

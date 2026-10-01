@@ -98,6 +98,18 @@ export interface MapViewport extends MapCoordinate {
   zoom: number;
 }
 
+export type SavedCategory = "favorite" | "saved" | "want_to_go";
+
+export interface SavedPlace {
+  id: string;
+  name: string;
+  address?: string;
+  latitude: number;
+  longitude: number;
+  category: SavedCategory;
+  savedAt: string;
+}
+
 export interface VietMapProps {
   places: (NearbyPlace | DiscoveryPlace)[];
   center: MapCoordinate;
@@ -110,4 +122,9 @@ export interface VietMapProps {
   locating: boolean;
   selectedProvinceName?: string | null;
   userLocation?: MapCoordinate | null;
+  geocodedPin?: { lat: number; lng: number; displayName: string } | null;
+  onMapClickDropPin?: (coords: { lat: number; lng: number }) => void;
+  routeToPinRequest?: { latitude: number; longitude: number; name: string } | null;
+  onSearchThisArea?: (center: MapCoordinate) => void;
+  onPinDragEnd?: (coords: { lat: number; lng: number }) => void;
 }

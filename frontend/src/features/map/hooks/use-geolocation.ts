@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import { toast } from "sonner";
 import type { MapCoordinate } from "../types";
 
 export type GeolocationStatus = "idle" | "pending" | "success" | "error";
@@ -22,24 +23,28 @@ export function useGeolocation() {
     setState((prev) => ({ ...prev, status: "pending", message: null }));
 
     if (typeof window === "undefined" || !navigator.geolocation) {
+      const msg = "Trình duyệt của bạn không hỗ trợ định vị vị trí.";
+      toast.error(msg);
       setState({
         status: "error",
         coordinate: null,
-        message: "Trình duyệt của bạn không hỗ trợ định vị vị trí.",
+        message: msg,
       });
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        const coord = {
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        };
         setState({
           status: "success",
-          coordinate: {
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
-          },
+          coordinate: coord,
           message: null,
         });
+        toast.success("Đã xác định vị trí hiện tại của bạn!");
       },
       (error) => {
         let reason = "Không thể lấy vị trí hiện tại.";
@@ -57,13 +62,14 @@ export function useGeolocation() {
             error.code === GeolocationPositionError.POSITION_UNAVAILABLE);
 
         if (isPermissionDenied) {
-          reason = "Bạn đã từ chối quyền truy cập vị trí. Hãy bật định vị trên trình duyệt để tìm địa điểm quanh bạn.";
+          reason = "Bạn đã từ chối quyền truy cập vị trí. Vui lòng cho phép quyền định vị trong cài đặt trình duyệt để tìm địa điểm gần bạn.";
         } else if (isTimeout) {
-          reason = "Quá thời gian chờ lấy vị trí từ thiết bị.";
+          reason = "Quá thời gian chờ lấy vị trí từ thiết bị. Vui lòng thử lại.";
         } else if (isUnavailable) {
-          reason = "Vị trí GPS hiện tại không khả dụng.";
+          reason = "Vị trí GPS hiện tại không khả dụng trên thiết bị.";
         }
 
+        toast.error(reason);
         setState({
           status: "error",
           coordinate: null,
@@ -72,8 +78,8 @@ export function useGeolocation() {
       },
       {
         enableHighAccuracy: false,
-        maximumAge: 300000,
-        timeout: 8000,
+        maximumAge: 60000,
+        timeout: 10000,
       }
     );
   }, []);

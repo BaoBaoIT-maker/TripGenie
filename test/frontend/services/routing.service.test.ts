@@ -6,7 +6,9 @@ import {
   formatDurationMinutes,
   estimateDurationMinutes,
   getGoogleMapsDirectionsUrl,
+  getGoogleMapsMultiStopUrl,
   fetchRoute,
+  fetchMultiStopRoute,
 } from "@/services/routing.service";
 
 describe("Routing Service", () => {
@@ -93,7 +95,9 @@ describe("Routing Service", () => {
 
     expect(fetchSpy).toHaveBeenCalled();
     expect(result.distanceKm).toBeCloseTo(3.12, 1);
-    expect(result.durationMinutes).toBe(8);
+    // durationMinutes is computed realistically (32 km/h for motorcycle), not from OSRM duration
+    expect(result.durationMinutes).toBeGreaterThan(4);
+    expect(result.durationMinutes).toBeLessThan(12);
     expect(result.geometry.type).toBe("LineString");
     expect(result.mode).toBe("motorcycle");
 
@@ -112,5 +116,52 @@ describe("Routing Service", () => {
     expect(fallbackResult.durationMinutes).toBeGreaterThan(0);
 
     fetchSpy.mockRestore();
+  });
+});
+
+describe("Multi-Stop Routing (New Features)", () => {
+  const daNang = { latitude: 16.0544, longitude: 108.2022 };
+  const banahills = { latitude: 15.9988, longitude: 107.9959 };
+  const hoian = { latitude: 15.8801, longitude: 108.338 };
+
+  it("getGoogleMapsMultiStopUrl: 1 stop returns search URL", () => {
+    const url = getGoogleMapsMultiStopUrl([{ coordinate: daNang, name: "Đà Nẵng" }]);
+    expect(url).toContain("https://www.google.com/maps/search/?api=1");
+    expect(url).toContain("query=");
+  });
+
+  it("getGoogleMapsMultiStopUrl: 2 stops returns directions URL without waypoints", () => {
+    const url = getGoogleMapsMultiStopUrl([
+      { coordinate: daNang, name: "Điểm A" },
+      { coordinate: hoian, name: "Hội An" },
+    ]);
+    expect(url).toContain("dir/?api=1");
+    expect(url).toContain("origin=");
+    expect(url).toContain("destination=");
+    expect(url).not.toContain("waypoints=");
+  });
+
+  it("getGoogleMapsMultiStopUrl: 3+ stops adds waypoints param", () => {
+    const url = getGoogleMapsMultiStopUrl([
+      { coordinate: daNang, name: "Điểm A" },
+      { coordinate: banahills, name: "Bà Nà Hills" },
+      { coordinate: hoian, name: "Hội An" },
+    ]);
+    expect(url).toContain("waypoints=");
+    expect(url).toContain(encodeURIComponent("Bà Nà Hills"));
+  });
+
+  it("fetchMultiStopRoute: throws when < 2 points given", async () => {
+    await expect(fetchMultiStopRoute([daNang])).rejects.toThrow();
+  });
+
+  it("fetchMultiStopRoute: geometric fallback when OSRM offline", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("offline"));
+    const res = await fetchMultiStopRoute([daNang, banahills, hoian], "motorcycle");
+    expect(res.fallback).toBe(true);
+    expect(res.distanceKm).toBeGreaterThan(0);
+    expect(res.geometry.type).toBe("LineString");
+    expect(res.waypoints?.length).toBe(3);
+    spy.mockRestore();
   });
 });

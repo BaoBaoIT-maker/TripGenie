@@ -4,6 +4,7 @@ import { IPlaceRepository } from './interfaces/place-repository.interface';
 import { IEmbeddingService } from './interfaces/embedding-service.interface';
 import { GeoJsonService } from '../geo/services/geojson.service';
 import { GeoJsonFeatureCollection, PlaceGeoInput } from '../geo/interfaces/geo.interface';
+import { NominatimService } from './services/nominatim.service';
 import { SearchPlacesDto } from './dto/search-places.dto';
 import { NearbyPlacesDto } from './dto/nearby-places.dto';
 import { SemanticSearchDto, SyncEmbeddingsDto } from './dto/semantic-search.dto';
@@ -14,6 +15,7 @@ import {
   CategoryItemDto,
   TravelAreaItemDto,
 } from './dto/place-response.dto';
+import { detectSearchIntent } from '../../common/utils/string.util';
 
 @Injectable()
 export class PlacesService {
@@ -25,35 +27,84 @@ export class PlacesService {
     @Inject(INJECT_TOKENS.EMBEDDING_SERVICE)
     private readonly embeddingService: IEmbeddingService,
     private readonly geoJsonService: GeoJsonService,
+    private readonly nominatim: NominatimService,
   ) {}
 
   /**
-   * Search places using multi-criteria filter form.
+   * Unified search with 3-tier fallback:
+   * 1. Coordinates → reverse-geocode → single PIN (items=[])
+   * 2. Address     → Nominatim geocode → single PIN (items=[])
+   * 3. Keyword     → DB keyword search → NLP semantic fallback
+   *
+   * Matches Google Maps: coordinates/address show a single pin.
+   * Frontend adds a "Tìm quanh đây" button for user-initiated nearby search.
    */
   async searchPlaces(dto: SearchPlacesDto): Promise<PaginatedPlacesResponseDto> {
+    const keyword = dto.keyword?.trim() ?? '';
+    const intent = keyword ? detectSearchIntent(keyword) : 'keyword';
+    const page = dto.page || 1;
+    const limit = dto.limit || 20;
+
+    // ── Tier 1: Coordinates → PIN only ───────────────────────────────────────
+    if (intent === 'coordinates') {
+      const [latStr, lngStr] = keyword.split(/[,\s]+/);
+      const lat = parseFloat(latStr);
+      const lng = parseFloat(lngStr);
+      const displayName = await this.nominatim.reverseGeocode(lat, lng);
+      return {
+        items: [],
+        meta: { totalItems: 0, page: 1, limit, totalPages: 0 },
+        geocoded: { lat, lng, displayName: displayName ?? keyword },
+      };
+    }
+
+    // ── Tier 2 & 3: DB keyword search first ──────────────────────────────────
     const { items: rawItems, total } = await this.placeRepo.searchPlaces(dto);
 
     let items: PlaceItemDto[] = rawItems.map((row) => this.mapToPlaceItemDto(row));
-
-    // If openNow filter was requested, filter in-memory for places with opening hours data
     if (dto.openNow === true) {
       items = items.filter((item) => item.isOpenNow === true);
     }
 
-    const page = dto.page || 1;
-    const limit = dto.limit || 20;
-    const totalItems = dto.openNow === true ? items.length : total;
-    const totalPages = limit > 0 ? Math.ceil(totalItems / limit) : 1;
+    if (items.length > 0) {
+      const totalItems = dto.openNow === true ? items.length : total;
+      return {
+        items,
+        meta: { totalItems, page, limit, totalPages: Math.ceil(totalItems / limit) || 1 },
+      };
+    }
 
-    return {
-      items,
-      meta: {
-        totalItems,
-        page,
+    // ── Nothing in DB ────────────────────────────────────────────────────────
+    if (intent === 'address' && keyword) {
+      // Address → PIN only, matches Google Maps behavior
+      const geocoded = await this.nominatim.geocode(keyword);
+      if (geocoded) {
+        return {
+          items: [],
+          meta: { totalItems: 0, page: 1, limit, totalPages: 0 },
+          geocoded,
+        };
+      }
+      // Geocode failed → fall through to NLP
+    }
+
+    // ── Tier 3: NLP semantic fallback ────────────────────────────────────────
+    if (keyword) {
+      this.logger.log(`Keyword "${keyword}" not found in DB — falling back to semantic search`);
+      const semantic = await this.searchSemantic({
+        query: keyword,
+        areaId: dto.areaId,
         limit,
-        totalPages,
-      },
-    };
+        minSimilarity: 0.25,
+      });
+      return {
+        items: semantic,
+        meta: { totalItems: semantic.length, page: 1, limit, totalPages: 1 },
+        isFallback: true,
+      };
+    }
+
+    return { items: [], meta: { totalItems: 0, page, limit, totalPages: 0 } };
   }
 
   /**

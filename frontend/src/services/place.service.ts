@@ -48,12 +48,20 @@ export interface PlaceFilterParams {
   sortBy?: "rating" | "reviews" | "name" | "distance";
 }
 
+export interface GeocodedLocation {
+  lat: number;
+  lng: number;
+  displayName: string;
+}
+
 export interface PaginatedPlacesResult {
   places: Place[];
   total: number;
   page: number;
   limit: number;
   totalPages: number;
+  geocoded?: GeocodedLocation;
+  isFallback?: boolean;
 }
 
 
@@ -168,11 +176,9 @@ export function optimizeImageUrl(rawUrl?: string | null): string {
     return trimmed;
   }
 
-  // If from wikimedia / wikipedia, route through wsrv.nl Cloudflare image proxy
-  // Stripping cache-busting / tracking query parameters that trigger upstream 429
+  // If from wikimedia / wikipedia, strip tracking query parameters but keep direct image URL
   if (trimmed.includes("wikimedia.org") || trimmed.includes("wikipedia.org")) {
-    const cleanUrl = trimmed.split("?")[0].replace(/^https?:\/\//, "");
-    return `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}&w=800&output=webp`;
+    return trimmed.split("?")[0];
   }
 
   return trimmed;
@@ -374,6 +380,8 @@ export const placeService = {
         page: meta.page,
         limit: meta.limit,
         totalPages: meta.totalPages,
+        geocoded: payload.geocoded,
+        isFallback: payload.isFallback,
       };
     } catch (err) {
       console.warn("Backend search places unavailable, falling back to mock data:", err);

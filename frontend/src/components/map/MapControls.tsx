@@ -55,7 +55,7 @@ export function MapControls({
         type="button"
         variant="secondary"
         size="icon"
-        className="size-10 sm:size-11 rounded-xl border bg-background/95 shadow-md backdrop-blur-sm hover:bg-muted/80"
+        className="size-10 sm:size-11 rounded-xl border bg-background/95 shadow-md backdrop-blur-sm hover:bg-muted/80 cursor-pointer"
         onClick={onRequestCurrentLocation}
         disabled={locating}
         aria-label="Vị trí của tôi"

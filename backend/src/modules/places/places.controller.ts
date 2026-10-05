@@ -8,7 +8,9 @@ import {
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
+  UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { PlacesService } from './places.service';
 import { SearchPlacesDto } from './dto/search-places.dto';
 import { NearbyPlacesDto } from './dto/nearby-places.dto';
@@ -77,6 +79,7 @@ export class PlacesController {
   /**
    * Sync and generate vector embeddings for places without embeddings.
    */
+  @UseGuards(AuthGuard('jwt')) // burns Gemini quota: authenticated callers only
   @Post('sync-embeddings')
   @HttpCode(HttpStatus.OK)
   async syncEmbeddings(

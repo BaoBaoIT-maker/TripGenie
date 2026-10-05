@@ -26,6 +26,9 @@ export interface BackendTravelAreaItem {
     minLng: number | null;
     maxLng: number | null;
   };
+  latitude?: number | null;
+  longitude?: number | null;
+  hubBadge?: string | null;
 }
 
 export interface PlaceFilterParams {
@@ -534,9 +537,17 @@ export const placeService = {
       const found = MOCK_PLACES.find((p) => p.slug === slug || p.slug === decoded || p.id === slug);
       if (found) return found;
 
-      const searchRes = await this.searchPlaces({ keyword: decoded, limit: 1 });
+      const cleanKeyword = decoded.replace(/-/g, " ").trim();
+      let searchRes = await this.searchPlaces({ keyword: cleanKeyword, limit: 1 });
       if (searchRes.places.length > 0) {
         return searchRes.places[0];
+      }
+      const words = cleanKeyword.split(/\s+/);
+      if (words.length > 2) {
+        searchRes = await this.searchPlaces({ keyword: words.slice(0, 2).join(" "), limit: 1 });
+        if (searchRes.places.length > 0) {
+          return searchRes.places[0];
+        }
       }
 
       return null;

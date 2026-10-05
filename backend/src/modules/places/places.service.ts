@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
-import { IPlaceRepository } from './interfaces/place-repository.interface';
+import { IPlaceRepository, PlaceRow } from './interfaces/place-repository.interface';
 import { IEmbeddingService } from './interfaces/embedding-service.interface';
 import { GeoJsonService } from '../geo/services/geojson.service';
 import { GeoJsonFeatureCollection, PlaceGeoInput } from '../geo/interfaces/geo.interface';
@@ -15,7 +15,12 @@ import {
   CategoryItemDto,
   TravelAreaItemDto,
 } from './dto/place-response.dto';
+import { BudgetLevel } from '@prisma/client';
 import { detectSearchIntent } from '../../common/utils/string.util';
+import { checkIsOpenNow } from '../../common/utils/opening-hours.util';
+
+/** Max rows scanned when filtering by openNow in memory (see ponytail note in searchPlaces). */
+const OPEN_NOW_SCAN_LIMIT = 500;
 
 @Injectable()
 export class PlacesService {
@@ -59,15 +64,24 @@ export class PlacesService {
     }
 
     // ── Tier 2 & 3: DB keyword search first ──────────────────────────────────
-    const { items: rawItems, total } = await this.placeRepo.searchPlaces(dto);
+    // ponytail: opening_hours is free-form text/JSON, so openNow is evaluated in memory over at most
+    // OPEN_NOW_SCAN_LIMIT rows, then paginated here. Ceiling: rows beyond the limit are never considered.
+    // Upgrade: normalize opening_hours into a table and filter in SQL.
+    const openNowOnly = dto.openNow === true;
+    const { items: rawItems, total: dbTotal } = await this.placeRepo.searchPlaces(
+      openNowOnly ? { ...dto, page: 1, limit: OPEN_NOW_SCAN_LIMIT } : dto,
+    );
 
     let items: PlaceItemDto[] = rawItems.map((row) => this.mapToPlaceItemDto(row));
-    if (dto.openNow === true) {
+    let total = dbTotal;
+    if (openNowOnly) {
       items = items.filter((item) => item.isOpenNow === true);
+      total = items.length;
+      items = items.slice((page - 1) * limit, page * limit);
     }
 
-    if (items.length > 0) {
-      const totalItems = dto.openNow === true ? items.length : total;
+    if (items.length > 0 || (openNowOnly && total > 0)) {
+      const totalItems = total;
       return {
         items,
         meta: { totalItems, page, limit, totalPages: Math.ceil(totalItems / limit) || 1 },
@@ -111,7 +125,7 @@ export class PlacesService {
    * Search places and return RFC 7946 compliant GeoJSON FeatureCollection.
    */
   async searchPlacesGeoJson(dto: SearchPlacesDto): Promise<GeoJsonFeatureCollection> {
-    const limit = dto.limit ? Math.min(dto.limit, 500) : 100;
+    const limit = dto.limit ?? 100;
     const { items: rawItems, total } = await this.placeRepo.searchPlaces({
       ...dto,
       limit,
@@ -128,10 +142,10 @@ export class PlacesService {
       reviewCount: row.review_count ? Number(row.review_count) : null,
       priceLevel: row.price_level || null,
       category: row.category_id
-        ? { id: row.category_id, name: row.category_name_vi || row.category_name }
+        ? { id: row.category_id, name: row.category_name_vi || row.category_name || '' }
         : null,
       area: row.area_id
-        ? { id: row.area_id, name: row.area_name_vi || row.area_name }
+        ? { id: row.area_id, name: row.area_name_vi || row.area_name || '' }
         : null,
       distanceMeters:
         row.distance_meters !== null && row.distance_meters !== undefined
@@ -206,9 +220,11 @@ export class PlacesService {
           this.embeddingService.getModelName(),
         );
         succeeded++;
-      } catch (err: any) {
+      } catch (err) {
         failed++;
-        this.logger.warn(`Failed to sync embedding for place "${place.name}": ${err.message}`);
+        this.logger.warn(
+          `Failed to sync embedding for place "${place.name}": ${err instanceof Error ? err.message : String(err)}`,
+        );
       }
     }
 
@@ -229,7 +245,22 @@ export class PlacesService {
     }
 
     const baseDto = this.mapToPlaceItemDto({
-      ...place,
+      id: place.id,
+      name: place.name,
+      description: place.description,
+      address: place.address,
+      address_normalized: place.addressNormalized,
+      district: null,
+      city: place.area?.nameVi || place.area?.name || null,
+      latitude: Number(place.latitude),
+      longitude: Number(place.longitude),
+      price_level: place.priceLevel,
+      opening_hours: place.openingHours,
+      phone: place.phone,
+      website: place.website,
+      rating_avg: Number(place.ratingAvg),
+      review_count: place.reviewCount,
+      image_count: place.imageCount,
       category_id: place.category?.id,
       category_name: place.category?.name,
       category_name_vi: place.category?.nameVi,
@@ -248,14 +279,14 @@ export class PlacesService {
       priceRange: place.priceRange as Record<string, unknown> | null,
       tags: place.tags || [],
       attributes: (place.attributes as Record<string, unknown>) || {},
-      images: (place.images || []).map((img: any) => ({
+      images: (place.images || []).map((img) => ({
         id: img.id,
         imageUrl: img.imageUrl,
         thumbnailUrl: img.thumbnailUrl,
         isPrimary: img.isPrimary,
         caption: img.caption,
       })),
-      sources: (place.sources || []).map((src: any) => ({
+      sources: (place.sources || []).map((src) => ({
         provider: src.provider,
         externalUrl: src.externalUrl,
         sourceRating: src.sourceRating,
@@ -285,66 +316,51 @@ export class PlacesService {
    */
   async getTravelAreas(): Promise<TravelAreaItemDto[]> {
     const areas = await this.placeRepo.findTravelAreas();
-    return areas.map((area) => ({
-      id: area.id,
-      name: area.name,
-      nameVi: area.nameVi,
-      slug: area.slug,
-      type: area.type,
-      bbox: {
-        minLat: area.bboxMinLat,
-        maxLat: area.bboxMaxLat,
-        minLng: area.bboxMinLng,
-        maxLng: area.bboxMaxLng,
-      },
-    }));
-  }
+    return areas.map((area) => {
+      const sortedHubs = [...(area.transitHubs || [])].sort((a, b) => {
+        const order: Record<string, number> = { AIRPORT: 1, BUS_TERMINAL: 2, TRAIN_STATION: 3 };
+        return (order[a.hubType] ?? 99) - (order[b.hubType] ?? 99);
+      });
+      const primaryHub = sortedHubs[0];
+      const lat =
+        primaryHub?.latitude ??
+        (area.bboxMinLat !== null && area.bboxMaxLat !== null
+          ? (area.bboxMinLat + area.bboxMaxLat) / 2
+          : null);
+      const lng =
+        primaryHub?.longitude ??
+        (area.bboxMinLng !== null && area.bboxMaxLng !== null
+          ? (area.bboxMinLng + area.bboxMaxLng) / 2
+          : null);
+      const hubBadge = primaryHub
+        ? primaryHub.hubType === 'AIRPORT'
+          ? `${primaryHub.name} (${primaryHub.id})`
+          : primaryHub.name
+        : area.nameVi || area.name;
 
-  /**
-   * Helper to evaluate whether a place is currently open based on opening_hours.
-   */
-  checkIsOpenNow(openingHours: any): boolean | null {
-    if (!openingHours) return null;
-
-    if (typeof openingHours === 'string') {
-      const trimmed = openingHours.trim().toLowerCase();
-      if (trimmed === '24/7') return true;
-
-      const simpleMatch = trimmed.match(/^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})$/);
-      if (simpleMatch) {
-        const now = new Date();
-        // Vietnam timezone UTC+7
-        const vnHours = (now.getUTCHours() + 7) % 24;
-        const currentMinutes = vnHours * 60 + now.getUTCMinutes();
-        const startMinutes = parseInt(simpleMatch[1], 10) * 60 + parseInt(simpleMatch[2], 10);
-        const endMinutes = parseInt(simpleMatch[3], 10) * 60 + parseInt(simpleMatch[4], 10);
-
-        if (endMinutes >= startMinutes) {
-          return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
-        } else {
-          // Overnight window (e.g., 18:00 - 02:00)
-          return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
-        }
-      }
-      return null;
-    }
-
-    if (typeof openingHours === 'object') {
-      if ('openNow' in openingHours && typeof openingHours.openNow === 'boolean') {
-        return openingHours.openNow;
-      }
-      if ('is_open' in openingHours && typeof openingHours.is_open === 'boolean') {
-        return openingHours.is_open;
-      }
-    }
-
-    return null;
+      return {
+        id: area.id,
+        name: area.name,
+        nameVi: area.nameVi,
+        slug: area.slug,
+        type: area.type,
+        bbox: {
+          minLat: area.bboxMinLat,
+          maxLat: area.bboxMaxLat,
+          minLng: area.bboxMinLng,
+          maxLng: area.bboxMaxLng,
+        },
+        latitude: lat,
+        longitude: lng,
+        hubBadge,
+      };
+    });
   }
 
   /**
    * Private helper to map raw SQL or Prisma row to PlaceItemDto.
    */
-  private mapToPlaceItemDto(row: any): PlaceItemDto {
+  private mapToPlaceItemDto(row: PlaceRow): PlaceItemDto {
     return {
       id: row.id,
       name: row.name,
@@ -361,11 +377,11 @@ export class PlacesService {
       ratingAvg: Number(row.rating_avg) || 0,
       reviewCount: Number(row.review_count) || 0,
       imageCount: Number(row.image_count) || 0,
-      priceLevel: row.price_level || null,
+      priceLevel: (row.price_level as BudgetLevel) || null,
       phone: row.phone || null,
       website: row.website || null,
       openingHours: (row.opening_hours as Record<string, unknown>) || null,
-      isOpenNow: this.checkIsOpenNow(row.opening_hours),
+      isOpenNow: checkIsOpenNow(row.opening_hours),
       primaryImage: row.primary_image || null,
       similarityScore:
         row.similarity_score !== null && row.similarity_score !== undefined
@@ -374,18 +390,18 @@ export class PlacesService {
       category: row.category_id
         ? {
             id: row.category_id,
-            name: row.category_name,
-            nameVi: row.category_name_vi,
-            slug: row.category_slug,
-            iconUrl: row.category_icon_url,
+            name: row.category_name as string,
+            nameVi: row.category_name_vi as string,
+            slug: row.category_slug as string,
+            iconUrl: row.category_icon_url ?? null,
           }
         : null,
       area: row.area_id
         ? {
             id: row.area_id,
-            name: row.area_name,
-            nameVi: row.area_name_vi,
-            slug: row.area_slug,
+            name: row.area_name as string,
+            nameVi: row.area_name_vi as string,
+            slug: row.area_slug as string,
           }
         : null,
     };

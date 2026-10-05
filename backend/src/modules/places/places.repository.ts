@@ -1,9 +1,57 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
-import { IPlaceRepository, PlaceSearchResult } from './interfaces/place-repository.interface';
+import {
+  IPlaceRepository,
+  PlaceSearchResult,
+  PlaceRow,
+  PlaceDetail,
+  CategoryWithCount,
+  TravelAreaRow,
+  PlaceForEmbedding,
+} from './interfaces/place-repository.interface';
+import { AMENITY_FILTERS, AMENITY_ALIASES } from './amenity-filters';
 import { SearchPlacesDto } from './dto/search-places.dto';
 import { NearbyPlacesDto } from './dto/nearby-places.dto';
 import { PlaceSortBy, SortOrder } from '../../common/enums/places.enum';
+
+/** Columns shared by every place listing query. district/city come from the area and its parent. */
+const PLACE_COLUMNS = `
+        p.id,
+        p.name,
+        p.description,
+        p.address,
+        p.address_normalized,
+        CASE WHEN a.type::text = 'DISTRICT' THEN a.name END AS district,
+        COALESCE(pa.name, a.name) AS city,
+        p.latitude,
+        p.longitude,
+        p.price_level,
+        p.opening_hours,
+        p.phone,
+        p.website,
+        p.rating_avg,
+        p.review_count,
+        p.image_count,
+        c.id AS category_id,
+        c.name AS category_name,
+        c.name_vi AS category_name_vi,
+        c.slug AS category_slug,
+        c.icon_url AS category_icon_url,
+        a.id AS area_id,
+        a.name AS area_name,
+        a.name_vi AS area_name_vi,
+        a.slug AS area_slug,
+        (
+          SELECT pi.image_url FROM place_images pi
+          WHERE pi.place_id = p.id
+          ORDER BY pi.is_primary DESC, pi.display_order ASC, pi.created_at ASC
+          LIMIT 1
+        ) AS primary_image`;
+
+const PLACE_JOINS = `
+      LEFT JOIN categories c ON p.category_id = c.id
+      LEFT JOIN travel_areas a ON p.area_id = a.id
+      LEFT JOIN travel_areas pa ON a.parent_id = pa.id`;
 
 @Injectable()
 export class PlacesRepository implements IPlaceRepository {
@@ -30,7 +78,7 @@ export class PlacesRepository implements IPlaceRepository {
 
     const hasLocation = lat !== undefined && lng !== undefined;
     const conditions: string[] = ["p.status = 'ACTIVE'", 'p.deleted_at IS NULL'];
-    const args: any[] = [];
+    const args: unknown[] = [];
     let paramIdx = 1;
 
     // Optional GPS location parameters
@@ -58,96 +106,15 @@ export class PlacesRepository implements IPlaceRepository {
     // Filter by Contextual Amenities / Tags
     if (amenities && amenities.length > 0) {
       for (const a of amenities) {
-        const item = a.trim().toLowerCase();
-        if (!item) continue;
-        switch (item) {
-          case 'ho-boi':
-            conditions.push(`('swimming_pool' = ANY(p.tags) OR p.description ILIKE '%hồ bơi%' OR p.description ILIKE '%bể bơi%')`);
-            break;
-          case 'gan-bien':
-          case 'view-bien':
-            conditions.push(`(p.description ILIKE '%biển%' OR p.address ILIKE '%biển%' OR p.address ILIKE '%Võ Nguyên Giáp%' OR p.address ILIKE '%Hoàng Sa%' OR p.address ILIKE '%Trường Sa%')`);
-            break;
-          case 'an-sang':
-            conditions.push(`('breakfast' = ANY(p.tags) OR p.description ILIKE '%ăn sáng%' OR p.description ILIKE '%bữa sáng%')`);
-            break;
-          case 'cho-do-xe':
-            conditions.push(`('parking' = ANY(p.tags) OR p.description ILIKE '%đỗ xe%' OR p.description ILIKE '%bãi xe%')`);
-            break;
-          case 'thu-cung':
-          case 'pet-friendly':
-            conditions.push(`('pets' = ANY(p.tags) OR p.description ILIKE '%thú cưng%' OR p.description ILIKE '%chó mèo%')`);
-            break;
-          case 'may-lanh':
-            conditions.push(`('air_conditioning' = ANY(p.tags) OR p.description ILIKE '%máy lạnh%' OR p.description ILIKE '%điều hòa%')`);
-            break;
-          case 'wifi-manh':
-          case 'wifi':
-            conditions.push(`('wifi' = ANY(p.tags) OR p.description ILIKE '%wifi%')`);
-            break;
-          case 'o-cam-dien':
-            conditions.push(`(p.description ILIKE '%ổ cắm%' OR p.description ILIKE '%làm việc%')`);
-            break;
-          case 'view-dep':
-            conditions.push(`(p.description ILIKE '%view%' OR p.description ILIKE '%rooftop%' OR p.description ILIKE '%ngắm cảnh%')`);
-            break;
-          case 'yen-tinh':
-            conditions.push(`(p.description ILIKE '%yên tĩnh%' OR p.description ILIKE '%làm việc%')`);
-            break;
-          case 'mo-khuya':
-            conditions.push(`('late_night' = ANY(p.tags) OR p.description ILIKE '%khuya%' OR p.description ILIKE '%24/7%')`);
-            break;
-          case 'hai-san':
-            conditions.push(`('seafood' = ANY(p.tags) OR p.name ILIKE '%hải sản%' OR p.description ILIKE '%hải sản%')`);
-            break;
-          case 'dac-san':
-            conditions.push(`('vietnamese' = ANY(p.tags) OR p.description ILIKE '%đặc sản%' OR p.name ILIKE '%mì quảng%' OR p.name ILIKE '%bánh tráng%')`);
-            break;
-          case 'mon-chay':
-            conditions.push(`('vegetarian' = ANY(p.tags) OR p.description ILIKE '%chay%' OR p.name ILIKE '%chay%')`);
-            break;
-          case 'ngoai-troi':
-            conditions.push(`('outdoor_seating' = ANY(p.tags) OR p.description ILIKE '%ngoài trời%' OR p.description ILIKE '%thoáng mát%')`);
-            break;
-          case 'phong-rieng':
-            conditions.push(`(p.description ILIKE '%phòng riêng%' OR p.description ILIKE '%vip%')`);
-            break;
-          case 'mien-phi':
-            conditions.push(`(p.description ILIKE '%miễn phí%' OR p.price_level = 'LOW')`);
-            break;
-          case 'check-in':
-            conditions.push(`(p.description ILIKE '%chụp hình%' OR p.description ILIKE '%check-in%' OR p.description ILIKE '%sống ảo%')`);
-            break;
-          case 'trong-nha':
-            conditions.push(`(p.description ILIKE '%trong nhà%' OR p.description ILIKE '%bảo tàng%')`);
-            break;
-          case 'tre-em':
-            conditions.push(`(p.description ILIKE '%trẻ em%' OR p.description ILIKE '%gia đình%')`);
-            break;
-          case 'nhac-song':
-            conditions.push(`('live_music' = ANY(p.tags) OR p.description ILIKE '%nhạc sống%' OR p.description ILIKE '%acoustic%')`);
-            break;
-          case 'cocktail':
-            conditions.push(`('cocktail' = ANY(p.tags) OR p.description ILIKE '%cocktail%' OR p.description ILIKE '%craft beer%')`);
-            break;
-          case 'beach-club':
-            conditions.push(`(p.description ILIKE '%beach club%' OR p.description ILIKE '%bãi biển%')`);
-            break;
-          case 'dac-san-qua':
-            conditions.push(`(p.description ILIKE '%làm quà%' OR p.description ILIKE '%đặc sản%')`);
-            break;
-          case 'hai-san-kho':
-            conditions.push(`(p.description ILIKE '%hải sản khô%' OR p.description ILIKE '%mực khô%')`);
-            break;
-          case 'cho-dem':
-            conditions.push(`(p.description ILIKE '%chợ đêm%' OR p.name ILIKE '%chợ đêm%')`);
-            break;
-          default: {
-            const tagIdx = paramIdx++;
-            conditions.push(`($${tagIdx} = ANY(p.tags) OR p.description ILIKE '%' || $${tagIdx} || '%')`);
-            args.push(item);
-            break;
-          }
+        const slug = a.trim().toLowerCase();
+        if (!slug) continue;
+        const predicate = AMENITY_FILTERS[AMENITY_ALIASES[slug] ?? slug];
+        if (predicate) {
+          conditions.push(predicate);
+        } else {
+          const tagIdx = paramIdx++;
+          conditions.push(`($${tagIdx} = ANY(p.tags) OR p.description ILIKE '%' || $${tagIdx} || '%')`);
+          args.push(slug);
         }
       }
     }
@@ -167,7 +134,7 @@ export class PlacesRepository implements IPlaceRepository {
 
     // Filter by Keyword (name, normalized name, address)
     if (keyword && keyword.trim() !== '') {
-      const kw = `%${keyword.trim()}%`;
+      const kw = `%${keyword.trim().replace(/[\\%_]/g, '\\$&')}%`; // escape LIKE wildcards
       const kwIdx = paramIdx++;
       conditions.push(
         `(p.name ILIKE $${kwIdx} OR p.name_normalized ILIKE $${kwIdx} OR p.address ILIKE $${kwIdx})`,
@@ -191,7 +158,7 @@ export class PlacesRepository implements IPlaceRepository {
     let orderByClause = '';
 
     if (sortBy === PlaceSortBy.DISTANCE && hasLocation) {
-      orderByClause = `${hasImageOrder}, distance_meters ${orderDir}, p.rating_avg DESC`;
+      orderByClause = `${hasImageOrder}, distance_meters ASC, p.rating_avg DESC`; // nearest first, regardless of sortOrder
     } else if (sortBy === PlaceSortBy.RATING) {
       orderByClause = `${hasImageOrder}, p.rating_avg ${orderDir}, p.review_count ${orderDir}`;
     } else if (sortBy === PlaceSortBy.POPULARITY) {
@@ -217,49 +184,16 @@ export class PlacesRepository implements IPlaceRepository {
 
     const sql = `
       SELECT
-        p.id,
-        p.name,
-        p.name_normalized,
-        p.description,
-        p.address,
-        p.address_normalized,
-        a.name AS district,
-        a.name AS city,
-        p.latitude,
-        p.longitude,
-        p.price_level,
-        p.opening_hours,
-        p.phone,
-        p.website,
-        p.rating_avg,
-        p.review_count,
-        p.image_count,
-        c.id AS category_id,
-        c.name AS category_name,
-        c.name_vi AS category_name_vi,
-        c.slug AS category_slug,
-        c.icon_url AS category_icon_url,
-        a.id AS area_id,
-        a.name AS area_name,
-        a.name_vi AS area_name_vi,
-        a.slug AS area_slug,
-        (
-          SELECT pi.image_url FROM place_images pi
-          WHERE pi.place_id = p.id
-          ORDER BY pi.is_primary DESC, pi.display_order ASC, pi.created_at ASC
-          LIMIT 1
-        ) AS primary_image,
+        ${PLACE_COLUMNS},
         ${distanceSelect},
         COUNT(*) OVER() AS full_count
-      FROM places p
-      LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN travel_areas a ON p.area_id = a.id
+      FROM places p${PLACE_JOINS}
       WHERE ${conditions.join(' AND ')}
       ORDER BY ${orderByClause}
       LIMIT $${limitIdx} OFFSET $${offsetIdx};
     `;
 
-    const rows = await this.prisma.$queryRawUnsafe<any[]>(sql, ...args);
+    const rows = await this.prisma.$queryRawUnsafe<PlaceRow[]>(sql, ...args);
     const total = rows.length > 0 ? Number(rows[0].full_count) : 0;
 
     return {
@@ -268,9 +202,9 @@ export class PlacesRepository implements IPlaceRepository {
     };
   }
 
-  async findNearby(dto: NearbyPlacesDto): Promise<any[]> {
+  async findNearby(dto: NearbyPlacesDto): Promise<PlaceRow[]> {
     const { lat, lng, radiusMeters = 3000, categorySlug, limit = 10 } = dto;
-    const args: any[] = [lng, lat, radiusMeters];
+    const args: unknown[] = [lng, lat, radiusMeters];
     let catCondition = '';
 
     if (categorySlug && categorySlug.trim() !== '') {
@@ -283,41 +217,9 @@ export class PlacesRepository implements IPlaceRepository {
 
     const sql = `
       SELECT
-        p.id,
-        p.name,
-        p.description,
-        p.address,
-        p.address_normalized,
-        a.name AS district,
-        a.name AS city,
-        p.latitude,
-        p.longitude,
-        p.price_level,
-        p.opening_hours,
-        p.phone,
-        p.website,
-        p.rating_avg,
-        p.review_count,
-        p.image_count,
-        c.id AS category_id,
-        c.name AS category_name,
-        c.name_vi AS category_name_vi,
-        c.slug AS category_slug,
-        c.icon_url AS category_icon_url,
-        a.id AS area_id,
-        a.name AS area_name,
-        a.name_vi AS area_name_vi,
-        a.slug AS area_slug,
-        (
-          SELECT pi.image_url FROM place_images pi
-          WHERE pi.place_id = p.id
-          ORDER BY pi.is_primary DESC, pi.display_order ASC, pi.created_at ASC
-          LIMIT 1
-        ) AS primary_image,
+        ${PLACE_COLUMNS},
         ST_Distance(p.location, ST_SetSRID(ST_MakePoint($1, $2), 4326), true) AS distance_meters
-      FROM places p
-      LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN travel_areas a ON p.area_id = a.id
+      FROM places p${PLACE_JOINS}
       WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
         AND ST_DWithin(p.location, ST_SetSRID(ST_MakePoint($1, $2), 4326), $3)
         ${catCondition}
@@ -325,10 +227,10 @@ export class PlacesRepository implements IPlaceRepository {
       LIMIT $${limitIdx};
     `;
 
-    return this.prisma.$queryRawUnsafe<any[]>(sql, ...args);
+    return this.prisma.$queryRawUnsafe<PlaceRow[]>(sql, ...args);
   }
 
-  async findById(id: string): Promise<any | null> {
+  async findById(id: string): Promise<PlaceDetail | null> {
     return this.prisma.place.findUnique({
       where: { id },
       include: {
@@ -353,7 +255,7 @@ export class PlacesRepository implements IPlaceRepository {
     });
   }
 
-  async findCategories(): Promise<any[]> {
+  async findCategories(): Promise<CategoryWithCount[]> {
     return this.prisma.category.findMany({
       orderBy: { sortOrder: 'asc' },
       select: {
@@ -370,7 +272,7 @@ export class PlacesRepository implements IPlaceRepository {
     });
   }
 
-  async findTravelAreas(): Promise<any[]> {
+  async findTravelAreas(): Promise<TravelAreaRow[]> {
     return this.prisma.travelArea.findMany({
       where: { isActive: true },
       orderBy: { id: 'asc' },
@@ -384,6 +286,16 @@ export class PlacesRepository implements IPlaceRepository {
         bboxMaxLat: true,
         bboxMinLng: true,
         bboxMaxLng: true,
+        transitHubs: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            name: true,
+            hubType: true,
+            latitude: true,
+            longitude: true,
+          },
+        },
       },
     });
   }
@@ -417,52 +329,20 @@ export class PlacesRepository implements IPlaceRepository {
     limit: number = 10,
     areaId?: number,
     minSimilarity: number = 0.3,
-  ): Promise<any[]> {
+  ): Promise<PlaceRow[]> {
     const vectorString = `[${vector.join(',')}]`;
     const areaCondition =
-      areaId !== undefined
-        ? `AND (p.area_id = ${Number(areaId)} OR a.parent_id = ${Number(areaId)})`
-        : '';
+      areaId !== undefined ? 'AND (p.area_id = $4 OR a.parent_id = $4)' : '';
+    const args: unknown[] = [vectorString, minSimilarity, limit];
+    if (areaId !== undefined) args.push(areaId);
 
     const sql = `
       SELECT
-        p.id,
-        p.name,
-        p.description,
-        p.address,
-        p.address_normalized,
-        a.name AS district,
-        a.name AS city,
-        p.latitude,
-        p.longitude,
-        p.price_level,
-        p.opening_hours,
-        p.phone,
-        p.website,
-        p.rating_avg,
-        p.review_count,
-        p.image_count,
-        c.id AS category_id,
-        c.name AS category_name,
-        c.name_vi AS category_name_vi,
-        c.slug AS category_slug,
-        c.icon_url AS category_icon_url,
-        a.id AS area_id,
-        a.name AS area_name,
-        a.name_vi AS area_name_vi,
-        a.slug AS area_slug,
-        (
-          SELECT pi.image_url FROM place_images pi
-          WHERE pi.place_id = p.id
-          ORDER BY pi.is_primary DESC, pi.display_order ASC, pi.created_at ASC
-          LIMIT 1
-        ) AS primary_image,
+        ${PLACE_COLUMNS},
         NULL AS distance_meters,
         ROUND((1 - (pe.embedding <=> $1::vector))::numeric, 4) AS similarity_score
       FROM place_embeddings pe
-      JOIN places p ON pe.place_id = p.id
-      LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN travel_areas a ON p.area_id = a.id
+      JOIN places p ON pe.place_id = p.id${PLACE_JOINS}
       WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
         ${areaCondition}
         AND (1 - (pe.embedding <=> $1::vector)) >= $2
@@ -470,10 +350,10 @@ export class PlacesRepository implements IPlaceRepository {
       LIMIT $3;
     `;
 
-    return this.prisma.$queryRawUnsafe<any[]>(sql, vectorString, minSimilarity, limit);
+    return this.prisma.$queryRawUnsafe<PlaceRow[]>(sql, ...args);
   }
 
-  async findPlacesWithoutEmbedding(limit: number = 50, areaId?: number): Promise<any[]> {
+  async findPlacesWithoutEmbedding(limit: number = 50, areaId?: number): Promise<PlaceForEmbedding[]> {
     return this.prisma.place.findMany({
       where: {
         status: 'ACTIVE',

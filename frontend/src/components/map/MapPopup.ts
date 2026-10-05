@@ -122,7 +122,10 @@ export function createMapPopupElement(
   if (place.rating && place.rating > 0) {
     const ratingEl = document.createElement("span");
     ratingEl.className = "font-extrabold text-amber-500 flex items-center gap-0.5 text-[11px]";
-    ratingEl.innerHTML = `<span>★</span><span>${place.rating.toFixed(1)}</span>`;
+    ratingEl.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="currentColor" stroke="none" class="shrink-0 text-amber-500" aria-hidden="true"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+      <span>${place.rating.toFixed(1)}</span>
+    `;
     metaRow.appendChild(ratingEl);
 
     if (place.reviewCount) {
@@ -219,7 +222,10 @@ export function createMapPopupElement(
       const originBtn = document.createElement("button");
       originBtn.type = "button";
       originBtn.className = "flex-1 min-w-0 inline-flex items-center justify-center gap-1 rounded-xl border border-border/80 bg-muted/50 hover:bg-muted py-1.5 px-2 text-[11px] font-semibold text-foreground transition-colors cursor-pointer";
-      originBtn.innerHTML = `<span>🚩</span><span>Điểm xuất phát</span>`;
+      originBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>
+        <span>Điểm xuất phát</span>
+      `;
       originBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -264,8 +270,10 @@ export function createMapPopupElement(
 
     const detailLink = document.createElement("a");
     detailLink.href = `/places/${place.slug || place.id}`;
-    detailLink.className = "shrink-0 inline-flex items-center justify-center rounded-xl border border-border/80 bg-background hover:bg-muted py-2 px-3 text-xs font-bold text-foreground transition-colors cursor-pointer whitespace-nowrap shadow-2xs no-underline";
-    detailLink.textContent = "Chi tiết →";
+    detailLink.className = onRequestDirections
+      ? "shrink-0 inline-flex items-center justify-center rounded-xl border border-border/80 bg-background hover:bg-muted py-2 px-3 text-xs font-bold text-foreground transition-colors cursor-pointer whitespace-nowrap shadow-2xs no-underline"
+      : "w-full inline-flex items-center justify-center rounded-xl bg-primary hover:bg-primary/90 py-2 px-3 text-xs font-bold text-primary-foreground transition-colors cursor-pointer shadow-xs no-underline";
+    detailLink.textContent = onRequestDirections ? "Chi tiết →" : "Xem chi tiết →";
     if (onOpenDetail) {
       detailLink.addEventListener("click", (e) => {
         e.preventDefault();
@@ -283,7 +291,10 @@ export function createMapPopupElement(
       const originBtn = document.createElement("button");
       originBtn.type = "button";
       originBtn.className = "w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-border/70 bg-muted/30 hover:bg-muted/70 py-1 px-2.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer";
-      originBtn.innerHTML = `<span>🚩</span><span>Đặt quán này làm điểm xuất phát</span>`;
+      originBtn.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>
+        <span>Đặt quán này làm điểm xuất phát</span>
+      `;
       originBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();

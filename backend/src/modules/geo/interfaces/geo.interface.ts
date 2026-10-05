@@ -2,13 +2,6 @@
  * Interface & Types cho hệ thống GeoModule (Chuẩn SOLID & Type-Safe)
  */
 
-export interface BoundingBox {
-  minLat: number;
-  maxLat: number;
-  minLng: number;
-  maxLng: number;
-}
-
 export interface PlaceCategorySummary {
   id: number;
   name: string;
@@ -68,61 +61,4 @@ export interface GeoJsonFeatureCollection {
     radiusMeters?: number;
     [key: string]: unknown;
   };
-}
-
-export interface GeoJsonLineStringGeometry {
-  type: 'LineString';
-  coordinates: [number, number][]; // [[lng, lat], ...]
-}
-
-export interface GeoJsonLineStringFeature {
-  type: 'Feature';
-  geometry: GeoJsonLineStringGeometry;
-  properties: {
-    distanceMeters: number;
-    durationSeconds: number;
-    travelMode: string;
-    [key: string]: unknown;
-  };
-}
-
-export interface OsmElementRaw {
-  type: 'node' | 'way' | 'relation';
-  id: number;
-  lat?: number;
-  lon?: number;
-  center?: {
-    lat: number;
-    lon: number;
-  };
-  tags?: Record<string, string>;
-}
-
-export interface ParsedOsmPlace {
-  name: string;
-  latitude: number;
-  longitude: number;
-  addressRaw: string;
-  phone?: string;
-  website?: string;
-  openingHours?: { raw: string } | null;
-  tags: string[];
-  osmType: string;
-  osmId: number;
-}
-
-export interface IAddressNormalizerService {
-  normalize(rawAddress: string): string;
-  removeAccents(str: string): string;
-}
-
-export interface IGeoJsonService {
-  isValidCoordinate(lat: number, lng: number): boolean;
-  buildFeatureCollection(places: PlaceGeoInput[], metadata?: Record<string, unknown>): GeoJsonFeatureCollection;
-  buildRouteFeature(coordinates: [number, number][], properties?: Record<string, unknown>): GeoJsonLineStringFeature;
-  parseOsmElement(element: OsmElementRaw): ParsedOsmPlace | null;
-}
-
-export interface IOverpassProvider {
-  queryPlacesInBBox(bbox: BoundingBox, limit?: number): Promise<OsmElementRaw[]>;
 }

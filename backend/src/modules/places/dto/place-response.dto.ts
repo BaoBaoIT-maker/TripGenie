@@ -106,4 +106,7 @@ export class TravelAreaItemDto {
     minLng: number | null;
     maxLng: number | null;
   };
+  latitude?: number | null;
+  longitude?: number | null;
+  hubBadge?: string | null;
 }

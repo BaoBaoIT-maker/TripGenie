@@ -257,8 +257,45 @@ model TravelArea {
   crawlJobs   CrawlJob[]
   documents   KnowledgeDocument[]
   itineraries Itinerary[]
+  transitHubs TransitHub[]
+  transitPartnerMappings TransitPartnerMapping[]
 
   @@map("travel_areas")
+}
+
+model TransitHub {
+  id        String     @id // "SGN", "HAN", "DAD", "BX_MIENDONG", "GA_SAIGON"
+  name      String     @db.VarChar(255)
+  hubType   String     @map("hub_type") @db.VarChar(50) // "AIRPORT", "BUS_TERMINAL", "TRAIN_STATION"
+  latitude  Float
+  longitude Float
+  areaId    Int        @map("area_id")
+  isActive  Boolean    @default(true) @map("is_active")
+
+  area      TravelArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
+
+  @@index([areaId])
+  @@index([hubType])
+  @@map("transit_hubs")
+}
+
+model TransitPartnerMapping {
+  id         Int         @id @default(autoincrement())
+  provider   String      @db.VarChar(50) // 'VEXERE', 'TRAVELOKA', 'DSVN'
+  hubType    String      @map("hub_type") @db.VarChar(50) // 'BUS', 'TRAIN', 'AIRPORT'
+  name       String      @db.VarChar(100)
+  slug       String      @db.VarChar(100)
+  externalId String      @map("external_id") @db.VarChar(50)
+  areaId     Int?        @map("area_id")
+  metadata   Json?       @default("{}")
+  createdAt  DateTime    @default(now()) @map("created_at")
+
+  area       TravelArea? @relation(fields: [areaId], references: [id], onDelete: SetNull)
+
+  @@unique([provider, hubType, slug])
+  @@index([provider, hubType])
+  @@index([areaId])
+  @@map("transit_partner_mappings")
 }
 
 model Category {
@@ -675,7 +712,7 @@ model DataCoverage {
   placeCount     Int            @default(0) @map("place_count")
   status         CoverageStatus @default(NOT_COVERED)
   lastCrawledAt  DateTime?      @map("last_crawled_at") @db.Timestamptz
-  staleThreshold String?        @default("7 days") @map("stale_threshold")
+  staleThreshold Unsupported("interval")? @default(dbgenerated("'7 days'::interval")) @map("stale_threshold")
   updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   area TravelArea @relation(fields: [areaId], references: [id], onDelete: Cascade)

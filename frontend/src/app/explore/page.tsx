@@ -80,6 +80,9 @@ function ExploreContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialViewParam = searchParams.get("view");
+  const initialSelectedId = searchParams.get("selected") || searchParams.get("placeId");
+  const initialLat = searchParams.get("lat") ? Number(searchParams.get("lat")) : null;
+  const initialLng = searchParams.get("lng") ? Number(searchParams.get("lng")) : null;
   const initialAreaParam = searchParams.get("areaId") || searchParams.get("area");
   const parsedInitialArea: number | "all" = useMemo(() => {
     if (!initialAreaParam || initialAreaParam === "all") return "all";
@@ -89,12 +92,56 @@ function ExploreContent() {
 
   // View Mode: Airbnb-style Grid vs Split Map
   const [userViewMode, setUserViewMode] = useState<"grid" | "split" | null>(null);
-  const viewMode = userViewMode ?? (initialViewParam === "split" ? "split" : "grid");
+  const viewMode = userViewMode ?? (initialViewParam === "split" || Boolean(initialSelectedId) ? "split" : "grid");
   const setViewMode = (mode: "grid" | "split") => setUserViewMode(mode);
 
   // Selection & Interactivity for Split Map
-  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(initialSelectedId || null);
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
+
+  // Synchronize URL selected param with state
+  useEffect(() => {
+    if (initialSelectedId) {
+      setSelectedPlaceId(initialSelectedId);
+      setUserViewMode("split");
+    }
+  }, [initialSelectedId]);
+
+  // Immediately load target place if initialSelectedId is present so map and card list have it without delay
+  useEffect(() => {
+    if (!initialSelectedId) return;
+    const targetId = initialSelectedId;
+    let active = true;
+
+    async function loadDirectPlace() {
+      try {
+        const directPlace = await placeService.getPlaceById(targetId);
+        if (active && directPlace) {
+          setPlaces((prev) => {
+            if (prev.some((p) => p.id === directPlace.id)) return prev;
+            return [directPlace, ...prev];
+          });
+          setSelectedPlaceId(directPlace.id);
+        }
+      } catch (err) {
+        console.warn("Could not load direct selected place:", err);
+      }
+    }
+
+    loadDirectPlace();
+    return () => {
+      active = false;
+    };
+  }, [initialSelectedId]);
+
+  // Auto scroll to selected card in split view list
+  useEffect(() => {
+    if (!selectedPlaceId || viewMode !== "split") return;
+    const cardEl = document.getElementById(`place-card-${selectedPlaceId}`);
+    if (cardEl) {
+      cardEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [selectedPlaceId, viewMode]);
 
   // Card click behavior: If map is open (split view), 1st click highlights on map, 2nd click enters details
   const handlePlaceCardClick = (place: Place, e?: React.MouseEvent) => {
@@ -248,8 +295,27 @@ function ExploreContent() {
         items = items.filter((p) => p.suitableFor.includes(selectedAudience));
       }
 
-      // Always place places with images at the top
+      // If initialSelectedId is present and not yet in items, fetch it directly and prepend
+      if (initialSelectedId && !items.some((p) => p.id === initialSelectedId || p.slug === initialSelectedId)) {
+        try {
+          const directPlace = await placeService.getPlaceById(initialSelectedId);
+          if (directPlace) {
+            items = [directPlace, ...items.filter((p) => p.id !== directPlace.id)];
+            if (selectedPlaceId === initialSelectedId && directPlace.id !== initialSelectedId) {
+              setSelectedPlaceId(directPlace.id);
+            }
+          }
+        } catch (targetErr) {
+          console.warn("Could not fetch target place by id:", targetErr);
+        }
+      }
+
+      // Always place places with images at the top, and ensure the selected place stays at the very top
       items.sort((a, b) => {
+        if (initialSelectedId) {
+          if (a.id === initialSelectedId || a.slug === initialSelectedId) return -1;
+          if (b.id === initialSelectedId || b.slug === initialSelectedId) return 1;
+        }
         const aHas = Boolean(a.coverImage || (a.images && a.images.length > 0));
         const bHas = Boolean(b.coverImage || (b.images && b.images.length > 0));
         if (aHas && !bHas) return -1;
@@ -281,6 +347,7 @@ function ExploreContent() {
     radiusKm,
     page,
     pageSize,
+    initialSelectedId,
   ]);
 
   useEffect(() => {
@@ -342,8 +409,17 @@ function ExploreContent() {
     return null;
   }, [geocodedLocation, pinNearbyCenter]);
 
-  // Map Center: fallback to geocoded pin, user location, or Da Nang
+  // Map Center: prioritize query param lat/lng, selected place, geocoded pin, user location, or Da Nang
   const mapCenter = useMemo(() => {
+    if (initialLat !== null && initialLng !== null && !isNaN(initialLat) && !isNaN(initialLng)) {
+      return { latitude: initialLat, longitude: initialLng };
+    }
+    const currentSelected = selectedPlaceId
+      ? places.find((p) => p.id === selectedPlaceId || p.slug === selectedPlaceId)
+      : null;
+    if (currentSelected && currentSelected.latitude && currentSelected.longitude) {
+      return { latitude: currentSelected.latitude, longitude: currentSelected.longitude };
+    }
     if (activeGeocodedPin) {
       return { latitude: activeGeocodedPin.lat, longitude: activeGeocodedPin.lng };
     }
@@ -354,7 +430,7 @@ function ExploreContent() {
       return { latitude: places[0].latitude, longitude: places[0].longitude };
     }
     return { latitude: 16.0544, longitude: 108.2022 };
-  }, [activeGeocodedPin, useGpsSearch, userLocation, places]);
+  }, [initialLat, initialLng, selectedPlaceId, places, activeGeocodedPin, useGpsSearch, userLocation]);
 
   // Super Category Select Handler
   const handleSelectSuperCategory = (catId: string) => {
@@ -443,6 +519,17 @@ function ExploreContent() {
     setKeyword("");
     setPage(1);
   }, []);
+
+  const handleSelectPlace = useCallback((id: string | null) => {
+    setSelectedPlaceId(id);
+  }, []);
+
+  const handleRequestCurrentLocation = useCallback(() => {
+    setUseGpsSearch(true);
+    setPinNearbyCenter(null);
+    setPage(1);
+    requestLocation();
+  }, [requestLocation]);
 
   const isFiltering =
     keyword !== "" ||
@@ -1161,6 +1248,7 @@ function ExploreContent() {
                   {places.map((place) => (
                     <div
                       key={place.id}
+                      id={`place-card-${place.id}`}
                       onMouseEnter={() => setHoveredPlaceId(place.id)}
                       onMouseLeave={() => setHoveredPlaceId(null)}
                       className="transition-all rounded-2xl"
@@ -1235,20 +1323,9 @@ function ExploreContent() {
               radiusKm={radiusKm}
               selectedPlaceId={selectedPlaceId}
               hoveredPlaceId={hoveredPlaceId}
-              onSelectPlace={(id) => {
-                if (id === null) {
-                  setSelectedPlaceId(null);
-                } else {
-                  setSelectedPlaceId((prev) => (prev === id ? null : id));
-                }
-              }}
+              onSelectPlace={handleSelectPlace}
               onViewportChange={() => {}}
-              onRequestCurrentLocation={() => {
-                setUseGpsSearch(true);
-                setPinNearbyCenter(null);
-                setPage(1);
-                requestLocation();
-              }}
+              onRequestCurrentLocation={handleRequestCurrentLocation}
               locating={locating}
               selectedProvinceName={selectedProvinceName}
               userLocation={userLocation || null}

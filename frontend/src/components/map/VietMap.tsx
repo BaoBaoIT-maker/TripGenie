@@ -138,6 +138,11 @@ export default function VietMap({
   routeToPinRequest,
   onSearchThisArea,
   onPinDragEnd,
+  markerLabels,
+  markerColors,
+  pathLine,
+  pathSegments,
+  hidePopupDirections = false,
 }: VietMapProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -147,6 +152,9 @@ export default function VietMap({
   const userMarkerRef = useRef<Marker | null>(null);
   const geocodedMarkerRef = useRef<Marker | null>(null);
   const popupRef = useRef<Popup | null>(null);
+  const isProgrammaticPopupCloseRef = useRef(false);
+  const currentPopupPlaceIdRef = useRef<string | null>(null);
+  const previousViewportRef = useRef<{ center: [number, number]; zoom: number } | null>(null);
   const [hasError, setHasError] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<MapStyleTheme>("bright");
@@ -159,6 +167,7 @@ export default function VietMap({
   const initialCenterRef = useRef(center);
   const selectedPlaceIdRef = useRef(selectedPlaceId);
   const lastSearchCenterRef = useRef(center);
+  const lastFittedPlacesKeyRef = useRef<string>("");
 
   // Multi-Stop Routing State (Unified A -> B -> C...)
   const [routeStops, setRouteStops] = useState<RouteStop[]>([]);
@@ -634,15 +643,17 @@ export default function VietMap({
     if (!containerRef.current) return;
 
     try {
+      const initialZoom = selectedPlaceIdRef.current ? 16 : DEFAULT_MAP_ZOOM;
       const map = new MapLibreMap({
         container: containerRef.current,
         style: MULTI_LAYER_MAP_STYLE,
         center: [initialCenterRef.current.longitude, initialCenterRef.current.latitude],
-        zoom: DEFAULT_MAP_ZOOM,
+        zoom: initialZoom,
       });
 
       map.on("load", () => {
         setMapLoaded(true);
+        map.resize();
 
         // Load 34 Provinces GeoJSON boundary overlay
         try {
@@ -705,12 +716,12 @@ export default function VietMap({
 
       // Map Click Handler: Drop Pin or Deselect
       map.on("click", (e) => {
-
         const originalEvent = e.originalEvent as MouseEvent;
         const target = originalEvent?.target as HTMLElement | null;
         if (target && !target.closest(".marker-container") && !target.closest(".maplibregl-popup")) {
+          const wasPlaceSelected = Boolean(selectedPlaceIdRef.current);
           onSelectPlaceRef.current(null);
-          if (onMapClickDropPinRef.current) {
+          if (!wasPlaceSelected && onMapClickDropPinRef.current) {
             onMapClickDropPinRef.current({ lat: e.lngLat.lat, lng: e.lngLat.lng });
           }
         }
@@ -741,8 +752,10 @@ export default function VietMap({
           geocodedMarkerRef.current = null;
         }
         if (popupRef.current) {
+          isProgrammaticPopupCloseRef.current = true;
           popupRef.current.remove();
           popupRef.current = null;
+          isProgrammaticPopupCloseRef.current = false;
         }
         map.remove();
         mapRef.current = null;
@@ -768,7 +781,7 @@ export default function VietMap({
       ]);
     }
 
-    if (selectedProvinceName && boundsMap[selectedProvinceName]) {
+    if (selectedProvinceName && boundsMap[selectedProvinceName] && !selectedPlaceId) {
       const b = boundsMap[selectedProvinceName];
       if (places.length === 0) {
         map.fitBounds(
@@ -780,10 +793,9 @@ export default function VietMap({
         );
       }
     }
-  }, [selectedProvinceName, mapLoaded, places.length]);
+  }, [selectedProvinceName, mapLoaded, places.length, selectedPlaceId]);
 
-  // Update User Location Marker (GPS)
-  // Update User Location Marker (GPS) and center map
+  // Update User Location Marker (GPS) - Renders user pin without overriding active place focus
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -806,13 +818,6 @@ export default function VietMap({
         .addTo(map);
 
       userMarkerRef.current = marker;
-
-      // Smoothly fly map to user's location
-      map.flyTo({
-        center: [userLocation.longitude, userLocation.latitude],
-        zoom: 15.5,
-        duration: 800,
-      });
     }
   }, [userLocation]);
 
@@ -911,11 +916,14 @@ export default function VietMap({
 
     places.forEach((item) => {
       const place = "place" in item ? (item.place as DiscoveryPlace) : item;
+      const customColor = markerColors?.[place.id];
       const { container, button } = createPlaceMarkerElement(item, {
         selected: false,
         hovered: false,
+        label: markerLabels?.[place.id],
+        customColor,
         onSelect: () => {
-          onSelectPlace(place.id);
+          onSelectPlaceRef.current(place.id);
         },
       });
 
@@ -930,8 +938,14 @@ export default function VietMap({
 
     markersRef.current = newMarkers;
 
-    // Auto fit bounds ONCE when places change (never on hover!)
-    if (places.length > 0) {
+    // Auto fit bounds ONCE when places list actually changes (only if no specific place is selected)
+    const placesKey = places.map((item) => {
+      const p = "place" in item ? item.place : item;
+      return p.id;
+    }).join(",");
+
+    if (places.length > 0 && !selectedPlaceIdRef.current && placesKey !== lastFittedPlacesKeyRef.current) {
+      lastFittedPlacesKeyRef.current = placesKey;
       const firstPlace = "place" in places[0] ? (places[0].place as DiscoveryPlace) : places[0];
       const bounds = new LngLatBounds(
         [firstPlace.longitude, firstPlace.latitude],
@@ -950,7 +964,8 @@ export default function VietMap({
         // ignore bounds calculation error
       }
     }
-  }, [places, onSelectPlace, geocodedPin]);
+  }, [places, geocodedPin, markerLabels, markerColors]);
+
 
   // Smooth, instant marker hover and selection update
   useEffect(() => {
@@ -960,39 +975,207 @@ export default function VietMap({
       const isHovered = placeId === hoveredPlaceId;
       button.className = getMarkerButtonClasses(isSelected, isHovered, button.dataset.categoryBg);
       button.dataset.active = isSelected ? "true" : "false";
+
+      // Preserve custom color styling (e.g. per-day signature colors)
+      if (button.dataset.customColor) {
+        button.style.backgroundColor = button.dataset.customColor;
+        button.style.borderColor = "#ffffff";
+        button.style.color = "#ffffff";
+      }
+
+      // Suppress the hover tooltip when selected so it never conflicts with the popup
+      const container = button.closest(".marker-container");
+      if (container) {
+        const tooltip = container.querySelector<HTMLDivElement>(":scope > div");
+        if (tooltip) {
+          tooltip.style.display = isSelected ? "none" : "";
+        }
+      }
     });
   }, [selectedPlaceId, hoveredPlaceId]);
 
-  // Center on selected place & show popup (with Quick Save & Multi-stop Add options)
+  // Draw / update the itinerary polyline (supports multi-day colored segments with high-contrast casing)
+  // Maps paint properties dynamically read each segment's color from feature properties
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    if (!map || !mapLoaded) return;
+    const SOURCE_ID = "tripgenie-itinerary-path";
+    const LAYER_ID = "tripgenie-itinerary-path-line";
+
+    let features: GeoJSON.Feature<GeoJSON.LineString>[] = [];
+
+    if (pathSegments && pathSegments.length > 0) {
+      features = pathSegments
+        .filter((seg) => seg.coordinates && seg.coordinates.length >= 2)
+        .map((seg) => ({
+          type: "Feature",
+          properties: {
+            dayNumber: seg.dayNumber,
+            color: seg.color || "#0D9488",
+          },
+          geometry: {
+            type: "LineString",
+            coordinates: seg.coordinates,
+          },
+        }));
+    } else if (pathLine && pathLine.length >= 2) {
+      features = [
+        {
+          type: "Feature",
+          properties: {
+            dayNumber: 1,
+            color: "#0D9488",
+          },
+          geometry: {
+            type: "LineString",
+            coordinates: pathLine,
+          },
+        },
+      ];
+    }
+
+    const geojson: GeoJSON.FeatureCollection<GeoJSON.LineString> = {
+      type: "FeatureCollection",
+      features,
+    };
+
+    const casingColor = currentTheme === "dark" ? "#0F172A" : "#FFFFFF";
+
+    try {
+      if (map.getSource(SOURCE_ID)) {
+        (map.getSource(SOURCE_ID) as GeoJSONSource).setData(geojson);
+      } else {
+        map.addSource(SOURCE_ID, { type: "geojson", data: geojson });
+        // High-contrast casing layer: crisp white in bright/satellite mode, dark in dark mode
+        map.addLayer({
+          id: `${LAYER_ID}-casing`,
+          type: "line",
+          source: SOURCE_ID,
+          layout: { "line-join": "round", "line-cap": "round" },
+          paint: {
+            "line-color": casingColor,
+            "line-width": 8.5,
+            "line-opacity": 0.9,
+          },
+        });
+        // Core line layer with dynamic per-segment day color
+        map.addLayer({
+          id: LAYER_ID,
+          type: "line",
+          source: SOURCE_ID,
+          layout: { "line-join": "round", "line-cap": "round" },
+          paint: {
+            "line-color": ["coalesce", ["get", "color"], "#0D9488"],
+            "line-width": 4.5,
+            "line-opacity": 0.95,
+          },
+        });
+      }
+
+      // Keep casing color up to date with map theme
+      if (map.getLayer(`${LAYER_ID}-casing`)) {
+        map.setPaintProperty(`${LAYER_ID}-casing`, "line-color", casingColor);
+      }
+    } catch (e) {
+      console.warn("[ItineraryPath] failed to update polyline:", e);
+    }
+  }, [pathSegments, pathLine, mapLoaded, currentTheme]);
+
+  // Center on selected place & show popup (with Quick Save & Multi-stop Add options)
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapLoaded) return;
 
     if (!selectedPlaceId) {
+      const wasSelected = Boolean(currentPopupPlaceIdRef.current || previousViewportRef.current);
+      currentPopupPlaceIdRef.current = null;
       if (popupRef.current) {
+        isProgrammaticPopupCloseRef.current = true;
         popupRef.current.remove();
         popupRef.current = null;
+        isProgrammaticPopupCloseRef.current = false;
+      }
+
+      // Smoothly un-zoom and return to the initial/previous overview
+      if (wasSelected) {
+        if (previousViewportRef.current) {
+          map.flyTo({
+            center: previousViewportRef.current.center,
+            zoom: previousViewportRef.current.zoom,
+            duration: 600,
+            essential: true,
+          });
+          previousViewportRef.current = null;
+        } else if (places.length > 0) {
+          const firstPlace = "place" in places[0] ? (places[0].place as DiscoveryPlace) : places[0];
+          const bounds = new LngLatBounds(
+            [firstPlace.longitude, firstPlace.latitude],
+            [firstPlace.longitude, firstPlace.latitude]
+          );
+          places.forEach((item) => {
+            const p = "place" in item ? (item.place as DiscoveryPlace) : item;
+            bounds.extend([p.longitude, p.latitude]);
+          });
+          try {
+            map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 600 });
+          } catch {
+            map.flyTo({
+              center: [center.longitude, center.latitude],
+              zoom: 13,
+              duration: 600,
+            });
+          }
+        } else {
+          map.flyTo({
+            center: [center.longitude, center.latitude],
+            zoom: 13,
+            duration: 600,
+          });
+        }
       }
       return;
     }
 
     const targetItem = places.find((item) => {
       const p = "place" in item ? (item.place as DiscoveryPlace) : item;
-      return p.id === selectedPlaceId;
+      return p.id === selectedPlaceId || ("slug" in p && p.slug === selectedPlaceId);
     });
     if (!targetItem) return;
     const targetPlace = "place" in targetItem ? (targetItem.place as DiscoveryPlace) : targetItem;
+    if (!targetPlace || typeof targetPlace.latitude !== "number" || typeof targetPlace.longitude !== "number") return;
+
+    // If popup is ALREADY showing for this exact place, keep it firmly open!
+    if (currentPopupPlaceIdRef.current === targetPlace.id && popupRef.current && popupRef.current.isOpen()) {
+      return;
+    }
+
+    // Save previous viewport before zooming in, so we can return to it when popup closes
+    const currentZoom = map.getZoom();
+    if (currentZoom < 15.5 && !previousViewportRef.current) {
+      const c = map.getCenter();
+      previousViewportRef.current = {
+        center: [c.lng, c.lat],
+        zoom: currentZoom,
+      };
+    }
+
+    map.resize();
 
     map.flyTo({
       center: [targetPlace.longitude, targetPlace.latitude],
-      zoom: Math.max(map.getZoom(), 15),
+      zoom: 16,
       offset: routeStops.length >= 2 && !isRoutePanelCollapsed ? [130, 0] : [0, 0],
-      duration: 600,
+      duration: 800,
+      essential: true,
     });
 
     if (popupRef.current) {
+      isProgrammaticPopupCloseRef.current = true;
       popupRef.current.remove();
       popupRef.current = null;
+      currentPopupPlaceIdRef.current = null;
+      isProgrammaticPopupCloseRef.current = false;
     }
 
     const isSaved = savedPlaces.some((p) => p.id === targetPlace.id);
@@ -1002,28 +1185,31 @@ export default function VietMap({
       (placeId) => {
         router.push(`/places/${targetPlace.slug || placeId}`);
       },
-      (targetPlace) => handleStartDirections(targetPlace),
+      hidePopupDirections ? undefined : (targetPlace) => handleStartDirections(targetPlace),
       {
-        isRoutingActive: routeStops.length >= 2,
+        isRoutingActive: hidePopupDirections ? false : routeStops.length >= 2,
         isSaved,
         onToggleSave: handleToggleSave,
-        onAddStopToRoute: handleAddStopToRoute,
-        onSetOrigin: handleSetOrigin,
+        onAddStopToRoute: hidePopupDirections ? undefined : handleAddStopToRoute,
+        onSetOrigin: hidePopupDirections ? undefined : handleSetOrigin,
       }
     );
 
     const popup = new Popup({
       closeButton: true,
       closeOnClick: false,
-      offset: 20,
+      offset: 25,
       maxWidth: "320px",
     })
       .setLngLat([targetPlace.longitude, targetPlace.latitude])
       .setDOMContent(popupEl)
       .addTo(map);
 
+    currentPopupPlaceIdRef.current = targetPlace.id;
+
     popup.on("close", () => {
-      if (selectedPlaceIdRef.current === targetPlace.id) {
+      if (isProgrammaticPopupCloseRef.current) return;
+      if (selectedPlaceIdRef.current === targetPlace.id || selectedPlaceIdRef.current === targetPlace.slug) {
         onSelectPlaceRef.current(null);
       }
     });
@@ -1032,6 +1218,7 @@ export default function VietMap({
   }, [
     selectedPlaceId,
     places,
+    mapLoaded,
     savedPlaces,
     routeStops.length,
     isRoutePanelCollapsed,

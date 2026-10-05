@@ -4,12 +4,17 @@ export interface PlaceMarkerOptions {
   selected?: boolean;
   hovered?: boolean;
   onSelect?: (placeId: string) => void;
+  /** Sequential number label (e.g. "1", "2"). When set, renders bold number with custom/day bg instead of category svg. */
+  label?: string;
+  /** Custom background color for marker pin (e.g. day color hex like #0D9488, #6366F1) */
+  customColor?: string;
 }
 
 interface CategoryStyle {
   bg: string;
   svgIcon: string;
 }
+
 
 // Clean inline vector SVG icons (Google Maps / Apple Maps style)
 const CATEGORY_STYLES: Record<string, CategoryStyle> = {
@@ -116,7 +121,10 @@ export function createPlaceMarkerElement(
   options: PlaceMarkerOptions = {}
 ): { container: HTMLDivElement; button: HTMLButtonElement } {
   const place = "place" in item ? item.place : item;
-  const style = getCategoryStyle(place.category);
+  // When a sequential label is provided (itinerary mode), use customColor if supplied, else slate-900 bg
+  const style = options.label
+    ? { bg: options.customColor ? "" : "bg-slate-900 text-white", svgIcon: "" }
+    : getCategoryStyle(place.category);
 
   // Outer container: coordinates managed strictly by MapLibre
   const container = document.createElement("div");
@@ -127,7 +135,7 @@ export function createPlaceMarkerElement(
   const nameTooltip = document.createElement("div");
   nameTooltip.className = `absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-background/95 border border-border/80 text-foreground text-[10px] font-bold shadow-md whitespace-nowrap pointer-events-none transition-all duration-150 ${
     options.selected
-      ? "opacity-100 scale-100 z-40"
+      ? "hidden"
       : options.hovered
         ? "opacity-100 scale-100 z-30"
         : "opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 z-20"
@@ -135,20 +143,42 @@ export function createPlaceMarkerElement(
   nameTooltip.textContent = place.name;
   container.appendChild(nameTooltip);
 
-  // Inner button with category color & SVG icon
+  // Inner button with category color & icon
   const button = document.createElement("button");
   button.type = "button";
   button.setAttribute("aria-label", `Xem ${place.name} trên bản đồ`);
   button.dataset.active = options.selected ? "true" : "false";
   button.dataset.categoryBg = style.bg;
+  if (options.customColor) {
+    button.dataset.customColor = options.customColor;
+  }
   button.className = getMarkerButtonClasses(Boolean(options.selected), Boolean(options.hovered), style.bg);
-  button.innerHTML = style.svgIcon;
+
+  if (options.customColor) {
+    button.style.backgroundColor = options.customColor;
+    button.style.borderColor = "#ffffff";
+    button.style.color = "#ffffff";
+  }
+
+  if (options.label) {
+    button.textContent = options.label;
+    button.style.fontWeight = "700";
+    button.style.fontSize = "11px";
+  } else {
+    button.innerHTML = style.svgIcon;
+  }
 
   // Tiny bottom pointer stem for exact location pinpointing
   const stem = document.createElement("div");
-  stem.className = "w-0 h-0 border-l-[3.5px] border-l-transparent border-r-[3.5px] border-r-transparent border-t-[4px] border-t-white -mt-[1px] shadow-xs";
+  stem.className = "w-0 h-0 border-l-[3.5px] border-l-transparent border-r-[3.5px] border-r-transparent border-t-[4px] -mt-[1px] shadow-xs";
+  if (options.customColor) {
+    stem.style.borderTopColor = options.customColor;
+  } else {
+    stem.className += " border-t-white";
+  }
 
   button.appendChild(stem);
+
 
   if (options.onSelect) {
     container.addEventListener("click", (event) => {

@@ -110,6 +110,28 @@ export interface SavedPlace {
   savedAt: string;
 }
 
+export interface ItineraryPathSegment {
+  dayNumber: number;
+  color: string;
+  coordinates: [number, number][];
+}
+
+export const ITINERARY_DAY_COLORS: readonly string[] = [
+  '#0D9488', // Day 1: Ocean Teal
+  '#6366F1', // Day 2: Indigo
+  '#F59E0B', // Day 3: Sunset Amber
+  '#EC4899', // Day 4: Pink / Rose
+  '#8B5CF6', // Day 5: Purple
+  '#10B981', // Day 6: Emerald
+  '#3B82F6', // Day 7: Sky Blue
+  '#F97316', // Day 8: Orange
+];
+
+export function getDayColor(dayNumber: number): string {
+  const index = Math.max(0, dayNumber - 1) % ITINERARY_DAY_COLORS.length;
+  return ITINERARY_DAY_COLORS[index];
+}
+
 export interface VietMapProps {
   places: (NearbyPlace | DiscoveryPlace)[];
   center: MapCoordinate;
@@ -127,4 +149,16 @@ export interface VietMapProps {
   routeToPinRequest?: { latitude: number; longitude: number; name: string } | null;
   onSearchThisArea?: (center: MapCoordinate) => void;
   onPinDragEnd?: (coords: { lat: number; lng: number }) => void;
+  /** Sequential number labels for itinerary pins (placeId → "1", "2", …). When set, overrides svg category icons. */
+  markerLabels?: Record<string, string>;
+  /** Custom color mapping for markers (placeId → hex color, e.g. day signature color) */
+  markerColors?: Record<string, string>;
+  /** Ordered [lng, lat] pairs for a dashed polyline connecting itinerary stops. */
+  pathLine?: [number, number][];
+  /** Multi-segment itinerary paths (e.g. per-day colored lines) */
+  pathSegments?: ItineraryPathSegment[];
+  /** Whether to hide directions/origin buttons in the place popup (e.g. inside itineraries view) */
+  hidePopupDirections?: boolean;
 }
+
+

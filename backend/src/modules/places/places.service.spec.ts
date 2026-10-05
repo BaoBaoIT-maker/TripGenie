@@ -7,6 +7,8 @@ import { IEmbeddingService } from './interfaces/embedding-service.interface';
 import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
 import { BudgetLevel } from '@prisma/client';
 import { PlaceSortBy, SortOrder } from '../../common/enums/places.enum';
+import { checkIsOpenNow } from '../../common/utils/opening-hours.util';
+import { NominatimService } from './services/nominatim.service';
 
 describe('PlacesService', () => {
   let service: PlacesService;
@@ -62,10 +64,19 @@ describe('PlacesService', () => {
       getModelName: jest.fn().mockReturnValue('models/gemini-embedding-2'),
     };
 
+    const mockNominatim = {
+      geocode: jest.fn(),
+      reverseGeocode: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PlacesService,
         GeoJsonService,
+        {
+          provide: NominatimService,
+          useValue: mockNominatim,
+        },
         {
           provide: INJECT_TOKENS.PLACE_REPOSITORY,
           useValue: mockRepo,
@@ -169,7 +180,7 @@ describe('PlacesService', () => {
         category: { name: 'Nha hang', nameVi: 'Nhà hàng' },
       };
 
-      repository.findPlacesWithoutEmbedding.mockResolvedValue([mockUnembeddedPlace]);
+      repository.findPlacesWithoutEmbedding.mockResolvedValue([mockUnembeddedPlace as never]);
 
       const result = await service.syncEmbeddings({ limit: 10, areaId: 1 });
 
@@ -263,7 +274,7 @@ describe('PlacesService', () => {
         ],
       };
 
-      repository.findById.mockResolvedValue(mockDetailedPlace);
+      repository.findById.mockResolvedValue(mockDetailedPlace as never);
 
       const result = await service.getPlaceById('a0000000-0000-0000-0000-000000000001');
 
@@ -333,24 +344,24 @@ describe('PlacesService', () => {
 
   describe('checkIsOpenNow', () => {
     it('should return true for 24/7', () => {
-      expect(service.checkIsOpenNow('24/7')).toBe(true);
-      expect(service.checkIsOpenNow(' 24/7 ')).toBe(true);
+      expect(checkIsOpenNow('24/7')).toBe(true);
+      expect(checkIsOpenNow(' 24/7 ')).toBe(true);
     });
 
     it('should return boolean for valid time range', () => {
-      const res = service.checkIsOpenNow('00:00-23:59');
+      const res = checkIsOpenNow('00:00-23:59');
       expect(typeof res).toBe('boolean');
     });
 
     it('should return null for invalid or empty string', () => {
-      expect(service.checkIsOpenNow(null)).toBeNull();
-      expect(service.checkIsOpenNow(undefined)).toBeNull();
-      expect(service.checkIsOpenNow('not-a-time')).toBeNull();
+      expect(checkIsOpenNow(null)).toBeNull();
+      expect(checkIsOpenNow(undefined)).toBeNull();
+      expect(checkIsOpenNow('not-a-time')).toBeNull();
     });
 
     it('should support object with openNow or is_open boolean', () => {
-      expect(service.checkIsOpenNow({ openNow: true })).toBe(true);
-      expect(service.checkIsOpenNow({ is_open: false })).toBe(false);
+      expect(checkIsOpenNow({ openNow: true })).toBe(true);
+      expect(checkIsOpenNow({ is_open: false })).toBe(false);
     });
   });
 

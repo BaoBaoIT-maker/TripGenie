@@ -297,10 +297,14 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
                 size="md"
               />
               <span>•</span>
-              <span className="flex items-center gap-1">
-                <MapPin className="size-3.5 text-primary" />
-                {place.address}
-              </span>
+              <Link
+                href={`/explore?view=split&selected=${place.id}&lat=${place.latitude}&lng=${place.longitude}`}
+                className="flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
+                title="Xem trên bản đồ"
+              >
+                <MapPin className="size-3.5 text-primary shrink-0" />
+                <span>{place.address}</span>
+              </Link>
               {directDistanceKm !== null && directDistanceKm > 0 && (
                 <>
                   <span>•</span>
@@ -466,7 +470,7 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
               {/* Action Buttons for Directions */}
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <Link
-                  href={`/explore?view=split&areaId=${place.city || "all"}&selected=${place.id}`}
+                  href={`/explore?view=split&selected=${place.id}&lat=${place.latitude}&lng=${place.longitude}`}
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-primary-foreground hover:bg-primary/90 transition-all shadow-xs"
                 >
                   <Compass className="size-3.5" />

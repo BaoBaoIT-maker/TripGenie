@@ -330,6 +330,7 @@ describe('PlacesService', () => {
           bboxMaxLat: 16.16,
           bboxMinLng: 107.98,
           bboxMaxLng: 108.36,
+          transitHubs: [],
         },
       ]);
 

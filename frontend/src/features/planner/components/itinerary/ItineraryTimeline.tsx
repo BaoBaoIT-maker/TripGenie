@@ -37,7 +37,7 @@ interface Props {
   selectedPlaceId?: string | null;
   onSelectPlace?: (placeId: string) => void;
   onHoverPlace?: (placeId: string | null) => void;
-  onSwapPlace?: (placeId: string) => void;
+  onSwapPlace?: (placeId: string, activity?: ItineraryActivity) => void;
   onDeletePlace?: (placeId: string) => void;
   onAddPlace?: (dayNumber: number) => void;
   onChangeTransitMode?: (newMode: TransitMode) => Promise<void> | void;
@@ -729,7 +729,7 @@ export default function ItineraryTimeline({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onSwapPlace?.(act.placeId);
+                              onSwapPlace?.(act.placeId, act);
                             }}
                             title="Đổi điểm tham quan hoặc quán ăn khác"
                             className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white hover:bg-teal-50 hover:border-teal-500 hover:text-teal-700 px-2.5 py-1 text-[11px] font-bold text-slate-700 transition-all cursor-pointer shadow-2xs"

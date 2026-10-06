@@ -53,6 +53,7 @@ export interface BudgetBreakdown {
 }
 
 export interface ItineraryActivity {
+  id?: string;
   placeId: string;
   placeName: string;
   startTime: string | null; // "HH:mm"
@@ -88,6 +89,7 @@ export interface ItineraryDetail {
   title: string;
   description: string | null;
   destination: string | null;
+  coverPhoto?: string | null;
   startDate: string | null; // YYYY-MM-DD
   endDate: string | null;
   totalDays: number;
@@ -673,6 +675,7 @@ export class ItineraryPlannerService {
       const image = dest.place.images[0];
       const list = byDay.get(dest.dayNumber) ?? [];
       list.push({
+        id: dest.id,
         placeId: dest.place.id,
         placeName: dest.place.name,
         startTime: formatTimeOfDay(dest.startTime),
@@ -757,6 +760,7 @@ export class ItineraryPlannerService {
       title: row.title,
       description: row.description,
       destination: row.destination,
+      coverPhoto: (stored as any).coverPhoto || (stored as any).coverImage || null,
       startDate: row.startDate?.toISOString().slice(0, 10) ?? null,
       endDate: row.endDate?.toISOString().slice(0, 10) ?? null,
       totalDays,
@@ -963,6 +967,37 @@ export class ItineraryPlannerService {
         totalBudget: totalEstimated,
         estimatedCost: totalEstimated,
         aiPreferences: updatedAiPreferences as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return this.getById(id, userId);
+  }
+
+  /**
+   * Update the cover photo of an itinerary.
+   */
+  async updateCoverPhoto(id: string, coverPhoto: string, userId?: string) {
+    const row = await this.prisma.itinerary.findUnique({
+      where: { id },
+      select: { id: true, aiPreferences: true },
+    });
+    if (!row) {
+      throw new NotFoundException('Không tìm thấy lịch trình hoặc lịch trình đã bị xóa.');
+    }
+
+    const currentAiPreferences =
+      typeof row.aiPreferences === 'object' && row.aiPreferences !== null
+        ? (row.aiPreferences as Record<string, unknown>)
+        : {};
+
+    await this.prisma.itinerary.update({
+      where: { id },
+      data: {
+        aiPreferences: {
+          ...currentAiPreferences,
+          coverPhoto,
+          coverImage: coverPhoto,
+        } as unknown as Prisma.InputJsonValue,
       },
     });
 

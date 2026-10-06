@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -8,7 +8,6 @@ import {
   Printer,
   Sparkles,
   Share2,
-  Edit3,
   Send,
   X,
   MessageSquare,
@@ -25,6 +24,8 @@ import {
   Gauge,
   UtensilsCrossed,
   Coffee,
+  Check,
+  Camera,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -34,12 +35,22 @@ import {
   useDeleteItinerary,
   useCloneItinerary,
   useUpdateTransitMode,
+  useUpdateCoverPhoto,
+  useCopilotChat,
+  useCopilotHistory,
+  useDirectSwapActivity,
+  useApplyProposal,
 } from '../../hooks/use-itinerary-planner';
 import ItineraryTimeline from './ItineraryTimeline';
 import BudgetBreakdownCard from './BudgetBreakdownCard';
 import ItineraryMap from './ItineraryMap';
+import PlaceAlternativesModal from './PlaceAlternativesModal';
+import CoverPhotoModal from './CoverPhotoModal';
+import ItineraryWizardModal from '../ItineraryWizardModal';
+import CopilotDrawer, { LocatePlaceTarget } from './CopilotDrawer';
+import { placeService } from '@/services/place.service';
 import { fetchMultiStopRoute, fetchRoute, Coordinate } from '@/services/routing.service';
-import type { ItineraryDetail, ItineraryActivity, ItineraryDay, TransitMode } from '@/types/itinerary';
+import type { ItineraryDetail, ItineraryActivity, ItineraryDay, TransitMode, CopilotProposal } from '@/types/itinerary';
 import { getDayColor, type ItineraryPathSegment, type DiscoveryPlace } from '@/features/map/types';
 
 interface Props {
@@ -85,7 +96,9 @@ export default function ItineraryView({ id }: Props) {
   const deleteMutation = useDeleteItinerary();
   const cloneMutation = useCloneItinerary();
   const updateTransitMutation = useUpdateTransitMode();
+  const updateCoverMutation = useUpdateCoverPhoto(id);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
 
   const handleDelete = async () => {
     try {
@@ -116,6 +129,16 @@ export default function ItineraryView({ id }: Props) {
     }
   };
 
+  const handleSaveCoverPhoto = async (newCoverUrl: string) => {
+    try {
+      await updateCoverMutation.mutateAsync(newCoverUrl);
+      toast.success('Đã cập nhật ảnh bìa lịch trình thành công!');
+    } catch (err: any) {
+      toast.error(err?.message || 'Không thể cập nhật ảnh bìa. Vui lòng thử lại!');
+      throw err;
+    }
+  };
+
   const [dayScope, setDayScope] = useState<'all' | number>('all');
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
@@ -132,18 +155,59 @@ export default function ItineraryView({ id }: Props) {
   // Local state for interactive editing (Micro-AI swap, delete, add)
   const [days, setDays] = useState<ItineraryDay[]>([]);
 
+  // Copilot mutations and history
+  const chatMutation = useCopilotChat(id);
+  const directSwapMutation = useDirectSwapActivity(id);
+  const applyProposalMutation = useApplyProposal(id);
+  const [applyingProposalId, setApplyingProposalId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | undefined>(undefined);
+  const { data: historyMessages } = useCopilotHistory(id, sessionId);
+
+  // Modal states for 1-click swap and wizard
+  const [selectedActivityForSwap, setSelectedActivityForSwap] = useState<ItineraryActivity | null>(null);
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [wizardPrefilledDestination, setWizardPrefilledDestination] = useState<string>('');
   // Copilot Drawer state
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [copilotMessages, setCopilotMessages] = useState<
-    Array<{ sender: 'ai' | 'user'; text: string }>
+    Array<{
+      sender: 'ai' | 'user';
+      text: string;
+      action?: {
+        type: 'CREATE_NEW_TRIP';
+        destination: string;
+      };
+      appliedTool?: {
+        name: string;
+        resultMessage: string;
+      };
+      proposal?: CopilotProposal;
+      proposalStatus?: 'PENDING' | 'APPLIED' | 'REJECTED';
+    }>
   >([
     {
       sender: 'ai',
-      text: 'Chào bạn! Lịch trình đã được tối ưu cung đường. Bạn có muốn đổi quán ăn trưa hay tìm thêm quán cafe view sông không?',
+      text: 'Chào bạn! Tôi là Genie Copilot. Tôi có thể giúp bạn đề xuất đổi quán ăn/điểm tham quan, hoán đổi thứ tự ngày hoặc giải đáp mọi thắc mắc về lịch trình!',
     },
   ]);
   const [copilotInput, setCopilotInput] = useState('');
-  const [quickAiPrompt, setQuickAiPrompt] = useState('');
+
+  const isHistoryLoadedRef = useRef(false);
+
+  // Sync historical messages if existing (only once on initial load, prevent overwriting active conversation)
+  useEffect(() => {
+    if (!isHistoryLoadedRef.current && historyMessages && historyMessages.length > 0) {
+      isHistoryLoadedRef.current = true;
+      setCopilotMessages(
+        historyMessages.map((m) => ({
+          sender: m.sender === 'user' ? 'user' : 'ai',
+          text: m.content,
+          proposal: m.proposal,
+          proposalStatus: m.proposalStatus || (m.proposal ? 'PENDING' : undefined),
+        }))
+      );
+    }
+  }, [historyMessages]);
 
   // Mobile View Switch (Timeline vs Map)
   const [mobileTab, setMobileTab] = useState<'timeline' | 'map'>('timeline');
@@ -296,39 +360,42 @@ export default function ItineraryView({ id }: Props) {
     return { mapPlaces: places, markerLabels: labels, markerColors: colors, pathLine: fallbackLine };
   }, [visibleDays, data?.destination]);
 
+  // Preview place for map inspection (from Copilot proposals or chat place cards)
+  const [previewPlace, setPreviewPlace] = useState<DiscoveryPlace | null>(null);
+
+  const finalMapPlaces = useMemo(() => {
+    if (!previewPlace || selectedPlaceId !== previewPlace.id) return mapPlaces;
+    if (mapPlaces.some((p) => p.id === previewPlace.id)) return mapPlaces;
+    return [...mapPlaces, previewPlace];
+  }, [mapPlaces, previewPlace, selectedPlaceId]);
+
+  const finalMarkerLabels = useMemo(() => {
+    if (!previewPlace || selectedPlaceId !== previewPlace.id) return markerLabels;
+    return { ...markerLabels, [previewPlace.id]: '✨' };
+  }, [markerLabels, previewPlace, selectedPlaceId]);
+
+  const finalMarkerColors = useMemo(() => {
+    if (!previewPlace || selectedPlaceId !== previewPlace.id) return markerColors;
+    return { ...markerColors, [previewPlace.id]: '#0D9488' };
+  }, [markerColors, previewPlace, selectedPlaceId]);
+
   const mapCenter = useMemo(() => {
-    return mapPlaces[0]
-      ? { latitude: mapPlaces[0].latitude, longitude: mapPlaces[0].longitude }
+    return finalMapPlaces[0]
+      ? { latitude: finalMapPlaces[0].latitude, longitude: finalMapPlaces[0].longitude }
       : { latitude: 16.0544, longitude: 108.2022 };
-  }, [mapPlaces]);
+  }, [finalMapPlaces]);
 
   const transitName = data?.intercityTransit?.mode
     ? TRANSIT_MODE_LABELS[data.intercityTransit.mode] || data.intercityTransit.mode
     : 'Máy bay';
 
   // Micro-AI handlers
-  function handleSwapPlace(placeId: string) {
-    const act = days.flatMap((d) => d.activities).find((a) => a.placeId === placeId);
-    const custom = window.prompt(
-      `Đổi địa điểm "${act?.placeName || ''}" sang địa điểm nào? (Bấm OK để AI đổi sang điểm tương đương):`,
-      ''
-    );
-    if (custom === null) return;
-    const newName = custom.trim() ? custom.trim() : `${act?.placeName || 'Địa điểm'} (Phương án thay thế AI)`;
-
-    setDays((prev) =>
-      prev.map((d) => ({
-        ...d,
-        activities: d.activities.map((a) => {
-          if (a.placeId !== placeId) return a;
-          return {
-            ...a,
-            placeName: newName,
-            notes: 'AI đã cập nhật sang địa điểm tương đương, tối ưu lại cung đường.',
-          };
-        }),
-      }))
-    );
+  function handleSwapPlace(placeId: string, activity?: ItineraryActivity) {
+    const act =
+      activity ||
+      days.flatMap((d) => d.activities).find((a) => a.placeId === placeId) ||
+      null;
+    setSelectedActivityForSwap(act);
   }
 
   function handleDeletePlace(placeId: string) {
@@ -374,30 +441,193 @@ export default function ItineraryView({ id }: Props) {
     );
   }
 
-  function handleSendCopilot(textToSend?: string) {
-    const msg = textToSend || copilotInput;
-    if (!msg.trim()) return;
+  async function handleSendCopilot(textToSend?: string) {
+    const msg = (textToSend || copilotInput).trim();
+    if (!msg || chatMutation.isPending) return;
 
     setCopilotMessages((prev) => [...prev, { sender: 'user', text: msg }]);
     setCopilotInput('');
 
-    setTimeout(() => {
+    try {
+      const res = await chatMutation.mutateAsync({ message: msg, sessionId });
+      if (res.sessionId) {
+        setSessionId(res.sessionId);
+      }
+
+      if (res.modified && res.itinerary?.days) {
+        setDays(res.itinerary.days);
+        toast.success('AI đã tự động cập nhật lịch trình của bạn!');
+      }
+
       setCopilotMessages((prev) => [
         ...prev,
         {
           sender: 'ai',
-          text: `Đã ghi nhận yêu cầu: "${msg}". Tôi đã tối ưu lại thời gian và cập nhật địa điểm tương ứng trên Timeline cho bạn!`,
+          text: res.reply,
+          action: res.action,
+          appliedTool: res.appliedTool
+            ? {
+                name: res.appliedTool.name,
+                resultMessage: res.appliedTool.resultMessage,
+              }
+            : undefined,
+          proposal: res.proposal,
+          proposalStatus: res.proposal ? 'PENDING' : undefined,
         },
       ]);
-    }, 700);
+    } catch (err: any) {
+      toast.error(err?.message || 'Có lỗi khi trò chuyện với Genie Copilot.');
+      setCopilotMessages((prev) => [
+        ...prev,
+        {
+          sender: 'ai',
+          text: 'Xin lỗi bạn, kết nối tới Genie AI đang gặp sự cố. Vui lòng thử lại sau giây lát!',
+        },
+      ]);
+    }
   }
 
-  function handleSendQuickAi() {
-    if (!quickAiPrompt.trim()) return;
-    setIsCopilotOpen(true);
-    handleSendCopilot(quickAiPrompt);
-    setQuickAiPrompt('');
-  }
+  const handleConfirmProposal = async (msgIndex: number, proposal: CopilotProposal) => {
+    try {
+      setApplyingProposalId(proposal.id);
+      const res = await applyProposalMutation.mutateAsync({
+        toolName: proposal.toolName,
+        args: proposal.args,
+        proposalId: proposal.id,
+      });
+
+      if (res.itinerary?.days) {
+        setDays(res.itinerary.days);
+      }
+      toast.success(res.message || 'Đã cập nhật lịch trình thành công!');
+
+      setCopilotMessages((prev) =>
+        prev.map((msg, idx) =>
+          idx === msgIndex ? { ...msg, proposalStatus: 'APPLIED' } : msg
+        )
+      );
+    } catch (err: any) {
+      toast.error(err?.message || 'Không thể cập nhật lịch trình. Vui lòng thử lại!');
+    } finally {
+      setApplyingProposalId(null);
+    }
+  };
+
+  const handleRejectProposal = (msgIndex: number) => {
+    setCopilotMessages((prev) =>
+      prev.map((msg, idx) =>
+        idx === msgIndex ? { ...msg, proposalStatus: 'REJECTED' } : msg
+      )
+    );
+    toast.info('Đã giữ nguyên lịch trình hiện tại.');
+  };
+
+  const handleResetSession = () => {
+    setSessionId(undefined);
+    setCopilotMessages([
+      {
+        sender: 'ai',
+        text: 'Chào bạn! Tôi là Genie Copilot. Tôi có thể giúp bạn đề xuất đổi quán ăn/điểm tham quan, hoán đổi thứ tự ngày hoặc giải đáp mọi thắc mắc về lịch trình!',
+      },
+    ]);
+    toast.info('Đã làm mới phiên trò chuyện Copilot.');
+  };
+
+  const handleLocatePlaceOnMap = async (target: LocatePlaceTarget) => {
+    const cleanName = target.name.toLowerCase().trim();
+
+    // 1. Check if place already exists in visible days (mapPlaces)
+    const existing = mapPlaces.find(
+      (p) =>
+        (target.id && p.id === target.id) ||
+        p.name.toLowerCase().includes(cleanName) ||
+        cleanName.includes(p.name.toLowerCase())
+    );
+
+    if (existing) {
+      setSelectedPlaceId(existing.id);
+      if (mobileTab === 'timeline') setMobileTab('map');
+      toast.success(`Đang mở vị trí "${existing.name}" trên bản đồ!`);
+      return;
+    }
+
+    // 2. If target has exact coordinates (e.g. from Copilot proposal)
+    if (target.latitude && target.longitude) {
+      const previewId = target.id || `preview-${Date.now()}`;
+      const previewItem: DiscoveryPlace = {
+        id: previewId,
+        slug: previewId,
+        name: target.name,
+        category: 'itinerary',
+        categoryLabel: target.categoryName || 'Đề xuất đổi',
+        areaSlug: '',
+        areaName: data?.destination || '',
+        address: target.address || '',
+        latitude: target.latitude,
+        longitude: target.longitude,
+        rating: target.rating ?? 4.8,
+        reviewCount: 60,
+        priceLevel: 2,
+        isOpenNow: true,
+        primaryImage: target.imageUrl || null,
+        images: target.imageUrl ? [target.imageUrl] : [],
+        phone: null,
+        website: null,
+        openingHours: null,
+        tags: [],
+      };
+      setPreviewPlace(previewItem);
+      setSelectedPlaceId(previewId);
+      if (mobileTab === 'timeline') setMobileTab('map');
+      toast.success(`Đang mở vị trí "${target.name}" trên bản đồ!`);
+      return;
+    }
+
+    // 3. Fallback: Search in backend places database by name
+    try {
+      const res = await placeService.searchPlaces({ keyword: target.name, limit: 1 });
+      if (res.places && res.places.length > 0) {
+        const found = res.places[0];
+        const previewItem: DiscoveryPlace = {
+          id: found.id,
+          slug: found.slug,
+          name: found.name,
+          category: found.category || 'itinerary',
+          categoryLabel: found.categoryLabel || 'Điểm đến',
+          areaSlug: '',
+          areaName: found.city || data?.destination || '',
+          address: found.address || '',
+          latitude: found.latitude,
+          longitude: found.longitude,
+          rating: found.rating ?? 4.8,
+          reviewCount: found.reviewCount ?? 50,
+          priceLevel: found.priceLevel ?? 2,
+          isOpenNow: true,
+          primaryImage: found.coverImage || null,
+          images: found.images || [],
+          phone: found.phone || null,
+          website: found.website || null,
+          openingHours: found.openingHoursText ? { text: found.openingHoursText } : null,
+          tags: found.tags || [],
+        };
+        setPreviewPlace(previewItem);
+        setSelectedPlaceId(found.id);
+        if (mobileTab === 'timeline') setMobileTab('map');
+        toast.success(`Đang mở vị trí "${found.name}" trên bản đồ!`);
+      } else {
+        toast.info(`Chưa có tọa độ chính xác của "${target.name}".`);
+      }
+    } catch {
+      toast.info(`Đang cập nhật vị trí "${target.name}"...`);
+    }
+  };
+
+  const handleSelectPlace = (placeId: string | null) => {
+    setSelectedPlaceId(placeId);
+    if (!placeId || (previewPlace && placeId !== previewPlace.id)) {
+      setPreviewPlace(null);
+    }
+  };
 
   function handleShareLink() {
     if (navigator.clipboard) {
@@ -420,12 +650,13 @@ export default function ItineraryView({ id }: Props) {
     );
   }
 
-  const coverPhoto =
+  const fallbackCoverPhoto =
     data.destination?.toLowerCase().includes('đà lạt')
       ? 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80'
       : data.destination?.toLowerCase().includes('phú quốc')
       ? 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&auto=format&fit=crop&q=80'
       : 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=1200&auto=format&fit=crop&q=80';
+  const activeCoverPhoto = data.coverPhoto || fallbackCoverPhoto;
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 pb-20 lg:pb-10">
@@ -437,7 +668,7 @@ export default function ItineraryView({ id }: Props) {
           {/* Panoramic Cover Image */}
           <div className="relative h-44 sm:h-52 w-full overflow-hidden bg-slate-100">
             <img
-              src={coverPhoto}
+              src={activeCoverPhoto}
               alt={data.title}
               className="w-full h-full object-cover"
             />
@@ -445,11 +676,22 @@ export default function ItineraryView({ id }: Props) {
 
             <Link
               href="/planner"
-              className="absolute top-4 left-4 size-9 rounded-full bg-white/90 backdrop-blur text-slate-700 hover:text-slate-950 hover:bg-white flex items-center justify-center transition-all shadow-sm"
+              className="absolute top-4 left-4 size-9 rounded-full bg-white/90 backdrop-blur text-slate-700 hover:text-slate-950 hover:bg-white flex items-center justify-center transition-all shadow-sm z-10"
               title="Quay lại danh sách"
             >
               <ArrowLeft className="size-5" />
             </Link>
+
+            {/* Edit Cover Photo Button */}
+            <button
+              type="button"
+              onClick={() => setIsCoverModalOpen(true)}
+              className="absolute top-4 right-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 hover:bg-slate-900/80 text-white backdrop-blur-md text-xs font-semibold shadow-md transition-all cursor-pointer border border-white/20 hover:scale-105 active:scale-95 z-10"
+              title="Chỉnh sửa ảnh bìa lịch trình"
+            >
+              <Camera className="size-3.5" />
+              <span>Đổi ảnh bìa</span>
+            </button>
 
             <div className="absolute bottom-4 left-5 right-5 text-white">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -527,14 +769,6 @@ export default function ItineraryView({ id }: Props) {
                 <Trash2 className="size-3.5" />
                 <span>Xóa</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setIsCopilotOpen(true)}
-                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-              >
-                <Edit3 className="size-3.5" />
-                <span>Chỉnh sửa</span>
-              </button>
             </div>
           </div>
         </div>
@@ -589,29 +823,6 @@ export default function ItineraryView({ id }: Props) {
               })}
             </div>
 
-            {/* Quick AI Prompt Bar (Matches Figma Prompt Screen 2 Item 5) */}
-            <div className="flex items-center gap-2 rounded-2xl border-2 border-indigo-200 bg-white p-2 shadow-xs focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
-              <div className="size-8 rounded-xl bg-gradient-to-r from-teal-600 to-indigo-600 text-white flex items-center justify-center shrink-0">
-                <Sparkles className="size-4" />
-              </div>
-              <input
-                type="text"
-                value={quickAiPrompt}
-                onChange={(e) => setQuickAiPrompt(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendQuickAi()}
-                placeholder="Ra lệnh cho AI sửa lịch trình: Đổi quán ăn trưa, thêm điểm cafe gần sông..."
-                className="flex-1 bg-transparent text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={handleSendQuickAi}
-                className="rounded-xl bg-gradient-to-r from-teal-600 to-indigo-600 hover:opacity-95 text-white font-bold text-xs px-4 py-2 transition-all cursor-pointer shadow-xs shrink-0 flex items-center gap-1"
-              >
-                <span>Gửi</span>
-                <Send className="size-3" />
-              </button>
-            </div>
-
             {/* Timeline Stream */}
             <ItineraryTimeline
               days={visibleDays}
@@ -620,7 +831,7 @@ export default function ItineraryView({ id }: Props) {
               endDate={data.endDate}
               selectedPlaceId={selectedPlaceId}
               onSelectPlace={(placeId) => {
-                setSelectedPlaceId(placeId);
+                handleSelectPlace(placeId);
                 if (mobileTab === 'timeline') {
                   setMobileTab('map');
                 }
@@ -652,15 +863,15 @@ export default function ItineraryView({ id }: Props) {
             <div className="bg-white rounded-3xl border border-slate-200 p-2.5 shadow-xs">
               <div className="relative w-full h-[620px] lg:h-[calc(100vh-140px)] min-h-[520px] rounded-2xl overflow-hidden">
                 <ItineraryMap
-                  places={mapPlaces}
+                  places={finalMapPlaces}
                   center={mapCenter}
-                  markerLabels={markerLabels}
-                  markerColors={markerColors}
+                  markerLabels={finalMarkerLabels}
+                  markerColors={finalMarkerColors}
                   pathLine={roadPolyline.length > 0 ? roadPolyline : pathLine}
                   pathSegments={pathSegments}
                   selectedPlaceId={selectedPlaceId}
                   hoveredPlaceId={hoveredPlaceId}
-                  onSelectPlace={setSelectedPlaceId}
+                  onSelectPlace={handleSelectPlace}
                   onHoverPlace={setHoveredPlaceId}
                 />
               </div>
@@ -672,116 +883,58 @@ export default function ItineraryView({ id }: Props) {
       {/* =========================================================================
           SCREEN 3: SLIDE-OVER AI COPILOT DRAWER (Matches Figma Prompt Screen 3)
           ========================================================================= */}
-      {/* Floating Copilot Button */}
+      {/* Floating Copilot Bubble Launcher (Messenger Style) */}
       {!isCopilotOpen && (
-        <button
-          type="button"
-          onClick={() => setIsCopilotOpen(true)}
-          className="fixed bottom-6 right-6 z-40 inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-teal-600 via-emerald-600 to-indigo-600 text-white font-extrabold text-xs sm:text-sm px-5 py-3 shadow-xl hover:shadow-2xl hover:scale-105 transition-all cursor-pointer"
-        >
-          <span className="size-2 rounded-full bg-emerald-300 animate-pulse" />
-          <Sparkles className="size-4" />
-          <span>Genie Copilot</span>
-        </button>
-      )}
+        <div className="fixed bottom-6 right-6 z-40 group">
+          <button
+            type="button"
+            onClick={() => setIsCopilotOpen(true)}
+            className="relative size-14 sm:size-15 rounded-full bg-gradient-to-tr from-teal-500 via-emerald-500 to-indigo-600 text-white flex items-center justify-center shadow-xl shadow-teal-600/30 hover:shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 cursor-pointer border-2 border-white/90"
+            aria-label="Mở Genie Copilot"
+          >
+            {/* Ambient Animated Glow Ring */}
+            <span className="absolute -inset-1 rounded-full bg-gradient-to-r from-teal-400 to-indigo-400 opacity-60 blur-xs group-hover:opacity-90 animate-pulse" />
 
-      {/* Slide-over Drawer */}
-      {isCopilotOpen && (
-        <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[400px] bg-white border-l border-slate-200 shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
-          {/* Drawer Header */}
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-white">
-            <div className="flex items-center gap-3">
-              <div className="size-10 rounded-2xl bg-gradient-to-tr from-teal-600 to-indigo-600 text-white flex items-center justify-center shadow-xs">
-                <Bot className="size-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 leading-tight">
-                  Genie Copilot
-                </h3>
-                <p className="text-[11px] text-teal-700 font-semibold flex items-center gap-1 mt-0.5">
-                  <span className="size-1.5 rounded-full bg-emerald-500 inline-block" />
-                  Trợ lý lịch trình trực tuyến
-                </p>
-              </div>
+            {/* Inner Content */}
+            <div className="relative flex items-center justify-center">
+              <Bot className="size-7 transition-transform group-hover:scale-110" />
+              <Sparkles className="size-3.5 absolute -top-1.5 -right-1.5 text-amber-300 animate-spin" />
             </div>
 
-            <button
-              type="button"
-              onClick={() => setIsCopilotOpen(false)}
-              className="size-8 rounded-full text-slate-400 hover:bg-slate-100 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
+            {/* Active Online Pulse Indicator */}
+            <span className="absolute top-0 right-0 size-4 rounded-full bg-emerald-500 border-2 border-white shadow-xs flex items-center justify-center">
+              <span className="size-2 rounded-full bg-white animate-ping" />
+            </span>
+          </button>
 
-          {/* Conversation Stream */}
-          <div className="flex-1 p-4 overflow-y-auto space-y-3.5 bg-slate-50/50 text-xs">
-            {copilotMessages.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`p-3 rounded-2xl max-w-[85%] leading-relaxed ${
-                    msg.sender === 'user'
-                      ? 'bg-teal-600 text-white font-medium rounded-br-xs shadow-xs'
-                      : 'bg-white border border-slate-200 text-slate-800 rounded-bl-xs shadow-2xs'
-                  }`}
-                >
-                  {msg.text}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Quick Chip Suggestions (Matches Figma Prompt) */}
-          <div className="p-3 border-t border-slate-100 bg-white flex items-center gap-1.5 overflow-x-auto">
-            <button
-              type="button"
-              onClick={() => handleSendCopilot('Đổi điểm trưa sang quán ăn đặc sản')}
-              className="whitespace-nowrap px-3 py-1.5 bg-slate-100 hover:bg-teal-50 hover:text-teal-700 text-slate-700 text-[11px] font-semibold rounded-full transition-colors cursor-pointer inline-flex items-center gap-1.5"
-            >
-              <UtensilsCrossed className="size-3 text-amber-600" aria-hidden="true" />
-              <span>Đổi điểm trưa sang đặc sản</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSendCopilot('Tìm cafe ngắm hoàng hôn Hội An')}
-              className="whitespace-nowrap px-3 py-1.5 bg-slate-100 hover:bg-teal-50 hover:text-teal-700 text-slate-700 text-[11px] font-semibold rounded-full transition-colors cursor-pointer inline-flex items-center gap-1.5"
-            >
-              <Coffee className="size-3 text-amber-700" aria-hidden="true" />
-              <span>Cafe ngắm hoàng hôn</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSendCopilot('Hỏi kinh nghiệm thuê xe máy')}
-              className="whitespace-nowrap px-3 py-1.5 bg-slate-100 hover:bg-teal-50 hover:text-teal-700 text-slate-700 text-[11px] font-semibold rounded-full transition-colors cursor-pointer inline-flex items-center gap-1.5"
-            >
-              <Bike className="size-3 text-teal-600" aria-hidden="true" />
-              <span>Kinh nghiệm xe máy</span>
-            </button>
-          </div>
-
-          {/* Bottom Chat Input */}
-          <div className="p-3.5 border-t border-slate-100 bg-white flex items-center gap-2">
-            <input
-              type="text"
-              value={copilotInput}
-              onChange={(e) => setCopilotInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSendCopilot()}
-              placeholder="Hỏi hoặc ra lệnh cho Genie..."
-              className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs text-slate-800 focus:outline-none focus:border-teal-500"
-            />
-            <button
-              type="button"
-              onClick={() => handleSendCopilot()}
-              className="size-9 rounded-xl bg-teal-600 hover:bg-teal-700 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0 shadow-xs"
-            >
-              <Send className="size-4" />
-            </button>
+          {/* Floating Pill Label Tooltip on Hover */}
+          <div className="absolute right-full top-1/2 -translate-y-1/2 mr-3 px-3 py-1.5 rounded-xl bg-slate-900/90 backdrop-blur-md text-white text-xs font-bold whitespace-nowrap shadow-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+            Genie Copilot
+            <div className="absolute top-1/2 -right-1 -translate-y-1/2 border-4 border-transparent border-l-slate-900/90" />
           </div>
         </div>
       )}
+
+      {/* Modern Slide-over AI Copilot Drawer */}
+      <CopilotDrawer
+        isOpen={isCopilotOpen}
+        onClose={() => setIsCopilotOpen(false)}
+        destination={data.destination || 'Đà Nẵng'}
+        messages={copilotMessages}
+        isPending={chatMutation.isPending}
+        onSendMessage={handleSendCopilot}
+        onConfirmProposal={handleConfirmProposal}
+        onRejectProposal={handleRejectProposal}
+        applyingProposalId={applyingProposalId}
+        onOpenWizard={(dest) => {
+          setWizardPrefilledDestination(dest);
+          setIsWizardOpen(true);
+        }}
+        onResetSession={handleResetSession}
+        prefilledInput={copilotInput}
+        onClearPrefilledInput={() => setCopilotInput('')}
+        onLocatePlaceOnMap={handleLocatePlaceOnMap}
+      />
 
       {/* =========================================================================
           SCREEN 4: MOBILE FLOATING BOTTOM DOCK (Matches Figma Prompt Screen 4)
@@ -870,6 +1023,52 @@ export default function ItineraryView({ id }: Props) {
           </div>
         </div>
       )}
+
+      {/* 1-Click Alternative Places Modal (Hybrid Model) */}
+      <PlaceAlternativesModal
+        itineraryId={id}
+        activity={selectedActivityForSwap}
+        isOpen={Boolean(selectedActivityForSwap)}
+        onClose={() => setSelectedActivityForSwap(null)}
+        onSelectAlternative={async (newPlaceId) => {
+          if (!selectedActivityForSwap) return;
+          const destId = selectedActivityForSwap.id || selectedActivityForSwap.placeId;
+          try {
+            const updated = await directSwapMutation.mutateAsync({
+              destinationId: destId,
+              newPlaceId,
+            });
+            if (updated?.days) {
+              setDays(updated.days);
+            }
+            toast.success('Đã đổi địa điểm thành công!');
+            setSelectedActivityForSwap(null);
+          } catch (err: any) {
+            toast.error(err?.message || 'Không thể đổi địa điểm. Vui lòng thử lại!');
+          }
+        }}
+        onAskCopilot={(placeName) => {
+          setSelectedActivityForSwap(null);
+          setIsCopilotOpen(true);
+          setCopilotInput(`Gợi ý cho tôi địa điểm tương đương để thay thế cho "${placeName}"`);
+        }}
+      />
+
+      {/* New Trip Wizard Modal (Triggered by Copilot when changing destination) */}
+      <ItineraryWizardModal
+        isOpen={isWizardOpen}
+        onClose={() => setIsWizardOpen(false)}
+        initialDestination={wizardPrefilledDestination}
+      />
+
+      {/* Cover Photo Customization Modal */}
+      <CoverPhotoModal
+        isOpen={isCoverModalOpen}
+        onClose={() => setIsCoverModalOpen(false)}
+        currentCover={activeCoverPhoto}
+        onSave={handleSaveCoverPhoto}
+        isSaving={updateCoverMutation.isPending}
+      />
     </div>
   );
 }

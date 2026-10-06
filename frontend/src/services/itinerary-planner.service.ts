@@ -4,6 +4,9 @@ import type {
   TransitMode,
   IntercityTransit,
   ItineraryDetail,
+  CopilotChatResponse,
+  CopilotHistoryMessage,
+  AlternativePlaceItem,
 } from '@/types/itinerary';
 
 const BASE =
@@ -89,5 +92,50 @@ export const itineraryService = {
     request<ItineraryDetail>(`/itineraries/${id}/transit-mode`, {
       method: 'PATCH',
       body: JSON.stringify({ transitMode }),
+    }),
+
+  chatCopilot: (id: string, message: string, sessionId?: string) =>
+    request<CopilotChatResponse>(`/itineraries/${id}/chat`, {
+      method: 'POST',
+      body: JSON.stringify({ message, sessionId }),
+    }),
+
+  getChatHistory: (id: string, sessionId?: string) =>
+    request<CopilotHistoryMessage[]>(
+      `/itineraries/${id}/chat/history${sessionId ? `?sessionId=${sessionId}` : ''}`
+    ),
+
+  getActivityAlternatives: (id: string, destinationId: string) =>
+    request<AlternativePlaceItem[]>(
+      `/itineraries/${id}/destinations/${destinationId}/alternatives`
+    ),
+
+  directSwapActivity: (id: string, destinationId: string, newPlaceId: string) =>
+    request<ItineraryDetail>(
+      `/itineraries/${id}/destinations/${destinationId}/swap`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ newPlaceId }),
+      }
+    ),
+
+  applyProposal: (
+    id: string,
+    toolName: string,
+    args: Record<string, unknown>,
+    proposalId?: string
+  ) =>
+    request<{ success: boolean; message: string; itinerary: ItineraryDetail }>(
+      `/itineraries/${id}/copilot/apply-proposal`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ toolName, args, proposalId }),
+      }
+    ),
+
+  updateCoverPhoto: (id: string, coverPhoto: string) =>
+    request<ItineraryDetail>(`/itineraries/${id}/cover-photo`, {
+      method: 'PATCH',
+      body: JSON.stringify({ coverPhoto }),
     }),
 };

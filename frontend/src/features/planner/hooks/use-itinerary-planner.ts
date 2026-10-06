@@ -109,3 +109,83 @@ export function useUpdateTransitMode() {
   });
 }
 
+/** Send a chat message to Genie Copilot with AI Tool Calling. */
+export function useCopilotChat(itineraryId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ message, sessionId }: { message: string; sessionId?: string }) =>
+      itineraryService.chatCopilot(itineraryId, message, sessionId),
+    onSuccess: (res) => {
+      if (res.modified && res.itinerary) {
+        queryClient.setQueryData(itineraryKeys.detail(itineraryId), res.itinerary);
+      }
+    },
+  });
+}
+
+/** Fetch chat history for an itinerary session. */
+export function useCopilotHistory(itineraryId: string, sessionId?: string) {
+  return useQuery({
+    queryKey: ['copilot-history', itineraryId, sessionId],
+    queryFn: () => itineraryService.getChatHistory(itineraryId, sessionId),
+    enabled: Boolean(itineraryId),
+  });
+}
+
+/** 1-click alternative places query for place card (Hybrid model). */
+export function useActivityAlternatives(itineraryId: string, destinationId: string | null) {
+  return useQuery({
+    queryKey: ['activity-alternatives', itineraryId, destinationId],
+    queryFn: destinationId
+      ? () => itineraryService.getActivityAlternatives(itineraryId, destinationId)
+      : skipToken,
+    enabled: Boolean(itineraryId && destinationId),
+    staleTime: 60 * 1000,
+  });
+}
+
+/** 1-click direct swap on place card (Hybrid model). */
+export function useDirectSwapActivity(itineraryId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ destinationId, newPlaceId }: { destinationId: string; newPlaceId: string }) =>
+      itineraryService.directSwapActivity(itineraryId, destinationId, newPlaceId),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(itineraryKeys.detail(itineraryId), updated);
+    },
+  });
+}
+
+/** Apply a user-confirmed proposal from Genie Copilot to update itinerary in DB. */
+export function useApplyProposal(itineraryId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      toolName,
+      args,
+      proposalId,
+    }: {
+      toolName: string;
+      args: Record<string, unknown>;
+      proposalId?: string;
+    }) => itineraryService.applyProposal(itineraryId, toolName, args, proposalId),
+    onSuccess: (res) => {
+      if (res.itinerary) {
+        queryClient.setQueryData(itineraryKeys.detail(itineraryId), res.itinerary);
+      }
+    },
+  });
+}
+
+/** Update itinerary cover photo */
+export function useUpdateCoverPhoto(itineraryId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (coverPhoto: string) => itineraryService.updateCoverPhoto(itineraryId, coverPhoto),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(itineraryKeys.detail(itineraryId), updated);
+      queryClient.invalidateQueries({ queryKey: itineraryKeys.all });
+    },
+  });
+}
+

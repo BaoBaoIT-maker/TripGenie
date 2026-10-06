@@ -158,12 +158,78 @@ Khi hoàn thành bất kỳ module nào, **BẮT BUỘC** thực hiện quy trì
   - **Kiểm thử thực tế (Real Tests)**: Test trực tiếp các câu query tự nhiên tiếng Việt trên dữ liệu thực tế Đà Nẵng (quán cafe yên tĩnh làm việc đạt 71.89%, ẩm thực đặc sản chợ đêm đạt 72.93%, điểm tham quan cảnh đẹp đạt 69.26%).
 - [x] **Unit Tests & Real DB Integration Tests** — 22/22 Unit Tests PASS 100% (`places.service.spec.ts`, `places.controller.spec.ts`) và test thực tế trên **2,124 địa điểm Đà Nẵng** trong PostgreSQL trả về kết quả chính xác trong vài miligiây.
 
-### TODO — PHASE 5: Personalized Itinerary Planner AI (Tiếp theo)
+### DONE — PHASE 5: Personalized Itinerary Planner AI & Multi-Modal Transit Engine
 
-- [ ] Itinerary Database Entities & Repository (`itineraries`, `itinerary_days`, `itinerary_items`)
-- [ ] AI Itinerary Generator Service (Tích hợp Gemini 2.5 Flash + Structured Output tạo lịch trình cá nhân hóa dựa trên gu du lịch, ngân sách và POIs thực tế từ DB)
-- [ ] Route & Distance Optimization giữa các điểm đến
-- [ ] Itinerary CRUD & Management APIs (Lưu, đổi điểm đến, chia sẻ lịch trình)
+- [x] **Itinerary Database Schema & Models**:
+  - `itineraries`: Lưu trữ toàn bộ chuyến đi đa ngày, destination, budget, estimated cost, transit mode, hỗ trợ cả User đăng nhập & Guest, soft delete `deletedAt`.
+  - `itinerary_destinations`: Chi tiết hoạt động từng ngày (`dayNumber`, `visitOrder`, `startTime`, `endTime`, `estimatedDurationMinutes`, `estimatedCost`, `notes`, tọa độ GPS).
+  - `transit_hubs` & `transit_routes`: Mạng lưới kết nối sân bay, ga tàu, bến xe liên tỉnh toàn quốc.
+- [x] **AI Itinerary Generator Service (Gemini 2.5 Flash Structured Output)**:
+  - Tích hợp Gemini 2.5 Flash qua `@google/genai` với **Structured Outputs** (`responseMimeType: 'application/json'`, `responseSchema`).
+  - **Candidate Places Injection**: Ưu tiên gợi ý các địa điểm có thật từ DB dựa trên đánh giá sao, số lượng review, chủ đề (ẩm thực đặc sản, cafe, điểm tham quan...).
+  - Prompt chuẩn phân bổ thời gian hợp lý (sáng, trưa, nghỉ ngơi, chiều, hoàng hôn, tối) và phân chia ngân sách theo ngày.
+- [x] **Bounding Box Địa Lý & Spatial Isolation Guards (Chống rò rỉ địa điểm chéo tỉnh)**:
+  - **Root Cause & Fix**: Xử lý triệt để lỗi chuyến đi Phú Quốc chứa địa điểm Đà Nẵng bằng thuật toán Bounding Box địa lý, **hoàn toàn không cần seed DB thủ công**.
+  - **Country Guard**: Khi điểm đến map về `area_id = 1` (Việt Nam) hoặc cấp quốc gia (`type: COUNTRY`), tự động ngắt không mở rộng tìm kiếm xuống 63 tỉnh con.
+  - **Dynamic Bounding Box GPS**: Tự động tính hộp tọa độ bao quanh điểm đến (bán kính chuẩn ~45km):
+    $$\Delta\text{lat} = \frac{R}{111}, \quad \Delta\text{lng} = \frac{R}{111 \times \cos(\text{lat})}$$
+  - **Candidate Places Filtering**: Lọc trực tiếp `latitude/longitude` trong Bounding Box, loại bỏ 100% rác ngoại tỉnh.
+  - **Strict Location Prompting**: Cung cấp tọa độ tâm điểm đến, cấm Gemini gợi ý địa điểm ngoài địa phương.
+  - **Deduplication Spatial Guard**: Kiểm tra trùng lặp tên địa điểm (`tx.place.findFirst`) ràng buộc trong Bounding Box, tránh liên kết nhầm chuỗi quán cùng tên ở tỉnh khác (Cộng Cà Phê, Highlands...).
+  - **Coordinate Sanitizer**: Ép các địa điểm mới sinh ra ngoài Bounding Box về tâm điểm đến, dọn sạch tên tỉnh thành ngoại lai khỏi địa chỉ.
+- [x] **Intercity Transit Engine (Strategy Pattern)**:
+  - `TransitService` với 4 chiến lược vận tải: `FlightStrategy`, `TrainStrategy`, `BusStrategy`, `RoadStrategy` (Ô tô & Xe máy).
+  - Ước lượng chính xác thời gian, cự ly, khoảng giá vé và tự động sinh **Deep Links đặt vé trực tiếp** (Vietnam Airlines, Vietjet Air, Vexere, Vé tàu DSVN, Google Maps).
+  - Cung cấp API `POST /api/v1/itineraries/transit-preview` (tính nhanh) và `PATCH /api/v1/itineraries/:id/transit-mode` (đổi phương tiện & tính lại chi phí).
+- [x] **Intra-city Routing & Polyline Optimization**:
+  - Tích hợp VietMap GL & OSRM Engine cho tuyến đường thực tế (motorcycle/driving).
+  - Hỗ trợ Multi-stop Routing & Fallback theo cặp điểm liên tiếp.
+  - Phân màu lộ trình riêng biệt theo từng ngày (`getDayColor`): Ngày 1: Ngọc bích (Teal), Ngày 2: Hổ phách (Amber), Ngày 3: Chàm (Indigo), Ngày 4: Hồng đỏ (Rose), Ngày 5+: Lam đá (Slate/Blue).
+- [x] **Itinerary Management APIs (CRUD & Bulk)**:
+  - `POST /api/v1/itineraries/generate`: Tạo lịch trình AI đầy đủ (hỗ trợ User & Guest).
+  - `POST /api/v1/itineraries/transit-preview`: Xem trước chi phí/thời gian liên tỉnh.
+  - `GET /api/v1/itineraries/:id`: Xem chi tiết lịch trình kèm danh sách ngày, hoạt động và thông tin transit.
+  - `GET /api/v1/itineraries`: Danh sách chuyến đi gần đây.
+  - `DELETE /api/v1/itineraries/:id`: Xóa mềm chuyến đi, bảo vệ an toàn tuyệt đối các bản sao đã được clone.
+  - `POST /api/v1/itineraries/:id/clone`: Nhân bản chuyến đi vào tài khoản cá nhân.
+  - `POST /api/v1/itineraries/bulk-delete`: Xóa hàng loạt an toàn.
+  - `PATCH /api/v1/itineraries/:id/transit-mode`: Cập nhật phương tiện liên tỉnh & cập nhật chi phí tổng.
+- [x] **Frontend Itinerary Wizard & Interactive Trip Detail View**:
+  - `ItineraryWizardModal.tsx`: Wizard 4 bước trực quan, tự động tính trước transit, preview lộ trình, chọn ngân sách, phong cách và thành viên.
+  - `ItineraryView.tsx`: Màn hình chi tiết chuyến đi hiện đại, xem tổng quan ngân sách `BudgetBreakdownCard`, bản đồ `ItineraryMap` tương tác, Timeline chi tiết `ItineraryTimeline`, công cụ chia sẻ/sao chép/in ấn.
+  - `Genie Copilot Drawer`: Giao diện trợ lý lịch trình AI mở rộng (sẵn sàng tích hợp Tool Calling).
+- [x] **Automated Integration & Verification Suite**:
+  - `backend/test/test-planner-check.ts`: 9 runnable checks kiểm thử toàn bộ luồng tạo, cập nhật, clone, xóa mềm và cô lập địa lý:
+    - Test 1: Khởi tạo service và kết nối DB.
+    - Test 2: Tạo lịch trình Đà Nẵng 3 ngày.
+    - Test 3: Truy vấn chi tiết theo ID.
+    - Test 4: Danh sách lịch trình.
+    - Test 5: Tính năng Clone lịch trình.
+    - Test 6: Cập nhật Transit Mode (chuyển sang Tàu hỏa).
+    - Test 7: Xóa mềm và kiểm tra bảo vệ bản clone.
+    - Test 8: Xóa hàng loạt (Bulk Delete).
+    - Test 9: **Kiểm tra cô lập địa lý Bounding Box (TP.HCM -> Phú Quốc)**: 100% địa điểm nằm tại Phú Quốc (Kiên Giang), 0 địa điểm ngoại tỉnh/Đà Nẵng.
+  - Chạy lệnh: `npx ts-node -r tsconfig-paths/register test/test-planner-check.ts` ➔ **100% PASS (9/9 checks thành công)**.
+  - Frontend & Backend: Typecheck `tsc --noEmit` ➔ **0 lỗi**.
+
+### TODO — PHASE 6: AI Agentic Tool Calling & Real-time Collaboration (Tiếp theo)
+
+- [ ] **AI Agentic Loop & Tool Calling Engine** (`ai` module):
+  - Tích hợp Gemini Tool Calling (Function Calling) cho phần chỉnh sửa lịch trình tương tác.
+  - Định nghĩa & đăng ký các Agent Tools nghiệp vụ:
+    - `searchAlternativePlaces`: Tìm địa điểm thay thế từ DB theo Bounding Box / Category.
+    - `swapItineraryActivity`: Đổi một địa điểm trong ngày thành phương án thay thế.
+    - `addItineraryActivity`: Bổ sung địa điểm mới vào khung giờ trống.
+    - `removeItineraryActivity`: Xóa địa điểm khỏi lịch trình.
+    - `reorderDayActivities`: Sắp xếp lại thứ tự tối ưu cung đường (TSP).
+  - Quản lý hội thoại và lưu vết vào hai bảng `ai_chat_sessions` & `ai_chat_messages` (`tool_calls`, `tool_results`).
+  - Hỗ trợ SSE streaming (`POST /api/v1/ai/chat`) truyền luồng phản hồi trực tiếp tới client.
+- [ ] **Frontend Genie Copilot Tool Calling Integration**:
+  - Thay thế mock handlers hiện tại bằng kết nối SSE stream thời gian thực.
+  - Cập nhật trực tiếp Timeline, Map polyline & Budget khi AI thực thi tool thành công.
+- [ ] **Real-time Collaboration (Socket.IO Gateway)**:
+  - Đồng bộ thay đổi lịch trình theo thời gian thực giữa các thành viên trong nhóm.
+  - Bầu chọn địa điểm (Group Voting) & hiển thị trạng thái thành viên trực tuyến (Presence).
 
 ---
 

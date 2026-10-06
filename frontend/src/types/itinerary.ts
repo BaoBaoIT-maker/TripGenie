@@ -111,6 +111,7 @@ export interface BudgetBreakdown {
 }
 
 export interface ItineraryActivity {
+  id?: string;
   placeId: string;
   placeName: string;
   startTime: string | null; // "HH:mm"
@@ -145,6 +146,7 @@ export interface ItineraryDetail {
   title: string;
   description: string | null;
   destination: string | null;
+  coverPhoto?: string | null;
   startDate: string | null; // YYYY-MM-DD
   endDate: string | null;
   totalDays: number;
@@ -153,3 +155,74 @@ export interface ItineraryDetail {
   budgetBreakdown: BudgetBreakdown | null;
   days: ItineraryDay[];
 }
+
+export interface CopilotProposal {
+  id: string;
+  toolName: string;
+  title: string;
+  description: string;
+  dayNumber?: number;
+  fromPlaceId?: string;
+  fromPlaceName?: string;
+  fromPlaceCoordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+  toPlaceId?: string;
+  toPlaceName?: string;
+  toPlaceRating?: number;
+  toPlaceCategory?: string;
+  toPlaceAddress?: string;
+  toPlaceImageUrl?: string;
+  toPlaceCoordinates?: {
+    latitude: number;
+    longitude: number;
+  };
+  status?: 'PENDING' | 'APPLIED' | 'REJECTED';
+  swapDays?: {
+    dayA: number;
+    dayB: number;
+  };
+  args: Record<string, unknown>;
+}
+
+export interface CopilotChatResponse {
+  sessionId: string;
+  reply: string;
+  modified: boolean;
+  action?: {
+    type: 'CREATE_NEW_TRIP';
+    destination: string;
+  };
+  appliedTool?: {
+    name: string;
+    args: Record<string, unknown>;
+    resultMessage: string;
+  };
+  proposal?: CopilotProposal;
+  itinerary?: ItineraryDetail;
+}
+
+export interface AlternativePlaceItem {
+  id: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  ratingAvg: number;
+  reviewCount: number;
+  priceLevel: string | null;
+  imageUrl: string | null;
+  categoryName: string;
+  distanceKm?: number;
+}
+
+export interface CopilotHistoryMessage {
+  id: string;
+  sender: 'user' | 'agent';
+  content: string;
+  createdAt: string;
+  proposal?: CopilotProposal;
+  proposalStatus?: 'PENDING' | 'APPLIED' | 'REJECTED';
+}
+

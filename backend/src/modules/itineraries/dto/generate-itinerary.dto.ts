@@ -114,3 +114,9 @@ export class UpdateTransitModeDto {
   transitMode: TransitModeEnum;
 }
 
+export class UpdateCoverPhotoDto {
+  @IsString()
+  @IsNotEmpty()
+  coverPhoto: string;
+}
+

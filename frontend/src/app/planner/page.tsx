@@ -299,7 +299,7 @@ export default function PlannerListPage() {
                 const budgetText = itin.budgetBreakdown?.totalEstimated
                   ? formatVnd(itin.budgetBreakdown.totalEstimated)
                   : 'Theo thực tế';
-                const imageUrl = getDestinationCover(itin.destination);
+                const imageUrl = itin.coverPhoto || getDestinationCover(itin.destination);
                 const dateText = formatTripDates(itin.startDate, itin.endDate);
 
                 const isSelected = selectedIds.includes(itin.id);

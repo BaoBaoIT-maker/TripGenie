@@ -3,9 +3,7 @@ import { Geist, Geist_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { Providers } from "./providers";
-import { Navbar } from "@/components/common/Navbar";
-import { Footer } from "@/components/common/Footer";
-import { BottomNav } from "@/components/common/BottomNav";
+import { SiteChrome } from "@/components/common/SiteChrome";
 import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({
@@ -41,10 +39,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans pb-16 md:pb-0">
         <Providers>
-          <Navbar />
-          <main className="flex-1 w-full">{children}</main>
-          <Footer />
-          <BottomNav />
+          <SiteChrome>{children}</SiteChrome>
           <Toaster position="top-right" richColors />
         </Providers>
       </body>

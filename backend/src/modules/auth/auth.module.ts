@@ -10,6 +10,9 @@ import { GoogleStrategy } from './strategies/google.strategy';
 import { FacebookStrategy } from './strategies/facebook.strategy';
 import { UsersModule } from '../users/users.module';
 
+import { OtpService } from './services/otp.service';
+import { PasswordResetService } from './services/password-reset.service';
+
 @Module({
   imports: [
     PassportModule,
@@ -21,11 +24,13 @@ import { UsersModule } from '../users/users.module';
   providers: [
     AuthService,
     MailService,
+    OtpService,
+    PasswordResetService,
     TokenBlacklistService,
     JwtStrategy,
     GoogleStrategy,
     FacebookStrategy,
   ],
-  exports: [AuthService, TokenBlacklistService],
+  exports: [AuthService, OtpService, PasswordResetService, TokenBlacklistService],
 })
 export class AuthModule {}

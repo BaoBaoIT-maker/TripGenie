@@ -71,8 +71,8 @@ function NewPlannerContent() {
     window.history.replaceState(null, "", `/planner/new?mode=${newMode}`);
   };
 
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGenerate = async (e?: React.FormEvent) => {
+    e?.preventDefault();
 
     if (!title.trim() || !destination.trim()) {
       toast.error("Vui lòng nhập tên chuyến đi và địa điểm!");
@@ -509,9 +509,10 @@ function NewPlannerContent() {
           {/* Submit Button */}
           <div className="pt-3">
             <Button
-              type="submit"
+              type="button"
+              onClick={handleGenerate}
               disabled={isSubmitting}
-              className="w-full h-12 rounded-xl font-bold gap-2 text-sm bg-primary text-primary-foreground shadow-md hover:bg-primary/90"
+              className="w-full h-12 rounded-xl font-bold gap-2 text-sm bg-primary text-primary-foreground shadow-md hover:bg-primary/90 cursor-pointer"
             >
               {isAiMode ? (
                 <>

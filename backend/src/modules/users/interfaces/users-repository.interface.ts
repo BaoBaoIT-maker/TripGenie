@@ -2,7 +2,10 @@ import { User, UserIdentity, Prisma } from '@prisma/client';
 
 export interface IUsersRepository {
   findByEmail(email: string): Promise<User | null>;
+  findByUsername(username: string): Promise<User | null>;
+  findByIdentifier(identifier: string): Promise<User | null>;
   findById(id: string): Promise<User | null>;
+  findUserWithIdentities(id: string): Promise<(User & { identities: UserIdentity[] }) | null>;
   create(data: Prisma.UserCreateInput): Promise<User>;
   update(id: string, data: Prisma.UserUpdateInput): Promise<User>;
   softDelete(id: string): Promise<User>;

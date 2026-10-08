@@ -171,7 +171,8 @@ enum ReportTargetType {
 
 model User {
   id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  email        String    @unique
+  username     String?   @unique @db.VarChar(50)
+  email        String?   @unique
   passwordHash String?   @map("password_hash") @db.VarChar(255)
   fullName     String    @map("full_name") @db.VarChar(255)
   avatarUrl    String?   @map("avatar_url")
@@ -179,6 +180,7 @@ model User {
   role         UserRole  @default(USER)
   isActive     Boolean   @default(true) @map("is_active")
   isVerified   Boolean   @default(false) @map("is_verified")
+  authVersion  Int       @default(0) @map("auth_version")
   verifiedAt   DateTime? @map("verified_at") @db.Timestamptz
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
@@ -212,6 +214,7 @@ model UserIdentity {
   provider       AuthProvider
   providerUserId String       @map("provider_user_id") @db.VarChar(255)
   identityData   Json?        @map("identity_data")
+  canSignIn      Boolean      @default(true) @map("can_sign_in")
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

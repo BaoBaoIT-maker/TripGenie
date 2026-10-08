@@ -5,6 +5,7 @@ import { MOCK_PLANNERS } from "@/mocks/data/planners";
 const STORAGE_KEY = "tripgenie:planners:v1";
 const LEGACY_STORAGE_KEY = "tripgenie_user_planners";
 const OLD_LEGACY_STORAGE_KEY = "triptailor:planners:v1";
+const OLD_LEGACY_USER_STORAGE_KEY = "triptailor_user_planners";
 
 interface StoredData {
   version: 1;
@@ -15,79 +16,104 @@ function deepClone<T>(data: T): T {
   return JSON.parse(JSON.stringify(data));
 }
 
+let inMemoryPlanners: Planner[] | null = null;
+
 function getStorage(): Storage | null {
-  if (typeof window !== "undefined" && window.localStorage) {
-    return window.localStorage;
-  }
-  if (typeof localStorage !== "undefined") {
-    return localStorage;
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      const testKey = "__test_storage__";
+      window.localStorage.setItem(testKey, "1");
+      window.localStorage.removeItem(testKey);
+      return window.localStorage;
+    }
+  } catch {
+    return null;
   }
   return null;
 }
 
 function loadFromStorage(): Planner[] {
-  const storage = getStorage();
-  if (!storage) {
-    return MOCK_PLANNERS.map(normalizePlanner);
-  }
+  try {
+    const storage = getStorage();
+    if (!storage) {
+      if (!inMemoryPlanners) {
+        inMemoryPlanners = MOCK_PLANNERS.map(normalizePlanner);
+      }
+      return inMemoryPlanners;
+    }
 
-  const raw = storage.getItem(STORAGE_KEY) || storage.getItem(OLD_LEGACY_STORAGE_KEY);
-  if (raw) {
-    try {
-      const parsed: StoredData = JSON.parse(raw);
-      if (parsed && Array.isArray(parsed.planners) && parsed.planners.length > 0) {
-        const map = new Map<string, Planner>();
-        for (const seed of MOCK_PLANNERS) {
-          map.set(seed.id, normalizePlanner(seed));
+    const raw = storage.getItem(STORAGE_KEY) || storage.getItem(OLD_LEGACY_STORAGE_KEY);
+    if (raw) {
+      try {
+        const parsed: StoredData = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.planners) && parsed.planners.length > 0) {
+          const map = new Map<string, Planner>();
+          for (const seed of MOCK_PLANNERS) {
+            map.set(seed.id, normalizePlanner(seed));
+          }
+          for (const item of parsed.planners) {
+            if (item && item.id) {
+              map.set(item.id, normalizePlanner(item));
+            }
+          }
+          const result = Array.from(map.values());
+          inMemoryPlanners = result;
+          return result;
         }
-        for (const item of parsed.planners) {
-          if (item && item.id) {
-            map.set(item.id, normalizePlanner(item));
+      } catch {
+        // Invalid JSON, fall back to seeded + legacy
+      }
+    }
+
+    // First time or invalid data: merge seeded with legacy
+    const map = new Map<string, Planner>();
+    for (const seed of MOCK_PLANNERS) {
+      map.set(seed.id, normalizePlanner(seed));
+    }
+
+    const legacyRaw =
+      storage.getItem(LEGACY_STORAGE_KEY) || storage.getItem(OLD_LEGACY_USER_STORAGE_KEY);
+    if (legacyRaw) {
+      try {
+        const legacyParsed = JSON.parse(legacyRaw);
+        if (Array.isArray(legacyParsed)) {
+          for (const item of legacyParsed) {
+            if (item && item.id) {
+              map.set(item.id, normalizePlanner(item));
+            }
           }
         }
-        return Array.from(map.values());
+      } catch {
+        // Ignore legacy parse errors
       }
-    } catch {
-      // Invalid JSON, fall back to seeded + legacy
     }
-  }
 
-  // First time or invalid data: merge seeded with legacy
-  const map = new Map<string, Planner>();
-  for (const seed of MOCK_PLANNERS) {
-    map.set(seed.id, normalizePlanner(seed));
-  }
-
-  const legacyRaw = storage.getItem(LEGACY_STORAGE_KEY);
-  if (legacyRaw) {
-    try {
-      const legacyParsed = JSON.parse(legacyRaw);
-      if (Array.isArray(legacyParsed)) {
-        for (const item of legacyParsed) {
-          if (item && item.id) {
-            map.set(item.id, normalizePlanner(item));
-          }
-        }
-      }
-    } catch {
-      // Ignore legacy parse errors
+    const merged = Array.from(map.values());
+    inMemoryPlanners = merged;
+    saveToStorage(merged);
+    return merged;
+  } catch {
+    if (!inMemoryPlanners) {
+      inMemoryPlanners = MOCK_PLANNERS.map(normalizePlanner);
     }
+    return inMemoryPlanners;
   }
-
-  const merged = Array.from(map.values());
-  saveToStorage(merged);
-  return merged;
 }
 
 function saveToStorage(planners: Planner[]): void {
-  const storage = getStorage();
-  if (!storage) return;
+  try {
+    inMemoryPlanners = planners.map(normalizePlanner);
+    const storage = getStorage();
+    if (!storage) return;
 
-  const data: StoredData = {
-    version: 1,
-    planners: planners.map(normalizePlanner),
-  };
-  storage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const data: StoredData = {
+      version: 1,
+      planners: planners.map(normalizePlanner),
+    };
+    storage.setItem(STORAGE_KEY, JSON.stringify(data));
+  } catch {
+    // Ignore storage quota or security errors gracefully
+  }
 }
 
 export const plannerRepository = {

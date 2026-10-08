@@ -49,13 +49,14 @@ CREATE TYPE report_type_enum      AS ENUM ('SPAM', 'INAPPROPRIATE', 'FALSE_INFO'
 CREATE TYPE report_status_enum    AS ENUM ('PENDING', 'REVIEWING', 'RESOLVED', 'DISMISSED');
 
 -- =============================================================================
--- 3. PHÃ‚N Há»† QUáº¢N LÃ NGÆ¯á»œI DÃ™NG & XÃC THá»°C (USER & AUTH)
+-- 3. PHÂN HỆ QUẢN LÝ NGƯỜI DÙNG & XÁC THỰC (USER & AUTH)
 -- =============================================================================
 
 CREATE TABLE users (
     id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    -- [MED] citext tá»± Ä‘á»™ng so sÃ¡nh case-insensitive â€” trÃ¡nh trÃ¹ng tÃ i khoáº£n do hoa/thÆ°á»ng
-    email         CITEXT UNIQUE NOT NULL,
+    username      VARCHAR(50) UNIQUE,
+    -- [MED] citext tự động so sánh case-insensitive — tránh trùng tài khoản do hoa/thường
+    email         CITEXT UNIQUE,
     password_hash VARCHAR(255),
     full_name     VARCHAR(255) NOT NULL,
     avatar_url    TEXT,
@@ -63,14 +64,16 @@ CREATE TABLE users (
     role          user_role_enum DEFAULT 'USER',
     is_active     BOOLEAN DEFAULT true,
     is_verified   BOOLEAN DEFAULT false,
+    auth_version  INT DEFAULT 0,
     verified_at   TIMESTAMP WITH TIME ZONE,
-    -- [HIGH] Soft-delete: khÃ´ng xÃ³a váº­t lÃ½, trace Ä‘Æ°á»£c ai Ä‘Ã£ tá»«ng cÃ³ tÃ i khoáº£n
+    -- [HIGH] Soft-delete: không xóa vật lý, trace được ai đã từng có tài khoản
     deleted_at    TIMESTAMP WITH TIME ZONE,
     created_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
--- Partial index: chá»‰ enforce uniqueness email trÃªn tÃ i khoáº£n chÆ°a bá»‹ soft-delete
-CREATE UNIQUE INDEX uq_users_email_active ON users(email) WHERE deleted_at IS NULL;
+-- Partial index: chỉ enforce uniqueness email/username trên tài khoản chưa bị soft-delete
+CREATE UNIQUE INDEX uq_users_email_active ON users(email) WHERE deleted_at IS NULL AND email IS NOT NULL;
+CREATE UNIQUE INDEX uq_users_username_active ON users(username) WHERE deleted_at IS NULL AND username IS NOT NULL;
 
 CREATE TABLE user_identities (
     id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -78,6 +81,7 @@ CREATE TABLE user_identities (
     provider         auth_provider_enum NOT NULL,
     provider_user_id VARCHAR(255) NOT NULL,
     identity_data    JSONB,
+    can_sign_in      BOOLEAN DEFAULT true,
     created_at       TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT unique_provider_user UNIQUE(provider, provider_user_id)
 );
@@ -612,8 +616,7 @@ CREATE INDEX idx_places_name_trgm        ON places USING GIN (name_normalized gi
 -- Places
 CREATE INDEX idx_places_category         ON places(category_id);
 CREATE INDEX idx_places_area             ON places(area_id);
-CREATE INDEX idx_places_district         ON places(district);
-CREATE INDEX idx_places_status_city      ON places(status, city) WHERE status = 'ACTIVE' AND deleted_at IS NULL;
+CREATE INDEX idx_places_status           ON places(status) WHERE status = 'ACTIVE' AND deleted_at IS NULL;
 CREATE INDEX idx_places_rating           ON places(rating_avg DESC) WHERE deleted_at IS NULL;
 CREATE INDEX idx_places_price_level      ON places(price_level) WHERE deleted_at IS NULL;
 CREATE INDEX idx_place_images_place      ON place_images(place_id);

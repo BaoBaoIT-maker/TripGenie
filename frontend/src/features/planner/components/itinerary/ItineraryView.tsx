@@ -607,7 +607,7 @@ export default function ItineraryView({ id }: Props) {
           images: found.images || [],
           phone: found.phone || null,
           website: found.website || null,
-          openingHours: found.openingHoursText ? { text: found.openingHoursText } : null,
+          openingHours: found.openingHoursText || null,
           tags: found.tags || [],
         };
         setPreviewPlace(previewItem);

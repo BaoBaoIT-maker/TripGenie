@@ -4,7 +4,7 @@ export const CURRENT_USER: InviteCandidate = {
   id: "user-current",
   displayName: "Trọng Phúc",
   email: "phuc@example.com",
-  avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80",
+  avatarUrl: "/avatar.jpg",
   isOnline: true,
 };
 

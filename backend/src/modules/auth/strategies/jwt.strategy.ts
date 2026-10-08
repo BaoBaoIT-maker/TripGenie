@@ -48,11 +48,23 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Tài khoản không tồn tại hoặc đã bị khóa');
     }
 
-    // Return jti + exp so logout can revoke without re-decoding the token
+    // 3. Verify token authVersion matches current user authVersion
+    const currentAuthVersion = user.authVersion ?? 0;
+    const tokenAuthVersion = payload.authVersion ?? 0;
+    if (tokenAuthVersion !== currentAuthVersion) {
+      throw new UnauthorizedException('Phiên đăng nhập đã hết hạn hoặc mật khẩu đã thay đổi, vui lòng đăng nhập lại');
+    }
+
+    // Return full profile + jti/exp so logout can revoke without re-decoding the token
     return {
       id: user.id,
-      email: user.email,
+      username: user.username || null,
+      email: user.email || null,
       role: user.role,
+      fullName: user.fullName,
+      avatarUrl: user.avatarUrl,
+      isVerified: user.isVerified,
+      authVersion: currentAuthVersion,
       jti: payload.jti ?? '',
       exp: payload.exp ?? 0,
     };

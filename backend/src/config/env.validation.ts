@@ -14,7 +14,7 @@ export const envValidationSchema = Joi.object({
   REDIS_URL: Joi.string().optional(),
 
   // AI Assistant
-  GEMINI_API_KEY: Joi.string().required(),
+  GEMINI_API_KEY: Joi.string().optional().allow('').default('mock_key'),
   GEMINI_MODEL: Joi.string().default('gemini-2.5-flash'),
   AI_PROVIDER: Joi.string().default('GEMINI'),
 

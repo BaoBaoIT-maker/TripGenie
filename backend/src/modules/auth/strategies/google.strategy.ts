@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy, Profile, VerifyCallback } from 'passport-google-oauth20';
 import { ConfigService } from '@nestjs/config';
@@ -23,14 +23,38 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
     profile: Profile,
     done: VerifyCallback,
   ): Promise<any> {
-    const { id, name, emails, photos } = profile;
+    const { id, name, emails, photos, _json } = profile as any;
+    const emailObj = emails?.[0];
+    const email = (emailObj?.value || _json?.email || '').toLowerCase().trim();
+
+    // Check Google verified email claim
+    const isEmailVerified =
+      emailObj?.verified === true ||
+      _json?.email_verified === true ||
+      _json?.email_verified === 'true';
+
+    if (!email) {
+      return done(
+        new UnauthorizedException('Không tìm thấy địa chỉ email từ tài khoản Google'),
+        undefined,
+      );
+    }
+
+    if (!isEmailVerified) {
+      return done(
+        new UnauthorizedException('Địa chỉ email từ tài khoản Google chưa được xác minh'),
+        undefined,
+      );
+    }
 
     const user = {
       provider: 'GOOGLE',
       providerUserId: id,
-      email: emails?.[0]?.value || '',
-      fullName: name ? `${name.givenName || ''} ${name.familyName || ''}`.trim() : 'Google User',
-      avatarUrl: photos?.[0]?.value,
+      email,
+      fullName: name
+        ? `${name.givenName || ''} ${name.familyName || ''}`.trim()
+        : _json?.name || 'Google User',
+      avatarUrl: photos?.[0]?.value || _json?.picture,
     };
 
     done(null, user);

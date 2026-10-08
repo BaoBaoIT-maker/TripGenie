@@ -3,8 +3,10 @@ import { Request } from 'express';
 
 export interface JwtPayload {
   sub: string;
-  email: string;
+  username?: string | null;
+  email?: string | null;
   role: UserRole;
+  authVersion?: number;
   jti?: string;
   iat?: number;
   exp?: number;
@@ -13,8 +15,13 @@ export interface JwtPayload {
 /** Authenticated user object attached to req.user by JwtStrategy */
 export interface AuthenticatedUser {
   id: string;
-  email: string;
+  username?: string | null;
+  email?: string | null;
   role: UserRole;
+  fullName: string;
+  avatarUrl: string | null;
+  isVerified: boolean;
+  authVersion: number;
   /** JWT ID — used to revoke this specific token on logout */
   jti: string;
   /** Token expiry unix timestamp — used to compute Redis TTL */

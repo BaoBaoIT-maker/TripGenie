@@ -5,13 +5,22 @@ export interface AuthTokens {
   refreshToken: string;
 }
 
+export interface UserCapabilities {
+  hasVerifiedEmail: boolean;
+  hasGoogleEmailLink: boolean;
+  canResetPasswordByEmail: boolean;
+}
+
 export interface UserResponse {
   id: string;
-  email: string;
+  username?: string | null;
+  email?: string | null;
   fullName: string;
   avatarUrl?: string | null;
   role: UserRole;
   isVerified: boolean;
+  authMethods: ('LOCAL' | 'GOOGLE')[];
+  capabilities: UserCapabilities;
 }
 
 export interface AuthResponse {

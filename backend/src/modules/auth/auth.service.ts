@@ -3,16 +3,21 @@ import {
   Inject,
   ConflictException,
   UnauthorizedException,
+  ForbiddenException,
   BadRequestException,
+  ServiceUnavailableException,
   NotFoundException,
+  HttpStatus,
   Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
 import { randomUUID } from 'crypto';
 import Redis from 'ioredis';
 import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
+import { AUTH_CONSTANTS } from '@/common/constants/auth.constants';
 import { IUsersRepository } from '@/modules/users/interfaces/users-repository.interface';
 import {
   RegisterDto,
@@ -22,8 +27,6 @@ import {
   ForgotPasswordDto,
   VerifyResetOtpDto,
   ResetPasswordDto,
-  ReauthenticateDto,
-  StartGoogleLinkDto,
 } from './dto';
 import { AuthTokens, AuthResponse, UserResponse } from './interfaces/auth.interface';
 import { MailService } from './services/mail.service';
@@ -31,6 +34,13 @@ import { OtpService } from './services/otp.service';
 import { PasswordResetService } from './services/password-reset.service';
 import { TokenBlacklistService } from './services/token-blacklist.service';
 import { User, AuthProvider } from '@prisma/client';
+
+export interface RegisterResult {
+  message: string;
+  expiresIn: number;
+  retryAfter: number;
+  registrationId: string;
+}
 
 @Injectable()
 export class AuthService {
@@ -49,95 +59,12 @@ export class AuthService {
     private readonly tokenBlacklistService: TokenBlacklistService,
   ) {}
 
-  /**
-   * Đăng ký tài khoản thường bằng username & password.
-   * Không bắt buộc email/OTP; trả về AuthResponse và phiên đăng nhập ngay.
-   */
-  async register(dto: RegisterDto): Promise<AuthResponse> {
-    const trimmedUsername = dto.username.trim().toLowerCase();
-    const existingUser = await this.usersRepository.findByUsername(trimmedUsername);
-
-    if (existingUser) {
-      throw new ConflictException('Tên tài khoản này đã được sử dụng');
-    }
-
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(dto.password, salt);
-
-    const user = await this.usersRepository.create({
-      username: trimmedUsername,
-      passwordHash,
-      fullName: dto.fullName.trim(),
-      email: null,
-      isVerified: false,
-    });
-
-    const tokens = await this.generateTokens(user);
-    const formattedUser = await this.formatUserResponse(user);
-    return { user: formattedUser, tokens };
+  private hashVerificationToken(token: string): string {
+    const secret =
+      this.configService.get<string>('JWT_SECRET', 'tripgenie_verification_secret');
+    return crypto.createHmac('sha256', secret).update(token).digest('hex');
   }
 
-  /**
-   * Đăng nhập bằng tên tài khoản hoặc email (legacy).
-   * Không chặn tài khoản chưa xác minh email (isVerified = false).
-   */
-  async login(dto: LoginDto): Promise<AuthResponse> {
-    const trimmedIdentifier = dto.identifier.trim();
-    const user = await this.usersRepository.findByIdentifier(trimmedIdentifier);
-
-    if (!user || !user.passwordHash) {
-      throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không chính xác');
-    }
-
-    if (!user.isActive) {
-      throw new UnauthorizedException('Tài khoản của bạn đã bị khóa');
-    }
-
-    const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!isPasswordValid) {
-      throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không chính xác');
-    }
-
-    const tokens = await this.generateTokens(user);
-    const formattedUser = await this.formatUserResponse(user);
-    return { user: formattedUser, tokens };
-  }
-
-  /**
-   * Xác thực lại mật khẩu của người dùng hiện tại để cấp grantToken ngắn hạn (5 phút).
-   */
-  async reauthenticate(
-    userId: string,
-    dto: ReauthenticateDto,
-  ): Promise<{ grantToken: string; expiresIn: number }> {
-    const user = await this.usersRepository.findById(userId);
-    if (!user || !user.passwordHash) {
-      throw new UnauthorizedException('Tài khoản không hỗ trợ xác thực bằng mật khẩu');
-    }
-
-    const isValid = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!isValid) {
-      throw new UnauthorizedException('Mật khẩu không chính xác');
-    }
-
-    const grantToken = randomUUID();
-    const grantKey = `reauth_grant:${grantToken}`;
-    const ttlSeconds = 300; // 5 mins
-
-    await this.redisClient.set(
-      grantKey,
-      JSON.stringify({ userId }),
-      'EX',
-      ttlSeconds,
-    );
-
-    return { grantToken, expiresIn: ttlSeconds };
-  }
-
-  /**
-   * Khởi tạo quá trình liên kết Google email an toàn bằng grantToken.
-   * Sinh state lưu trong Redis và trả về URL ủy quyền Google.
-   */
   /**
    * Helper: Atomic GET and DEL via Redis Lua script to prevent race conditions.
    * Guarantees single-use consumption even under concurrent requests.
@@ -155,214 +82,275 @@ export class AuthService {
   }
 
   /**
-   * Khởi tạo quá trình liên kết Google email an toàn bằng grantToken.
-   * Sinh state lưu trong Redis và trả về URL ủy quyền Google.
+   * Đăng ký tài khoản bằng email & mật khẩu:
+   * Lưu draft trong Redis với thời hạn 30 phút, gửi email link xác thực.
+   * KHÔNG phát phiên hoặc cấp token khi chưa xác thực email.
    */
-  async startGoogleLink(
-    userId: string,
-    dto: StartGoogleLinkDto,
-  ): Promise<{ url: string; state: string; browserNonce: string }> {
-    const grantKey = `reauth_grant:${dto.grantToken}`;
-    // Atomically consume grant token to prevent concurrent replay
-    const rawGrant = await this.atomicGetDel(grantKey);
+  async register(dto: RegisterDto): Promise<RegisterResult> {
+    const normalizedEmail = dto.email.toLowerCase().trim();
+    const existingUser = await this.usersRepository.findByEmail(normalizedEmail);
 
-    if (!rawGrant) {
-      throw new UnauthorizedException('Mã xác thực lại đã hết hạn, không hợp lệ hoặc đã được sử dụng');
+    if (existingUser && existingUser.isVerified) {
+      throw new ConflictException('Email này đã được sử dụng bởi một tài khoản khác');
     }
 
-    const grant = JSON.parse(rawGrant);
-    if (grant.userId !== userId) {
-      throw new UnauthorizedException('Mã xác thực lại không khớp với tài khoản hiện tại');
-    }
+    const registrationId = randomUUID();
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = this.hashVerificationToken(rawToken);
 
-    const userWithIdentities = await this.usersRepository.findUserWithIdentities(userId);
-    if (!userWithIdentities) {
-      throw new NotFoundException('Không tìm thấy tài khoản người dùng');
-    }
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(dto.password, salt);
 
-    const hasGoogle = userWithIdentities.identities?.some(
-      (identity) => identity.provider === 'GOOGLE',
-    );
-    if (hasGoogle) {
-      throw new ConflictException('Tài khoản này đã được liên kết với Google');
-    }
+    const draft = {
+      registrationId,
+      email: normalizedEmail,
+      fullName: dto.fullName.trim(),
+      passwordHash,
+      tokenHash,
+      createdAt: Date.now(),
+    };
 
-    const state = randomUUID();
-    const browserNonce = randomUUID();
-    const stateKey = `oauth_state:${state}`;
-    const ttlSeconds = 600; // 10 mins
+    const tokenKey = `email_verification:token:${tokenHash}`;
+    const regKey = `email_verification:reg:${registrationId}`;
+    const cooldownKey = `email_verification:cooldown:${registrationId}`;
 
     await this.redisClient.set(
-      stateKey,
-      JSON.stringify({
-        purpose: 'link-email',
-        userId,
-        authVersion: userWithIdentities.authVersion ?? 0,
-        browserNonce,
-        returnUrl: dto.returnUrl || '/profile',
-      }),
+      tokenKey,
+      JSON.stringify(draft),
       'EX',
-      ttlSeconds,
+      AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS,
+    );
+    await this.redisClient.set(
+      regKey,
+      JSON.stringify(draft),
+      'EX',
+      AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS,
+    );
+    await this.redisClient.set(
+      cooldownKey,
+      '1',
+      'EX',
+      AUTH_CONSTANTS.EMAIL_VERIFICATION_COOLDOWN_SECONDS,
     );
 
-    const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID', '');
-    const callbackUrl = this.configService.get<string>('GOOGLE_CALLBACK_URL', '');
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_BASE_URL') ||
+      process.env.FRONTEND_BASE_URL ||
+      'http://localhost:3000';
+    const verificationUrl = `${frontendUrl}/verify-email?token=${rawToken}`;
 
-    const params = new URLSearchParams({
-      client_id: clientId,
-      redirect_uri: callbackUrl,
-      response_type: 'code',
-      scope: 'email profile',
-      state,
-      access_type: 'online',
-      prompt: 'select_account',
-    });
+    const emailSent = await this.mailService.sendVerificationLinkEmail(
+      normalizedEmail,
+      verificationUrl,
+    );
+
+    if (!emailSent) {
+      await this.redisClient.del(tokenKey);
+      await this.redisClient.del(regKey);
+      await this.redisClient.del(cooldownKey);
+      throw new ServiceUnavailableException(
+        'Dịch vụ gửi email xác thực tạm thời không khả dụng. Vui lòng thử lại sau.',
+      );
+    }
+
+    this.logger.log(`🔗 [DEV VERIFY LINK] Cho ${normalizedEmail}: ${verificationUrl}`);
 
     return {
-      url: `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`,
-      state,
-      browserNonce,
+      message: 'Đăng ký thành công! Vui lòng kiểm tra hộp thư email của bạn để xác thực tài khoản.',
+      expiresIn: AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS,
+      retryAfter: AUTH_CONSTANTS.EMAIL_VERIFICATION_COOLDOWN_SECONDS,
+      registrationId,
     };
   }
 
   /**
-   * Xử lý OAuth callback cho Google: Phân tách rõ ràng giữa Login và Link Email.
-   * State được bind chặt chẽ với browser nonce, user id và authVersion.
+   * Xác thực tài khoản qua link email:
+   * Consume verification token một lần duy nhất, lưu credentials và cấp phiên đăng nhập.
    */
-  async handleOAuthCallback(
-    oauthProfile: {
-      provider: string;
-      providerUserId: string;
-      email: string;
-      fullName: string;
-      avatarUrl?: string;
-    },
-    state?: string,
-    options?: {
-      browserNonce?: string;
-      currentUserId?: string;
-    },
-  ): Promise<
-    | { mode: 'login'; authResponse: AuthResponse }
-    | { mode: 'link'; returnUrl: string }
-  > {
-    if (state) {
-      const stateKey = `oauth_state:${state}`;
-      // Atomically consume state to prevent concurrent replay attacks
-      const rawState = await this.atomicGetDel(stateKey);
-
-      if (!rawState) {
-        throw new BadRequestException('Trạng thái xác thực không hợp lệ, đã hết hạn hoặc đã được sử dụng');
-      }
-
-      const parsedState = JSON.parse(rawState);
-
-      if (parsedState.purpose === 'link-email') {
-        // 1. Current user login session is MANDATORY for linking Gmail as required by plan
-        if (!options?.currentUserId) {
-          throw new UnauthorizedException(
-            'Phiên đăng nhập đã hết hạn hoặc không tồn tại. Vui lòng đăng nhập lại để liên kết Gmail.',
-          );
-        }
-
-        // 2. Current session must match the initiator's userId
-        if (options.currentUserId !== parsedState.userId) {
-          throw new UnauthorizedException(
-            'Tài khoản đăng nhập hiện tại không khớp với tài khoản yêu cầu liên kết ban đầu',
-          );
-        }
-
-        // 3. Verify browser nonce cookie
-        if (!options?.browserNonce || options.browserNonce !== parsedState.browserNonce) {
-          throw new UnauthorizedException('Phiên trình duyệt không khớp với yêu cầu liên kết');
-        }
-
-        // 4. Verify user in database
-        const targetUser = await this.usersRepository.findById(parsedState.userId);
-        if (!targetUser || !targetUser.isActive) {
-          throw new UnauthorizedException('Tài khoản người dùng không tồn tại hoặc đã bị khóa');
-        }
-
-        if ((targetUser.authVersion ?? 0) !== parsedState.authVersion) {
-          throw new UnauthorizedException('Phiên liên kết bị hủy do tài khoản đã thay đổi');
-        }
-
-        await this.linkGoogleEmail(parsedState.userId, oauthProfile);
-        return {
-          mode: 'link',
-          returnUrl: parsedState.returnUrl || '/profile',
-        };
-      }
-
-      throw new BadRequestException('Mục đích xác thực không hợp lệ');
+  async verifyEmail(token: string): Promise<AuthResponse> {
+    if (!token || typeof token !== 'string') {
+      throw new BadRequestException('Mã xác thực email không hợp lệ');
     }
 
-    // Default flow: Google Login
-    const authResponse = await this.validateOAuthUser(oauthProfile);
-    return { mode: 'login', authResponse };
-  }
+    const tokenHash = this.hashVerificationToken(token);
+    const tokenKey = `email_verification:token:${tokenHash}`;
 
-  /**
-   * Liên kết Google email an toàn cho tài khoản local:
-   * - canSignIn = false (chống bypass mật khẩu)
-   * - 1 email chỉ thuộc 1 tài khoản
-   */
-  private async linkGoogleEmail(
-    userId: string,
-    oauthProfile: {
-      provider: string;
-      providerUserId: string;
-      email: string;
-      fullName: string;
-      avatarUrl?: string;
-    },
-  ): Promise<User> {
-    const normalizedEmail = oauthProfile.email.toLowerCase().trim();
-
-    // 1. Kiểm tra email đã thuộc user khác chưa
-    const userWithEmail = await this.usersRepository.findByEmail(normalizedEmail);
-    if (userWithEmail && userWithEmail.id !== userId) {
-      throw new ConflictException('Email này đã được sử dụng bởi một tài khoản khác');
-    }
-
-    // 2. Kiểm tra Google providerUserId đã thuộc user khác chưa
-    const existingIdentity = await this.usersRepository.findIdentity(
-      'GOOGLE',
-      oauthProfile.providerUserId,
-    );
-    if (existingIdentity && existingIdentity.userId !== userId) {
-      throw new ConflictException('Tài khoản Google này đã được liên kết với người dùng khác');
-    }
-
-    // 3. Kiểm tra user hiện tại
-    const currentUser = await this.usersRepository.findUserWithIdentities(userId);
-    if (!currentUser) {
-      throw new NotFoundException('Không tìm thấy tài khoản người dùng');
-    }
-
-    if (currentUser.email && currentUser.email.toLowerCase() !== normalizedEmail) {
-      throw new ConflictException(
-        'Tài khoản đã có email khác, không thể ghi đè địa chỉ email liên kết',
+    const rawDraft = await this.atomicGetDel(tokenKey);
+    if (!rawDraft) {
+      throw new BadRequestException(
+        'Đường link xác thực không hợp lệ hoặc đã hết hạn. Vui lòng yêu cầu gửi lại.',
       );
     }
 
-    // 4. Tạo identity nếu chưa có (canSignIn = false)
-    if (!existingIdentity) {
-      await this.usersRepository.createIdentity({
-        user: { connect: { id: userId } },
-        provider: AuthProvider.GOOGLE,
-        providerUserId: oauthProfile.providerUserId,
-        canSignIn: false,
-        identityData: oauthProfile as any,
+    let draft: {
+      registrationId: string;
+      email: string;
+      fullName: string;
+      passwordHash: string;
+    };
+
+    try {
+      draft = JSON.parse(rawDraft);
+    } catch {
+      throw new BadRequestException('Dữ liệu xác thực không hợp lệ');
+    }
+
+    await this.redisClient.del(`email_verification:reg:${draft.registrationId}`);
+
+    let user = await this.usersRepository.findByEmail(draft.email);
+    if (user && user.isVerified) {
+      throw new ConflictException('Email này đã được xác thực trước đó. Vui lòng đăng nhập.');
+    }
+
+    if (user) {
+      user = await this.usersRepository.update(user.id, {
+        fullName: draft.fullName,
+        passwordHash: draft.passwordHash,
+        isVerified: true,
+        verifiedAt: new Date(),
+      });
+    } else {
+      user = await this.usersRepository.create({
+        email: draft.email,
+        fullName: draft.fullName,
+        passwordHash: draft.passwordHash,
+        isVerified: true,
+        verifiedAt: new Date(),
       });
     }
 
-    // 5. Cập nhật user email & isVerified
-    return this.usersRepository.update(userId, {
-      email: normalizedEmail,
-      isVerified: true,
-      verifiedAt: currentUser.verifiedAt || new Date(),
-    });
+    const tokens = await this.generateTokens(user);
+    const formattedUser = await this.formatUserResponse(user);
+    return { user: formattedUser, tokens };
+  }
+
+  /**
+   * Gửi lại email xác thực: Vô hiệu hóa link cũ và cấp link mới.
+   */
+  async resendVerificationEmail(registrationId: string): Promise<{
+    message: string;
+    expiresIn: number;
+    retryAfter: number;
+    registrationId: string;
+  }> {
+    const cooldownKey = `email_verification:cooldown:${registrationId}`;
+    const remainingCooldown = await this.redisClient.ttl(cooldownKey);
+    if (remainingCooldown > 0) {
+      throw new BadRequestException(
+        `Vui lòng đợi ${remainingCooldown} giây trước khi yêu cầu gửi lại email xác thực`,
+      );
+    }
+
+    const regKey = `email_verification:reg:${registrationId}`;
+    const rawReg = await this.redisClient.get(regKey);
+    if (!rawReg) {
+      throw new BadRequestException(
+        'Phiên đăng ký đã hết hạn hoặc không tồn tại. Vui lòng đăng ký lại.',
+      );
+    }
+
+    const draft = JSON.parse(rawReg);
+    if (draft.tokenHash) {
+      await this.redisClient.del(`email_verification:token:${draft.tokenHash}`);
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = this.hashVerificationToken(rawToken);
+    draft.tokenHash = tokenHash;
+
+    const tokenKey = `email_verification:token:${tokenHash}`;
+    await this.redisClient.set(
+      tokenKey,
+      JSON.stringify(draft),
+      'EX',
+      AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS,
+    );
+    await this.redisClient.set(
+      regKey,
+      JSON.stringify(draft),
+      'EX',
+      AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS,
+    );
+    await this.redisClient.set(
+      cooldownKey,
+      '1',
+      'EX',
+      AUTH_CONSTANTS.EMAIL_VERIFICATION_COOLDOWN_SECONDS,
+    );
+
+    const frontendUrl =
+      this.configService.get<string>('FRONTEND_BASE_URL') ||
+      process.env.FRONTEND_BASE_URL ||
+      'http://localhost:3000';
+    const verificationUrl = `${frontendUrl}/verify-email?token=${rawToken}`;
+
+    const emailSent = await this.mailService.sendVerificationLinkEmail(
+      draft.email,
+      verificationUrl,
+    );
+
+    if (!emailSent) {
+      throw new ServiceUnavailableException(
+        'Dịch vụ gửi email xác thực tạm thời không khả dụng. Vui lòng thử lại sau.',
+      );
+    }
+
+    this.logger.log(`🔗 [DEV RESEND VERIFY LINK] Cho ${draft.email}: ${verificationUrl}`);
+
+    return {
+      message: 'Đã gửi lại email xác thực. Vui lòng kiểm tra hộp thư của bạn.',
+      expiresIn: AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS,
+      retryAfter: AUTH_CONSTANTS.EMAIL_VERIFICATION_COOLDOWN_SECONDS,
+      registrationId,
+    };
+  }
+
+  /**
+   * Đăng nhập bằng email hoặc tên tài khoản (hỗ trợ tài khoản legacy).
+   * Kiểm tra mật khẩu trước, nếu tài khoản chưa kích hoạt trả về EMAIL_NOT_VERIFIED.
+   */
+  async login(dto: LoginDto): Promise<AuthResponse> {
+    const trimmedIdentifier = dto.identifier.trim();
+    const user = await this.usersRepository.findByIdentifier(trimmedIdentifier);
+
+    if (!user || !user.passwordHash) {
+      throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không chính xác');
+    }
+
+    const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không chính xác');
+    }
+
+    if (!user.isActive) {
+      throw new UnauthorizedException('Tài khoản của bạn đã bị khóa');
+    }
+
+    if (!user.isVerified) {
+      throw new ForbiddenException({
+        statusCode: HttpStatus.FORBIDDEN,
+        code: 'EMAIL_NOT_VERIFIED',
+        message: 'Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email để xác thực tài khoản.',
+      });
+    }
+
+    const tokens = await this.generateTokens(user);
+    const formattedUser = await this.formatUserResponse(user);
+    return { user: formattedUser, tokens };
+  }
+
+  /**
+   * Xử lý OAuth callback cho Google (chỉ đăng nhập/đăng ký mới, không còn mode link).
+   */
+  async handleOAuthCallback(oauthProfile: {
+    provider: string;
+    providerUserId: string;
+    email: string;
+    fullName: string;
+    avatarUrl?: string;
+  }): Promise<{ mode: 'login'; authResponse: AuthResponse }> {
+    const authResponse = await this.validateOAuthUser(oauthProfile);
+    return { mode: 'login', authResponse };
   }
 
   async getProfile(userId: string): Promise<UserResponse> {
@@ -406,12 +394,10 @@ export class AuthService {
       user = await this.usersRepository.findByEmail(normalizedEmail);
 
       if (user) {
-        // 1 email chỉ thuộc 1 tài khoản, không tự gộp
         throw new ConflictException(
-          'Email này đã được sử dụng bởi một tài khoản khác. Vui lòng đăng nhập và liên kết tài khoản trong trang cá nhân.',
+          'Email này đã được sử dụng bởi một tài khoản khác. Vui lòng đăng nhập bằng mật khẩu.',
         );
       } else {
-        // Tạo tài khoản Google mới (Google-only, canSignIn = true)
         user = await this.usersRepository.create({
           email: normalizedEmail,
           fullName: oauthProfile.fullName,
@@ -431,17 +417,13 @@ export class AuthService {
     }
 
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('Tài khoản đã bị khóa');
+      throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa hoặc không tồn tại');
     }
 
     const tokens = await this.generateTokens(user);
     const formattedUser = await this.formatUserResponse(user);
     return { user: formattedUser, tokens };
   }
-
-  // ---------------------------------------------------------------------------
-  // OTP & Recovery methods
-  // ---------------------------------------------------------------------------
 
   async resendOtp(
     dto: ResendOtpDto,
@@ -520,56 +502,30 @@ export class AuthService {
         throw new UnauthorizedException('Phiên làm việc đã hết hạn do thay đổi tài khoản');
       }
 
-      if (payload.jti && payload.exp) {
-        await this.tokenBlacklistService.revokeByJti(payload.jti, payload.exp, user.id);
-      }
-
       return this.generateTokens(user);
     } catch (err: any) {
-      if (err instanceof UnauthorizedException) throw err;
-      throw new UnauthorizedException('Refresh Token không hợp lệ hoặc đã hết hạn');
+      if (err instanceof UnauthorizedException) {
+        throw err;
+      }
+      throw new UnauthorizedException('Refresh token không hợp lệ hoặc đã hết hạn');
     }
   }
 
-  async logout(jti: string, exp: number, userId: string): Promise<void> {
-    await this.tokenBlacklistService.revokeByJti(jti, exp, userId);
-  }
-
-  /**
-   * Safely revokes available session tokens (even if expired) and prevents replay.
-   */
-  async performLogout(options: {
-    accessToken?: string;
-    refreshToken?: string;
-  }): Promise<void> {
-    const tryRevoke = async (token?: string, secretKeyName = 'JWT_SECRET') => {
+  async logout(userId: string, options: { accessToken?: string; refreshToken?: string }): Promise<void> {
+    const tryRevoke = async (token?: string) => {
       if (!token) return;
       try {
-        const payload = this.jwtService.verify(token, {
-          secret: this.configService.get<string>(secretKeyName),
-          ignoreExpiration: true,
-        });
-        if (payload?.jti && payload?.exp && payload?.sub) {
-          await this.tokenBlacklistService.revokeByJti(
-            payload.jti,
-            payload.exp,
-            payload.sub,
-          );
-        }
+        await this.tokenBlacklistService.revokeAccessToken(token);
       } catch {
-        // Ignore verify error for malformed tokens
+        // Non-blocking revocation failure
       }
     };
 
     await Promise.all([
-      tryRevoke(options.accessToken, 'JWT_SECRET'),
-      tryRevoke(options.refreshToken, 'JWT_REFRESH_SECRET'),
+      tryRevoke(options.accessToken),
+      tryRevoke(options.refreshToken),
     ]);
   }
-
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
 
   private async generateTokens(user: User): Promise<AuthTokens> {
     const basePayload = {
@@ -613,11 +569,6 @@ export class AuthService {
     }
 
     const hasVerifiedEmail = Boolean(user.email && user.isVerified);
-    const hasGoogleEmailLink = Boolean(
-      user.email &&
-        user.isVerified &&
-        identities.some((identity) => identity.provider === 'GOOGLE'),
-    );
     const canResetPasswordByEmail = Boolean(
       user.passwordHash && user.email && user.isVerified,
     );
@@ -633,7 +584,7 @@ export class AuthService {
       authMethods,
       capabilities: {
         hasVerifiedEmail,
-        hasGoogleEmailLink,
+        hasGoogleEmailLink: false,
         canResetPasswordByEmail,
       },
     };

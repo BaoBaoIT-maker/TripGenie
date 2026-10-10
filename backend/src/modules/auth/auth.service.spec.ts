@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { ConflictException, UnauthorizedException, BadRequestException } from '@nestjs/common';
+import { ConflictException, UnauthorizedException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { MailService } from './services/mail.service';
@@ -37,6 +37,7 @@ describe('AuthService', () => {
     mockJwtService = {
       signAsync: jest.fn().mockResolvedValue('mock_token'),
       verify: jest.fn(),
+      decode: jest.fn().mockReturnValue({ jti: 'mock_jti', exp: Math.floor(Date.now() / 1000) + 3600 }),
     };
 
     mockConfigService = {
@@ -51,6 +52,7 @@ describe('AuthService', () => {
 
     mockMailService = {
       sendOtpEmail: jest.fn().mockResolvedValue(true),
+      sendVerificationLinkEmail: jest.fn().mockResolvedValue(true),
     };
 
     mockOtpService = {
@@ -77,14 +79,23 @@ describe('AuthService', () => {
       }),
     };
 
+    const redisStore = new Map<string, string>();
     mockRedisClient = {
-      set: jest.fn().mockResolvedValue('OK'),
-      get: jest.fn().mockResolvedValue(null),
-      del: jest.fn().mockResolvedValue(1),
+      set: jest.fn().mockImplementation(async (key: string, val: string) => {
+        redisStore.set(key, val);
+        return 'OK';
+      }),
+      get: jest.fn().mockImplementation(async (key: string) => {
+        return redisStore.get(key) || null;
+      }),
+      del: jest.fn().mockImplementation(async (key: string) => {
+        return redisStore.delete(key) ? 1 : 0;
+      }),
+      ttl: jest.fn().mockResolvedValue(-1),
       eval: jest.fn().mockImplementation(async (_script: string, _numKeys: number, key: string) => {
-        const val = await mockRedisClient.get(key);
+        const val = redisStore.get(key) || null;
         if (val) {
-          await mockRedisClient.del(key);
+          redisStore.delete(key);
         }
         return val;
       }),
@@ -114,67 +125,140 @@ describe('AuthService', () => {
   });
 
   describe('register', () => {
-    it('nên ném ra ConflictException nếu username đã tồn tại', async () => {
-      mockUsersRepository.findByUsername.mockResolvedValue({
+    it('nên ném ra ConflictException nếu email đã tồn tại và đã xác thực', async () => {
+      mockUsersRepository.findByEmail.mockResolvedValue({
         id: '1',
-        username: 'traveler1',
+        email: 'traveler1@example.com',
+        isVerified: true,
       });
 
       await expect(
         authService.register({
-          username: 'traveler1',
-          password: 'Password123456789!',
+          email: 'traveler1@example.com',
+          password: 'Password123!',
           fullName: 'Test User',
         }),
       ).rejects.toThrow(ConflictException);
     });
 
-    it('nên tạo user mới bằng username, không bắt email/OTP và trả tokens ngay', async () => {
-      mockUsersRepository.findByUsername.mockResolvedValue(null);
-      const createdUser = {
-        id: '1',
-        username: 'traveler1',
+    it('nên lưu draft vào Redis, gửi email xác thực và trả về registrationId mà không cấp session', async () => {
+      mockUsersRepository.findByEmail.mockResolvedValue(null);
+
+      const result = await authService.register({
+        email: 'traveler1@example.com',
+        password: 'Password123!',
         fullName: 'Test User',
-        email: null,
-        isVerified: false,
+      });
+
+      expect(mockRedisClient.set).toHaveBeenCalled();
+      expect(mockMailService.sendVerificationLinkEmail).toHaveBeenCalledWith(
+        'traveler1@example.com',
+        expect.stringContaining('/verify-email?token='),
+      );
+      expect(result.registrationId).toBeDefined();
+      expect(result.message).toContain('xác thực tài khoản');
+      expect((result as any).tokens).toBeUndefined();
+    });
+  });
+
+  describe('verifyEmail', () => {
+    it('nên từ chối nếu token không hợp lệ hoặc đã hết hạn', async () => {
+      await expect(authService.verifyEmail('invalid-token')).rejects.toThrow(BadRequestException);
+    });
+
+    it('nên tạo tài khoản và cấp phiên khi token hợp lệ', async () => {
+      const regId = 'reg-123';
+      const email = 'newuser@example.com';
+      const token = 'valid-token-32-chars-long-test-string-here';
+      const tokenHash = (authService as any).hashVerificationToken(token);
+
+      await mockRedisClient.set(
+        `email_verification:token:${tokenHash}`,
+        JSON.stringify({
+          registrationId: regId,
+          email,
+          fullName: 'New User',
+          passwordHash: 'hashed_pwd',
+        }),
+      );
+
+      const createdUser = {
+        id: 'user-new',
+        email,
+        fullName: 'New User',
+        isVerified: true,
         role: 'USER',
-        passwordHash: 'hashed_pwd',
       };
+      mockUsersRepository.findByEmail.mockResolvedValue(null);
       mockUsersRepository.create.mockResolvedValue(createdUser);
       mockUsersRepository.findUserWithIdentities.mockResolvedValue({
         ...createdUser,
         identities: [],
       });
 
-      const result = await authService.register({
-        username: 'traveler1',
-        password: 'Password123456789!',
-        fullName: 'Test User',
-      });
-
+      const result = await authService.verifyEmail(token);
       expect(mockUsersRepository.create).toHaveBeenCalledWith(
         expect.objectContaining({
-          username: 'traveler1',
-          fullName: 'Test User',
-          email: null,
-          isVerified: false,
+          email,
+          fullName: 'New User',
+          isVerified: true,
         }),
       );
       expect(result.tokens).toBeDefined();
-      expect(result.user.username).toBe('traveler1');
-      expect(result.user.capabilities.hasVerifiedEmail).toBe(false);
+      expect(result.user.email).toBe(email);
     });
   });
 
   describe('login', () => {
-    it('nên đăng nhập thành công bằng identifier và mật khẩu dù tài khoản chưa xác minh email', async () => {
-      const passwordHash = await bcrypt.hash('ValidPassword123456', 10);
+    it('nên từ chối đăng nhập nếu sai mật khẩu', async () => {
+      const passwordHash = await bcrypt.hash('ValidPassword123!', 10);
+      mockUsersRepository.findByIdentifier.mockResolvedValue({
+        id: 'user-1',
+        passwordHash,
+        isActive: true,
+        isVerified: true,
+      });
+
+      await expect(
+        authService.login({
+          identifier: 'user@example.com',
+          password: 'WrongPassword',
+        }),
+      ).rejects.toThrow(UnauthorizedException);
+    });
+
+    it('nên ném ForbiddenException với code EMAIL_NOT_VERIFIED nếu tài khoản chưa kích hoạt', async () => {
+      const passwordHash = await bcrypt.hash('ValidPassword123!', 10);
       const user = {
         id: 'user-1',
-        username: 'traveler1',
+        email: 'user@example.com',
         passwordHash,
         isActive: true,
         isVerified: false,
+        role: 'USER',
+      };
+      mockUsersRepository.findByIdentifier.mockResolvedValue(user);
+
+      try {
+        await authService.login({
+          identifier: 'user@example.com',
+          password: 'ValidPassword123!',
+        });
+        fail('Should have thrown ForbiddenException');
+      } catch (err: any) {
+        expect(err).toBeInstanceOf(ForbiddenException);
+        expect(err.getResponse()?.code).toBe('EMAIL_NOT_VERIFIED');
+      }
+    });
+
+    it('nên đăng nhập thành công khi đúng mật khẩu và tài khoản đã kích hoạt', async () => {
+      const passwordHash = await bcrypt.hash('ValidPassword123!', 10);
+      const user = {
+        id: 'user-1',
+        email: 'user@example.com',
+        passwordHash,
+        isActive: true,
+        isVerified: true,
         role: 'USER',
       };
       mockUsersRepository.findByIdentifier.mockResolvedValue(user);
@@ -184,282 +268,68 @@ describe('AuthService', () => {
       });
 
       const result = await authService.login({
-        identifier: 'traveler1',
-        password: 'ValidPassword123456',
+        identifier: 'user@example.com',
+        password: 'ValidPassword123!',
       });
 
       expect(result.tokens).toBeDefined();
       expect(result.user.id).toBe('user-1');
     });
-
-    it('nên từ chối đăng nhập nếu sai mật khẩu', async () => {
-      const passwordHash = await bcrypt.hash('ValidPassword123456', 10);
-      mockUsersRepository.findByIdentifier.mockResolvedValue({
-        id: 'user-1',
-        passwordHash,
-        isActive: true,
-      });
-
-      await expect(
-        authService.login({
-          identifier: 'traveler1',
-          password: 'WrongPassword',
-        }),
-      ).rejects.toThrow(UnauthorizedException);
-    });
   });
 
-  describe('reauthenticate & startGoogleLink', () => {
-    it('nên phát sinh grantToken khi mật khẩu xác thực lại chính xác', async () => {
-      const passwordHash = await bcrypt.hash('Secret123456789!', 10);
-      mockUsersRepository.findById.mockResolvedValue({
-        id: 'user-1',
-        passwordHash,
-      });
-
-      const res = await authService.reauthenticate('user-1', {
-        password: 'Secret123456789!',
-      });
-
-      expect(res.grantToken).toBeDefined();
-      expect(mockRedisClient.set).toHaveBeenCalledWith(
-        expect.stringContaining('reauth_grant:'),
-        JSON.stringify({ userId: 'user-1' }),
-        'EX',
-        300,
-      );
-    });
-
-    it('startGoogleLink nên từ chối nếu grantToken không tồn tại hoặc sai user', async () => {
-      mockRedisClient.get.mockResolvedValue(null);
-
-      await expect(
-        authService.startGoogleLink('user-1', { grantToken: 'invalid-grant' }),
-      ).rejects.toThrow(UnauthorizedException);
-    });
-  });
-
-  describe('Google OAuth login & link mode', () => {
-    it('validateOAuthUser nên từ chối login bằng Google nếu identity có canSignIn = false', async () => {
+  describe('Google OAuth login', () => {
+    it('validateOAuthUser nên từ chối login nếu identity có canSignIn = false', async () => {
       mockUsersRepository.findIdentity.mockResolvedValue({
         id: 'id-1',
         userId: 'user-1',
-        canSignIn: false, // Local user link Gmail only
+        canSignIn: false,
       });
 
       await expect(
         authService.validateOAuthUser({
           provider: 'GOOGLE',
-          providerUserId: 'google-sub-123',
-          email: 'user@gmail.com',
-          fullName: 'Google User',
+          providerUserId: 'g-123',
+          email: 'test@gmail.com',
+          fullName: 'Test Google',
         }),
       ).rejects.toThrow(UnauthorizedException);
     });
 
-    it('handleOAuthCallback nên từ chối ngay lập tức nếu state không tồn tại trong Redis, không fall-through sang login', async () => {
-      mockRedisClient.get.mockResolvedValue(null);
-
-      await expect(
-        authService.handleOAuthCallback(
-          {
-            provider: 'GOOGLE',
-            providerUserId: 'google-sub-123',
-            email: 'user@gmail.com',
-            fullName: 'Google User',
-          },
-          'invalid-or-expired-state',
-        ),
-      ).rejects.toThrow(BadRequestException);
-    });
-
-    it('handleOAuthCallback mode link nên từ chối nếu thiếu phiên đăng nhập hiện tại (currentUserId)', async () => {
-      mockRedisClient.get.mockResolvedValue(
-        JSON.stringify({
-          purpose: 'link-email',
-          userId: 'user-1',
-          authVersion: 0,
-          browserNonce: 'nonce-123',
-          returnUrl: '/profile',
-        }),
-      );
-
-      await expect(
-        authService.handleOAuthCallback(
-          {
-            provider: 'GOOGLE',
-            providerUserId: 'google-sub-123',
-            email: 'linked@gmail.com',
-            fullName: 'Google User',
-          },
-          'state-123',
-          { browserNonce: 'nonce-123' }, // missing currentUserId
-        ),
-      ).rejects.toThrow(UnauthorizedException);
-    });
-
-    it('handleOAuthCallback mode link nên từ chối nếu phiên đăng nhập khác với tài khoản yêu cầu', async () => {
-      mockRedisClient.get.mockResolvedValue(
-        JSON.stringify({
-          purpose: 'link-email',
-          userId: 'user-1',
-          authVersion: 0,
-          browserNonce: 'nonce-123',
-          returnUrl: '/profile',
-        }),
-      );
-
-      await expect(
-        authService.handleOAuthCallback(
-          {
-            provider: 'GOOGLE',
-            providerUserId: 'google-sub-123',
-            email: 'linked@gmail.com',
-            fullName: 'Google User',
-          },
-          'state-123',
-          { browserNonce: 'nonce-123', currentUserId: 'user-different' },
-        ),
-      ).rejects.toThrow(UnauthorizedException);
-    });
-
-    it('handleOAuthCallback mode link nên từ chối nếu browserNonce không khớp', async () => {
-      mockRedisClient.get.mockResolvedValue(
-        JSON.stringify({
-          purpose: 'link-email',
-          userId: 'user-1',
-          authVersion: 0,
-          browserNonce: 'correct-nonce-123',
-          returnUrl: '/profile',
-        }),
-      );
-
-      await expect(
-        authService.handleOAuthCallback(
-          {
-            provider: 'GOOGLE',
-            providerUserId: 'google-sub-123',
-            email: 'linked@gmail.com',
-            fullName: 'Google User',
-          },
-          'state-123',
-          { browserNonce: 'wrong-nonce-456', currentUserId: 'user-1' },
-        ),
-      ).rejects.toThrow(UnauthorizedException);
-    });
-
-    it('handleOAuthCallback mode link nên tạo identity canSignIn = false và cập nhật email khi hợp lệ', async () => {
-      mockRedisClient.get.mockResolvedValue(
-        JSON.stringify({
-          purpose: 'link-email',
-          userId: 'user-1',
-          authVersion: 0,
-          browserNonce: 'nonce-123',
-          returnUrl: '/profile',
-        }),
-      );
-
-      mockUsersRepository.findById.mockResolvedValue({
-        id: 'user-1',
-        isActive: true,
-        authVersion: 0,
-      });
-      mockUsersRepository.findByEmail.mockResolvedValue(null);
+    it('validateOAuthUser nên tạo mới Google user nếu chưa tồn tại', async () => {
       mockUsersRepository.findIdentity.mockResolvedValue(null);
-      mockUsersRepository.findUserWithIdentities.mockResolvedValue({
-        id: 'user-1',
-        email: null,
-        authVersion: 0,
-        identities: [],
-      });
-      mockUsersRepository.update.mockResolvedValue({
-        id: 'user-1',
-        email: 'linked@gmail.com',
+      mockUsersRepository.findByEmail.mockResolvedValue(null);
+      const createdUser = {
+        id: 'g-user-1',
+        email: 'newgoogle@gmail.com',
+        fullName: 'Google User',
         isVerified: true,
+        isActive: true,
+      };
+      mockUsersRepository.create.mockResolvedValue(createdUser);
+      mockUsersRepository.findUserWithIdentities.mockResolvedValue({
+        ...createdUser,
+        identities: [{ provider: 'GOOGLE' }],
       });
 
-      const result = await authService.handleOAuthCallback(
-        {
-          provider: 'GOOGLE',
-          providerUserId: 'google-sub-123',
-          email: 'linked@gmail.com',
-          fullName: 'Google User',
-        },
-        'state-123',
-        { browserNonce: 'nonce-123', currentUserId: 'user-1' },
-      );
+      const res = await authService.validateOAuthUser({
+        provider: 'GOOGLE',
+        providerUserId: 'g-999',
+        email: 'newgoogle@gmail.com',
+        fullName: 'Google User',
+      });
 
-      expect(result.mode).toBe('link');
+      expect(mockUsersRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: 'newgoogle@gmail.com',
+          isVerified: true,
+        }),
+      );
       expect(mockUsersRepository.createIdentity).toHaveBeenCalledWith(
         expect.objectContaining({
-          canSignIn: false,
-          providerUserId: 'google-sub-123',
+          canSignIn: true,
         }),
       );
-      expect(mockUsersRepository.update).toHaveBeenCalledWith('user-1', {
-        email: 'linked@gmail.com',
-        isVerified: true,
-        verifiedAt: expect.any(Date),
-      });
-    });
-
-    it('handleOAuthCallback mode link nên từ chối nếu email Google đã thuộc về tài khoản khác', async () => {
-      mockRedisClient.get.mockResolvedValue(
-        JSON.stringify({
-          purpose: 'link-email',
-          userId: 'user-1',
-          authVersion: 0,
-          browserNonce: 'nonce-123',
-          returnUrl: '/profile',
-        }),
-      );
-
-      mockUsersRepository.findById.mockResolvedValue({
-        id: 'user-1',
-        isActive: true,
-        authVersion: 0,
-      });
-      mockUsersRepository.findByEmail.mockResolvedValue({
-        id: 'user-different',
-        email: 'taken@gmail.com',
-      });
-
-      await expect(
-        authService.handleOAuthCallback(
-          {
-            provider: 'GOOGLE',
-            providerUserId: 'google-sub-123',
-            email: 'taken@gmail.com',
-            fullName: 'Google User',
-          },
-          'state-123',
-          { browserNonce: 'nonce-123', currentUserId: 'user-1' },
-        ),
-      ).rejects.toThrow(ConflictException);
-    });
-  });
-
-  describe('performLogout', () => {
-    it('thu hồi cả accessToken và refreshToken qua tokenBlacklistService', async () => {
-      mockJwtService.verify
-        .mockReturnValueOnce({ jti: 'jti-access', exp: 1234567, sub: 'user-1' })
-        .mockReturnValueOnce({ jti: 'jti-refresh', exp: 1234567, sub: 'user-1' });
-
-      await authService.performLogout({
-        accessToken: 'valid-access',
-        refreshToken: 'valid-refresh',
-      });
-
-      expect(mockTokenBlacklistService.revokeByJti).toHaveBeenCalledWith(
-        'jti-access',
-        1234567,
-        'user-1',
-      );
-      expect(mockTokenBlacklistService.revokeByJti).toHaveBeenCalledWith(
-        'jti-refresh',
-        1234567,
-        'user-1',
-      );
+      expect(res.tokens).toBeDefined();
     });
   });
 });

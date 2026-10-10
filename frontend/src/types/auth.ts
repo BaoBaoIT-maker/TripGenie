@@ -2,7 +2,6 @@ export type UserRole = 'ADMIN' | 'USER';
 
 export interface UserCapabilities {
   hasVerifiedEmail: boolean;
-  hasGoogleEmailLink: boolean;
   canResetPasswordByEmail: boolean;
 }
 
@@ -29,9 +28,16 @@ export interface AuthResponse {
 }
 
 export interface RegisterDto {
-  username: string;
+  email: string;
   fullName: string;
   password: string;
+}
+
+export interface RegisterResult {
+  message: string;
+  expiresIn: number;
+  retryAfter: number;
+  registrationId: string;
 }
 
 export interface LoginDto {
@@ -39,13 +45,14 @@ export interface LoginDto {
   password: string;
 }
 
-export interface ReauthenticateDto {
-  password: string;
+export interface VerifyEmailDto {
+  token: string;
 }
 
-export interface StartGoogleLinkDto {
-  grantToken: string;
-  returnUrl?: string;
+export interface ResendVerificationEmailResult {
+  message: string;
+  expiresIn: number;
+  retryAfter: number;
 }
 
 export interface OtpChallengeResponse {

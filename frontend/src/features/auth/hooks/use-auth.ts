@@ -68,26 +68,18 @@ export function useAuth() {
 
   const registerMutation = useMutation({
     mutationFn: authService.register,
+  });
+
+  const verifyEmailMutation = useMutation({
+    mutationFn: authService.verifyEmail,
     onSuccess: (data) => {
       queryClient.setQueryData(AUTH_QUERY_KEY, data.user);
       broadcastAuthEvent('login');
     },
   });
 
-  const reauthenticateMutation = useMutation({
-    mutationFn: (password: string) => authService.reauthenticate(password),
-  });
-
-  const startGoogleLinkMutation = useMutation({
-    mutationFn: ({ grantToken, returnUrl }: { grantToken: string; returnUrl?: string }) =>
-      authService.startGoogleLink(grantToken, returnUrl),
-  });
-
-  const updateUsernameMutation = useMutation({
-    mutationFn: (username: string) => authService.updateUsername(username),
-    onSuccess: (data) => {
-      queryClient.setQueryData(AUTH_QUERY_KEY, data.user);
-    },
+  const resendVerificationEmailMutation = useMutation({
+    mutationFn: authService.resendVerificationEmail,
   });
 
   const verifyOtpMutation = useMutation({
@@ -136,12 +128,10 @@ export function useAuth() {
     isLoggingIn: loginMutation.isPending,
     register: registerMutation.mutateAsync,
     isRegistering: registerMutation.isPending,
-    reauthenticate: reauthenticateMutation.mutateAsync,
-    isReauthenticating: reauthenticateMutation.isPending,
-    startGoogleLink: startGoogleLinkMutation.mutateAsync,
-    isStartingGoogleLink: startGoogleLinkMutation.isPending,
-    updateUsername: updateUsernameMutation.mutateAsync,
-    isUpdatingUsername: updateUsernameMutation.isPending,
+    verifyEmail: verifyEmailMutation.mutateAsync,
+    isVerifyingEmail: verifyEmailMutation.isPending,
+    resendVerificationEmail: resendVerificationEmailMutation.mutateAsync,
+    isResendingVerificationEmail: resendVerificationEmailMutation.isPending,
     verifyOtp: verifyOtpMutation.mutateAsync,
     isVerifyingOtp: verifyOtpMutation.isPending,
     resendOtp: resendOtpMutation.mutateAsync,

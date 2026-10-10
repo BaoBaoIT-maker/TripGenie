@@ -4,6 +4,8 @@ export const envValidationSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
   PORT: Joi.number().default(3000),
   BACKEND_BASE_URL: Joi.string().uri().required(),
+  FRONTEND_BASE_URL: Joi.string().uri().optional().default('http://localhost:3000'),
+  OTP_SECRET: Joi.string().optional().allow(''),
 
   // Database
   DATABASE_URL: Joi.string().required(),
@@ -16,6 +18,7 @@ export const envValidationSchema = Joi.object({
   // AI Assistant
   GEMINI_API_KEY: Joi.string().optional().allow('').default('mock_key'),
   GEMINI_MODEL: Joi.string().default('gemini-2.5-flash'),
+  GEMINI_EMBEDDING_MODEL: Joi.string().optional().allow(''),
   AI_PROVIDER: Joi.string().default('GEMINI'),
 
   // Auth & JWT
@@ -43,6 +46,7 @@ export const envValidationSchema = Joi.object({
   // Crawler & External POI APIs
   OVERPASS_API_URL: Joi.string().optional().allow(''),
   FOURSQUARE_API_KEY: Joi.string().optional().allow(''),
+  DEDUP_RADIUS_METERS: Joi.number().optional().default(50),
 
   // Email
   EMAIL_HOST: Joi.string().optional().allow(''),

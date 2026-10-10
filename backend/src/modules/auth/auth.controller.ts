@@ -4,33 +4,31 @@ import {
   Get,
   Body,
   UseGuards,
-  Req,
-  Res,
-  HttpStatus,
   HttpCode,
-  UnauthorizedException,
+  HttpStatus,
+  Res,
+  Req,
 } from '@nestjs/common';
+import { Response, Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import {
   RegisterDto,
   LoginDto,
   VerifyOtpDto,
-  RefreshTokenDto,
   ResendOtpDto,
   ForgotPasswordDto,
   VerifyResetOtpDto,
   ResetPasswordDto,
-  ReauthenticateDto,
-  StartGoogleLinkDto,
+  VerifyEmailDto,
+  ResendVerificationEmailDto,
 } from './dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
-import { AuthTokens, UserResponse } from './interfaces/auth.interface';
 import { AuthenticatedUser } from '@/common/types';
+import { UserResponse } from './interfaces/auth.interface';
 import { TokenBlacklistService } from './services/token-blacklist.service';
 
 @Controller('auth')
@@ -42,8 +40,9 @@ export class AuthController {
     private readonly tokenBlacklistService: TokenBlacklistService,
   ) {}
 
-  private setAuthCookies(res: Response, tokens: AuthTokens) {
+  private setAuthCookies(res: Response, tokens: { accessToken: string; refreshToken: string }) {
     const isProd = process.env.NODE_ENV === 'production';
+
     res.cookie('accessToken', tokens.accessToken, {
       httpOnly: true,
       secure: isProd,
@@ -51,6 +50,7 @@ export class AuthController {
       maxAge: 24 * 60 * 60 * 1000, // 1 day
       path: '/',
     });
+
     res.cookie('refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: isProd,
@@ -63,18 +63,29 @@ export class AuthController {
   private clearAuthCookies(res: Response) {
     res.clearCookie('accessToken', { path: '/' });
     res.clearCookie('refreshToken', { path: '/' });
-    res.clearCookie('oauth_link_nonce', { path: '/' });
   }
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  async register(
-    @Body() dto: RegisterDto,
+  async register(@Body() dto: RegisterDto) {
+    return this.authService.register(dto);
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  async verifyEmail(
+    @Body() dto: VerifyEmailDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const authResult = await this.authService.register(dto);
+    const authResult = await this.authService.verifyEmail(dto.token);
     this.setAuthCookies(res, authResult.tokens);
     return authResult;
+  }
+
+  @Post('resend-verification-email')
+  @HttpCode(HttpStatus.OK)
+  async resendVerificationEmail(@Body() dto: ResendVerificationEmailDto) {
+    return this.authService.resendVerificationEmail(dto.registrationId);
   }
 
   @Post('login')
@@ -86,36 +97,6 @@ export class AuthController {
     const authResult = await this.authService.login(dto);
     this.setAuthCookies(res, authResult.tokens);
     return authResult;
-  }
-
-  @Post('reauthenticate')
-  @UseGuards(JwtAuthGuard)
-  @HttpCode(HttpStatus.OK)
-  async reauthenticate(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: ReauthenticateDto,
-  ) {
-    return this.authService.reauthenticate(user.id, dto);
-  }
-
-  @Post('google/link/start')
-  @UseGuards(JwtAuthGuard)
-  @HttpCode(HttpStatus.OK)
-  async startGoogleLink(
-    @CurrentUser() user: AuthenticatedUser,
-    @Body() dto: StartGoogleLinkDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const result = await this.authService.startGoogleLink(user.id, dto);
-    const isProd = process.env.NODE_ENV === 'production';
-    res.cookie('oauth_link_nonce', result.browserNonce, {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: 'lax',
-      maxAge: 10 * 60 * 1000, // 10 minutes
-      path: '/',
-    });
-    return { url: result.url, state: result.state };
   }
 
   @Post('resend-otp')
@@ -146,49 +127,64 @@ export class AuthController {
 
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
-  async resetPassword(
-    @Body() dto: ResetPasswordDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const result = await this.authService.resetPassword(dto);
-    this.clearAuthCookies(res);
-    return result;
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.authService.resetPassword(dto);
   }
 
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  async refreshTokens(
+  async refresh(
     @Req() req: Request,
-    @Body() dto: RefreshTokenDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const refreshToken = req.cookies?.refreshToken || dto.refreshToken;
+    const refreshToken = req.cookies?.refreshToken;
     if (!refreshToken) {
-      throw new UnauthorizedException('Refresh Token không tồn tại');
+      this.clearAuthCookies(res);
+      return res.status(HttpStatus.UNAUTHORIZED).json({
+        statusCode: HttpStatus.UNAUTHORIZED,
+        message: 'Không tìm thấy refresh token trong cookie',
+      });
     }
 
-    const tokens = await this.authService.refreshTokens(refreshToken);
-    this.setAuthCookies(res, tokens);
-    return { tokens };
+    try {
+      const tokens = await this.authService.refreshTokens(refreshToken);
+      this.setAuthCookies(res, tokens);
+      return { tokens };
+    } catch (err: any) {
+      this.clearAuthCookies(res);
+      throw err;
+    }
   }
 
-  /**
-   * Logout: Robustly clears HttpOnly cookies and attempts to blacklist session tokens.
-   * Does NOT reject with 401 when access token is expired, ensuring complete session revocation.
-   */
   @Post('logout')
   @HttpCode(HttpStatus.OK)
   async logout(
     @Req() req: Request,
-    @Body() body: any,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const authHeader = req.headers.authorization;
-    const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : undefined;
-    const accessToken = req.cookies?.accessToken || bearerToken;
-    const refreshToken = req.cookies?.refreshToken || body?.refreshToken;
+    const accessToken = req.cookies?.accessToken;
+    const refreshToken = req.cookies?.refreshToken;
 
-    await this.authService.performLogout({ accessToken, refreshToken });
+    let userId = '';
+    if (accessToken) {
+      try {
+        const decoded = this.jwtService.decode(accessToken) as any;
+        userId = decoded?.sub || '';
+      } catch {
+        // Token invalid, clear cookies anyway
+      }
+    }
+
+    if (!userId && refreshToken) {
+      try {
+        const decoded = this.jwtService.decode(refreshToken) as any;
+        userId = decoded?.sub || '';
+      } catch {
+        // Token invalid
+      }
+    }
+
+    await this.authService.logout(userId, { accessToken, refreshToken });
     this.clearAuthCookies(res);
     return { message: 'Đăng xuất thành công' };
   }
@@ -214,77 +210,11 @@ export class AuthController {
       process.env.FRONTEND_BASE_URL ||
       'http://localhost:3000';
 
-    const stateParam = req.query?.state as string | undefined;
-    const browserNonce = req.cookies?.oauth_link_nonce;
-
-    // Clear one-time browser nonce cookie
-    res.clearCookie('oauth_link_nonce', { path: '/' });
-
-    // Try reading current authenticated user from session if present (checking blacklist)
-    let currentUserId: string | undefined;
-    const accessToken = req.cookies?.accessToken;
-    if (accessToken) {
-      try {
-        const payload = this.jwtService.verify(accessToken, {
-          secret: this.configService.get<string>('JWT_SECRET'),
-        });
-        if (payload?.jti) {
-          const isBlacklisted = await this.tokenBlacklistService.isBlacklisted(payload.jti);
-          if (!isBlacklisted) {
-            currentUserId = payload?.sub;
-          }
-        } else {
-          currentUserId = payload?.sub;
-        }
-      } catch {
-        // Access token might be expired, check refresh token
-      }
-    }
-
-    if (!currentUserId) {
-      const refreshToken = req.cookies?.refreshToken;
-      if (refreshToken) {
-        try {
-          const payload = this.jwtService.verify(refreshToken, {
-            secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-          });
-          if (payload?.jti) {
-            const isBlacklisted = await this.tokenBlacklistService.isBlacklisted(payload.jti);
-            if (!isBlacklisted) {
-              currentUserId = payload?.sub;
-            }
-          } else {
-            currentUserId = payload?.sub;
-          }
-        } catch {
-          // Refresh token expired or invalid
-        }
-      }
-    }
-
     try {
-      const result = await this.authService.handleOAuthCallback(req.user, stateParam, {
-        browserNonce,
-        currentUserId,
-      });
-
-      if (result.mode === 'link') {
-        const targetPath = result.returnUrl.startsWith('/') ? result.returnUrl : `/${result.returnUrl}`;
-        const delimiter = targetPath.includes('?') ? '&' : '?';
-        return res.redirect(`${frontendUrl}${targetPath}${delimiter}linked=true`);
-      }
-
+      const result = await this.authService.handleOAuthCallback(req.user);
       this.setAuthCookies(res, result.authResponse.tokens);
       return res.redirect(`${frontendUrl}/auth/callback?success=true`);
     } catch (err: any) {
-      if (stateParam) {
-        // Link mode error: never fall back to login!
-        const message = err?.message || 'Không thể liên kết tài khoản Google';
-        return res.redirect(
-          `${frontendUrl}/profile?link_error=${encodeURIComponent(message)}`,
-        );
-      }
-
       const errorCode =
         err?.status === 409 ? 'account_collision' : 'oauth_failed';
       return res.redirect(

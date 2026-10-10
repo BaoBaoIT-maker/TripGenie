@@ -6,7 +6,7 @@ export const loginSchema = z.object({
   identifier: z
     .string()
     .trim()
-    .min(1, 'Vui lòng nhập tên đăng nhập hoặc email'),
+    .min(1, 'Vui lòng nhập địa chỉ email hoặc tên đăng nhập'),
   password: z
     .string()
     .min(1, 'Vui lòng nhập mật khẩu'),
@@ -17,15 +17,11 @@ export type LoginFormData = z.infer<typeof loginSchema>;
 
 export const registerSchema = z
   .object({
-    username: z
+    email: z
       .string()
       .trim()
-      .min(3, 'Tên đăng nhập phải có ít nhất 3 ký tự')
-      .max(32, 'Tên đăng nhập không được vượt quá 32 ký tự')
-      .regex(
-        /^[a-zA-Z0-9._-]+$/,
-        'Tên đăng nhập chỉ gồm chữ cái, số, dấu chấm (.), gạch dưới (_) hoặc gạch ngang (-) và không chứa @',
-      ),
+      .min(1, 'Vui lòng nhập địa chỉ email')
+      .email('Địa chỉ email không hợp lệ'),
     fullName: z
       .string()
       .trim()
@@ -35,7 +31,7 @@ export const registerSchema = z
     password: z
       .string()
       .min(1, 'Vui lòng nhập mật khẩu')
-      .min(15, 'Mật khẩu phải có tối thiểu 15 ký tự')
+      .min(8, 'Mật khẩu phải có tối thiểu 8 ký tự')
       .refine((val) => getUtf8BytesLength(val) <= 72, {
         message: 'Mật khẩu không được vượt quá 72 bytes UTF-8',
       }),
@@ -75,7 +71,7 @@ export const resetPasswordSchema = z
     password: z
       .string()
       .min(1, 'Vui lòng nhập mật khẩu mới')
-      .min(15, 'Mật khẩu phải có tối thiểu 15 ký tự')
+      .min(8, 'Mật khẩu phải có tối thiểu 8 ký tự')
       .refine((val) => getUtf8BytesLength(val) <= 72, {
         message: 'Mật khẩu không được vượt quá 72 bytes UTF-8',
       }),
@@ -87,9 +83,3 @@ export const resetPasswordSchema = z
   });
 
 export type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
-
-export const reauthenticateSchema = z.object({
-  password: z.string().min(1, 'Vui lòng nhập mật khẩu để xác nhận'),
-});
-
-export type ReauthenticateFormData = z.infer<typeof reauthenticateSchema>;

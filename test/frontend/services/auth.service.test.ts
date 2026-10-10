@@ -18,18 +18,16 @@ describe('authService', () => {
     expect(user).toBeNull();
   });
 
-  it('getMe trả về user kèm username và capabilities khi backend trả về 200', async () => {
+  it('getMe trả về user kèm email và capabilities khi backend trả về 200', async () => {
     const mockUser = {
       id: 'user-1',
-      username: 'traveler1',
-      email: 'test@example.com',
+      email: 'traveler1@example.com',
       fullName: 'Test User',
       role: 'USER' as const,
       isVerified: true,
       authMethods: ['LOCAL' as const],
       capabilities: {
         hasVerifiedEmail: true,
-        hasGoogleEmailLink: false,
         canResetPasswordByEmail: true,
       },
     };
@@ -49,19 +47,12 @@ describe('authService', () => {
     expect(user).toEqual(mockUser);
   });
 
-  it('register gửi payload username, fullName, password và nhận AuthResponse', async () => {
+  it('register gửi payload email, fullName, password và nhận RegisterResult', async () => {
     const mockResponse = {
-      user: {
-        id: 'user-1',
-        username: 'traveler1',
-        fullName: 'Test User',
-        role: 'USER' as const,
-        isVerified: false,
-      },
-      tokens: {
-        accessToken: 'mock_at',
-        refreshToken: 'mock_rt',
-      },
+      message: 'Đăng ký thành công. Vui lòng kiểm tra email.',
+      expiresIn: 1800,
+      retryAfter: 60,
+      registrationId: 'reg-uuid-1',
     };
 
     const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
@@ -76,9 +67,9 @@ describe('authService', () => {
     } as Response);
 
     const result = await authService.register({
-      username: 'traveler1',
+      email: 'traveler1@example.com',
       fullName: 'Test User',
-      password: 'Password123456789!',
+      password: 'Password123!',
     });
 
     expect(fetchSpy).toHaveBeenCalledWith(
@@ -87,20 +78,90 @@ describe('authService', () => {
         method: 'POST',
         credentials: 'include',
         body: JSON.stringify({
-          username: 'traveler1',
+          email: 'traveler1@example.com',
           fullName: 'Test User',
-          password: 'Password123456789!',
+          password: 'Password123!',
         }),
       }),
     );
-    expect(result.user.username).toBe('traveler1');
+    expect(result.registrationId).toBe('reg-uuid-1');
+  });
+
+  it('verifyEmail gửi token và nhận AuthResponse', async () => {
+    const mockResponse = {
+      user: {
+        id: 'user-1',
+        email: 'traveler1@example.com',
+        fullName: 'Test User',
+        role: 'USER' as const,
+        isVerified: true,
+      },
+      tokens: {
+        accessToken: 'mock_at',
+        refreshToken: 'mock_rt',
+      },
+    };
+
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({
+        statusCode: 200,
+        success: true,
+        data: mockResponse,
+      }),
+    } as Response);
+
+    const result = await authService.verifyEmail('valid-token-hex');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining('/auth/verify-email'),
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        body: JSON.stringify({ token: 'valid-token-hex' }),
+      }),
+    );
+    expect(result.user.email).toBe('traveler1@example.com');
+  });
+
+  it('resendVerificationEmail gửi registrationId', async () => {
+    const mockResponse = {
+      message: 'Email xác thực mới đã được gửi.',
+      expiresIn: 1800,
+      retryAfter: 60,
+    };
+
+    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({
+        statusCode: 200,
+        success: true,
+        data: mockResponse,
+      }),
+    } as Response);
+
+    const result = await authService.resendVerificationEmail('reg-uuid-1');
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.stringContaining('/auth/resend-verification-email'),
+      expect.objectContaining({
+        method: 'POST',
+        credentials: 'include',
+        body: JSON.stringify({ registrationId: 'reg-uuid-1' }),
+      }),
+    );
+    expect(result.expiresIn).toBe(1800);
   });
 
   it('login gửi identifier và password', async () => {
     const mockResponse = {
       user: {
         id: 'user-1',
-        username: 'traveler1',
+        email: 'traveler1@example.com',
         fullName: 'Test User',
         role: 'USER' as const,
         isVerified: true,
@@ -119,8 +180,8 @@ describe('authService', () => {
     } as Response);
 
     const result = await authService.login({
-      identifier: 'traveler1',
-      password: 'Password123456789!',
+      identifier: 'traveler1@example.com',
+      password: 'Password123!',
     });
 
     expect(fetchSpy).toHaveBeenCalledWith(
@@ -129,58 +190,12 @@ describe('authService', () => {
         method: 'POST',
         credentials: 'include',
         body: JSON.stringify({
-          identifier: 'traveler1',
-          password: 'Password123456789!',
+          identifier: 'traveler1@example.com',
+          password: 'Password123!',
         }),
       }),
     );
-    expect(result.user.username).toBe('traveler1');
-  });
-
-  it('reauthenticate gửi password và trả về grantToken', async () => {
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      headers: new Headers({ 'content-type': 'application/json' }),
-      json: async () => ({
-        statusCode: 200,
-        success: true,
-        data: { grantToken: 'grant-xyz', expiresIn: 300 },
-      }),
-    } as Response);
-
-    const res = await authService.reauthenticate('Secret123456789!');
-    expect(fetchSpy).toHaveBeenCalledWith(
-      expect.stringContaining('/auth/reauthenticate'),
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ password: 'Secret123456789!' }),
-      }),
-    );
-    expect(res.grantToken).toBe('grant-xyz');
-  });
-
-  it('startGoogleLink gửi grantToken và returnUrl', async () => {
-    const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      headers: new Headers({ 'content-type': 'application/json' }),
-      json: async () => ({
-        statusCode: 200,
-        success: true,
-        data: { url: 'https://accounts.google.com/...', state: 'state-123' },
-      }),
-    } as Response);
-
-    const res = await authService.startGoogleLink('grant-xyz', '/profile');
-    expect(fetchSpy).toHaveBeenCalledWith(
-      expect.stringContaining('/auth/google/link/start'),
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify({ grantToken: 'grant-xyz', returnUrl: '/profile' }),
-      }),
-    );
-    expect(res.url).toContain('https://accounts.google.com');
+    expect(result.user.email).toBe('traveler1@example.com');
   });
 
   it('logout gửi request và trả về thông báo', async () => {

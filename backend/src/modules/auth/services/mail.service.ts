@@ -105,4 +105,72 @@ export class MailService {
       return false;
     }
   }
+
+  async sendVerificationLinkEmail(
+    toEmail: string,
+    verificationUrl: string,
+  ): Promise<boolean> {
+    const sender = this.configService.get<string>('EMAIL_USER');
+    const subject = `[TripGenie] Kích hoạt tài khoản của bạn`;
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f7fafc; margin: 0; padding: 24px; }
+          .container { max-width: 560px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05); }
+          .header { background: linear-gradient(135deg, #0d9488 0%, #0f766e 100%); padding: 32px 24px; text-align: center; }
+          .header h1 { color: #ffffff; margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.5px; }
+          .content { padding: 32px 28px; color: #334155; line-height: 1.6; }
+          .btn-box { text-align: center; margin: 32px 0; }
+          .btn { background-color: #0d9488; color: #ffffff !important; padding: 14px 32px; border-radius: 12px; font-weight: 700; text-decoration: none; display: inline-block; font-size: 15px; }
+          .footer { padding: 20px 28px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>TripGenie</h1>
+          </div>
+          <div class="content">
+            <h2 style="color: #0f172a; margin-top: 0; font-size: 20px;">Xác Thực Tài Khoản TripGenie</h2>
+            <p>Xin chào,</p>
+            <p>Cảm ơn bạn đã đăng ký tài khoản tại <strong>TripGenie</strong> — Nền tảng Lập kế hoạch Du lịch Thông minh.</p>
+            <p>Vui lòng nhấn vào nút bên dưới để xác thực địa chỉ email và kích hoạt tài khoản của bạn:</p>
+            <div class="btn-box">
+              <a href="${verificationUrl}" target="_blank" class="btn">Xác Thực Tài Khoản</a>
+            </div>
+            <p style="margin-bottom: 8px;">Đường link xác thực này có hiệu lực trong vòng <strong>30 phút</strong>.</p>
+            <p style="color: #64748b; font-size: 13px;">Nếu nút trên không bấm được, bạn có thể copy liên kết này vào trình duyệt:<br/><a href="${verificationUrl}" style="color: #0d9488; word-break: break-all;">${verificationUrl}</a></p>
+          </div>
+          <div class="footer">
+            <p style="margin: 0;">Đây là email tự động từ hệ thống TripGenie, vui lòng không phản hồi thư này.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    try {
+      if (!sender || sender.includes('mock_email')) {
+        this.logger.warn(`Mock email configured (${sender}) — Verification URL: ${verificationUrl}`);
+        return true;
+      }
+
+      await this.transporter.sendMail({
+        from: `"TripGenie" <${sender}>`,
+        to: toEmail,
+        subject,
+        html: htmlContent,
+      });
+
+      this.logger.log(`Email verification link sent successfully to ${toEmail}`);
+      return true;
+    } catch (error: any) {
+      this.logger.error(`Failed to send verification email to ${toEmail}: ${error.message}`, error.stack);
+      return false;
+    }
+  }
 }

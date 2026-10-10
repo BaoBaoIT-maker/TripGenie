@@ -83,7 +83,7 @@ export function ResetPasswordForm() {
   return (
     <div className="space-y-6">
       <p className="text-xs text-muted-foreground leading-relaxed">
-        Tạo mật khẩu mới cho tài khoản của bạn. Mật khẩu phải có tối thiểu 15 ký tự để bảo đảm an toàn.
+        Tạo mật khẩu mới cho tài khoản của bạn. Mật khẩu phải có tối thiểu 8 ký tự (tối đa 72 bytes) để bảo đảm an toàn.
       </p>
 
       {serverError && (
@@ -112,7 +112,7 @@ export function ResetPasswordForm() {
               {...register('password')}
               type={showPassword ? 'text' : 'password'}
               autoComplete="new-password"
-              placeholder="Tối thiểu 6 ký tự"
+              placeholder="Tối thiểu 8 ký tự"
               className="w-full h-10 pl-9 pr-10 rounded-xl border border-input bg-background/50 text-sm placeholder:text-muted-foreground/60 transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
             <button

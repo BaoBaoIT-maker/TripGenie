@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { Sparkles, CalendarDays, Bookmark, Plus, Compass, Settings, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -15,35 +15,20 @@ import { MOCK_PLACES } from "@/mocks/data/places";
 import { toast } from "sonner";
 
 function ProfileContent() {
-  const { user, refetchUser } = useAuth();
-  const router = useRouter();
+  const { user } = useAuth();
   const searchParams = useSearchParams();
-  const linkedParam = searchParams.get("linked");
-  const linkErrorParam = searchParams.get("link_error");
   const tabParam = searchParams.get("tab");
 
   const [activeTab, setActiveTab] = useState<"planners" | "saved" | "preferences" | "account">(() => {
-    if (linkedParam || linkErrorParam || tabParam === "account") return "account";
+    if (tabParam === "account") return "account";
     return "planners";
   });
 
   useEffect(() => {
-    if (linkedParam === "true") {
-      toast.success("Liên kết tài khoản Gmail thành công!");
-      refetchUser();
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.setItem("tripgenie:auth_event", `login:${Date.now()}`);
-        } catch {
-          /* ignore storage error */
-        }
-      }
-      router.replace("/profile");
-    } else if (linkErrorParam) {
-      toast.error(decodeURIComponent(linkErrorParam));
-      router.replace("/profile");
+    if (tabParam === "account") {
+      setActiveTab("account");
     }
-  }, [linkedParam, linkErrorParam, refetchUser, router]);
+  }, [tabParam]);
   const [preferences, setPreferences] = useState<string[]>([
     "Cafe chill",
     "View hoàng hôn",

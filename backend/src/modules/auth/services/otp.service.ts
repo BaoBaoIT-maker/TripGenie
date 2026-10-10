@@ -108,6 +108,7 @@ export class OtpService {
 
     // 3. Generate Cryptographically Secure 6-digit OTP
     const rawOtp = crypto.randomInt(100000, 1000000).toString();
+    this.logger.log(`🔑 [OTP DEBUG] Mã OTP cho ${normalizedEmail} (${purpose}) là: ${rawOtp}`);
     const otpHash = this.hashOtp(rawOtp);
     const now = Date.now();
 

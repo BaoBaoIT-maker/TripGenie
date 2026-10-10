@@ -5,12 +5,13 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { User, Lock, Eye, EyeOff, Loader2, AlertCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { loginSchema, LoginFormData } from '../schemas/auth.schema';
 import { useAuth } from '../hooks/use-auth';
 import { GoogleAuthButton } from './GoogleAuthButton';
 import { getSafeRedirectUrl } from '@/lib/safe-redirect';
+import { ApiClientError } from '@/lib/api-client';
 
 export function LoginForm() {
   const router = useRouter();
@@ -20,13 +21,14 @@ export function LoginForm() {
 
   const [showPassword, setShowPassword] = React.useState(false);
   const [formError, setFormError] = React.useState<string | null>(null);
+  const [isUnverified, setIsUnverified] = React.useState(false);
 
   const initialOAuthError = React.useMemo(() => {
     if (errorParam === 'oauth_failed') {
       return 'Đăng nhập với Google thất bại. Vui lòng thử lại.';
     }
     if (errorParam === 'account_collision') {
-      return 'Email này đã thuộc về một tài khoản khác. Vui lòng đăng nhập bằng phương thức tương ứng hoặc liên kết trong Profile.';
+      return 'Email này đã thuộc về một tài khoản khác. Vui lòng đăng nhập bằng mật khẩu.';
     }
     return null;
   }, [errorParam]);
@@ -50,6 +52,7 @@ export function LoginForm() {
 
   const onSubmit = async (data: LoginFormData) => {
     setFormError(null);
+    setIsUnverified(false);
     try {
       await login({
         identifier: data.identifier,
@@ -59,8 +62,13 @@ export function LoginForm() {
       router.push(nextUrl);
       router.refresh();
     } catch (err: unknown) {
+      if (err instanceof ApiClientError && err.code === 'EMAIL_NOT_VERIFIED') {
+        setIsUnverified(true);
+        setFormError('Tài khoản chưa được kích hoạt qua email. Vui lòng kiểm tra hộp thư đến để nhấn vào liên kết xác thực.');
+        return;
+      }
       const message =
-        err instanceof Error ? err.message : 'Tên đăng nhập/email hoặc mật khẩu không chính xác';
+        err instanceof Error ? err.message : 'Tài khoản/email hoặc mật khẩu không chính xác';
       setFormError(message);
     }
   };
@@ -68,9 +76,26 @@ export function LoginForm() {
   return (
     <div className="space-y-6">
       {displayError && (
-        <div className="flex items-start gap-3 p-3.5 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive text-sm leading-relaxed animate-in fade-in">
-          <AlertCircle className="size-4.5 shrink-0 mt-0.5" />
-          <span>{displayError}</span>
+        <div
+          className={`flex items-start gap-3 p-3.5 rounded-xl border text-sm leading-relaxed animate-in fade-in ${
+            isUnverified
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400'
+              : 'bg-destructive/10 border-destructive/20 text-destructive'
+          }`}
+        >
+          {isUnverified ? (
+            <Info className="size-4.5 shrink-0 mt-0.5" />
+          ) : (
+            <AlertCircle className="size-4.5 shrink-0 mt-0.5" />
+          )}
+          <div className="space-y-1">
+            <p className="font-semibold">{displayError}</p>
+            {isUnverified && (
+              <p className="text-xs text-muted-foreground">
+                Nếu bạn không tìm thấy thư kích hoạt, hãy kiểm tra thư mục Spam hoặc thực hiện đăng ký lại để nhận liên kết mới.
+              </p>
+            )}
+          </div>
         </div>
       )}
 
@@ -78,15 +103,15 @@ export function LoginForm() {
         {/* Identifier Field */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-foreground tracking-wide">
-            Tên đăng nhập hoặc Email
+            Địa chỉ Email hoặc Tên đăng nhập
           </label>
           <div className="relative">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
             <input
               {...register('identifier')}
               type="text"
               autoComplete="username"
-              placeholder="vd: traveler_01 hoặc email@domain.com"
+              placeholder="vd: traveler@example.com"
               className="w-full h-10 pl-9 pr-3.5 rounded-xl border border-input bg-background/50 text-sm placeholder:text-muted-foreground/60 transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>
@@ -114,7 +139,7 @@ export function LoginForm() {
               {...register('password')}
               type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
-              placeholder="•••••••••••••••"
+              placeholder="Tối thiểu 8 ký tự"
               className="w-full h-10 pl-9 pr-10 rounded-xl border border-input bg-background/50 text-sm placeholder:text-muted-foreground/60 transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
             <button

@@ -10,6 +10,7 @@ import {
   Bookmark,
   Users,
   User,
+  ShieldCheck,
   LogOut,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -137,17 +139,25 @@ export function Navbar() {
                   </Avatar>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 p-1.5 rounded-2xl shadow-lg border border-border/80">
-                  <DropdownMenuLabel className="px-2.5 py-2">
-                    <div className="font-semibold text-xs text-foreground truncate">{user?.fullName || "Người dùng"}</div>
-                    <div className="text-[11px] text-muted-foreground truncate">
-                      {user?.username ? `@${user.username}` : user?.email || "Thành viên TripGenie"}
-                    </div>
-                  </DropdownMenuLabel>
+                  <DropdownMenuGroup>
+                    <DropdownMenuLabel className="px-2.5 py-2">
+                      <div className="font-semibold text-xs text-foreground truncate">{user?.fullName || "Người dùng"}</div>
+                      <div className="text-[11px] text-muted-foreground truncate">
+                        {user?.username ? `@${user.username}` : user?.email || "Thành viên TripGenie"}
+                      </div>
+                    </DropdownMenuLabel>
+                  </DropdownMenuGroup>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem className="rounded-xl cursor-pointer">
                     <Link href="/profile" className="flex items-center gap-2 w-full text-xs font-medium">
                       <User className="size-3.5" />
                       <span>Hồ sơ cá nhân</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="rounded-xl cursor-pointer">
+                    <Link href="/profile?tab=account" className="flex items-center gap-2 w-full text-xs font-medium">
+                      <ShieldCheck className="size-3.5" />
+                      <span>Tài khoản & Bảo mật</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem className="rounded-xl cursor-pointer">

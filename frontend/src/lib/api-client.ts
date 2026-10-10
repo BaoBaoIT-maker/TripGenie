@@ -5,6 +5,7 @@ export class ApiClientError extends Error {
     message: string,
     public statusCode: number,
     public errors?: string[] | Record<string, unknown>,
+    public code?: string,
   ) {
     super(message);
     this.name = 'ApiClientError';
@@ -107,6 +108,7 @@ export async function apiClient<T = unknown>(
   if (!response.ok) {
     let errorMessage = 'Đã có lỗi xảy ra. Vui lòng thử lại.';
     let errorDetails: unknown = undefined;
+    const errorCode = data && typeof data.code === 'string' ? data.code : undefined;
 
     if (data) {
       if (typeof data.message === 'string') {
@@ -119,7 +121,12 @@ export async function apiClient<T = unknown>(
       }
     }
 
-    throw new ApiClientError(errorMessage, response.status, errorDetails as string[] | Record<string, unknown> | undefined);
+    throw new ApiClientError(
+      errorMessage,
+      response.status,
+      errorDetails as string[] | Record<string, unknown> | undefined,
+      errorCode,
+    );
   }
 
   // If backend wrapped in { statusCode, success, message, data }, return data directly

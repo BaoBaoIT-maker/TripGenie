@@ -9,6 +9,7 @@ import Redis from 'ioredis';
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
 import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
+import { AUTH_CONSTANTS } from '@/common/constants/auth.constants';
 import { IUsersRepository } from '@/modules/users/interfaces/users-repository.interface';
 import { OtpService } from './otp.service';
 import { PrismaService } from '@/database/prisma.service';
@@ -128,12 +129,16 @@ export class PasswordResetService {
       throw new BadRequestException('Vé xác thực đặt lại mật khẩu không hợp lệ');
     }
 
-    if (!newPassword || newPassword.length < 15) {
-      throw new BadRequestException('Mật khẩu mới phải có tối thiểu 15 ký tự');
+    if (!newPassword || newPassword.length < AUTH_CONSTANTS.PASSWORD_MIN_LENGTH) {
+      throw new BadRequestException(
+        `Mật khẩu mới phải có tối thiểu ${AUTH_CONSTANTS.PASSWORD_MIN_LENGTH} ký tự`,
+      );
     }
 
-    if (Buffer.byteLength(newPassword, 'utf8') > 72) {
-      throw new BadRequestException('Mật khẩu không được vượt quá 72 bytes UTF-8');
+    if (Buffer.byteLength(newPassword, 'utf8') > AUTH_CONSTANTS.PASSWORD_MAX_BYTES) {
+      throw new BadRequestException(
+        `Mật khẩu không được vượt quá ${AUTH_CONSTANTS.PASSWORD_MAX_BYTES} bytes UTF-8`,
+      );
     }
 
     const ticketKey = this.getTicketKey(resetTicket);

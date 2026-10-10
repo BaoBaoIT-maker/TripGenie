@@ -6,5 +6,5 @@ export * from './resend-otp.dto';
 export * from './forgot-password.dto';
 export * from './verify-reset-otp.dto';
 export * from './reset-password.dto';
-export * from './reauthenticate.dto';
-export * from './start-google-link.dto';
+export * from './verify-email.dto';
+export * from './resend-verification-email.dto';

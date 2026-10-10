@@ -5,6 +5,8 @@ import {
   OtpChallengeResponse,
   ResetTicketResponse,
   RegisterDto,
+  RegisterResult,
+  ResendVerificationEmailResult,
   LoginDto,
 } from '@/types/auth';
 
@@ -32,35 +34,27 @@ export const authService = {
     });
   },
 
-  async register(data: RegisterDto): Promise<AuthResponse> {
-    return apiClient<AuthResponse>('/auth/register', {
+  async register(data: RegisterDto): Promise<RegisterResult> {
+    return apiClient<RegisterResult>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
       skipAuthRefresh: true,
     });
   },
 
-  async reauthenticate(password: string): Promise<{ grantToken: string; expiresIn: number }> {
-    return apiClient<{ grantToken: string; expiresIn: number }>('/auth/reauthenticate', {
+  async verifyEmail(token: string): Promise<AuthResponse> {
+    return apiClient<AuthResponse>('/auth/verify-email', {
       method: 'POST',
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ token }),
+      skipAuthRefresh: true,
     });
   },
 
-  async startGoogleLink(
-    grantToken: string,
-    returnUrl?: string,
-  ): Promise<{ url: string; state: string }> {
-    return apiClient<{ url: string; state: string }>('/auth/google/link/start', {
+  async resendVerificationEmail(registrationId: string): Promise<ResendVerificationEmailResult> {
+    return apiClient<ResendVerificationEmailResult>('/auth/resend-verification-email', {
       method: 'POST',
-      body: JSON.stringify({ grantToken, returnUrl }),
-    });
-  },
-
-  async updateUsername(username: string): Promise<{ message: string; user: AuthUser }> {
-    return apiClient<{ message: string; user: AuthUser }>('/users/me/username', {
-      method: 'PATCH',
-      body: JSON.stringify({ username }),
+      body: JSON.stringify({ registrationId }),
+      skipAuthRefresh: true,
     });
   },
 

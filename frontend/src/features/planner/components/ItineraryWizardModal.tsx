@@ -19,19 +19,15 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  Lightbulb,
   AlertTriangle,
-  ShieldAlert,
   Loader2,
   Navigation,
-  TrainFront,
-  Layers,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { useGenerateItinerary, useTransitPreview } from '../hooks/use-itinerary-planner';
 import { placeService } from '@/services/place.service';
 import { ApiError } from '@/services/itinerary-planner.service';
-import { formatVnd } from '../model/itinerary-format';
+import TransitRouteBreakdown from './itinerary/TransitRouteBreakdown';
 import type { TransitMode, IntracityMode, BudgetLevel, TravelPace } from '@/types/itinerary';
 
 interface Props {
@@ -182,23 +178,6 @@ const TRAVEL_STYLE_TAGS = [
   'Trải nghiệm thủ công',
 ];
 
-function cleanHubName(name?: string): string {
-  if (!name) return '';
-  if (name.includes('?')) {
-    if (/t[?]+n/i.test(name) || /s[?]+n\s*bay/i.test(name) && name.includes('Nh')) {
-      return 'Sân bay Quốc tế Tân Sơn Nhất (SGN)';
-    }
-    if (/n[?]+ng/i.test(name) || name.includes('DAD')) {
-      return 'Sân bay Quốc tế Đà Nẵng (DAD)';
-    }
-    if (/n[?]+i\s*b[?]+i/i.test(name) || name.includes('HAN')) {
-      return 'Sân bay Quốc tế Nội Bài (HAN)';
-    }
-    return name.replace(/\?+/g, '');
-  }
-  return name;
-}
-
 export default function ItineraryWizardModal({ isOpen, onClose, initialDestination }: Props) {
   const router = useRouter();
 
@@ -333,11 +312,6 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
     departDate: startDate,
     returnDate: endDate,
   });
-
-  const distKm = transitPreview?.distanceKm ?? 0;
-  const durMinutes = transitPreview?.durationMinutes ?? 0;
-  const durHours = Math.round(durMinutes / 60);
-  const priceOneWay = transitPreview?.estimatedPriceOneWay ?? 0;
 
   useEffect(() => {
     if (initialDestination) {
@@ -832,206 +806,19 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                     <Loader2 className="size-5 text-teal-600 animate-spin shrink-0" />
                     <div>
                       <div className="text-xs sm:text-sm font-bold text-teal-950">
-                        Đang đồng bộ lộ trình & tính cự ly thực tế từ CSDL...
+                        Đang đồng bộ lộ trình &amp; tính cự ly thực tế từ CSDL...
                       </div>
                       <div className="text-[11px] text-teal-700/80 mt-0.5">
                         Tuyến đường: {cleanOrigin} ──&gt; {cleanDest}
                       </div>
                     </div>
                   </div>
-                ) : transitPreview.isMultiModal ? (
-                  /* ── Multi-Modal Connecting Route Box (Train to Da Lat/Sa Pa/Phu Quoc, Bus/Bike to Islands) ── */
-                  <div className="rounded-2xl border border-indigo-200 bg-indigo-50/70 p-4 space-y-3 shadow-2xs">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
-                        <Layers className="size-4 text-indigo-600 shrink-0" />
-                        <span>LỘ TRÌNH NỐI CHẶNG THÔNG MINH ({transitPreview.mode === 'TRAIN' ? 'TÀU HỎA + XE TRUNG CHUYỂN' : 'XE KHÁCH + TÀU CAO TỐC'}):</span>
-                      </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 border border-indigo-300">
-                        {transitPreview.transferLeg?.type === 'FERRY' ? 'Vượt biển sang đảo' : 'Vượt đèo / Kết nối vùng cao'}
-                      </span>
-                    </div>
-
-                    <div className="space-y-2 text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">
-                      {transitPreview.details?.routeSteps?.map((step, idx) => (
-                        <div key={idx} className="flex items-start gap-2">
-                          <span className="size-5 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">
-                            {idx + 1}
-                          </span>
-                          <p className="flex-1 text-slate-800">{step}</p>
-                        </div>
-                      ))}
-                    </div>
-
-                    {transitPreview.transferLeg && (
-                      <div className="rounded-xl bg-white border border-indigo-200 p-3 text-xs flex items-center justify-between shadow-2xs">
-                        <div className="flex items-center gap-2">
-                          <TrainFront className="size-4 text-indigo-600 shrink-0" />
-                          <span className="font-bold text-slate-800">
-                            Chặng nối: {transitPreview.transferLeg.title}
-                          </span>
-                        </div>
-                        <span className="font-bold text-indigo-700">
-                          ~{formatVnd(transitPreview.transferLeg.estimatedPrice)}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="bg-white/90 rounded-xl border border-indigo-200/80 p-3 text-xs text-indigo-950 flex items-center gap-2 shadow-2xs">
-                      <Lightbulb className="size-4 text-amber-500 shrink-0" />
-                      <span>
-                        <strong>Gợi ý kinh nghiệm:</strong> {transitPreview.details?.notes || 'Hệ thống tự động đồng bộ giờ tàu và xe trung chuyển để chuyến đi của bạn thông suốt.'}
-                      </span>
-                    </div>
-                  </div>
-                ) : transitMode === 'PERSONAL_MOTORBIKE' ? (
-                  <div className={`rounded-2xl border p-4 space-y-3 shadow-xs ${
-                    distKm > 350
-                      ? 'border-rose-300 bg-rose-50/80 text-rose-950'
-                      : 'border-amber-300 bg-amber-50/80 text-amber-950'
-                  }`}>
-                    <div className="text-xs font-bold flex items-center gap-1.5">
-                      {distKm > 350 ? (
-                        <>
-                          <ShieldAlert className="size-4 text-rose-600 shrink-0" />
-                          <span className="text-rose-900 font-extrabold">CẢNH BÁO AN TOÀN PHƯỢT XE MÁY ({cleanOrigin} ──&gt; {cleanDest}):</span>
-                        </>
-                      ) : (
-                        <>
-                          <AlertTriangle className="size-4 text-amber-600 shrink-0" />
-                          <span className="text-amber-900 font-extrabold">LƯU Ý PHƯỢT XE MÁY & CẢNH BÁO AN TOÀN ({cleanOrigin} ──&gt; {cleanDest}):</span>
-                        </>
-                      )}
-                    </div>
-
-                    {distKm > 350 ? (
-                      <div className="space-y-2 text-xs sm:text-sm text-rose-950 leading-relaxed font-medium">
-                        <p className="font-bold text-rose-800">
-                          CỰ LY QUÁ XA CHO XE MÁY (~{distKm} km, mất hơn{' '}
-                          {durHours} tiếng lái xe liên tục):
-                        </p>
-                        <p>
-                          Quãng đường {distKm} km bằng xe máy cực kỳ nguy hiểm, dễ gây kiệt sức và mất an toàn giao thông nghiêm trọng. Bạn nên ưu tiên chọn <strong>Xe khách giường nằm</strong> hoặc <strong>Máy bay</strong> để bảo đảm sức khỏe cho chuyến đi!
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2 text-xs sm:text-sm text-amber-950 leading-relaxed font-medium">
-                        <p>
-                          1. <strong>Cung đường phượt xe máy:</strong> Từ {cleanOrigin} ──&gt; {cleanDest} (~{distKm} km, dự kiến ~{durHours} tiếng lái xe).
-                        </p>
-                        <p>
-                          2. <strong>Chi phí xăng xe ước tính:</strong> ~{formatVnd(priceOneWay)} (khoảng {transitPreview.details?.fuelLiters ?? (priceOneWay / (transitPreview.details?.gasPricePerLiter || 23000)).toFixed(1)} lít xăng RON95, xe tự lái không tốn tiền vé).
-                        </p>
-                        <p className="text-amber-900 font-semibold bg-amber-100/80 p-2.5 rounded-xl border border-amber-300 text-xs flex items-start gap-1.5">
-                          <AlertTriangle className="size-3.5 text-amber-600 shrink-0 mt-0.5" />
-                          <span><strong>Cảnh báo an toàn đường trường:</strong> Cung đường qua nhiều đoạn đèo quanh co và thời tiết thay đổi. Bắt buộc kiểm tra kỹ phanh, lốp xe, đổ đầy bình xăng trước khi lên đèo, mặc đồ bảo hộ và tuyệt đối không chạy xe tốc độ cao vào ban đêm!</span>
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="bg-white/90 rounded-xl border border-amber-200/80 p-3 text-xs text-amber-900 flex items-center gap-2 shadow-2xs">
-                      <Lightbulb className="size-4 text-amber-600 shrink-0" />
-                      <span>
-                        <strong>Khuyến nghị:</strong> Nên xuất phát sớm từ 5:00 sáng, dừng nghỉ 15–20 phút sau mỗi 2 tiếng lái xe để uống nước và thư giãn cơ bắp.
-                      </span>
-                    </div>
-                  </div>
-                ) : transitMode === 'SLEEPER_BUS' ? (
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-4 space-y-2.5">
-                    <div className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                      <MapPin className="size-3.5 text-amber-600 shrink-0" />
-                      <span>LỘ TRÌNH XE KHÁCH GIƯỜNG NẰM LIÊN TỈNH:</span>
-                    </div>
-                    <div className="space-y-1.5 text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">
-                      {transitPreview.details?.routeSteps && transitPreview.details.routeSteps.length > 0 ? (
-                        transitPreview.details.routeSteps.map((step, idx) => (
-                          <p key={idx}>{idx + 1}. {step}</p>
-                        ))
-                      ) : (
-                        <>
-                          <p>
-                            1. Đón xe tại{' '}
-                            <strong>{cleanHubName(transitPreview?.originHub?.name || `Bến xe tại ${cleanOrigin}`)}</strong> ──&gt;{' '}
-                            <strong>{cleanHubName(transitPreview?.destHub?.name || `Bến xe tại ${cleanDest}`)}</strong> (
-                            ~{durHours} tiếng, ~{formatVnd(priceOneWay)}/vé)
-                          </p>
-                          <p>
-                            2. Các nhà xe uy tín chất lượng cao: <strong>Phương Trang (FUTA), Thành Bưởi, Limousine giường nằm cao cấp</strong>
-                          </p>
-                        </>
-                      )}
-                    </div>
-                    <div className="bg-white rounded-xl border border-amber-200 p-3 text-xs text-slate-700 flex items-center gap-2 shadow-2xs">
-                      <Lightbulb className="size-4 text-amber-500 shrink-0" />
-                      <span>
-                        <strong>Gợi ý:</strong> {transitPreview.details?.notes || 'Khuyên chọn xe giường nằm xuất phát tối (22:00 – 23:00) để ngủ đêm trên xe, tiết kiệm 1 đêm khách sạn.'}
-                      </span>
-                    </div>
-                  </div>
-                ) : transitMode === 'TRAIN' ? (
-                  <div className="rounded-2xl border border-indigo-200 bg-indigo-50/50 p-4 space-y-2.5">
-                    <div className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
-                      <TrainFront className="size-3.5 text-indigo-600 shrink-0" />
-                      <span>TUYẾN ĐƯỜNG SẮT VIỆT NAM (ĐƯỜNG SẮT BẮC NAM):</span>
-                    </div>
-                    <div className="space-y-1.5 text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">
-                      {transitPreview.details?.routeSteps && transitPreview.details.routeSteps.length > 0 ? (
-                        transitPreview.details.routeSteps.map((step, idx) => (
-                          <p key={idx}>{idx + 1}. {step}</p>
-                        ))
-                      ) : (
-                        <>
-                          <p>
-                            1. Tuyến tàu: <strong>{cleanHubName(transitPreview?.originHub?.name || `Ga ${cleanOrigin}`)}</strong> ──&gt;{' '}
-                            <strong>{cleanHubName(transitPreview?.destHub?.name || `Ga ${cleanDest}`)}</strong> (
-                            ~{durHours} tiếng, ~{formatVnd(priceOneWay)}/vé)
-                          </p>
-                          <p>
-                            2. Lựa chọn vé: <strong>Khoang 4 giường nằm điều hòa</strong> hoặc <strong>Ghế mềm điều hòa</strong> ngắm cảnh đèo núi và bờ biển.
-                          </p>
-                        </>
-                      )}
-                    </div>
-                    <div className="bg-white rounded-xl border border-indigo-200 p-3 text-xs text-slate-700 flex items-center gap-2 shadow-2xs">
-                      <Lightbulb className="size-4 text-amber-500 shrink-0" />
-                      <span>
-                        <strong>Gợi ý:</strong> {transitPreview.details?.notes || 'Trải nghiệm ngắm cảnh thiên nhiên qua ô cửa sổ tàu hỏa an toàn và thư thái.'}
-                      </span>
-                    </div>
-                  </div>
                 ) : (
-                  <div className="rounded-2xl border border-teal-200 bg-teal-50/50 p-4 space-y-2.5">
-                    <div className="text-xs font-bold text-teal-800 flex items-center gap-1.5">
-                      <Plane className="size-3.5 text-teal-600 shrink-0" />
-                      <span>LỘ TRÌNH ĐƯỜNG HÀNG KHÔNG (MÁY BAY):</span>
-                    </div>
-                    <div className="space-y-1.5 text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">
-                      {transitPreview.details?.routeSteps && transitPreview.details.routeSteps.length > 0 ? (
-                        transitPreview.details.routeSteps.map((step, idx) => (
-                          <p key={idx}>{idx + 1}. {step}</p>
-                        ))
-                      ) : (
-                        <>
-                          <p>
-                            1. Khởi hành từ{' '}
-                            <strong>{cleanHubName(transitPreview?.originHub?.name || cleanOrigin)}</strong> ──&gt;{' '}
-                            <strong>{cleanHubName(transitPreview?.destHub?.name || cleanDest)}</strong> (
-                            ~{Math.floor(durMinutes / 60)}h{durMinutes % 60 ? `${durMinutes % 60}p` : ''}, ~{formatVnd(priceOneWay)})
-                          </p>
-                          <p>
-                            2. Xe bus/Taxi từ sân bay {cleanHubName(transitPreview?.destHub?.name || '')} về trung tâm{' '}
-                            <strong>{cleanDest}</strong> (~{transitPreview?.destHub?.distanceKm || 25}km, ~35 phút)
-                          </p>
-                        </>
-                      )}
-                    </div>
-                    <div className="bg-white rounded-xl border border-teal-100 p-3 text-xs text-slate-700 flex items-center gap-2 shadow-2xs">
-                      <Lightbulb className="size-4 text-amber-500 shrink-0" />
-                      <span>
-                        <strong>Gợi ý:</strong> {transitPreview.details?.notes || 'Sau khi hạ cánh, xe trung chuyển đón tận cửa ga về thẳng khách sạn.'}
-                      </span>
-                    </div>
-                  </div>
+                  <TransitRouteBreakdown
+                    transit={transitPreview}
+                    originCity={cleanOrigin}
+                    destCity={cleanDest}
+                  />
                 )}
 
                 {/* Đi lại tại điểm du lịch */}

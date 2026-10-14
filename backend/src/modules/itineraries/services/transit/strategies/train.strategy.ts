@@ -7,7 +7,13 @@ import {
   TransitStrategyContext,
   IntercityTransitResult,
   TransitHubDto,
+  TransitModeSummary,
   TransitTransferLeg,
+  computeLocalTransfer,
+  findNearestHub,
+  formatDurationVi,
+  formatVndCurrency,
+  isDirectCityHub,
 } from '../transit.types';
 
 @Injectable()
@@ -16,40 +22,31 @@ export class TrainTransitStrategy implements ITransitStrategy {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private computeHaversineDistance(
-    lat1: number,
-    lon1: number,
-    lat2: number,
-    lon2: number,
-  ): number {
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  private async resolveStations(
+    ctx: TransitStrategyContext,
+  ): Promise<{ originTrain: TransitHubDto | null; destTrain: TransitHubDto | null }> {
+    const hubs =
+      ctx.activeHubs ??
+      (await this.prisma.transitHub.findMany({
+        where: { isActive: true, hubType: 'TRAIN_STATION' },
+      }));
+    return {
+      originTrain: findNearestHub(hubs, 'TRAIN_STATION', ctx.originCoords.lat, ctx.originCoords.lng),
+      destTrain: findNearestHub(hubs, 'TRAIN_STATION', ctx.destCoords.lat, ctx.destCoords.lng),
+    };
   }
 
-  private async findNearestStation(lat: number, lng: number): Promise<TransitHubDto | null> {
-    const hubs = await this.prisma.transitHub.findMany({
-      where: { isActive: true, hubType: 'TRAIN_STATION' },
-    });
-    if (!hubs || hubs.length === 0) return null;
-
-    let nearest: TransitHubDto | null = null;
-    let minDist = Infinity;
-    for (const hub of hubs) {
-      const dist = this.computeHaversineDistance(lat, lng, hub.latitude, hub.longitude);
-      if (dist < minDist) {
-        minDist = dist;
-        nearest = { ...hub, distanceKm: Math.round(dist) };
-      }
-    }
-    return nearest;
+  summarize(res: IntercityTransitResult): TransitModeSummary {
+    const durHours = Math.max(1, Math.round(res.durationMinutes / 60));
+    return {
+      mode: this.mode,
+      title: 'Tàu hỏa (Đường sắt)',
+      durationText: res.isMultiModal ? `Tàu + Xe (~${durHours}h)` : `Đường sắt (~${durHours}h)`,
+      priceText: `Từ ~${formatVndCurrency(res.estimatedPriceOneWay)}/vé`,
+      estimatedPriceOneWay: res.estimatedPriceOneWay,
+      durationMinutes: res.durationMinutes,
+      isMultiModal: Boolean(res.isMultiModal),
+    };
   }
 
   async calculate(ctx: TransitStrategyContext): Promise<IntercityTransitResult> {
@@ -63,14 +60,13 @@ export class TrainTransitStrategy implements ITransitStrategy {
     } = ctx;
 
     const speed = PRICING_CONFIG.INTERCITY.AVG_SPEED_KMH;
-    const originTrain = await this.findNearestStation(originCoords.lat, originCoords.lng);
-    const destTrain = await this.findNearestStation(destCoords.lat, destCoords.lng);
+    const T = PRICING_CONFIG.INTERCITY.TRANSFER;
+    const C = PRICING_CONFIG.INTERCITY.CARRIERS;
+    const D = PRICING_CONFIG.DEFAULTS;
+    const { originTrain, destTrain } = await this.resolveStations(ctx);
 
-    const originTrainName =
-      originTrain?.name ||
-      (originCity.toLowerCase().includes('hồ chí minh') || originCity.toLowerCase().includes('sài gòn')
-        ? 'Ga Sài Gòn'
-        : `Ga ${originCity}`);
+    const originTrainName = originTrain?.name || `Ga ${originCity}`;
+    const ferryPortName = ctx.nearestFerryHub?.name || D.FERRY_PORT_NAME;
 
     let destTrainName = '';
     let isMultiModal = false;
@@ -79,55 +75,63 @@ export class TrainTransitStrategy implements ITransitStrategy {
     let trainDurationMinutes = 0;
     let routeSteps: string[] = [];
 
+    const hasDirectStation =
+      !isIsland && isDirectCityHub(destTrain, destCoords.areaId, T.LOCAL_HUB_MAX_DISTANCE_KM);
+
     if (isIsland) {
-      // 1. Island destination (Phú Quốc, Côn Đảo...): No railway can cross open sea directly
+      // 1. Island destination: No railway crosses open sea directly
       isMultiModal = true;
-      const gatewayStationName = originCity.toLowerCase().includes('hồ chí minh')
-        ? 'Ga Sài Gòn'
-        : (destTrain?.name || 'Ga Sài Gòn');
+      const gatewayStationName = destTrain?.name || originTrainName;
       destTrainName = `${gatewayStationName} (Điểm dừng đường sắt)`;
 
-      const trainDist = Math.max(120, Math.round(roadDistanceKm * 0.65));
+      const trainDist = Math.max(
+        T.MIN_TRAIN_DISTANCE_KM,
+        Math.round(roadDistanceKm * T.TRAIN_ISLAND_LAND_RATIO),
+      );
       const trainDur = Math.round((trainDist / speed.TRAIN) * 60);
       const trainFare = Math.round(trainDist * PRICING_CONFIG.INTERCITY.TRAIN_PER_KM);
 
-      const transferDur = PRICING_CONFIG.INTERCITY.TRANSFER.FERRY_MINUTES + 240; // 4h bus + 2h20m speedboat
-      const transferPrice = PRICING_CONFIG.INTERCITY.TRANSFER.FERRY_ONE_WAY_PASSENGER + 180_000;
+      const transferKm = Math.max(
+        T.ISLAND_PORT_DISTANCE_KM,
+        destTrain?.distanceKm || Math.round(roadDistanceKm - trainDist),
+      );
+      const transferDur = T.FERRY_MINUTES + T.ISLAND_MAINLAND_BUS_MINUTES;
+      const transferPrice = T.FERRY_ONE_WAY_PASSENGER + T.ISLAND_MAINLAND_BUS_FARE;
 
       transferLeg = {
         type: 'FERRY',
-        title: 'Nối chặng: Xe khách ra bến cảng & Tàu cao tốc sang đảo',
+        title: `Nối chặng: Xe trung chuyển ra ${ferryPortName} & Tàu cao tốc sang đảo`,
         fromName: gatewayStationName,
         toName: destCity,
-        distanceKm: 320,
+        distanceKm: transferKm,
         durationMinutes: transferDur,
         estimatedPrice: transferPrice,
-        description: `Tàu hỏa kết thúc tại ${gatewayStationName}. Nối chặng: Xe khách đến Cảng Rạch Giá/Hà Tiên và đi tàu cao tốc sang ${destCity}.`,
+        description: `Tàu hỏa dừng tại ${gatewayStationName}. Nối chặng xe khách đến ${ferryPortName} và đi tàu cao tốc sang ${destCity}.`,
       };
 
       trainDurationMinutes = trainDur + transferDur;
       trainPriceOneWay = trainFare + transferPrice;
 
       routeSteps = [
-        `Chặng 1 (Đường sắt Bắc - Nam): ${originTrainName} ──> ${gatewayStationName} (~${Math.round(trainDur / 60)} tiếng, ~${trainFare.toLocaleString()}đ/vé)`,
-        `Chặng 2 (Xe trung chuyển & Tàu cao tốc): Từ ${gatewayStationName} đi xe khách ra cảng Rạch Giá/Hà Tiên và đón tàu cao tốc sang đảo ${destCity} (~${Math.round(transferDur / 60)} tiếng, ~${transferPrice.toLocaleString()}đ)`,
-        `Lưu ý: ${destCity} là đảo biệt lập không có mạng lưới đường sắt. Để tiết kiệm thời gian, bạn nên ưu tiên chọn Máy bay bay thẳng tới Sân bay Phú Quốc (PQC).`,
+        `Chặng 1 (Đường sắt): ${originTrainName} ──> ${gatewayStationName} (~${formatDurationVi(trainDur)}, ~${formatVndCurrency(trainFare)}/vé)`,
+        `Chặng 2 (Xe trung chuyển & Tàu cao tốc): Từ ${gatewayStationName} đi xe trung chuyển ra ${ferryPortName} và đón tàu cao tốc sang đảo ${destCity} (~${formatDurationVi(transferDur)}, ~${formatVndCurrency(transferPrice)})`,
+        `Lưu ý: ${destCity} là đảo biệt lập không có mạng lưới đường sắt. Để tiết kiệm thời gian, bạn nên ưu tiên chọn Máy bay.`,
       ];
-    } else if (destTrain && (destTrain.distanceKm ?? 999) > 35) {
+    } else if (destTrain && !hasDirectStation) {
       // 2. Mainland destination far from railway (e.g. Đà Lạt via Ga Tháp Chàm, Sa Pa via Ga Lào Cai, Quy Nhơn via Ga Diêu Trì)
       isMultiModal = true;
       destTrainName = destTrain.name;
-      const transferDist = destTrain.distanceKm || 80;
-      const trainDist = Math.max(100, Math.round(roadDistanceKm - transferDist));
+      const transferDist = destTrain.distanceKm || T.DEFAULT_RAIL_TRANSFER_KM;
+      const trainDist = Math.max(T.MIN_TRAIN_DISTANCE_KM, Math.round(roadDistanceKm - transferDist));
       const trainDur = Math.round((trainDist / speed.TRAIN) * 60);
       const trainFare = Math.round(trainDist * PRICING_CONFIG.INTERCITY.TRAIN_PER_KM);
 
-      const transferDur = Math.round(transferDist * 1.4);
-      const transferPrice = Math.round(transferDist * PRICING_CONFIG.INTERCITY.TRANSFER.BUS_PER_KM);
+      const transferDur = Math.round(transferDist * T.REGIONAL_TRANSFER_MINS_PER_KM);
+      const transferPrice = Math.round(transferDist * T.BUS_PER_KM);
 
       transferLeg = {
         type: 'BUS',
-        title: 'Xe trung chuyển kết nối từ Ga về trung tâm',
+        title: `Xe trung chuyển kết nối từ ${destTrain.name} về ${destCity}`,
         fromName: destTrain.name,
         toName: destCity,
         distanceKm: transferDist,
@@ -140,49 +144,58 @@ export class TrainTransitStrategy implements ITransitStrategy {
       trainPriceOneWay = trainFare + transferPrice;
 
       routeSteps = [
-        `Chặng 1 (Đường sắt Bắc - Nam): ${originTrainName} ──> ${destTrain.name} (~${Math.round(trainDur / 60)} tiếng, ~${trainFare.toLocaleString()}đ/vé)`,
-        `Chặng 2 (Xe trung chuyển kết nối): Đón tại ${destTrain.name} về trung tâm ${destCity} (~${transferDist}km, ~${Math.round(transferDur / 60)}h${transferDur % 60 ? transferDur % 60 + 'p' : ''}, ~${transferPrice.toLocaleString()}đ)`,
+        `Chặng 1 (Đường sắt): ${originTrainName} ──> ${destTrain.name} (~${formatDurationVi(trainDur)}, ~${formatVndCurrency(trainFare)}/vé)`,
+        `Chặng 2 (Xe trung chuyển kết nối): Đón tại ${destTrain.name} về trung tâm ${destCity} (~${transferDist}km, ~${formatDurationVi(transferDur, true)}, ~${formatVndCurrency(transferPrice)})`,
       ];
     } else {
-      // 3. Direct Train Station exists (Đà Nẵng, Nha Trang, Huế, Hà Nội, Vinh, Tuy Hòa...)
+      // 3. Direct / Satellite Train Station exists (Đà Nẵng, Nha Trang, Huế, Hà Nội, Vinh, Hội An via Ga Đà Nẵng...)
       isMultiModal = false;
       destTrainName = destTrain?.name || `Ga ${destCity}`;
       trainDurationMinutes = Math.round((roadDistanceKm / speed.TRAIN) * 60);
       trainPriceOneWay = Math.round(roadDistanceKm * PRICING_CONFIG.INTERCITY.TRAIN_PER_KM);
 
+      const { transferKm, transferMinutes } = computeLocalTransfer(
+        destTrain?.distanceKm,
+        T.MIN_LOCAL_TRANSFER_KM,
+      );
+
       routeSteps = [
-        `Tuyến đường sắt: ${originTrainName} ──> ${destTrainName} (~${Math.round(trainDurationMinutes / 60)} tiếng, ~${trainPriceOneWay.toLocaleString()}đ/vé)`,
-        `Lựa chọn khoang 4 giường nằm điều hòa hoặc ghế mềm ngắm cảnh an toàn và thư thái`,
+        `Tuyến đường sắt chính: ${originTrainName} ──> ${destTrainName} (~${formatDurationVi(trainDurationMinutes)}, ~${formatVndCurrency(trainPriceOneWay)}/vé)`,
+        `Trung chuyển về khách sạn: Đón Taxi / Grab từ ${destTrainName} về trung tâm ${destCity} (~${transferKm}km, ~${transferMinutes} phút)`,
       ];
     }
 
     const safetyAdvisory = checkTransitSafety(TransitModeEnum.TRAIN, roadDistanceKm);
 
     return {
-      mode: 'TRAIN',
+      mode: this.mode,
       originName: originTrainName,
-      destName: destTrainName,
+      destName: destCity,
       distanceKm: roadDistanceKm,
       durationMinutes: trainDurationMinutes,
       estimatedPriceOneWay: trainPriceOneWay,
       estimatedPriceRoundTrip: trainPriceOneWay * 2,
       deepLinks: {
-        vexereTrain: 'https://vexere.com/vi-VN/ve-tau-hoa',
-        dsvn: 'https://dsvn.vn',
+        vexereTrain: PRICING_CONFIG.DEEP_LINKS.VEXERE_TRAIN_URL,
+        dsvn: PRICING_CONFIG.DEEP_LINKS.DSVN_URL,
       },
       safetyAdvisory,
-      originHub: originTrain && (originTrain.distanceKm ?? 999) <= 50 ? originTrain : undefined,
-      destHub: destTrain && (destTrain.distanceKm ?? 999) <= 35 ? destTrain : undefined,
+      originHub: isDirectCityHub(originTrain, originCoords.areaId, T.LOCAL_HUB_MAX_DISTANCE_KM)
+        ? originTrain || undefined
+        : undefined,
+      destHub: destTrain || undefined,
       isIsland,
       isMultiModal,
       transferLeg,
       details: {
-        carriers: 'Đường sắt Việt Nam (Tàu SE / Thống Nhất)',
+        carriers: C.TRAIN,
         notes: isMultiModal
           ? `Lộ trình nối chặng: Tàu hỏa dừng tại ${destTrainName}, sau đó đi xe trung chuyển/tàu cao tốc đến ${destCity}.`
-          : 'Khoang giường nằm 4 hoặc ghế mềm điều hòa ngắm cảnh an toàn.',
+          : `Tàu dừng tại ${destTrainName}; nên chọn khoang 4 giường nằm điều hòa hoặc ghế mềm ngắm cảnh an toàn.`,
         routeSteps,
       },
     };
   }
 }
+
+

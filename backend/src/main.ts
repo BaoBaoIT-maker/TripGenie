@@ -36,14 +36,10 @@ async function bootstrap() {
 
   // CORS Configuration (credentials: true for HttpOnly cookies)
   app.enableCors({
-    origin: (origin: string | undefined, callback: (err: Error | null, allow?: boolean | string) => void) => {
-      // Dynamic origin reflection allows credentials: 'include' without wildcard '*'
-      callback(null, origin || true);
-    },
+    origin: configService.getOrThrow<string>('FRONTEND_BASE_URL'),
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
     allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'Cookie', 'X-Requested-With'],
-    exposedHeaders: ['Set-Cookie'],
   });
 
   // Global Pipes & Interceptors & Filters

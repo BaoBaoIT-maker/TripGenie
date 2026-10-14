@@ -98,6 +98,7 @@ export class TransitPreviewDto {
   @IsOptional() @IsNumber() destLat?: number;
   @IsOptional() @IsNumber() destLng?: number;
   @IsOptional() @IsEnum(TransitModeEnum) transitMode?: TransitModeEnum;
+  @IsOptional() @IsEnum(BudgetLevelEnum) budgetLevel?: BudgetLevelEnum;
   @IsDateString() departDate: string; // YYYY-MM-DD
   @IsOptional() @IsDateString() returnDate?: string;
 }

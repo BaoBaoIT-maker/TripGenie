@@ -1,13 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { PRICING_CONFIG } from '../../../config/pricing.config';
-import { TransitModeEnum } from '../dto/generate-itinerary.dto';
+import { INJECT_TOKENS } from '../../../common/constants/inject-tokens';
+import { normalizeVietnamese } from '../../../common/utils/string.util';
+import { BudgetLevelEnum, TransitModeEnum } from '../dto/generate-itinerary.dto';
 import {
   IntercityTransitResult,
   TransitHubDto,
   TransitModeSummary,
   TransitStrategyContext,
   ITransitStrategy,
+  computeHaversineDistance as calcHaversine,
+  findNearestHub,
 } from './transit/transit.types';
 import { FlightTransitStrategy } from './transit/strategies/flight.strategy';
 import { TrainTransitStrategy } from './transit/strategies/train.strategy';
@@ -21,20 +25,26 @@ export * from './transit/transit.types';
 export class TransitService {
   private readonly strategies: Map<TransitModeEnum, ITransitStrategy>;
 
-  constructor(private readonly prisma: PrismaService) {
-    const flightStrategy = new FlightTransitStrategy(this.prisma);
-    const trainStrategy = new TrainTransitStrategy(this.prisma);
-    const busStrategy = new BusTransitStrategy(this.prisma);
-    const motorbikeStrategy = new RoadTransitStrategy(TransitModeEnum.PERSONAL_MOTORBIKE);
-    const carStrategy = new RoadTransitStrategy(TransitModeEnum.PERSONAL_CAR);
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional()
+    @Inject(INJECT_TOKENS.TRANSIT_STRATEGIES)
+    injectedStrategies?: ITransitStrategy[],
+  ) {
+    const strategyList =
+      injectedStrategies && injectedStrategies.length > 0
+        ? injectedStrategies
+        : [
+            new FlightTransitStrategy(this.prisma),
+            new BusTransitStrategy(this.prisma),
+            new TrainTransitStrategy(this.prisma),
+            new RoadTransitStrategy(TransitModeEnum.PERSONAL_MOTORBIKE),
+            new RoadTransitStrategy(TransitModeEnum.PERSONAL_CAR),
+          ];
 
-    this.strategies = new Map<TransitModeEnum, ITransitStrategy>([
-      [TransitModeEnum.FLIGHT, flightStrategy],
-      [TransitModeEnum.TRAIN, trainStrategy],
-      [TransitModeEnum.SLEEPER_BUS, busStrategy],
-      [TransitModeEnum.PERSONAL_MOTORBIKE, motorbikeStrategy],
-      [TransitModeEnum.PERSONAL_CAR, carStrategy],
-    ]);
+    this.strategies = new Map<TransitModeEnum, ITransitStrategy>(
+      strategyList.map((s) => [s.mode, s]),
+    );
   }
 
   /**
@@ -46,16 +56,7 @@ export class TransitService {
     lat2: number,
     lon2: number,
   ): number {
-    const R = 6371; // Earth radius in km
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return calcHaversine(lat1, lon1, lat2, lon2);
   }
 
   /**
@@ -74,12 +75,13 @@ export class TransitService {
   /**
    * Dynamically resolve coordinates for any city/destination from PostgreSQL database.
    * Priority:
-   * 1. Query transit_hubs via travel_areas
-   * 2. Query travel_areas bbox center
+   * 1. Query travel_areas bbox center (represents true city/province center so hub-to-center distance is accurate)
+   * 2. Query transit_hubs via travel_areas when bbox is null
    * 3. Query transit_hubs directly
    */
   async resolveCityLocation(cityName: string): Promise<{ lat: number; lng: number; areaId?: number }> {
-    if (!cityName) return { lat: 10.765, lng: 106.695 };
+    const fallback = PRICING_CONFIG.DEFAULTS.FALLBACK_COORDS;
+    if (!cityName) return fallback;
     const raw = cityName.trim();
     const terms = raw
       .split('/')
@@ -87,6 +89,27 @@ export class TransitService {
       .filter(Boolean);
 
     for (const term of terms) {
+      try {
+        const areas = await this.prisma.$queryRaw<
+          Array<{ lat: number; lng: number; area_id: number }>
+        >`
+          SELECT (bbox_min_lat + bbox_max_lat) / 2 AS lat, (bbox_min_lng + bbox_max_lng) / 2 AS lng, id AS area_id
+          FROM travel_areas
+          WHERE type != 'COUNTRY'
+            AND (
+              unaccent(name) ILIKE '%' || unaccent(${term}) || '%'
+              OR (name_vi IS NOT NULL AND unaccent(name_vi) ILIKE '%' || unaccent(${term}) || '%')
+              OR unaccent(slug) ILIKE '%' || unaccent(${term}) || '%'
+            )
+            AND bbox_min_lat IS NOT NULL AND bbox_max_lat IS NOT NULL
+          ORDER BY CASE WHEN type = 'CITY' THEN 1 WHEN type = 'PROVINCE' THEN 2 ELSE 3 END
+          LIMIT 1
+        `;
+        if (areas && areas.length > 0 && areas[0].lat && areas[0].lng) {
+          return { lat: Number(areas[0].lat), lng: Number(areas[0].lng), areaId: areas[0].area_id };
+        }
+      } catch {}
+
       try {
         const areaHub = await this.prisma.$queryRaw<
           Array<{ lat: number; lng: number; area_id: number }>
@@ -108,26 +131,6 @@ export class TransitService {
       } catch {}
 
       try {
-        const areas = await this.prisma.$queryRaw<
-          Array<{ lat: number; lng: number; area_id: number }>
-        >`
-          SELECT (bbox_min_lat + bbox_max_lat) / 2 AS lat, (bbox_min_lng + bbox_max_lng) / 2 AS lng, id AS area_id
-          FROM travel_areas
-          WHERE (
-            unaccent(name) ILIKE '%' || unaccent(${term}) || '%'
-            OR (name_vi IS NOT NULL AND unaccent(name_vi) ILIKE '%' || unaccent(${term}) || '%')
-            OR unaccent(slug) ILIKE '%' || unaccent(${term}) || '%'
-          )
-          AND bbox_min_lat IS NOT NULL AND bbox_max_lat IS NOT NULL
-          ORDER BY CASE WHEN type = 'CITY' THEN 1 WHEN type = 'PROVINCE' THEN 2 ELSE 3 END
-          LIMIT 1
-        `;
-        if (areas && areas.length > 0 && areas[0].lat && areas[0].lng) {
-          return { lat: Number(areas[0].lat), lng: Number(areas[0].lng), areaId: areas[0].area_id };
-        }
-      } catch {}
-
-      try {
         const hubs = await this.prisma.$queryRaw<
           Array<{ latitude: number; longitude: number; area_id: number }>
         >`
@@ -143,53 +146,39 @@ export class TransitService {
       } catch {}
     }
 
-    return { lat: 10.765, lng: 106.695 };
+    return fallback;
   }
 
   /**
    * Determine if destination is an island or isolated by water requiring sea transit.
    */
-  async isIslandDestination(destCity: string, destLat: number, destLng: number): Promise<boolean> {
-    const norm = (destCity || '')
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/đ/g, 'd')
-      .replace(/Đ/g, 'D')
-      .toLowerCase();
+  async isIslandDestination(
+    destCity: string,
+    destLat: number,
+    destLng: number,
+    activeHubs?: TransitHubDto[],
+  ): Promise<boolean> {
+    const norm = normalizeVietnamese(destCity || '').replace(/đ/g, 'd');
 
-    if (
-      norm.includes('phu quoc') ||
-      norm.includes('con dao') ||
-      norm.includes('cat ba') ||
-      norm.includes('ly son') ||
-      norm.includes('phu quy') ||
-      norm.includes('cu lao cham') ||
-      norm.includes('co to')
-    ) {
+    if (PRICING_CONFIG.ISLAND_KEYWORDS.some((kw) => norm.includes(kw))) {
       return true;
     }
 
-    // Check if nearest transit hub in DB is specifically a FERRY_TERMINAL within 50km
     try {
-      const ferryHubs = await this.prisma.transitHub.findMany({
-        where: { isActive: true, hubType: 'FERRY_TERMINAL' },
-      });
+      const ferryHubs = activeHubs
+        ? activeHubs.filter((h) => h.hubType === 'FERRY_TERMINAL')
+        : await this.prisma.transitHub.findMany({
+            where: { isActive: true, hubType: 'FERRY_TERMINAL' },
+          });
       for (const hub of ferryHubs) {
         const dist = this.computeHaversineDistance(destLat, destLng, hub.latitude, hub.longitude);
-        if (dist <= 45) {
+        if (dist <= PRICING_CONFIG.INTERCITY.TRANSFER.ISLAND_PORT_DISTANCE_KM) {
           return true;
         }
       }
     } catch {}
 
     return false;
-  }
-
-  /**
-   * Format VND currency string for summary cards.
-   */
-  private formatVnd(val: number): string {
-    return `${Math.round(val).toLocaleString('vi-VN')}đ`;
   }
 
   /**
@@ -203,20 +192,27 @@ export class TransitService {
     destLat?: number;
     destLng?: number;
     transitMode?: TransitModeEnum;
+    budgetLevel?: BudgetLevelEnum | string;
     departDate: string;
     returnDate?: string;
   }): Promise<IntercityTransitResult> {
-    const { originCity, destCity, departDate, returnDate } = params;
+    const { originCity, destCity, departDate, returnDate, budgetLevel } = params;
+
+    const [resolvedOrigin, resolvedDest, activeHubs] = await Promise.all([
+      this.resolveCityLocation(originCity),
+      this.resolveCityLocation(destCity),
+      this.prisma.transitHub.findMany({ where: { isActive: true } }),
+    ]);
 
     const originCoords =
       params.originLat && params.originLng
-        ? { lat: params.originLat, lng: params.originLng }
-        : await this.resolveCityLocation(originCity);
+        ? { lat: params.originLat, lng: params.originLng, areaId: resolvedOrigin.areaId }
+        : resolvedOrigin;
 
     const destCoords =
       params.destLat && params.destLng
-        ? { lat: params.destLat, lng: params.destLng }
-        : await this.resolveCityLocation(destCity);
+        ? { lat: params.destLat, lng: params.destLng, areaId: resolvedDest.areaId }
+        : resolvedDest;
 
     const roadDistanceKm = this.computeRoadDistance(
       originCoords.lat,
@@ -225,17 +221,21 @@ export class TransitService {
       destCoords.lng,
     );
 
-    const isIsland = await this.isIslandDestination(destCity, destCoords.lat, destCoords.lng);
+    const isIsland = await this.isIslandDestination(destCity, destCoords.lat, destCoords.lng, activeHubs);
+    const nearestFerryHub = findNearestHub(activeHubs, 'FERRY_TERMINAL', destCoords.lat, destCoords.lng);
 
     const context: TransitStrategyContext = {
       originCity,
       destCity,
       departDate,
       returnDate,
+      budgetLevel,
       originCoords,
       destCoords,
       roadDistanceKm,
       isIsland,
+      nearestFerryHub,
+      activeHubs,
     };
 
     const requestedMode =
@@ -247,59 +247,24 @@ export class TransitService {
     const strategy = this.strategies.get(requestedMode) || this.strategies.get(TransitModeEnum.SLEEPER_BUS)!;
     const result = await strategy.calculate(context);
 
-    // Compute allModesSummary so the Frontend Wizard modal cards get real backend figures with ZERO magic numbers
+    // Open-Closed summary generation: each strategy produces its own TransitModeSummary
     const allModesSummary: TransitModeSummary[] = [];
-    const modeConfigs = [
-      { mode: TransitModeEnum.FLIGHT, title: 'Máy bay' },
-      { mode: TransitModeEnum.SLEEPER_BUS, title: 'Xe khách giường nằm' },
-      { mode: TransitModeEnum.TRAIN, title: 'Tàu hỏa (Đường sắt)' },
-      { mode: TransitModeEnum.PERSONAL_MOTORBIKE, title: 'Phượt xe máy' },
-    ];
-
-    for (const item of modeConfigs) {
-      const itemStrategy = this.strategies.get(item.mode);
-      if (itemStrategy) {
-        try {
-          const itemRes = await itemStrategy.calculate(context);
-          const durHours = Math.round(itemRes.durationMinutes / 60);
-          let durationText = '';
-          let priceText = '';
-
-          if (item.mode === TransitModeEnum.FLIGHT) {
-            const durM = itemRes.durationMinutes;
-            durationText = `Nhanh nhất (~${durM >= 60 ? `${Math.floor(durM / 60)}h${durM % 60 ? durM % 60 + 'p' : ''}` : `${durM}p`})`;
-            priceText = `Từ ~${this.formatVnd(itemRes.estimatedPriceOneWay)}`;
-          } else if (item.mode === TransitModeEnum.SLEEPER_BUS) {
-            durationText = `Giường nằm (~${durHours}h)`;
-            priceText = `Từ ~${this.formatVnd(itemRes.estimatedPriceOneWay)}/vé`;
-          } else if (item.mode === TransitModeEnum.TRAIN) {
-            durationText = itemRes.isMultiModal
-              ? `Tàu + Xe (~${durHours}h)`
-              : `Đường sắt (~${durHours}h)`;
-            priceText = `Từ ~${this.formatVnd(itemRes.estimatedPriceOneWay)}/vé`;
-          } else if (item.mode === TransitModeEnum.PERSONAL_MOTORBIKE) {
-            durationText = `Phượt xe máy (~${durHours}h)`;
-            priceText = `~${this.formatVnd(itemRes.estimatedPriceOneWay)} xăng`;
-          }
-
-          allModesSummary.push({
-            mode: item.mode,
-            title: item.title,
-            durationText,
-            priceText,
-            estimatedPriceOneWay: itemRes.estimatedPriceOneWay,
-            durationMinutes: itemRes.durationMinutes,
-            isMultiModal: Boolean(itemRes.isMultiModal),
-            warning:
-              item.mode === TransitModeEnum.PERSONAL_MOTORBIKE && roadDistanceKm > 350
-                ? 'Chú ý cự ly xa'
-                : undefined,
-          });
-        } catch {}
-      }
+    for (const [, itemStrategy] of this.strategies) {
+      if (!itemStrategy.summarize) continue;
+      try {
+        const itemRes =
+          itemStrategy.mode === requestedMode
+            ? result
+            : await itemStrategy.calculate(context);
+        const summary = itemStrategy.summarize(itemRes, roadDistanceKm);
+        if (summary) {
+          allModesSummary.push(summary);
+        }
+      } catch {}
     }
 
     result.allModesSummary = allModesSummary;
     return result;
   }
 }
+

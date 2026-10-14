@@ -1,8 +1,6 @@
+import { apiClient } from "@/lib/api-client";
 import { Place, PlaceCategory, SuitableAudience, TravelStyle } from "@/types/place";
 import { MOCK_PLACES } from "@/mocks/data/places";
-
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
 export interface BackendCategoryItem {
   id: number;
@@ -266,115 +264,65 @@ export const placeService = {
    */
   async searchPlaces(params?: PlaceFilterParams): Promise<PaginatedPlacesResult> {
     try {
-      const url = new URL(`${API_BASE_URL}/places/search`);
+      const searchParams = new URLSearchParams();
 
-      if (params?.keyword?.trim()) {
-        url.searchParams.set("keyword", params.keyword.trim());
-      }
-      if (params?.areaId) {
-        url.searchParams.set("areaId", String(params.areaId));
-      }
+      if (params?.keyword?.trim()) searchParams.set("keyword", params.keyword.trim());
+      if (params?.areaId) searchParams.set("areaId", String(params.areaId));
+
       if (params?.categorySlugs) {
         const val = Array.isArray(params.categorySlugs)
           ? params.categorySlugs.join(",")
           : params.categorySlugs;
-        if (val && val !== "all") {
-          url.searchParams.set("categorySlugs", val);
-        }
+        if (val && val !== "all") searchParams.set("categorySlugs", val);
       } else if (params?.category && params.category !== "all") {
-        url.searchParams.set("categorySlugs", params.category);
+        searchParams.set("categorySlugs", params.category);
       }
 
       if (params?.amenities) {
-        const val = Array.isArray(params.amenities)
-          ? params.amenities.join(",")
-          : params.amenities;
-        if (val) {
-          url.searchParams.set("amenities", val);
-        }
+        const val = Array.isArray(params.amenities) ? params.amenities.join(",") : params.amenities;
+        if (val) searchParams.set("amenities", val);
       }
-      if (params?.minRating) {
-        url.searchParams.set("minRating", String(params.minRating));
-      }
+      if (params?.minRating) searchParams.set("minRating", String(params.minRating));
       if (params?.sortBy) {
         const sortMap: Record<string, string> = {
-          rating: "RATING",
-          distance: "DISTANCE",
-          reviews: "POPULARITY",
-          name: "NAME",
-          RATING: "RATING",
-          DISTANCE: "DISTANCE",
-          POPULARITY: "POPULARITY",
-          NAME: "NAME",
+          rating: "RATING", distance: "DISTANCE", reviews: "POPULARITY", name: "NAME",
         };
-        url.searchParams.set("sortBy", sortMap[params.sortBy] || "RATING");
+        searchParams.set("sortBy", sortMap[params.sortBy] ?? "RATING");
       }
       if (typeof params?.latitude === "number" && typeof params?.longitude === "number") {
-        url.searchParams.set("lat", String(params.latitude));
-        url.searchParams.set("lng", String(params.longitude));
-        url.searchParams.set("latitude", String(params.latitude));
-        url.searchParams.set("longitude", String(params.longitude));
+        searchParams.set("lat", String(params.latitude));
+        searchParams.set("lng", String(params.longitude));
       }
-      if (params?.radiusMeters) {
-        url.searchParams.set("radiusMeters", String(params.radiusMeters));
-      }
+      if (params?.radiusMeters) searchParams.set("radiusMeters", String(params.radiusMeters));
       if (params?.budgetLevels) {
-        const raw = Array.isArray(params.budgetLevels)
-          ? params.budgetLevels
-          : [params.budgetLevels];
-        const validLevels = ["LOW", "MEDIUM", "HIGH", "LUXURY"];
-        const filtered = raw.filter((l) => validLevels.includes(l));
-        if (filtered.length > 0) {
-          url.searchParams.set("budgetLevels", filtered.join(","));
-        }
+        const valid = ["LOW", "MEDIUM", "HIGH", "LUXURY"];
+        const filtered = (Array.isArray(params.budgetLevels) ? params.budgetLevels : [params.budgetLevels])
+          .filter((l) => valid.includes(l));
+        if (filtered.length > 0) searchParams.set("budgetLevels", filtered.join(","));
       }
-      if (typeof params?.openNow === "boolean") {
-        url.searchParams.set("openNow", String(params.openNow));
-      }
+      if (typeof params?.openNow === "boolean") searchParams.set("openNow", String(params.openNow));
+
       const requestedLimit = params?.limit || 24;
-      url.searchParams.set("page", String(params?.page || 1));
-      url.searchParams.set("limit", String(requestedLimit));
+      searchParams.set("page", String(params?.page || 1));
+      searchParams.set("limit", String(requestedLimit));
 
-      let res: Response;
-      const isServer = typeof window === "undefined";
-      const fetchOptions: RequestInit = {
-        headers: { "Content-Type": "application/json" },
-        ...(isServer ? { next: { revalidate: 60 } } : { cache: "no-store" }),
-      };
-      try {
-        res = await fetch(url.toString(), fetchOptions);
-      } catch (fetchErr) {
-        if (API_BASE_URL.includes("localhost")) {
-          const fallbackUrlStr = url.toString().replace("localhost", "127.0.0.1");
-          res = await fetch(fallbackUrlStr, fetchOptions);
-        } else {
-          throw fetchErr;
-        }
-      }
+      const payload = await apiClient<{
+        items: BackendPlaceItem[];
+        meta: { totalItems: number; page: number; limit: number; totalPages: number };
+        geocoded?: GeocodedLocation;
+        isFallback?: boolean;
+      }>(`/places/search?${searchParams.toString()}`);
 
-      if (!res.ok) {
-        throw new Error(`API returned ${res.status}`);
-      }
-
-      const json = await res.json();
-      const payload = json.data || json;
       const rawItems = Array.isArray(payload.items) ? payload.items : [];
       const items = rawItems.slice(0, requestedLimit);
-      const meta = payload.meta || {
-        totalItems: rawItems.length,
-        page: params?.page || 1,
-        limit: requestedLimit,
-        totalPages: 1,
-      };
+      const meta = payload.meta ?? { totalItems: rawItems.length, page: params?.page || 1, limit: requestedLimit, totalPages: 1 };
 
       const mappedPlaces: Place[] = items.map(mapBackendPlaceToPlace);
-      // Always prioritize places with real images at the top
-      mappedPlaces.sort((a: Place, b: Place) => {
-        const aHas = Boolean(a.coverImage || (a.images && a.images.length > 0));
-        const bHas = Boolean(b.coverImage || (b.images && b.images.length > 0));
-        if (aHas && !bHas) return -1;
-        if (!aHas && bHas) return 1;
-        return 0;
+      // Prioritize places with real images first
+      mappedPlaces.sort((a, b) => {
+        const aHas = Boolean(a.coverImage || a.images?.length);
+        const bHas = Boolean(b.coverImage || b.images?.length);
+        return aHas === bHas ? 0 : aHas ? -1 : 1;
       });
 
       return {
@@ -392,20 +340,16 @@ export const placeService = {
       if (params?.keyword) {
         const q = params.keyword.toLowerCase().trim();
         places = places.filter(
-          (p) =>
-            p.name.toLowerCase().includes(q) ||
-            p.address.toLowerCase().includes(q) ||
-            p.city.toLowerCase().includes(q) ||
-            p.tags.some((t) => t.toLowerCase().includes(q))
+          (p) => p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q) ||
+            p.city.toLowerCase().includes(q) || p.tags.some((t) => t.toLowerCase().includes(q))
         );
       }
       if (params?.category && params.category !== "all") {
         places = places.filter((p) => p.category === params.category);
       }
       const fallbackLimit = params?.limit || 20;
-      const paginated = places.slice(0, fallbackLimit);
       return {
-        places: paginated,
+        places: places.slice(0, fallbackLimit),
         total: places.length,
         page: 1,
         limit: fallbackLimit,
@@ -426,30 +370,15 @@ export const placeService = {
    * Natural language AI Semantic Search using Gemini Vector Embeddings & pgvector.
    * Connects to GET /places/semantic-search
    */
-  async searchSemantic(
-    query: string,
-    areaId?: number,
-    limit = 12
-  ): Promise<Place[]> {
+  async searchSemantic(query: string, areaId?: number, limit = 12): Promise<Place[]> {
     try {
-      const url = new URL(`${API_BASE_URL}/places/semantic-search`);
-      url.searchParams.set("query", query.trim());
-      if (areaId) {
-        url.searchParams.set("areaId", String(areaId));
-      }
-      url.searchParams.set("limit", String(limit));
+      const searchParams = new URLSearchParams({ query: query.trim(), limit: String(limit) });
+      if (areaId) searchParams.set("areaId", String(areaId));
 
-      const res = await fetch(url.toString(), {
-        headers: { "Content-Type": "application/json" },
-        cache: "no-store",
-      });
-
-      if (!res.ok) {
-        throw new Error(`Semantic search returned ${res.status}`);
-      }
-
-      const json = await res.json();
-      const items = Array.isArray(json.data) ? json.data : (Array.isArray(json) ? json : []);
+      const json = await apiClient<BackendPlaceItem[] | { data: BackendPlaceItem[] }>(
+        `/places/semantic-search?${searchParams.toString()}`
+      );
+      const items = Array.isArray(json) ? json : (Array.isArray((json as any).data) ? (json as any).data : []);
       return items.map(mapBackendPlaceToPlace);
     } catch (err) {
       console.warn("Semantic search failed or offline, fallback to keyword search:", err);
@@ -462,12 +391,8 @@ export const placeService = {
    */
   async getCategories(): Promise<BackendCategoryItem[]> {
     try {
-      const res = await fetch(`${API_BASE_URL}/places/categories`, {
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error(`Categories API returned ${res.status}`);
-      const json = await res.json();
-      return Array.isArray(json.data) ? json.data : [];
+      const data = await apiClient<BackendCategoryItem[]>("/places/categories");
+      return Array.isArray(data) ? data : [];
     } catch (err) {
       console.warn("Failed to fetch categories, using default categories:", err);
       return [
@@ -491,32 +416,17 @@ export const placeService = {
    * Fetch active travel areas (Vietnam provinces & Da Nang districts).
    */
   async getTravelAreas(): Promise<BackendTravelAreaItem[]> {
-    const urlsToTry = [
-      `${API_BASE_URL}/places/travel-areas`,
-      API_BASE_URL.includes("localhost")
-        ? `${API_BASE_URL.replace("localhost", "127.0.0.1")}/places/travel-areas`
-        : null,
-    ].filter(Boolean) as string[];
-
-    for (const url of urlsToTry) {
-      try {
-        const res = await fetch(url, { cache: "no-store" });
-        if (res.ok) {
-          const json = await res.json();
-          const items = Array.isArray(json.data) ? json.data : Array.isArray(json) ? json : [];
-          if (items.length > 0) return items;
-        }
-      } catch {
-        // try next URL
-      }
+    try {
+      const data = await apiClient<BackendTravelAreaItem[]>("/places/travel-areas");
+      return Array.isArray(data) && data.length > 0 ? data : [];
+    } catch (err) {
+      console.warn("Failed to fetch travel areas from backend, using defaults", err);
+      return [
+        { id: 5, name: "Da Nang City", nameVi: "Thành phố Đà Nẵng", slug: "da-nang", type: "CITY", bbox: { minLat: 15.9, maxLat: 16.2, minLng: 107.9, maxLng: 108.4 } },
+        { id: 1, name: "Hanoi City", nameVi: "Thành phố Hà Nội", slug: "ha-noi", type: "CITY", bbox: { minLat: 20.8, maxLat: 21.4, minLng: 105.5, maxLng: 106.1 } },
+        { id: 3, name: "Ho Chi Minh City", nameVi: "TP. Hồ Chí Minh", slug: "ho-chi-minh", type: "CITY", bbox: { minLat: 10.3, maxLat: 11.2, minLng: 106.3, maxLng: 107.1 } },
+      ];
     }
-
-    console.warn("Failed to fetch travel areas from backend, using defaults");
-    return [
-      { id: 5, name: "Da Nang City", nameVi: "Thành phố Đà Nẵng", slug: "da-nang", type: "CITY", bbox: { minLat: 15.9, maxLat: 16.2, minLng: 107.9, maxLng: 108.4 } },
-      { id: 1, name: "Hanoi City", nameVi: "Thành phố Hà Nội", slug: "ha-noi", type: "CITY", bbox: { minLat: 20.8, maxLat: 21.4, minLng: 105.5, maxLng: 106.1 } },
-      { id: 3, name: "Ho Chi Minh City", nameVi: "TP. Hồ Chí Minh", slug: "ho-chi-minh", type: "CITY", bbox: { minLat: 10.3, maxLat: 11.2, minLng: 106.3, maxLng: 107.1 } },
-    ];
   },
 
   /**
@@ -527,10 +437,11 @@ export const placeService = {
       const decoded = decodeURIComponent(slug);
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(decoded);
       if (isUuid) {
-        const res = await fetch(`${API_BASE_URL}/places/${decoded}`, { cache: "no-store" });
-        if (res.ok) {
-          const json = await res.json();
-          return mapBackendPlaceToPlace(json.data || json);
+        try {
+          const data = await apiClient<BackendPlaceItem>(`/places/${decoded}`);
+          return mapBackendPlaceToPlace(data);
+        } catch {
+          // fall through to mock/search fallback
         }
       }
 

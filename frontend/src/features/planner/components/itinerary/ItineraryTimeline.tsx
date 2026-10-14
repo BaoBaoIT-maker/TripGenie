@@ -22,16 +22,24 @@ import {
   Footprints,
   ArrowLeftRight,
   Loader2,
-  Layers,
   X,
 } from 'lucide-react';
 import type { ItineraryDay, IntercityTransit, ItineraryActivity, TransitMode } from '@/types/itinerary';
-import { formatVnd } from '../../model/itinerary-format';
+import {
+  TRANSIT_UI_CONFIG,
+  cleanHubName,
+  formatClockMinutes,
+  formatDuration,
+  formatVnd,
+  isDiningActivity,
+} from '../../model/itinerary-format';
 import { getDayColor } from '@/features/map/types';
+import TransitRouteBreakdown from './TransitRouteBreakdown';
 
 interface Props {
   days: ItineraryDay[];
   transit?: IntercityTransit | null;
+  destination?: string | null;
   startDate?: string | null;
   endDate?: string | null;
   selectedPlaceId?: string | null;
@@ -65,28 +73,38 @@ function formatDayFullDate(isoString: string | null | undefined, dayIndex: numbe
 
 function getTransitModeConfig(transit: IntercityTransit) {
   switch (transit.mode) {
-    case 'FLIGHT':
+    case 'FLIGHT': {
+      const dur = Math.max(
+        TRANSIT_UI_CONFIG.FLIGHT_MIN_DURATION_MINUTES,
+        transit.durationMinutes || TRANSIT_UI_CONFIG.FLIGHT_DEFAULT_DURATION_MINUTES,
+      );
+      const departClock = formatClockMinutes(TRANSIT_UI_CONFIG.FLIGHT_DEPART_MINUTES);
+      const arriveClock = formatClockMinutes(TRANSIT_UI_CONFIG.FLIGHT_DEPART_MINUTES + dur);
+      const durLabel = formatDuration(dur);
       return {
         icon: <Plane className="size-4 text-sky-600 shrink-0" aria-hidden="true" />,
-        title: 'Chặng bay: Hàng không liên tỉnh',
-        departLabel: 'Khởi hành 10:30',
-        arriveLabel: 'Hạ cánh 11:50',
-        distanceSummary: `Chặng bay ${Math.floor(transit.durationMinutes / 60)}h ${transit.durationMinutes % 60}m`,
+        title: transit.isMultiModal
+          ? 'Chặng bay & Trung chuyển kết nối'
+          : 'Chặng bay: Hàng không liên tỉnh',
+        departLabel: `Khởi hành ~${departClock}`,
+        arriveLabel: `${transit.isMultiModal ? 'Đến nơi' : 'Hạ cánh'} ~${arriveClock}`,
+        distanceSummary: `${transit.isMultiModal ? 'Tổng hành trình' : 'Chặng bay'} ~${durLabel}`,
       };
+    }
     case 'TRAIN':
       return {
         icon: <TrainFront className="size-4 text-amber-600 shrink-0" aria-hidden="true" />,
         title: 'Chặng tàu: Đường sắt Bắc - Nam',
-        departLabel: 'Khởi hành 19:00',
-        arriveLabel: 'Đến ga ~07:30 hôm sau',
+        departLabel: `Khởi hành ${TRANSIT_UI_CONFIG.TRAIN_DEPART_TIME}`,
+        arriveLabel: `Đến ga ~${TRANSIT_UI_CONFIG.TRAIN_ARRIVE_TIME}`,
         distanceSummary: `Tàu hỏa đường sắt ~${transit.distanceKm} km (~${Math.round(transit.durationMinutes / 60)} tiếng)`,
       };
     case 'SLEEPER_BUS':
       return {
         icon: <Bus className="size-4 text-emerald-600 shrink-0" aria-hidden="true" />,
         title: 'Chặng đi: Xe khách đường dài',
-        departLabel: 'Khởi hành 22:00',
-        arriveLabel: 'Đến bến ~06:00 sáng',
+        departLabel: `Khởi hành ${TRANSIT_UI_CONFIG.BUS_DEPART_TIME}`,
+        arriveLabel: `Đến bến ~${TRANSIT_UI_CONFIG.BUS_ARRIVE_TIME}`,
         distanceSummary: `Xe khách giường nằm ~${transit.distanceKm} km (~${Math.round(transit.durationMinutes / 60)} tiếng)`,
       };
     case 'PERSONAL_CAR':
@@ -101,7 +119,7 @@ function getTransitModeConfig(transit: IntercityTransit) {
       return {
         icon: <Bike className="size-4 text-teal-600 shrink-0" aria-hidden="true" />,
         title: 'Chặng đi: Phượt xe máy',
-        departLabel: 'Khởi hành sáng sớm (~05:30)',
+        departLabel: `Khởi hành sáng sớm (~${TRANSIT_UI_CONFIG.MOTORBIKE_DEPART_TIME})`,
         arriveLabel: 'Đến nơi dự kiến',
         distanceSummary: `Phượt xe máy ~${transit.distanceKm} km (~${Math.round(transit.durationMinutes / 60)} tiếng)`,
       };
@@ -154,26 +172,21 @@ const TRANSIT_MODE_OPTIONS: Array<{
   },
 ];
 
-function formatDurationMinutes(minutes: number): string {
-  if (minutes >= 60) {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return mins > 0 ? `${hours}h ${mins}p` : `${hours} tiếng`;
-  }
-  return `${minutes} phút`;
-}
-
 function renderIntracityTransitConnector(act: ItineraryActivity) {
   if (act.distanceToNextKm != null && act.distanceToNextKm > 0) {
     const km = act.distanceToNextKm;
-    const mode = act.travelModeToNext ?? (km <= 0.8 ? 'WALK' : 'BIKE');
+    const IC = TRANSIT_UI_CONFIG.INTRACITY;
+    const mode = act.travelModeToNext ?? (km <= IC.WALK_THRESHOLD_KM ? 'WALK' : 'BIKE');
     const minutes =
       act.durationToNextMinutes ??
       (mode === 'WALK'
-        ? Math.max(2, Math.round((km / 4.5) * 60))
-        : Math.max(3, Math.round(((km * 1.25) / 25) * 60) + 2));
+        ? Math.max(IC.MIN_WALK_MINUTES, Math.round((km / IC.WALK_SPEED_KMH) * 60))
+        : Math.max(
+            IC.MIN_BIKE_MINUTES,
+            Math.round(((km * IC.ROAD_DETOUR_FACTOR) / IC.BIKE_SPEED_KMH) * 60) + IC.BIKE_BUFFER_MINUTES,
+          ));
 
-    const durationText = formatDurationMinutes(minutes);
+    const durationText = formatDuration(minutes);
 
     if (mode === 'WALK') {
       return (
@@ -214,20 +227,8 @@ function renderActivityPriceBadge(act: ItineraryActivity) {
     act.estimatedCost === 0 ||
     (act.priceRange?.min === 0 && (act.priceRange?.max === 0 || act.priceRange?.max == null));
 
-  const catLower = (act.categoryName || '').toLowerCase();
-  const placeLower = (act.placeName || '').toLowerCase();
-  const isDining =
-    catLower.includes('ẩm thực') ||
-    catLower.includes('nhà hàng') ||
-    catLower.includes('cà phê') ||
-    catLower.includes('quán ăn') ||
-    catLower.includes('tráng miệng') ||
-    catLower.includes('ăn vặt') ||
-    catLower.includes('bar') ||
-    placeLower.includes('quán') ||
-    placeLower.includes('phở') ||
-    placeLower.includes('bún') ||
-    placeLower.includes('cơm');
+  const isDining = isDiningActivity(act.categoryName, act.placeName);
+
 
   if (isFree) {
     return (
@@ -295,6 +296,7 @@ function renderActivityPriceBadge(act: ItineraryActivity) {
 export default function ItineraryTimeline({
   days,
   transit,
+  destination,
   startDate,
   endDate,
   selectedPlaceId,
@@ -310,6 +312,7 @@ export default function ItineraryTimeline({
   const modeConfig = transit ? getTransitModeConfig(transit) : null;
   const [isEditTransitOpen, setIsEditTransitOpen] = useState(false);
   const [selectedTransitMode, setSelectedTransitMode] = useState<TransitMode>(transit?.mode || 'FLIGHT');
+  const targetCityName = destination || transit?.destName || '';
 
   const handleConfirmChangeTransit = async () => {
     if (!onChangeTransitMode || !selectedTransitMode || selectedTransitMode === transit?.mode) {
@@ -365,7 +368,7 @@ export default function ItineraryTimeline({
           <div className="flex items-center justify-between py-1 text-xs">
             <div>
               <div className="text-sm font-bold text-foreground">
-                {transit.originHub?.name || transit.originName}
+                {cleanHubName(transit.originHub?.name || transit.originName)}
               </div>
               <div className="text-[11px] text-muted-foreground">
                 {modeConfig.departLabel}
@@ -379,13 +382,15 @@ export default function ItineraryTimeline({
               </div>
               <div className="w-full h-px bg-border my-1" />
               <div className="text-[11px] text-muted-foreground">
-                {transit.destHub ? `Trung chuyển về ${transit.destName}` : `Đến ${transit.destName}`}
+                {transit.destHub
+                  ? `Trung chuyển về trung tâm ${targetCityName}${transit.destHub.distanceKm ? ` (~${transit.destHub.distanceKm}km)` : ''}`
+                  : `Đến trung tâm ${targetCityName}`}
               </div>
             </div>
 
             <div className="text-right">
               <div className="text-sm font-bold text-foreground">
-                {transit.destHub?.name || transit.destName}
+                {cleanHubName(transit.destHub?.name || transit.destName)}
               </div>
               <div className="text-[11px] text-muted-foreground">
                 {modeConfig.arriveLabel}
@@ -393,40 +398,8 @@ export default function ItineraryTimeline({
             </div>
           </div>
 
-          {/* Multi-Modal Connecting Route Breakdown (e.g. Train to Da Lat / Sa Pa / Phu Quoc, Bus to Phu Quoc) */}
-          {transit.isMultiModal && (
-            <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 dark:border-indigo-900/60 dark:bg-indigo-950/30 p-3.5 space-y-2.5 text-xs shadow-2xs">
-              <div className="flex items-center justify-between font-bold text-indigo-950 dark:text-indigo-200 flex-wrap gap-2">
-                <span className="flex items-center gap-1.5">
-                  <Layers className="size-4 text-indigo-600 dark:text-indigo-400" aria-hidden="true" />
-                  <span>LỘ TRÌNH NỐI CHẶNG THÔNG MINH:</span>
-                </span>
-                {transit.transferLeg && (
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 border border-indigo-300 dark:border-indigo-700">
-                    {transit.transferLeg.type === 'FERRY' ? 'Tàu cao tốc sang đảo' : 'Xe trung chuyển kết nối'}
-                  </span>
-                )}
-              </div>
-
-              <div className="space-y-1.5 text-slate-700 dark:text-slate-300">
-                {transit.details?.routeSteps?.map((step, idx) => (
-                  <p key={idx} className="flex items-start gap-2">
-                    <span className="size-4 rounded-full bg-indigo-600 text-white text-[9px] font-bold flex items-center justify-center shrink-0 mt-0.5">
-                      {idx + 1}
-                    </span>
-                    <span className="flex-1">{step}</span>
-                  </p>
-                ))}
-              </div>
-
-              {transit.details?.notes && (
-                <div className="flex items-center gap-1.5 pt-1 text-[11px] text-indigo-800 dark:text-indigo-300 font-medium">
-                  <Lightbulb className="size-3.5 text-amber-500 shrink-0" aria-hidden="true" />
-                  <span>{transit.details.notes}</span>
-                </div>
-              )}
-            </div>
-          )}
+          {/* Full Route & Transfer Breakdown (Multi-Modal + Local Airport/Station Transfer + Safety Alerts) */}
+          <TransitRouteBreakdown transit={transit} destCity={targetCityName} />
 
           {/* Mode-Specific Booking & Routing Buttons (No Emojis, Clean UI/UX) */}
           <div className="pt-2.5 border-t border-border/80 flex items-center justify-between text-xs flex-wrap gap-2">

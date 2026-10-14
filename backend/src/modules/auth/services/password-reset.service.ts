@@ -36,8 +36,7 @@ export class PasswordResetService {
   ) {}
 
   private hashTicket(ticket: string): string {
-    const secret =
-      this.configService.get<string>('JWT_SECRET', 'tripgenie_reset_ticket_secret');
+    const secret = this.configService.getOrThrow<string>('JWT_SECRET');
     return crypto.createHmac('sha256', secret).update(ticket).digest('hex');
   }
 

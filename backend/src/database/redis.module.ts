@@ -1,14 +1,9 @@
-import { Module, Global } from '@nestjs/common';
+import { Module, Global, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
 /**
  * Global RedisModule — provides a single shared Redis connection across all modules.
- *
- * By marking @Global(), any module that imports RedisModule (or AppModule)
- * automatically gets REDIS_CLIENT injected without re-declaring it.
- *
- * This follows DRY: Redis connection config lives in exactly one place.
  */
 @Global()
 @Module({
@@ -17,20 +12,53 @@ import Redis from 'ioredis';
       provide: 'REDIS_CLIENT',
       inject: [ConfigService],
       useFactory: (configService: ConfigService): Redis => {
+        const logger = new Logger('RedisModule');
         const redisUrl = configService.get<string>('REDIS_URL');
         const host = configService.get<string>('REDIS_HOST', 'localhost');
         const port = configService.get<number>('REDIS_PORT', 6379);
 
-        const client = redisUrl?.startsWith('redis')
-          ? new Redis(redisUrl, { lazyConnect: true, maxRetriesPerRequest: 3 })
-          : new Redis({ host, port, lazyConnect: true, maxRetriesPerRequest: 3 });
+        const commonOptions = {
+          lazyConnect: true,
+          maxRetriesPerRequest: 10,
+          connectTimeout: 10000,
+          retryStrategy: (times: number) => {
+            if (times > 10) {
+              logger.error(`Redis reconnection failed after ${times} attempts.`);
+              return null;
+            }
+            return Math.min(times * 100, 3000);
+          },
+        };
 
-        client.on('error', (err) => {
-          // Prevent unhandled error event crash on Redis connection errors
+        let client: Redis;
+        if (redisUrl?.startsWith('redis')) {
+          const isLocal = redisUrl.includes('localhost') || redisUrl.includes('127.0.0.1');
+          const url = !isLocal && redisUrl.startsWith('redis://')
+            ? redisUrl.replace('redis://', 'rediss://')
+            : redisUrl;
+
+          client = new Redis(url, {
+            ...commonOptions,
+            tls: isLocal ? undefined : { rejectUnauthorized: false },
+          });
+        } else {
+          client = new Redis({
+            host,
+            port,
+            ...commonOptions,
+          });
+        }
+
+        client.on('connect', () => {
+          logger.log('✅ Connected to Redis successfully');
         });
 
-        client.connect().catch(() => {
-          // Connection errors are non-fatal — services degrade gracefully
+        client.on('error', (err) => {
+          logger.warn(`Redis connection issue: ${err.message}`);
+        });
+
+        client.connect().catch((err) => {
+          logger.error(`Initial Redis connection failed: ${err.message}`);
         });
 
         return client;

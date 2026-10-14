@@ -323,15 +323,13 @@ export class PlacesService {
       });
       const primaryHub = sortedHubs[0];
       const lat =
-        primaryHub?.latitude ??
-        (area.bboxMinLat !== null && area.bboxMaxLat !== null
+        area.bboxMinLat !== null && area.bboxMaxLat !== null
           ? (area.bboxMinLat + area.bboxMaxLat) / 2
-          : null);
+          : (primaryHub?.latitude ?? null);
       const lng =
-        primaryHub?.longitude ??
-        (area.bboxMinLng !== null && area.bboxMaxLng !== null
+        area.bboxMinLng !== null && area.bboxMaxLng !== null
           ? (area.bboxMinLng + area.bboxMaxLng) / 2
-          : null);
+          : (primaryHub?.longitude ?? null);
       const hubBadge = primaryHub
         ? primaryHub.hubType === 'AIRPORT'
           ? `${primaryHub.name} (${primaryHub.id})`

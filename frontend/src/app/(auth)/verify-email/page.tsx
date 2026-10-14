@@ -48,6 +48,18 @@ function VerifyEmailContent() {
     try {
       await verifyEmail(token);
       setIsSuccess(true);
+
+      // Notify any waiting tabs (e.g., registration tab) in the same browser
+      if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+        try {
+          const channel = new BroadcastChannel('tripgenie_auth_channel');
+          channel.postMessage({ type: 'EMAIL_VERIFIED' });
+          channel.close();
+        } catch {
+          // Non-blocking if BroadcastChannel is unsupported
+        }
+      }
+
       toast.success('Xác thực email thành công! Chào mừng bạn đến với TripGenie.');
       setTimeout(() => {
         router.push(nextParam || '/explore');
@@ -87,7 +99,7 @@ function VerifyEmailContent() {
         </div>
         <div className="pt-2">
           <Link href={nextParam || '/explore'}>
-            <Button className="w-full h-10.5 rounded-xl font-semibold text-xs gap-2 cursor-pointer">
+            <Button className="w-full h-11 rounded-xl font-semibold text-xs gap-2 cursor-pointer">
               <span>Khám phá ngay</span>
               <ArrowRight className="size-4" />
             </Button>
@@ -114,12 +126,12 @@ function VerifyEmailContent() {
         </div>
         <div className="grid grid-cols-2 gap-3 pt-2">
           <Link href="/register">
-            <Button variant="outline" className="w-full h-10 rounded-xl text-xs font-semibold cursor-pointer">
+            <Button variant="outline" className="w-full h-11 rounded-xl text-xs font-semibold cursor-pointer">
               Đăng ký lại
             </Button>
           </Link>
           <Link href="/login">
-            <Button className="w-full h-10 rounded-xl text-xs font-semibold cursor-pointer">
+            <Button className="w-full h-11 rounded-xl text-xs font-semibold cursor-pointer">
               Đăng nhập
             </Button>
           </Link>

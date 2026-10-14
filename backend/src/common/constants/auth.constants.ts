@@ -5,4 +5,6 @@ export const AUTH_CONSTANTS = {
   EMAIL_VERIFICATION_COOLDOWN_SECONDS: 60, // 60 seconds
   PASSWORD_RESET_OTP_TTL_SECONDS: 600, // 10 minutes
   PASSWORD_RESET_TICKET_TTL_SECONDS: 300, // 5 minutes
+  MAIL_QUEUE: 'auth-mail-queue',
+  REGISTRATION_COMPLETION_TTL_SECONDS: 120, // 2 minutes window to claim session across tabs/devices
 };

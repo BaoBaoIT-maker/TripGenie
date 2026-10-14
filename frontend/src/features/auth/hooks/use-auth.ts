@@ -82,18 +82,6 @@ export function useAuth() {
     mutationFn: authService.resendVerificationEmail,
   });
 
-  const verifyOtpMutation = useMutation({
-    mutationFn: authService.verifyOtp,
-    onSuccess: (data) => {
-      queryClient.setQueryData(AUTH_QUERY_KEY, data.user);
-      broadcastAuthEvent('login');
-    },
-  });
-
-  const resendOtpMutation = useMutation({
-    mutationFn: authService.resendOtp,
-  });
-
   const forgotPasswordMutation = useMutation({
     mutationFn: authService.forgotPassword,
   });
@@ -132,10 +120,6 @@ export function useAuth() {
     isVerifyingEmail: verifyEmailMutation.isPending,
     resendVerificationEmail: resendVerificationEmailMutation.mutateAsync,
     isResendingVerificationEmail: resendVerificationEmailMutation.isPending,
-    verifyOtp: verifyOtpMutation.mutateAsync,
-    isVerifyingOtp: verifyOtpMutation.isPending,
-    resendOtp: resendOtpMutation.mutateAsync,
-    isResendingOtp: resendOtpMutation.isPending,
     forgotPassword: forgotPasswordMutation.mutateAsync,
     isSubmittingForgotPassword: forgotPasswordMutation.isPending,
     verifyResetOtp: verifyResetOtpMutation.mutateAsync,

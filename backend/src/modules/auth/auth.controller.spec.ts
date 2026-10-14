@@ -1,15 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
-import { TokenBlacklistService } from './services/token-blacklist.service';
 
 describe('AuthController', () => {
   let controller: AuthController;
   let mockAuthService: any;
   let mockConfigService: any;
-  let mockJwtService: any;
 
   beforeEach(async () => {
     mockAuthService = {
@@ -39,21 +36,12 @@ describe('AuthController', () => {
       resetPassword: jest.fn().mockResolvedValue({ message: 'Password reset successful' }),
       logout: jest.fn().mockResolvedValue(undefined),
       getProfile: jest.fn().mockResolvedValue({ id: '1', email: 'traveler1@example.com' }),
+      checkRegistrationStatus: jest.fn().mockResolvedValue({ verified: false }),
     };
 
     mockConfigService = {
       get: jest.fn().mockReturnValue('http://localhost:3000'),
-    };
-
-    mockJwtService = {
-      decode: jest.fn().mockReturnValue({ sub: 'user-1' }),
-      verify: jest.fn().mockReturnValue({ sub: 'user-1', jti: 'jti-1' }),
-    };
-
-    const mockTokenBlacklistService = {
-      isBlacklisted: jest.fn().mockResolvedValue(false),
-      revokeAccessToken: jest.fn().mockResolvedValue(undefined),
-      revokeByJti: jest.fn().mockResolvedValue(undefined),
+      getOrThrow: jest.fn().mockReturnValue('http://localhost:3000'),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -61,8 +49,6 @@ describe('AuthController', () => {
       providers: [
         { provide: AuthService, useValue: mockAuthService },
         { provide: ConfigService, useValue: mockConfigService },
-        { provide: JwtService, useValue: mockJwtService },
-        { provide: TokenBlacklistService, useValue: mockTokenBlacklistService },
       ],
     }).compile();
 
@@ -123,7 +109,7 @@ describe('AuthController', () => {
 
       const res = await controller.logout(mockReq, mockRes);
 
-      expect(mockAuthService.logout).toHaveBeenCalledWith('user-1', {
+      expect(mockAuthService.logout).toHaveBeenCalledWith({
         accessToken: 'acc-token',
         refreshToken: 'ref-token',
       });

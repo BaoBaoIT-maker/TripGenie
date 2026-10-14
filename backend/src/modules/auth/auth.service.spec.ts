@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { ConflictException, UnauthorizedException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { getQueueToken } from '@nestjs/bullmq';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { MailService } from './services/mail.service';
@@ -9,6 +10,7 @@ import { OtpService } from './services/otp.service';
 import { PasswordResetService } from './services/password-reset.service';
 import { TokenBlacklistService } from './services/token-blacklist.service';
 import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
+import { AUTH_CONSTANTS } from '@/common/constants/auth.constants';
 
 describe('AuthService', () => {
   let authService: AuthService;
@@ -16,6 +18,7 @@ describe('AuthService', () => {
   let mockJwtService: any;
   let mockConfigService: any;
   let mockMailService: any;
+  let mockMailQueue: any;
   let mockOtpService: any;
   let mockPasswordResetService: any;
   let mockRedisClient: any;
@@ -48,11 +51,21 @@ describe('AuthService', () => {
         if (key === 'GOOGLE_CALLBACK_URL') return 'http://localhost:3000/api/v1/auth/google/callback';
         return defaultValue;
       }),
+      getOrThrow: jest.fn().mockImplementation((key: string) => {
+        if (key === 'JWT_SECRET') return 'secret';
+        if (key === 'JWT_REFRESH_SECRET') return 'refresh_secret';
+        if (key === 'FRONTEND_BASE_URL') return 'http://localhost:3001';
+        throw new Error(`Missing config key: ${key}`);
+      }),
     };
 
     mockMailService = {
       sendOtpEmail: jest.fn().mockResolvedValue(true),
       sendVerificationLinkEmail: jest.fn().mockResolvedValue(true),
+    };
+
+    mockMailQueue = {
+      add: jest.fn().mockResolvedValue({ id: 'job-1' }),
     };
 
     mockOtpService = {
@@ -80,6 +93,10 @@ describe('AuthService', () => {
     };
 
     const redisStore = new Map<string, string>();
+    const mockPipeline = {
+      set: jest.fn().mockReturnThis(),
+      exec: jest.fn().mockResolvedValue([]),
+    };
     mockRedisClient = {
       set: jest.fn().mockImplementation(async (key: string, val: string) => {
         redisStore.set(key, val);
@@ -88,8 +105,12 @@ describe('AuthService', () => {
       get: jest.fn().mockImplementation(async (key: string) => {
         return redisStore.get(key) || null;
       }),
-      del: jest.fn().mockImplementation(async (key: string) => {
-        return redisStore.delete(key) ? 1 : 0;
+      del: jest.fn().mockImplementation(async (...keys: string[]) => {
+        let count = 0;
+        for (const key of keys) {
+          if (redisStore.delete(key)) count++;
+        }
+        return count;
       }),
       ttl: jest.fn().mockResolvedValue(-1),
       eval: jest.fn().mockImplementation(async (_script: string, _numKeys: number, key: string) => {
@@ -99,6 +120,7 @@ describe('AuthService', () => {
         }
         return val;
       }),
+      multi: jest.fn().mockReturnValue(mockPipeline),
     };
 
     mockTokenBlacklistService = {
@@ -112,6 +134,7 @@ describe('AuthService', () => {
         AuthService,
         { provide: INJECT_TOKENS.USER_REPOSITORY, useValue: mockUsersRepository },
         { provide: 'REDIS_CLIENT', useValue: mockRedisClient },
+        { provide: getQueueToken(AUTH_CONSTANTS.MAIL_QUEUE), useValue: mockMailQueue },
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: MailService, useValue: mockMailService },
@@ -150,14 +173,47 @@ describe('AuthService', () => {
         fullName: 'Test User',
       });
 
-      expect(mockRedisClient.set).toHaveBeenCalled();
-      expect(mockMailService.sendVerificationLinkEmail).toHaveBeenCalledWith(
-        'traveler1@example.com',
-        expect.stringContaining('/verify-email?token='),
+      expect(mockRedisClient.multi).toHaveBeenCalled();
+      expect(mockMailQueue.add).toHaveBeenCalledWith(
+        'send-verification-email',
+        expect.objectContaining({
+          email: 'traveler1@example.com',
+          verificationUrl: expect.stringContaining('/verify-email?token='),
+        }),
+        expect.any(Object),
       );
       expect(result.registrationId).toBeDefined();
       expect(result.message).toContain('xác thực tài khoản');
       expect((result as any).tokens).toBeUndefined();
+    });
+  });
+
+  describe('checkRegistrationStatus', () => {
+    it('nên trả về verified: false nếu registrationId chưa hoàn tất', async () => {
+      mockRedisClient.eval.mockResolvedValueOnce(null);
+      const res = await authService.checkRegistrationStatus('reg-not-ready');
+      expect(res.verified).toBe(false);
+      expect(res.tokens).toBeUndefined();
+    });
+
+    it('nên trả về verified: true và cấp session nếu registrationId đã hoàn tất', async () => {
+      mockRedisClient.eval.mockResolvedValueOnce('user-1');
+      mockUsersRepository.findById.mockResolvedValueOnce({
+        id: 'user-1',
+        email: 'traveler1@example.com',
+        fullName: 'Test User',
+        isActive: true,
+        isVerified: true,
+      });
+      mockUsersRepository.findUserWithIdentities.mockResolvedValueOnce({
+        id: 'user-1',
+        identities: [],
+      });
+
+      const res = await authService.checkRegistrationStatus('reg-completed');
+      expect(res.verified).toBe(true);
+      expect(res.user).toBeDefined();
+      expect(res.tokens).toBeDefined();
     });
   });
 
@@ -278,21 +334,53 @@ describe('AuthService', () => {
   });
 
   describe('Google OAuth login', () => {
-    it('validateOAuthUser nên từ chối login nếu identity có canSignIn = false', async () => {
-      mockUsersRepository.findIdentity.mockResolvedValue({
-        id: 'id-1',
-        userId: 'user-1',
-        canSignIn: false,
+    it('validateOAuthUser nên tự động link Google vào tài khoản local đã verified', async () => {
+      const localUser = {
+        id: 'user-local-1',
+        email: 'alice@gmail.com',
+        fullName: 'Alice',
+        isVerified: true,
+        isActive: true,
+        passwordHash: 'hashed',
+      };
+      mockUsersRepository.findIdentity.mockResolvedValue(null);
+      mockUsersRepository.findByEmail.mockResolvedValue(localUser);
+      mockUsersRepository.findUserWithIdentities.mockResolvedValue({
+        ...localUser,
+        identities: [{ provider: 'GOOGLE' }],
+      });
+
+      const res = await authService.validateOAuthUser({
+        provider: 'GOOGLE',
+        providerUserId: 'g-123',
+        email: 'alice@gmail.com',
+        fullName: 'Alice',
+      });
+
+      expect(mockUsersRepository.createIdentity).toHaveBeenCalledWith(
+        expect.objectContaining({ canSignIn: true }),
+      );
+      expect(mockUsersRepository.create).not.toHaveBeenCalled();
+      expect(res.tokens).toBeDefined();
+    });
+
+    it('validateOAuthUser nên từ chối nếu email trùng tài khoản local chưa xác thực', async () => {
+      mockUsersRepository.findIdentity.mockResolvedValue(null);
+      mockUsersRepository.findByEmail.mockResolvedValue({
+        id: 'user-unverified',
+        email: 'alice@gmail.com',
+        isVerified: false,
+        isActive: true,
       });
 
       await expect(
         authService.validateOAuthUser({
           provider: 'GOOGLE',
           providerUserId: 'g-123',
-          email: 'test@gmail.com',
-          fullName: 'Test Google',
+          email: 'alice@gmail.com',
+          fullName: 'Alice',
         }),
-      ).rejects.toThrow(UnauthorizedException);
+      ).rejects.toThrow(ConflictException);
     });
 
     it('validateOAuthUser nên tạo mới Google user nếu chưa tồn tại', async () => {
@@ -319,15 +407,10 @@ describe('AuthService', () => {
       });
 
       expect(mockUsersRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          email: 'newgoogle@gmail.com',
-          isVerified: true,
-        }),
+        expect.objectContaining({ email: 'newgoogle@gmail.com', isVerified: true }),
       );
       expect(mockUsersRepository.createIdentity).toHaveBeenCalledWith(
-        expect.objectContaining({
-          canSignIn: true,
-        }),
+        expect.objectContaining({ canSignIn: true }),
       );
       expect(res.tokens).toBeDefined();
     });

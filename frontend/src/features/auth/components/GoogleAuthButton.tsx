@@ -22,7 +22,7 @@ export function GoogleAuthButton({
     <button
       type="button"
       onClick={handleGoogleClick}
-      className={`w-full flex items-center justify-center gap-3 py-2.5 px-4 rounded-xl border border-border/80 bg-background hover:bg-muted/60 text-foreground text-sm font-semibold transition-all duration-200 shadow-2xs hover:shadow-xs active:scale-[0.99] cursor-pointer ${className}`}
+      className={`w-full h-11 flex items-center justify-center gap-3 px-4 rounded-xl border border-border/80 bg-background hover:bg-muted/60 text-foreground text-sm font-semibold transition-all duration-200 shadow-2xs hover:shadow-xs active:scale-[0.99] cursor-pointer ${className}`}
     >
       <svg className="size-4.5" viewBox="0 0 24 24">
         <path

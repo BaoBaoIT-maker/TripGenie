@@ -44,10 +44,7 @@ export class OtpService {
   ) {}
 
   private getOtpSecret(): string {
-    return (
-      this.configService.get<string>('OTP_SECRET') ||
-      this.configService.get<string>('JWT_SECRET', 'tripgenie_default_otp_secret_key_32_chars')
-    );
+    return this.configService.getOrThrow<string>('JWT_SECRET');
   }
 
   private hashOtp(otp: string): string {
@@ -108,7 +105,6 @@ export class OtpService {
 
     // 3. Generate Cryptographically Secure 6-digit OTP
     const rawOtp = crypto.randomInt(100000, 1000000).toString();
-    this.logger.log(`🔑 [OTP DEBUG] Mã OTP cho ${normalizedEmail} (${purpose}) là: ${rawOtp}`);
     const otpHash = this.hashOtp(rawOtp);
     const now = Date.now();
 

@@ -7,7 +7,6 @@ export interface AuthTokens {
 
 export interface UserCapabilities {
   hasVerifiedEmail: boolean;
-  hasGoogleEmailLink: boolean;
   canResetPasswordByEmail: boolean;
 }
 

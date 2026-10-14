@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Body,
+  Param,
   UseGuards,
   HttpCode,
   HttpStatus,
@@ -12,13 +13,10 @@ import {
 import { Response, Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { AuthService } from './auth.service';
 import {
   RegisterDto,
   LoginDto,
-  VerifyOtpDto,
-  ResendOtpDto,
   ForgotPasswordDto,
   VerifyResetOtpDto,
   ResetPasswordDto,
@@ -29,15 +27,12 @@ import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '@/common/types';
 import { UserResponse } from './interfaces/auth.interface';
-import { TokenBlacklistService } from './services/token-blacklist.service';
 
 @Controller('auth')
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly configService: ConfigService,
-    private readonly jwtService: JwtService,
-    private readonly tokenBlacklistService: TokenBlacklistService,
   ) {}
 
   private setAuthCookies(res: Response, tokens: { accessToken: string; refreshToken: string }) {
@@ -88,6 +83,19 @@ export class AuthController {
     return this.authService.resendVerificationEmail(dto.registrationId);
   }
 
+  @Get('registration-status/:registrationId')
+  @HttpCode(HttpStatus.OK)
+  async checkRegistrationStatus(
+    @Param('registrationId') registrationId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.checkRegistrationStatus(registrationId);
+    if (result.verified && result.tokens) {
+      this.setAuthCookies(res, result.tokens);
+    }
+    return result;
+  }
+
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(
@@ -95,20 +103,6 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const authResult = await this.authService.login(dto);
-    this.setAuthCookies(res, authResult.tokens);
-    return authResult;
-  }
-
-  @Post('resend-otp')
-  @HttpCode(HttpStatus.OK)
-  async resendOtp(@Body() dto: ResendOtpDto) {
-    return this.authService.resendOtp(dto);
-  }
-
-  @Post('verify-otp')
-  @HttpCode(HttpStatus.OK)
-  async verifyOtp(@Body() dto: VerifyOtpDto, @Res({ passthrough: true }) res: Response) {
-    const authResult = await this.authService.verifyOtp(dto);
     this.setAuthCookies(res, authResult.tokens);
     return authResult;
   }
@@ -165,26 +159,7 @@ export class AuthController {
     const accessToken = req.cookies?.accessToken;
     const refreshToken = req.cookies?.refreshToken;
 
-    let userId = '';
-    if (accessToken) {
-      try {
-        const decoded = this.jwtService.decode(accessToken) as any;
-        userId = decoded?.sub || '';
-      } catch {
-        // Token invalid, clear cookies anyway
-      }
-    }
-
-    if (!userId && refreshToken) {
-      try {
-        const decoded = this.jwtService.decode(refreshToken) as any;
-        userId = decoded?.sub || '';
-      } catch {
-        // Token invalid
-      }
-    }
-
-    await this.authService.logout(userId, { accessToken, refreshToken });
+    await this.authService.logout({ accessToken, refreshToken });
     this.clearAuthCookies(res);
     return { message: 'Đăng xuất thành công' };
   }
@@ -205,10 +180,7 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req: any, @Res() res: Response) {
-    const frontendUrl =
-      this.configService.get<string>('FRONTEND_BASE_URL') ||
-      process.env.FRONTEND_BASE_URL ||
-      'http://localhost:3000';
+    const frontendUrl = this.configService.getOrThrow<string>('FRONTEND_BASE_URL');
 
     try {
       const result = await this.authService.handleOAuthCallback(req.user);

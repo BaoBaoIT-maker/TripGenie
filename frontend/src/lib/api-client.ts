@@ -10,6 +10,11 @@ export class ApiClientError extends Error {
     super(message);
     this.name = 'ApiClientError';
   }
+
+  /** Alias for statusCode — matches the legacy ApiError.status interface. */
+  get status(): number {
+    return this.statusCode;
+  }
 }
 
 const API_BASE_URL =
@@ -80,7 +85,6 @@ export async function apiClient<T = unknown>(
     endpoint.includes('/auth/login') ||
     endpoint.includes('/auth/register') ||
     endpoint.includes('/auth/refresh') ||
-    endpoint.includes('/auth/verify-otp') ||
     options.skipAuthRefresh;
 
   if (response.status === 401 && !isAuthEndpoint) {

@@ -7,14 +7,10 @@ import { Loader2, AlertCircle, ArrowLeft, RotateCw, CheckCircle2 } from 'lucide-
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/use-auth';
 
-import { getSafeRedirectUrl } from '@/lib/safe-redirect';
-
 export function VerifyOtpForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const email = searchParams.get('email') || '';
-  const purpose = (searchParams.get('purpose') as 'email-verification' | 'password-reset') || 'email-verification';
-  const nextUrl = getSafeRedirectUrl(searchParams.get('next'));
 
   const [otp, setOtp] = React.useState(['', '', '', '', '', '']);
   const [countdown, setCountdown] = React.useState(60);
@@ -24,15 +20,13 @@ export function VerifyOtpForm() {
   const inputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
 
   const {
-    verifyOtp,
-    isVerifyingOtp,
     verifyResetOtp,
     isVerifyingResetOtp,
-    resendOtp,
-    isResendingOtp,
+    forgotPassword,
+    isSubmittingForgotPassword,
   } = useAuth();
 
-  const isSubmitting = isVerifyingOtp || isVerifyingResetOtp;
+  const isSubmitting = isVerifyingResetOtp;
 
   // Countdown timer for resend
   React.useEffect(() => {
@@ -101,37 +95,22 @@ export function VerifyOtpForm() {
     setServerError(null);
 
     try {
-      if (purpose === 'password-reset') {
-        const result = await verifyResetOtp({
-          email,
-          otp: fullOtp,
-        });
+      const result = await verifyResetOtp({
+        email,
+        otp: fullOtp,
+      });
 
-        setIsSuccess(true);
-        toast.success('Xác thực OTP thành công!');
+      setIsSuccess(true);
+      toast.success('Xác thực OTP thành công!');
 
-        // Store reset ticket securely in sessionStorage for next step
-        if (typeof window !== 'undefined') {
-          sessionStorage.setItem('tripgenie:reset_ticket', result.resetTicket);
-        }
-
-        setTimeout(() => {
-          router.push('/reset-password');
-        }, 800);
-      } else {
-        await verifyOtp({
-          email,
-          otp: fullOtp,
-        });
-
-        setIsSuccess(true);
-        toast.success('Xác thực tài khoản thành công!');
-
-        setTimeout(() => {
-          router.push(nextUrl);
-          router.refresh();
-        }, 800);
+      // Store reset ticket securely in sessionStorage for next step
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('tripgenie:reset_ticket', result.resetTicket);
       }
+
+      setTimeout(() => {
+        router.push('/reset-password');
+      }, 800);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : 'Mã OTP không chính xác hoặc đã hết hạn';
@@ -140,14 +119,11 @@ export function VerifyOtpForm() {
   };
 
   const handleResend = async () => {
-    if (countdown > 0 || isResendingOtp) return;
+    if (countdown > 0 || isSubmittingForgotPassword) return;
     setServerError(null);
 
     try {
-      const result = await resendOtp({
-        email,
-        purpose,
-      });
+      const result = await forgotPassword({ email });
 
       toast.success(result.message || 'Mã OTP mới đã được gửi tới email!');
       setCountdown(result.retryAfter || 60);
@@ -229,7 +205,7 @@ export function VerifyOtpForm() {
         <button
           type="submit"
           disabled={!isComplete || isSubmitting || isSuccess}
-          className="w-full h-10.5 rounded-xl bg-primary text-primary-foreground font-semibold text-sm transition-all hover:bg-primary/90 active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 shadow-xs cursor-pointer"
+          className="w-full h-11 rounded-xl bg-primary text-primary-foreground font-semibold text-sm transition-all hover:bg-primary/90 active:scale-[0.99] disabled:opacity-50 disabled:pointer-events-none flex items-center justify-center gap-2 shadow-xs cursor-pointer"
         >
           {isSubmitting ? (
             <>
@@ -253,17 +229,17 @@ export function VerifyOtpForm() {
             <button
               type="button"
               onClick={handleResend}
-              disabled={isResendingOtp}
+              disabled={isSubmittingForgotPassword}
               className="inline-flex items-center gap-1 text-primary font-semibold hover:underline cursor-pointer disabled:opacity-50"
             >
-              <RotateCw className={`size-3 ${isResendingOtp ? 'animate-spin' : ''}`} />
+              <RotateCw className={`size-3 ${isSubmittingForgotPassword ? 'animate-spin' : ''}`} />
               <span>Gửi lại mã OTP</span>
             </button>
           )}
         </div>
 
         <Link
-          href={purpose === 'password-reset' ? '/forgot-password' : '/register'}
+          href="/forgot-password"
           className="hover:text-foreground hover:underline transition-colors font-medium"
         >
           Đổi địa chỉ email khác

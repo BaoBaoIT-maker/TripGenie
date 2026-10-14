@@ -58,22 +58,16 @@ export const authService = {
     });
   },
 
-  async verifyOtp(data: { email: string; otp: string }): Promise<AuthResponse> {
-    return apiClient<AuthResponse>('/auth/verify-otp', {
-      method: 'POST',
-      body: JSON.stringify(data),
-      skipAuthRefresh: true,
-    });
-  },
-
-  async resendOtp(data: {
-    email: string;
-    purpose?: 'email-verification' | 'password-reset';
-  }): Promise<OtpChallengeResponse> {
-    return apiClient<OtpChallengeResponse>('/auth/resend-otp', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+  async checkRegistrationStatus(
+    registrationId: string,
+  ): Promise<{ verified: boolean; user?: AuthUser }> {
+    return apiClient<{ verified: boolean; user?: AuthUser }>(
+      `/auth/registration-status/${encodeURIComponent(registrationId)}`,
+      {
+        method: 'GET',
+        skipAuthRefresh: true,
+      },
+    );
   },
 
   async forgotPassword(data: { email: string }): Promise<OtpChallengeResponse> {

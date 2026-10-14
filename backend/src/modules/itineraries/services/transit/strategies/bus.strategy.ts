@@ -1,13 +1,23 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../../database/prisma.service';
-import { PRICING_CONFIG, checkTransitSafety } from '../../../../../config/pricing.config';
+import {
+  PRICING_CONFIG,
+  buildVexereBusUrl,
+  checkTransitSafety,
+} from '../../../../../config/pricing.config';
 import { TransitModeEnum } from '../../../dto/generate-itinerary.dto';
 import {
   ITransitStrategy,
   TransitStrategyContext,
   IntercityTransitResult,
   TransitHubDto,
+  TransitModeSummary,
   TransitTransferLeg,
+  computeLocalTransfer,
+  findNearestHub,
+  formatDurationVi,
+  formatVndCurrency,
+  isDirectCityHub,
 } from '../transit.types';
 
 function formatVnDate(dateStr?: string | null): string {
@@ -25,40 +35,18 @@ export class BusTransitStrategy implements ITransitStrategy {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private computeHaversineDistance(
-    lat1: number,
-    lon1: number,
-    lat2: number,
-    lon2: number,
-  ): number {
-    const R = 6371;
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }
-
-  private async findNearestBusTerminal(lat: number, lng: number): Promise<TransitHubDto | null> {
-    const hubs = await this.prisma.transitHub.findMany({
-      where: { isActive: true, hubType: 'BUS_TERMINAL' },
-    });
-    if (!hubs || hubs.length === 0) return null;
-
-    let nearest: TransitHubDto | null = null;
-    let minDist = Infinity;
-    for (const hub of hubs) {
-      const dist = this.computeHaversineDistance(lat, lng, hub.latitude, hub.longitude);
-      if (dist < minDist) {
-        minDist = dist;
-        nearest = { ...hub, distanceKm: Math.round(dist) };
-      }
-    }
-    return nearest;
+  private async resolveTerminals(
+    ctx: TransitStrategyContext,
+  ): Promise<{ originBus: TransitHubDto | null; destBus: TransitHubDto | null }> {
+    const hubs =
+      ctx.activeHubs ??
+      (await this.prisma.transitHub.findMany({
+        where: { isActive: true, hubType: 'BUS_TERMINAL' },
+      }));
+    return {
+      originBus: findNearestHub(hubs, 'BUS_TERMINAL', ctx.originCoords.lat, ctx.originCoords.lng),
+      destBus: findNearestHub(hubs, 'BUS_TERMINAL', ctx.destCoords.lat, ctx.destCoords.lng),
+    };
   }
 
   private async findPartnerMapping(params: {
@@ -110,6 +98,19 @@ export class BusTransitStrategy implements ITransitStrategy {
     return null;
   }
 
+  summarize(res: IntercityTransitResult): TransitModeSummary {
+    const durHours = Math.max(1, Math.round(res.durationMinutes / 60));
+    return {
+      mode: this.mode,
+      title: 'Xe khách giường nằm',
+      durationText: res.isMultiModal ? `Xe + Tàu (~${durHours}h)` : `Giường nằm (~${durHours}h)`,
+      priceText: `Từ ~${formatVndCurrency(res.estimatedPriceOneWay)}/vé`,
+      estimatedPriceOneWay: res.estimatedPriceOneWay,
+      durationMinutes: res.durationMinutes,
+      isMultiModal: Boolean(res.isMultiModal),
+    };
+  }
+
   async calculate(ctx: TransitStrategyContext): Promise<IntercityTransitResult> {
     const {
       originCity,
@@ -122,71 +123,82 @@ export class BusTransitStrategy implements ITransitStrategy {
     } = ctx;
 
     const speed = PRICING_CONFIG.INTERCITY.AVG_SPEED_KMH;
-    const originBus = await this.findNearestBusTerminal(originCoords.lat, originCoords.lng);
-    const destBus = await this.findNearestBusTerminal(destCoords.lat, destCoords.lng);
+    const T = PRICING_CONFIG.INTERCITY.TRANSFER;
+    const C = PRICING_CONFIG.INTERCITY.CARRIERS;
+    const D = PRICING_CONFIG.DEFAULTS;
+    const { originBus, destBus } = await this.resolveTerminals(ctx);
 
-    const originBusName =
-      originBus && (originBus.distanceKm ?? 999) <= 50
-        ? originBus.name
-        : `Bến xe tại ${originCity}`;
+    const hasOriginBus = isDirectCityHub(originBus, originCoords.areaId, T.LOCAL_HUB_MAX_DISTANCE_KM);
+    const hasDestBus = !isIsland && isDirectCityHub(destBus, destCoords.areaId, T.LOCAL_HUB_MAX_DISTANCE_KM);
+    const ferryPortName = ctx.nearestFerryHub?.name || D.FERRY_PORT_NAME;
+
+    const originBusName = hasOriginBus && originBus ? originBus.name : `Bến xe tại ${originCity}`;
     const destBusName =
-      destBus && (destBus.distanceKm ?? 999) <= 50
+      hasDestBus && destBus
         ? destBus.name
-        : (isIsland ? `Bến tàu cao tốc đi ${destCity}` : `Bến xe tại ${destCity}`);
+        : isIsland
+        ? ferryPortName
+        : `Bến xe tại ${destCity}`;
 
     const fromPartner = await this.findPartnerMapping({
       cityName: originCity,
       areaId: originCoords.areaId || originBus?.areaId,
     });
     const toPartner = await this.findPartnerMapping({
-      cityName: isIsland ? 'Kiên Giang' : destCity,
-      areaId: destCoords.areaId || destBus?.areaId,
+      cityName: isIsland ? ferryPortName : destCity,
+      areaId: (isIsland ? ctx.nearestFerryHub?.areaId : destCoords.areaId) || destBus?.areaId,
     });
-    const depDateVn = formatVnDate(departDate);
-    const vexereUrl =
-      fromPartner && toPartner
-        ? `https://vexere.com/vi-VN/ve-xe-khach-tu-${fromPartner.slug}-di-${toPartner.slug}-${fromPartner.externalId}t${toPartner.externalId}1.html?date=${depDateVn}`
-        : `https://vexere.com/vi-VN/ve-xe-khach`;
+    const vexereUrl = buildVexereBusUrl({
+      fromSlug: fromPartner?.slug,
+      toSlug: toPartner?.slug,
+      fromExternalId: fromPartner?.externalId,
+      toExternalId: toPartner?.externalId,
+      departDateVn: formatVnDate(departDate),
+    });
 
-    let busPriceOneWay = Math.round(
-      roadDistanceKm * PRICING_CONFIG.INTERCITY.SLEEPER_BUS_PER_KM,
-    );
-    let busDurationMinutes = Math.round((roadDistanceKm / speed.SLEEPER_BUS) * 60);
+    const baseBusFare = Math.round(roadDistanceKm * PRICING_CONFIG.INTERCITY.SLEEPER_BUS_PER_KM);
+    const baseBusMinutes = Math.round((roadDistanceKm / speed.SLEEPER_BUS) * 60);
+    let busPriceOneWay = baseBusFare;
+    let busDurationMinutes = baseBusMinutes;
     let transferLeg: TransitTransferLeg | undefined;
     let routeSteps: string[] = [];
 
     if (isIsland) {
-      const ferryFare = PRICING_CONFIG.INTERCITY.TRANSFER.FERRY_ONE_WAY_PASSENGER;
-      const ferryDur = PRICING_CONFIG.INTERCITY.TRANSFER.FERRY_MINUTES;
+      const ferryFare = T.FERRY_ONE_WAY_PASSENGER;
+      const ferryDur = T.FERRY_MINUTES;
       transferLeg = {
         type: 'FERRY',
-        title: 'Tàu cao tốc vượt biển sang đảo',
-        fromName: 'Cảng Bến tàu Rạch Giá / Hà Tiên',
+        title: `Tàu cao tốc vượt biển từ ${ferryPortName} sang đảo ${destCity}`,
+        fromName: ferryPortName,
         toName: destCity,
-        distanceKm: 45,
+        distanceKm: T.ISLAND_PORT_DISTANCE_KM,
         durationMinutes: ferryDur,
         estimatedPrice: ferryFare,
-        description: `Tàu cao tốc Superdong / Phú Quốc Express từ đất liền sang đảo ${destCity}`,
+        description: `Tàu cao tốc từ ${ferryPortName} vượt biển sang đảo ${destCity}`,
       };
       busPriceOneWay += ferryFare;
       busDurationMinutes += ferryDur;
       routeSteps = [
-        `Chặng 1 (Xe khách giường nằm): ${originBusName} ──> Cảng Bến tàu Rạch Giá / Hà Tiên (~${Math.round(roadDistanceKm / speed.SLEEPER_BUS)} tiếng, ~${Math.round(roadDistanceKm * PRICING_CONFIG.INTERCITY.SLEEPER_BUS_PER_KM).toLocaleString()}đ/vé)`,
-        `Chặng 2 (Tàu cao tốc vượt biển): Cảng đất liền ──> Đảo ${destCity} (~${Math.floor(ferryDur / 60)}h${ferryDur % 60 ? ferryDur % 60 + 'p' : ''}, ~${ferryFare.toLocaleString()}đ/vé)`,
+        `Chặng 1 (Xe khách giường nằm): ${originBusName} ──> ${ferryPortName} (~${formatDurationVi(baseBusMinutes)}, ~${formatVndCurrency(baseBusFare)}/vé)`,
+        `Chặng 2 (Tàu cao tốc vượt biển): ${ferryPortName} ──> Đảo ${destCity} (~${formatDurationVi(ferryDur, true)}, ~${formatVndCurrency(ferryFare)}/vé)`,
       ];
     } else {
+      const { transferKm, transferMinutes } = computeLocalTransfer(
+        hasDestBus ? destBus?.distanceKm : undefined,
+        T.MIN_LOCAL_TRANSFER_KM,
+      );
       routeSteps = [
-        `Đón xe tại ${originBusName} ──> ${destBusName} (~${Math.round(busDurationMinutes / 60)} tiếng, ~${busPriceOneWay.toLocaleString()}đ/vé)`,
-        `Các nhà xe chất lượng cao: Phương Trang (FUTA), Thành Bưởi, Limousine cao cấp`,
+        `Chặng chính (Xe giường nằm / Limousine): Đón xe tại ${originBusName} ──> ${destBusName} (~${formatDurationVi(busDurationMinutes)}, ~${formatVndCurrency(busPriceOneWay)}/vé)`,
+        `Trung chuyển về khách sạn: Xe trung chuyển của nhà xe hoặc Taxi từ ${destBusName} về trung tâm ${destCity} (~${transferKm}km, ~${transferMinutes} phút)`,
       ];
     }
 
     const safetyAdvisory = checkTransitSafety(TransitModeEnum.SLEEPER_BUS, roadDistanceKm);
 
     return {
-      mode: 'SLEEPER_BUS',
+      mode: this.mode,
       originName: originBusName,
-      destName: destBusName,
+      destName: destCity,
       distanceKm: roadDistanceKm,
       durationMinutes: busDurationMinutes,
       estimatedPriceOneWay: busPriceOneWay,
@@ -195,19 +207,21 @@ export class BusTransitStrategy implements ITransitStrategy {
         vexere: vexereUrl,
       },
       safetyAdvisory,
-      originHub: originBus && (originBus.distanceKm ?? 999) <= 50 ? originBus : undefined,
-      destHub: destBus && (destBus.distanceKm ?? 999) <= 50 ? destBus : undefined,
+      originHub: hasOriginBus && originBus ? originBus : undefined,
+      destHub: hasDestBus && destBus ? destBus : undefined,
       isIsland,
       isMultiModal: isIsland,
       transferLeg,
       details: {
-        carriers: 'Phương Trang (FUTA), Thành Bưởi, Limousine liên tỉnh',
+        carriers: C.SLEEPER_BUS,
         notes:
-          busDurationMinutes > 360
-            ? 'Khuyên chọn xe giường nằm xuất phát lúc 22:00 - 23:00 để ngủ đêm trên xe, tiết kiệm 1 đêm khách sạn.'
-            : 'Nên chọn xe Limousine xuất phát sáng để đến nơi vào đầu giờ chiều.',
+          busDurationMinutes > T.OVERNIGHT_BUS_MIN_MINUTES
+            ? 'Khuyên chọn xe giường nằm xuất phát lúc 22:00 - 23:00 (có xe trung chuyển miễn phí tận khách sạn) để ngủ đêm trên xe, tiết kiệm 1 đêm lưu trú.'
+            : 'Nên chọn xe Limousine đưa đón tận nơi, xuất phát sáng để đến khách sạn vào đầu giờ chiều.',
         routeSteps,
       },
     };
   }
 }
+
+

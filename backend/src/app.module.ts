@@ -11,6 +11,8 @@ import { CrawlerModule } from './modules/crawler/crawler.module';
 import { PlacesModule } from './modules/places/places.module';
 import { GeoModule } from './modules/geo/geo.module';
 import { ItinerariesModule } from './modules/itineraries/itineraries.module';
+import { KnowledgeModule } from './modules/knowledge/knowledge.module';
+import { AdvisorModule } from './modules/advisor/advisor.module';
 import { appConfig, databaseConfig, jwtConfig, redisConfig, aiConfig, crawlerConfig } from './config';
 import { envValidationSchema } from './config/env.validation';
 
@@ -23,12 +25,34 @@ import { envValidationSchema } from './config/env.validation';
     }),
     BullModule.forRootAsync({
       inject: [ConfigService],
-      useFactory: (configService: ConfigService) => ({
-        connection: {
-          host: configService.get<string>('REDIS_HOST', 'localhost'),
-          port: configService.get<number>('REDIS_PORT', 6379),
-        },
-      }),
+      useFactory: (configService: ConfigService) => {
+        const redisUrl = configService.get<string>('REDIS_URL');
+        if (redisUrl?.startsWith('redis')) {
+          const isLocal = redisUrl.includes('localhost') || redisUrl.includes('127.0.0.1');
+          try {
+            const parsed = new URL(redisUrl);
+            return {
+              connection: {
+                host: parsed.hostname,
+                port: parseInt(parsed.port || '6379', 10),
+                username: parsed.username || undefined,
+                password: parsed.password || undefined,
+                tls: isLocal ? undefined : { rejectUnauthorized: false },
+                maxRetriesPerRequest: null,
+              },
+            };
+          } catch {
+            // fallback to host/port
+          }
+        }
+        return {
+          connection: {
+            host: configService.get<string>('REDIS_HOST', 'localhost'),
+            port: configService.get<number>('REDIS_PORT', 6379),
+            maxRetriesPerRequest: null,
+          },
+        };
+      },
     }),
     PrismaModule,
     RedisModule,
@@ -38,6 +62,8 @@ import { envValidationSchema } from './config/env.validation';
     PlacesModule,
     GeoModule,
     ItinerariesModule,
+    KnowledgeModule,
+    AdvisorModule,
   ],
   controllers: [AppController],
   providers: [AppService],

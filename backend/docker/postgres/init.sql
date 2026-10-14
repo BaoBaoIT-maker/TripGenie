@@ -54,9 +54,9 @@ CREATE TYPE report_status_enum    AS ENUM ('PENDING', 'REVIEWING', 'RESOLVED', '
 
 CREATE TABLE users (
     id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    username      VARCHAR(50) UNIQUE,
+    username      VARCHAR(50),
     -- [MED] citext tự động so sánh case-insensitive — tránh trùng tài khoản do hoa/thường
-    email         CITEXT UNIQUE,
+    email         CITEXT,
     password_hash VARCHAR(255),
     full_name     VARCHAR(255) NOT NULL,
     avatar_url    TEXT,

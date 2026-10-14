@@ -4,7 +4,8 @@ import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   User,
   Mail,
@@ -20,11 +21,14 @@ import {
 import { toast } from 'sonner';
 import { registerSchema, RegisterFormData } from '../schemas/auth.schema';
 import { useAuth } from '../hooks/use-auth';
+import { authService } from '@/services/auth.service';
 import { GoogleAuthButton } from './GoogleAuthButton';
 import { getSafeRedirectUrl } from '@/lib/safe-redirect';
 import { Button } from '@/components/ui/button';
 
 export function RegisterForm() {
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const searchParams = useSearchParams();
   const nextParam = getSafeRedirectUrl(searchParams.get('next'));
 
@@ -71,6 +75,56 @@ export function RegisterForm() {
     }, 1000);
     return () => clearInterval(interval);
   }, [countdown]);
+
+  // Cross-tab and Cross-device auto-login effect:
+  // 1. BroadcastChannel: 0ms instant trigger when verified on another tab in the same browser
+  // 2. Short-polling (2.5s): Auto-redirects when verified on another device (e.g. mobile phone)
+  React.useEffect(() => {
+    if (!pendingRegistration) return;
+
+    let isHandled = false;
+
+    const handleSuccess = () => {
+      if (isHandled) return;
+      isHandled = true;
+      toast.success('Tài khoản đã được kích hoạt thành công!');
+      queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
+      router.push(nextParam || '/explore');
+    };
+
+    // 1. BroadcastChannel (Same browser)
+    let channel: BroadcastChannel | null = null;
+    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
+      try {
+        channel = new BroadcastChannel('tripgenie_auth_channel');
+        channel.onmessage = (event) => {
+          if (event.data?.type === 'EMAIL_VERIFIED') {
+            handleSuccess();
+          }
+        };
+      } catch {
+        // BroadcastChannel unsupported
+      }
+    }
+
+    // 2. Short-polling (Cross-device, e.g. clicked magic link on phone)
+    const pollInterval = setInterval(async () => {
+      if (isHandled) return;
+      try {
+        const res = await authService.checkRegistrationStatus(pendingRegistration.registrationId);
+        if (res.verified) {
+          handleSuccess();
+        }
+      } catch {
+        // Silently ignore transient network blips
+      }
+    }, 2500);
+
+    return () => {
+      clearInterval(pollInterval);
+      channel?.close();
+    };
+  }, [pendingRegistration, nextParam, router, queryClient]);
 
   const onSubmit = async (data: RegisterFormData) => {
     setServerError(null);
@@ -276,7 +330,7 @@ export function RegisterForm() {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-0.5 transition-colors cursor-pointer"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 size-8 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg transition-colors cursor-pointer"
               aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
             >
               {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
@@ -305,6 +359,14 @@ export function RegisterForm() {
               placeholder="Nhập lại mật khẩu"
               className="w-full h-10 pl-9 pr-10 rounded-xl border border-input bg-background/50 text-sm placeholder:text-muted-foreground/60 transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 size-8 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg transition-colors cursor-pointer"
+              aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+            >
+              {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+            </button>
           </div>
           {errors.confirmPassword && (
             <p className="text-xs text-destructive mt-1">

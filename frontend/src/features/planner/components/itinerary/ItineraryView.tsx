@@ -827,6 +827,7 @@ export default function ItineraryView({ id }: Props) {
             <ItineraryTimeline
               days={visibleDays}
               transit={data.intercityTransit}
+              destination={data.destination}
               startDate={data.startDate}
               endDate={data.endDate}
               selectedPlaceId={selectedPlaceId}

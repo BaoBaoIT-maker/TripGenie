@@ -5,7 +5,13 @@ import {
 } from '@nestjs/common';
 import { BudgetLevel, Prisma, TravelArea } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
-import { TransitService, IntercityTransitResult } from './transit.service';
+import {
+  TransitService,
+  IntercityTransitResult,
+  computeLocalTransfer,
+  formatDurationVi,
+  formatVndCurrency,
+} from './transit.service';
 import { GeminiPlannerService } from './gemini-planner.service';
 import {
   GenerateItineraryDto,
@@ -633,22 +639,69 @@ export class ItineraryPlannerService {
     if (distanceKm == null || distanceKm <= 0) {
       return { durationMinutes: null, travelMode: null };
     }
-    if (distanceKm <= 0.8) {
+    const IC = PRICING_CONFIG.INTRACITY;
+    if (distanceKm <= IC.WALK_THRESHOLD_KM) {
       return {
-        durationMinutes: Math.max(2, Math.round((distanceKm / 4.5) * 60)),
+        durationMinutes: Math.max(
+          IC.MIN_WALK_MINUTES,
+          Math.round((distanceKm / IC.WALK_SPEED_KMH) * 60),
+        ),
         travelMode: 'WALK',
       };
     }
-    const roadKm = distanceKm * 1.25;
+    const roadKm = distanceKm * IC.ROAD_DETOUR_FACTOR;
     if (intracityMode === 'TAXI_CAR') {
       return {
-        durationMinutes: Math.max(4, Math.round((roadKm / 22) * 60) + 3),
+        durationMinutes: Math.max(
+          IC.MIN_CAR_MINUTES,
+          Math.round((roadKm / IC.CAR_SPEED_KMH) * 60) + IC.CAR_TRAFFIC_BUFFER_MINUTES,
+        ),
         travelMode: 'CAR',
       };
     }
     return {
-      durationMinutes: Math.max(3, Math.round((roadKm / 25) * 60) + 2),
+      durationMinutes: Math.max(
+        IC.MIN_BIKE_MINUTES,
+        Math.round((roadKm / IC.BIKE_SPEED_KMH) * 60) + IC.BIKE_TRAFFIC_BUFFER_MINUTES,
+      ),
       travelMode: 'BIKE',
+    };
+  }
+
+  /**
+   * Normalizes legacy stored intercityTransit snapshots so older DB itineraries
+   * display accurate destination names and local transfer steps without re-generating.
+   */
+  private normalizeStoredTransit(
+    transit: IntercityTransitResult | null | undefined,
+    destination: string | null,
+  ): IntercityTransitResult | null {
+    if (!transit) return null;
+    const cleanDest = destination?.trim() || transit.destName;
+
+    // Legacy snapshots stored the airport/station hub name inside destName
+    const isHubNameInDest =
+      transit.destHub?.name && transit.destName === transit.destHub.name && cleanDest !== transit.destHub.name;
+    const normalizedDestName = isHubNameInDest ? cleanDest : transit.destName;
+
+    let routeSteps = transit.details?.routeSteps ? [...transit.details.routeSteps] : [];
+    if (routeSteps.length === 0 && transit.mode === 'FLIGHT') {
+      const hubName = transit.destHub?.name || `Sân bay đi ${cleanDest}`;
+      const { transferKm, transferMinutes } = computeLocalTransfer(transit.destHub?.distanceKm);
+      const durM = transit.durationMinutes || PRICING_CONFIG.INTERCITY.FLIGHT.MINUTES_SHORT;
+      routeSteps = [
+        `Chặng bay chính: Khởi hành từ ${transit.originHub?.name || transit.originName} ──> ${hubName} (~${formatDurationVi(durM, true)}, ~${formatVndCurrency(transit.estimatedPriceOneWay || 0)}/vé)`,
+        `Trung chuyển sân bay về trung tâm: Xe trung chuyển / Taxi từ ${hubName} về trung tâm ${cleanDest} (~${transferKm}km, ~${transferMinutes} phút)`,
+      ];
+    }
+
+    return {
+      ...transit,
+      destName: normalizedDestName,
+      details: {
+        ...transit.details,
+        routeSteps,
+      },
     };
   }
 
@@ -765,7 +818,7 @@ export class ItineraryPlannerService {
       endDate: row.endDate?.toISOString().slice(0, 10) ?? null,
       totalDays,
       budgetLevel: row.budgetLevel ?? 'MEDIUM',
-      intercityTransit: stored.intercityTransit ?? null,
+      intercityTransit: this.normalizeStoredTransit(stored.intercityTransit, row.destination),
       budgetBreakdown: stored.budgetBreakdown ?? null,
       days,
     };
@@ -917,8 +970,8 @@ export class ItineraryPlannerService {
     }
 
     const stored = readStoredPlan(row.aiPreferences);
-    const originCity = (stored as any).originCity || 'Hồ Chí Minh';
-    const destCity = row.destination || (stored as any).destCity || 'Đà Nẵng';
+    const originCity = (stored as any).originCity || PRICING_CONFIG.DEFAULTS.ORIGIN_CITY;
+    const destCity = row.destination || (stored as any).destCity || PRICING_CONFIG.DEFAULTS.DEST_CITY;
     const departDate =
       row.startDate?.toISOString().slice(0, 10) ||
       new Date().toISOString().slice(0, 10);
@@ -929,6 +982,7 @@ export class ItineraryPlannerService {
       originCity,
       destCity,
       transitMode: newTransitMode,
+      budgetLevel: row.budgetLevel || (stored as any).budgetLevel,
       departDate,
       returnDate,
     });

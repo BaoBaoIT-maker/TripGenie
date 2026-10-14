@@ -6,7 +6,6 @@ import {
   ForbiddenException,
   BadRequestException,
   ServiceUnavailableException,
-  NotFoundException,
   HttpStatus,
   Logger,
 } from '@nestjs/common';
@@ -16,14 +15,14 @@ import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { randomUUID } from 'crypto';
 import Redis from 'ioredis';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
 import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
 import { AUTH_CONSTANTS } from '@/common/constants/auth.constants';
 import { IUsersRepository } from '@/modules/users/interfaces/users-repository.interface';
 import {
   RegisterDto,
   LoginDto,
-  VerifyOtpDto,
-  ResendOtpDto,
   ForgotPasswordDto,
   VerifyResetOtpDto,
   ResetPasswordDto,
@@ -51,6 +50,8 @@ export class AuthService {
     private readonly usersRepository: IUsersRepository,
     @Inject('REDIS_CLIENT')
     private readonly redisClient: Redis,
+    @InjectQueue(AUTH_CONSTANTS.MAIL_QUEUE)
+    private readonly mailQueue: Queue,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly mailService: MailService,
@@ -60,8 +61,7 @@ export class AuthService {
   ) {}
 
   private hashVerificationToken(token: string): string {
-    const secret =
-      this.configService.get<string>('JWT_SECRET', 'tripgenie_verification_secret');
+    const secret = this.configService.getOrThrow<string>('JWT_SECRET');
     return crypto.createHmac('sha256', secret).update(token).digest('hex');
   }
 
@@ -114,46 +114,23 @@ export class AuthService {
     const regKey = `email_verification:reg:${registrationId}`;
     const cooldownKey = `email_verification:cooldown:${registrationId}`;
 
-    await this.redisClient.set(
-      tokenKey,
-      JSON.stringify(draft),
-      'EX',
-      AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS,
-    );
-    await this.redisClient.set(
-      regKey,
-      JSON.stringify(draft),
-      'EX',
-      AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS,
-    );
-    await this.redisClient.set(
-      cooldownKey,
-      '1',
-      'EX',
-      AUTH_CONSTANTS.EMAIL_VERIFICATION_COOLDOWN_SECONDS,
-    );
+    // ponytail: multi() pipelines all 3 writes in one round-trip and prevents partial state on process crash between awaits
+    await this.redisClient
+      .multi()
+      .set(tokenKey, JSON.stringify(draft), 'EX', AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS)
+      .set(regKey, JSON.stringify(draft), 'EX', AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS)
+      .set(cooldownKey, '1', 'EX', AUTH_CONSTANTS.EMAIL_VERIFICATION_COOLDOWN_SECONDS)
+      .exec();
 
-    const frontendUrl =
-      this.configService.get<string>('FRONTEND_BASE_URL') ||
-      process.env.FRONTEND_BASE_URL ||
-      'http://localhost:3000';
+    const frontendUrl = this.configService.getOrThrow<string>('FRONTEND_BASE_URL');
     const verificationUrl = `${frontendUrl}/verify-email?token=${rawToken}`;
 
-    const emailSent = await this.mailService.sendVerificationLinkEmail(
-      normalizedEmail,
-      verificationUrl,
+    // Dispatch email job to BullMQ queue — returns in ~20ms, worker retries on failure
+    await this.mailQueue.add(
+      'send-verification-email',
+      { email: normalizedEmail, verificationUrl },
+      { attempts: 3, backoff: { type: 'exponential', delay: 1000 } },
     );
-
-    if (!emailSent) {
-      await this.redisClient.del(tokenKey);
-      await this.redisClient.del(regKey);
-      await this.redisClient.del(cooldownKey);
-      throw new ServiceUnavailableException(
-        'Dịch vụ gửi email xác thực tạm thời không khả dụng. Vui lòng thử lại sau.',
-      );
-    }
-
-    this.logger.log(`🔗 [DEV VERIFY LINK] Cho ${normalizedEmail}: ${verificationUrl}`);
 
     return {
       message: 'Đăng ký thành công! Vui lòng kiểm tra hộp thư email của bạn để xác thực tài khoản.',
@@ -219,9 +196,47 @@ export class AuthService {
       });
     }
 
+    // Set completion signal in Redis so waiting tab or other devices can auto-login (TTL: 120s)
+    const completionKey = `email_verification:completed:${draft.registrationId}`;
+    await this.redisClient.set(
+      completionKey,
+      user.id,
+      'EX',
+      AUTH_CONSTANTS.REGISTRATION_COMPLETION_TTL_SECONDS,
+    );
+
     const tokens = await this.generateTokens(user);
     const formattedUser = await this.formatUserResponse(user);
     return { user: formattedUser, tokens };
+  }
+
+  /**
+   * Check if a registration was verified by another tab or mobile device.
+   * Atomically exchanges the completion signal for an active session.
+   */
+  async checkRegistrationStatus(registrationId: string): Promise<{
+    verified: boolean;
+    user?: UserResponse;
+    tokens?: AuthTokens;
+  }> {
+    if (!registrationId) {
+      return { verified: false };
+    }
+
+    const completionKey = `email_verification:completed:${registrationId}`;
+    const userId = await this.atomicGetDel(completionKey);
+    if (!userId) {
+      return { verified: false };
+    }
+
+    const user = await this.usersRepository.findById(userId);
+    if (!user || !user.isActive) {
+      return { verified: false };
+    }
+
+    const tokens = await this.generateTokens(user);
+    const formattedUser = await this.formatUserResponse(user);
+    return { verified: true, user: formattedUser, tokens };
   }
 
   /**
@@ -259,43 +274,22 @@ export class AuthService {
     draft.tokenHash = tokenHash;
 
     const tokenKey = `email_verification:token:${tokenHash}`;
-    await this.redisClient.set(
-      tokenKey,
-      JSON.stringify(draft),
-      'EX',
-      AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS,
-    );
-    await this.redisClient.set(
-      regKey,
-      JSON.stringify(draft),
-      'EX',
-      AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS,
-    );
-    await this.redisClient.set(
-      cooldownKey,
-      '1',
-      'EX',
-      AUTH_CONSTANTS.EMAIL_VERIFICATION_COOLDOWN_SECONDS,
-    );
+    await this.redisClient
+      .multi()
+      .set(tokenKey, JSON.stringify(draft), 'EX', AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS)
+      .set(regKey, JSON.stringify(draft), 'EX', AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS)
+      .set(cooldownKey, '1', 'EX', AUTH_CONSTANTS.EMAIL_VERIFICATION_COOLDOWN_SECONDS)
+      .exec();
 
-    const frontendUrl =
-      this.configService.get<string>('FRONTEND_BASE_URL') ||
-      process.env.FRONTEND_BASE_URL ||
-      'http://localhost:3000';
+    const frontendUrl = this.configService.getOrThrow<string>('FRONTEND_BASE_URL');
     const verificationUrl = `${frontendUrl}/verify-email?token=${rawToken}`;
 
-    const emailSent = await this.mailService.sendVerificationLinkEmail(
-      draft.email,
-      verificationUrl,
+    // Dispatch email job to BullMQ queue
+    await this.mailQueue.add(
+      'send-verification-email',
+      { email: draft.email, verificationUrl },
+      { attempts: 3, backoff: { type: 'exponential', delay: 1000 } },
     );
-
-    if (!emailSent) {
-      throw new ServiceUnavailableException(
-        'Dịch vụ gửi email xác thực tạm thời không khả dụng. Vui lòng thử lại sau.',
-      );
-    }
-
-    this.logger.log(`🔗 [DEV RESEND VERIFY LINK] Cho ${draft.email}: ${verificationUrl}`);
 
     return {
       message: 'Đã gửi lại email xác thực. Vui lòng kiểm tra hộp thư của bạn.',
@@ -362,8 +356,11 @@ export class AuthService {
   }
 
   /**
-   * Đăng nhập thông qua Google:
-   * Chỉ cho phép khi identity có canSignIn = true hoặc tạo mới Google-only user.
+   * Xử lý đăng nhập/đăng ký qua Google OAuth.
+   * - Identity tồn tại → đăng nhập thẳng.
+   * - Email trùng tài khoản local đã verified → tự động link Google vào, đăng nhập.
+   * - Email trùng tài khoản local chưa verified → ConflictException (hoàn tất đăng ký email trước).
+   * - Email mới → tạo user + identity, isVerified = true ngay.
    */
   async validateOAuthUser(oauthProfile: {
     provider: string;
@@ -380,12 +377,6 @@ export class AuthService {
     let user: User | null = null;
 
     if (existingIdentity) {
-      if (!existingIdentity.canSignIn) {
-        throw new UnauthorizedException(
-          'Tài khoản này chỉ được liên kết Gmail để nhận thông báo hoặc khôi phục mật khẩu. Vui lòng đăng nhập bằng tên tài khoản và mật khẩu.',
-        );
-      }
-
       user =
         (existingIdentity as any).user ||
         (await this.usersRepository.findById(existingIdentity.userId));
@@ -394,9 +385,20 @@ export class AuthService {
       user = await this.usersRepository.findByEmail(normalizedEmail);
 
       if (user) {
-        throw new ConflictException(
-          'Email này đã được sử dụng bởi một tài khoản khác. Vui lòng đăng nhập bằng mật khẩu.',
-        );
+        if (!user.isVerified) {
+          throw new ConflictException(
+            'Email này đã được dùng nhưng chưa xác thực. Vui lòng hoàn tất đăng ký qua email trước.',
+          );
+        }
+
+        // Verified ở cả 2 phía → link Google vào tài khoản local hiện có
+        await this.usersRepository.createIdentity({
+          user: { connect: { id: user.id } },
+          provider: oauthProfile.provider as AuthProvider,
+          providerUserId: oauthProfile.providerUserId,
+          canSignIn: true,
+          identityData: oauthProfile as any,
+        });
       } else {
         user = await this.usersRepository.create({
           email: normalizedEmail,
@@ -425,43 +427,6 @@ export class AuthService {
     return { user: formattedUser, tokens };
   }
 
-  async resendOtp(
-    dto: ResendOtpDto,
-  ): Promise<{ message: string; expiresIn: number; retryAfter: number }> {
-    const normalizedEmail = dto.email.toLowerCase().trim();
-    const user = await this.usersRepository.findByEmail(normalizedEmail);
-
-    if (!user) {
-      throw new BadRequestException('Không tìm thấy tài khoản với email này');
-    }
-
-    if (user.isVerified && dto.purpose !== 'password-reset') {
-      throw new BadRequestException('Tài khoản đã được xác thực');
-    }
-
-    const purpose = dto.purpose || 'email-verification';
-    return this.otpService.generateAndSendOtp(normalizedEmail, purpose);
-  }
-
-  async verifyOtp(dto: VerifyOtpDto): Promise<AuthResponse> {
-    const normalizedEmail = dto.email.toLowerCase().trim();
-    const user = await this.usersRepository.findByEmail(normalizedEmail);
-    if (!user) {
-      throw new BadRequestException('Không tìm thấy tài khoản với email này');
-    }
-
-    await this.otpService.verifyOtp(normalizedEmail, dto.otp, 'email-verification');
-
-    const updatedUser = await this.usersRepository.update(user.id, {
-      isVerified: true,
-      verifiedAt: new Date(),
-    });
-
-    const tokens = await this.generateTokens(updatedUser);
-    const formattedUser = await this.formatUserResponse(updatedUser);
-    return { user: formattedUser, tokens };
-  }
-
   async forgotPassword(
     dto: ForgotPasswordDto,
   ): Promise<{ message: string; expiresIn: number; retryAfter: number }> {
@@ -481,7 +446,7 @@ export class AuthService {
   async refreshTokens(refreshToken: string): Promise<AuthTokens> {
     try {
       const payload = this.jwtService.verify(refreshToken, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
       });
 
       if (payload.jti) {
@@ -511,7 +476,7 @@ export class AuthService {
     }
   }
 
-  async logout(userId: string, options: { accessToken?: string; refreshToken?: string }): Promise<void> {
+  async logout(options: { accessToken?: string; refreshToken?: string }): Promise<void> {
     const tryRevoke = async (token?: string) => {
       if (!token) return;
       try {
@@ -540,14 +505,14 @@ export class AuthService {
       this.jwtService.signAsync(
         { ...basePayload, jti: randomUUID() },
         {
-          secret: this.configService.get<string>('JWT_SECRET'),
+          secret: this.configService.getOrThrow<string>('JWT_SECRET'),
           expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '1d') as any,
         },
       ),
       this.jwtService.signAsync(
         { ...basePayload, jti: randomUUID() },
         {
-          secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+          secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
           expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '7d') as any,
         },
       ),
@@ -584,7 +549,6 @@ export class AuthService {
       authMethods,
       capabilities: {
         hasVerifiedEmail,
-        hasGoogleEmailLink: false,
         canResetPasswordByEmail,
       },
     };

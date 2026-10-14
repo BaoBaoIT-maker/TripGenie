@@ -22,6 +22,7 @@ describe('OtpService', () => {
 
     mockConfigService = {
       get: jest.fn().mockReturnValue('test_otp_secret_key_1234567890'),
+      getOrThrow: jest.fn().mockReturnValue('test_otp_secret_key_1234567890'),
     };
 
     mockMailService = {

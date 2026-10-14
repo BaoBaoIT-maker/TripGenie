@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
+import { BullModule } from '@nestjs/bullmq';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { MailService } from './services/mail.service';
@@ -12,13 +13,17 @@ import { UsersModule } from '../users/users.module';
 
 import { OtpService } from './services/otp.service';
 import { PasswordResetService } from './services/password-reset.service';
+import { AuthMailProcessor } from './processors/auth-mail.processor';
+import { AUTH_CONSTANTS } from '@/common/constants/auth.constants';
 
 @Module({
   imports: [
     PassportModule,
     JwtModule.register({}),
     UsersModule,
-    // REDIS_CLIENT is provided globally by RedisModule in AppModule
+    BullModule.registerQueue({
+      name: AUTH_CONSTANTS.MAIL_QUEUE,
+    }),
   ],
   controllers: [AuthController],
   providers: [
@@ -27,6 +32,7 @@ import { PasswordResetService } from './services/password-reset.service';
     OtpService,
     PasswordResetService,
     TokenBlacklistService,
+    AuthMailProcessor,
     JwtStrategy,
     GoogleStrategy,
     FacebookStrategy,

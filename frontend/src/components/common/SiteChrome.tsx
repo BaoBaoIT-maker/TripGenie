@@ -5,17 +5,24 @@ import { usePathname } from 'next/navigation';
 import { Navbar } from '@/components/common/Navbar';
 import { Footer } from '@/components/common/Footer';
 import { BottomNav } from '@/components/common/BottomNav';
+import { AdvisorWidget } from '@/features/advisor/components/AdvisorWidget';
+
+const AUTH_EXACT_ROUTES = new Set([
+  '/login',
+  '/register',
+  '/verify-otp',
+  '/forgot-password',
+  '/reset-password',
+]);
+const AUTH_PREFIX = '/auth/';
+const ITINERARY_DETAIL_PATTERN = /^\/itineraries\/[^/]+/;
 
 export function SiteChrome({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
+  const pathname = usePathname() || '';
 
   const isAuthPage =
-    pathname === '/login' ||
-    pathname === '/register' ||
-    pathname === '/verify-otp' ||
-    pathname === '/forgot-password' ||
-    pathname === '/reset-password' ||
-    pathname?.startsWith('/auth/');
+    AUTH_EXACT_ROUTES.has(pathname) || pathname.startsWith(AUTH_PREFIX);
+  const isItineraryCopilotPage = ITINERARY_DETAIL_PATTERN.test(pathname);
 
   if (isAuthPage) {
     return (
@@ -30,6 +37,7 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
       <Navbar />
       <main className="flex-1 w-full">{children}</main>
       <Footer />
+      {!isItineraryCopilotPage && <AdvisorWidget />}
       <BottomNav />
     </>
   );

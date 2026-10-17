@@ -3,34 +3,67 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Bookmark, MapPin, Sparkles, Heart, Camera, UploadCloud } from "lucide-react";
+import { MapPin, Sparkles, Heart, Camera, UploadCloud, Navigation } from "lucide-react";
 import { Place } from "@/types/place";
 import { Badge } from "@/components/ui/badge";
 import { RatingStars } from "@/components/common/RatingStars";
 import { cn } from "@/lib/utils";
 import { routingService } from "@/services/routing.service";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useSavedPlaceIds, useToggleFavorite } from "@/features/collections/hooks/use-collections";
+import { SaveToCollectionModal } from "@/features/collections/components/SaveToCollectionModal";
+import { collectionService, DEFAULT_COLLECTION_TITLE } from "@/services/collection.service";
+import { toast } from "sonner";
 
 interface PlaceCardProps {
   place: Place;
   className?: string;
-  onBookmark?: (place: Place) => void;
-  isBookmarked?: boolean;
   onContributePhoto?: (place: Place) => void;
   userLocation?: { latitude: number; longitude: number } | null;
   onCardClick?: (e: React.MouseEvent, place: Place) => void;
   isSelected?: boolean;
+  currentCollectionId?: string | null;
+  collectionName?: string;
 }
 
 export function PlaceCard({
   place,
   className,
-  onBookmark,
-  isBookmarked = false,
   onContributePhoto,
   userLocation,
   onCardClick,
   isSelected,
+  currentCollectionId,
+  collectionName,
 }: PlaceCardProps) {
+  const { user } = useAuth();
+  const isAuthenticated = Boolean(user);
+  const { data: savedIdsSet } = useSavedPlaceIds({ enabled: isAuthenticated });
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isCheckingCollections, setIsCheckingCollections] = useState(false);
+
+  const toggleMutation = useToggleFavorite({
+    onSaved: (data) => {
+      if (data.isSaved) {
+        toast.success(`Đã lưu "${place.name}" vào ${collectionName || DEFAULT_COLLECTION_TITLE}`, {
+          action: {
+            label: "Đổi bộ sưu tập",
+            onClick: () => setIsSaveModalOpen(true),
+          },
+        });
+      } else {
+        toast.info(
+          collectionName
+            ? `Đã xóa "${place.name}" khỏi bộ sưu tập "${collectionName}"`
+            : `Đã bỏ lưu "${place.name}"`
+        );
+      }
+    },
+  });
+
+  const isBookmarked = isAuthenticated
+    ? (currentCollectionId ? true : (savedIdsSet?.has(place.id) ?? false))
+    : false;
   const [imgError, setImgError] = useState(false);
 
   // Compute direct distance if user location is available
@@ -42,6 +75,40 @@ export function PlaceCard({
     });
   }, [userLocation, place.latitude, place.longitude]);
 
+  const toggleBookmark = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      toast.info("Vui lòng đăng nhập để lưu địa điểm vào bộ sưu tập");
+      return;
+    }
+    if (toggleMutation.isPending || isCheckingCollections) return;
+
+    if (currentCollectionId) {
+      toggleMutation.mutate({ placeId: place.id, collectionId: currentCollectionId });
+      return;
+    }
+
+    if (!isBookmarked) {
+      toggleMutation.mutate({ placeId: place.id });
+      return;
+    }
+
+    // Is currently bookmarked in 1 or more collections
+    try {
+      setIsCheckingCollections(true);
+      const containing = await collectionService.getCollectionsContainingPlace(place.id);
+      if (containing && containing.length > 1) {
+        setIsSaveModalOpen(true);
+      } else {
+        toggleMutation.mutate({ placeId: place.id });
+      }
+    } catch {
+      toggleMutation.mutate({ placeId: place.id });
+    } finally {
+      setIsCheckingCollections(false);
+    }
+  };
   const handleCardInteraction = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest("button")) return;
@@ -139,30 +206,39 @@ export function PlaceCard({
             )}
           </div>
 
-          {/* Bookmark Button (rendered only if onBookmark callback is provided) */}
-          {onBookmark && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                onBookmark(place);
-              }}
+          {/* Bookmark Button */}
+          <button
+            type="button"
+            onClick={toggleBookmark}
+            disabled={toggleMutation.isPending || isCheckingCollections}
+            className={cn(
+              "pointer-events-auto flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full backdrop-blur-md transition-all active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary shadow-xs cursor-pointer",
+              isBookmarked
+                ? "bg-rose-500 text-white shadow-md hover:bg-rose-600"
+                : "bg-background/85 text-foreground hover:bg-background hover:text-rose-500"
+            )}
+            aria-label={
+              isBookmarked
+                ? currentCollectionId
+                  ? `Xóa khỏi bộ sưu tập ${collectionName || ""}`
+                  : "Bỏ lưu địa điểm"
+                : "Lưu địa điểm"
+            }
+            title={
+              isBookmarked
+                ? currentCollectionId
+                  ? `Xóa khỏi bộ sưu tập "${collectionName || ""}"`
+                  : "Bỏ lưu địa điểm"
+                : "Lưu địa điểm"
+            }
+          >
+            <Heart
               className={cn(
-                "pointer-events-auto flex size-8.5 items-center justify-center rounded-full backdrop-blur-md transition-transform active:scale-90 focus:outline-none",
-                isBookmarked
-                  ? "bg-rose-500 text-white shadow-md"
-                  : "bg-background/80 text-foreground hover:bg-background shadow-xs"
+                "size-4.5 transition-transform",
+                isBookmarked ? "fill-current scale-110" : ""
               )}
-              aria-label="Lưu địa điểm"
-            >
-              {isBookmarked ? (
-                <Heart className="size-4 fill-current" />
-              ) : (
-                <Bookmark className="size-4" />
-              )}
-            </button>
-          )}
+            />
+          </button>
         </div>
 
         {/* Bottom Image Info: Price, City & Distance (when image present) */}
@@ -174,8 +250,9 @@ export function PlaceCard({
                 <span>{place.city}</span>
               </div>
               {distanceKm !== null && distanceKm > 0 && (
-                <span className="rounded-md bg-black/65 text-white font-semibold px-1.5 py-0.5 backdrop-blur-xs text-[10px] border border-white/20 shadow-2xs">
-                  📍 ~{routingService.formatDistanceKm(distanceKm)}
+                <span className="inline-flex items-center gap-1 rounded-md bg-black/65 text-white font-semibold px-2 py-0.5 backdrop-blur-xs text-[10px] border border-white/20 shadow-2xs">
+                  <Navigation className="size-2.5 text-primary shrink-0" />
+                  <span>~{routingService.formatDistanceKm(distanceKm)}</span>
                 </span>
               )}
             </div>
@@ -241,6 +318,13 @@ export function PlaceCard({
           </Link>
         </div>
       </div>
+
+      {/* Save to Collection Modal */}
+      <SaveToCollectionModal
+        place={place}
+        isOpen={isSaveModalOpen}
+        onClose={() => setIsSaveModalOpen(false)}
+      />
     </div>
   );
 }

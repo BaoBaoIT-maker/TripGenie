@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { User, UserIdentity, Prisma } from '@prisma/client';
+import { User, UserIdentity, UserPreference, Prisma } from '@prisma/client';
 import { PrismaService } from '@/database/prisma.service';
 import { IUsersRepository } from './interfaces/users-repository.interface';
 
@@ -106,6 +106,26 @@ export class UsersRepository implements IUsersRepository {
   async createIdentity(data: Prisma.UserIdentityCreateInput): Promise<UserIdentity> {
     return this.prisma.userIdentity.create({
       data,
+    });
+  }
+
+  async findPreferences(userId: string): Promise<UserPreference | null> {
+    return this.prisma.userPreference.findUnique({
+      where: { userId },
+    });
+  }
+
+  async upsertPreferences(
+    userId: string,
+    data: Prisma.UserPreferenceCreateWithoutUserInput,
+  ): Promise<UserPreference> {
+    return this.prisma.userPreference.upsert({
+      where: { userId },
+      create: {
+        ...data,
+        user: { connect: { id: userId } },
+      },
+      update: data,
     });
   }
 }

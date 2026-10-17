@@ -49,8 +49,11 @@ export class AdvisorController {
    */
   @UseGuards(OptionalJwtAuthGuard)
   @Get('sessions/:id/messages')
-  async getSessionMessages(@Param('id', ParseUUIDPipe) sessionId: string) {
-    return this.advisorService.getSessionMessages(sessionId);
+  async getSessionMessages(
+    @Param('id', ParseUUIDPipe) sessionId: string,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.advisorService.getSessionMessages(sessionId, userId);
   }
 
   /**

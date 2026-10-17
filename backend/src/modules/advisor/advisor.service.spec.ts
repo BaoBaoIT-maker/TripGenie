@@ -1,3 +1,4 @@
+import { ForbiddenException } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
@@ -480,6 +481,16 @@ describe('AdvisorService & AdvisorToolsService (Unit + Integration)', () => {
       expect(result.places).toEqual([]);
       expect(result.citations).toEqual([]);
       expect(mockPrisma.aiChatMessage.create).toHaveBeenCalledTimes(2);
+    });
+
+    it('5b. Session Ownership Protection (IDOR prevention): forbids reading or deleting another user session', async () => {
+      await expect(
+        advisorService.getSessionMessages(MOCK_SESSION_ID, 'stranger-user-id'),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        advisorService.deleteSession(MOCK_SESSION_ID, undefined),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 

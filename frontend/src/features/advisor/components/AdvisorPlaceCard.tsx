@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { Compass, ExternalLink, MapPin, Star } from 'lucide-react';
 import { ADVISOR_UI_CONSTANTS, AdvisorPlaceSummary } from '@/types/advisor';
@@ -11,6 +12,7 @@ interface AdvisorPlaceCardProps {
 }
 
 export function AdvisorPlaceCard({ place, onNavigate }: AdvisorPlaceCardProps) {
+  const [imgError, setImgError] = React.useState(false);
   const priceLabel = place.priceLevel
     ? ADVISOR_UI_CONSTANTS.PRICE_LEVEL_LABELS[place.priceLevel] ||
       place.priceLevel
@@ -23,13 +25,18 @@ export function AdvisorPlaceCard({ place, onNavigate }: AdvisorPlaceCardProps) {
       className="group flex min-h-[44px] cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-2.5 text-card-foreground shadow-xs transition-all duration-200 motion-reduce:transition-none hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
-        {place.primaryImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+        {place.primaryImage && !imgError ? (
+          <Image
             src={place.primaryImage}
             alt={place.name}
-            loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-300 motion-reduce:transition-none group-hover:scale-105"
+            fill
+            sizes="64px"
+            unoptimized={
+              place.primaryImage.includes('wikimedia.org') ||
+              place.primaryImage.includes('wikipedia.org')
+            }
+            onError={() => setImgError(true)}
+            className="object-cover transition-transform duration-300 motion-reduce:transition-none group-hover:scale-105"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-secondary text-secondary-foreground">

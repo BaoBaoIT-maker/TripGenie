@@ -135,13 +135,13 @@ export interface BackendPlaceItem {
   id: string;
   name: string;
   description?: string | null;
-  address?: string;
+  address?: string | null;
   district?: string | null;
   city?: string | null;
   latitude?: number;
   longitude?: number;
-  ratingAvg?: number;
-  reviewCount?: number;
+  ratingAvg?: number | null;
+  reviewCount?: number | null;
   imageCount?: number;
   priceLevel?: string | null;
   phone?: string | null;

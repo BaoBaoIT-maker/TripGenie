@@ -42,11 +42,11 @@ export function Navbar() {
     const parts = user.fullName.trim().split(" ");
     if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  }, [user?.fullName]);
+  }, [user]);
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-border/70 bg-background/90 backdrop-blur-md">
-      <div className="flex h-16 w-full items-center justify-between px-4 sm:px-6 lg:px-8 xl:px-12">
+      <div className="flex h-16 w-full items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Left: Brand Logo & Desktop Nav Links */}
         <div className="flex items-center gap-6 lg:gap-8">
           <Link

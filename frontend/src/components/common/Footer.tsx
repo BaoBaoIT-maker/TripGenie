@@ -4,7 +4,7 @@ import { MapPin, Heart } from "lucide-react";
 export function Footer() {
   return (
     <footer className="border-t border-border bg-card/50 text-foreground py-12 mt-auto mb-16 md:mb-0">
-      <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-12">
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
           {/* Brand Col */}
           <div className="space-y-3">
@@ -31,17 +31,17 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/explore?category=cafe" className="hover:text-foreground transition-colors">
+                <Link href="/explore?category=ca-phe" className="hover:text-foreground transition-colors">
                   Quán Cafe & Trà
                 </Link>
               </li>
               <li>
-                <Link href="/explore?category=restaurant" className="hover:text-foreground transition-colors">
+                <Link href="/explore?category=am-thuc" className="hover:text-foreground transition-colors">
                   Ẩm thực & Nhà hàng
                 </Link>
               </li>
               <li>
-                <Link href="/explore?category=nature" className="hover:text-foreground transition-colors">
+                <Link href="/explore?category=tham-quan" className="hover:text-foreground transition-colors">
                   Thiên nhiên & Check-in
                 </Link>
               </li>

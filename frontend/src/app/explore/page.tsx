@@ -43,6 +43,7 @@ import { Place, SuitableAudience } from "@/types/place";
 import { DiscoveryPlace, RadiusKm } from "@/features/map/types";
 import { SUPER_CATEGORIES, type SuperCategory } from "@/config/categories";
 import { useGeolocation } from "@/features/map/hooks/use-geolocation";
+import { parseExploreQuery, type ExploreSort } from "@/features/map/lib/explore-query";
 
 const AUDIENCES: { id: SuitableAudience | "all"; label: string }[] = [
   { id: "all", label: "Tất cả đối tượng" },
@@ -79,33 +80,118 @@ const AI_SUGGESTIONS = [
 function ExploreContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialViewParam = searchParams.get("view");
+  const parsedQuery = useMemo(() => parseExploreQuery(searchParams), [searchParams]);
+
   const initialSelectedId = searchParams.get("selected") || searchParams.get("placeId");
   const initialLat = searchParams.get("lat") ? Number(searchParams.get("lat")) : null;
   const initialLng = searchParams.get("lng") ? Number(searchParams.get("lng")) : null;
-  const initialAreaParam = searchParams.get("areaId") || searchParams.get("area");
-  const parsedInitialArea: number | "all" = useMemo(() => {
-    if (!initialAreaParam || initialAreaParam === "all") return "all";
-    const num = Number(initialAreaParam);
-    return isNaN(num) ? "all" : num;
-  }, [initialAreaParam]);
 
   // View Mode: Airbnb-style Grid vs Split Map
   const [userViewMode, setUserViewMode] = useState<"grid" | "split" | null>(null);
-  const viewMode = userViewMode ?? (initialViewParam === "split" || Boolean(initialSelectedId) ? "split" : "grid");
+  const viewMode = userViewMode ?? (parsedQuery.view === "split" || Boolean(initialSelectedId) ? "split" : "grid");
   const setViewMode = (mode: "grid" | "split") => setUserViewMode(mode);
 
   // Selection & Interactivity for Split Map
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(initialSelectedId || null);
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
 
-  // Synchronize URL selected param with state
-  useEffect(() => {
+  // Photo Contribution Modal State
+  const [contributePlace, setContributePlace] = useState<Place | null>(null);
+
+  // Filters
+  const [keyword, setKeyword] = useState<string>(parsedQuery.keyword || "");
+  const [selectedAreaId, setSelectedAreaId] = useState<number | "all">(parsedQuery.areaId || "all");
+  const [selectedSuperCategoryId, setSelectedSuperCategoryId] = useState<string>(parsedQuery.category || "all");
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
+  const [selectedAudience, setSelectedAudience] = useState<SuitableAudience | "all">(parsedQuery.suitableFor || "all");
+  const [selectedSort, setSelectedSort] = useState<ExploreSort>(parsedQuery.sort || "rating");
+
+  // Multi-criteria GPS & Radius & Quality Filters
+  const { coordinate: userLocation, locating, requestLocation } = useGeolocation();
+  const [useGpsSearch, setUseGpsSearch] = useState(false);
+  const [radiusKm, setRadiusKm] = useState<RadiusKm>(5);
+  const [minRating, setMinRating] = useState<number | null>(null);
+  const [selectedBudgetLevels, setSelectedBudgetLevels] = useState<string[]>([]);
+  const [openNow, setOpenNow] = useState<boolean>(false);
+
+  // Pagination & Data
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number | "all">(24);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [places, setPlaces] = useState<Place[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Geocoded Pin (Coordinates / Address search) & Fallback indicator
+  const [geocodedLocation, setGeocodedLocation] = useState<GeocodedLocation | null>(null);
+  const [isFallbackResult, setIsFallbackResult] = useState<boolean>(false);
+  const [pinNearbyCenter, setPinNearbyCenter] = useState<{
+    latitude: number;
+    longitude: number;
+    label: string;
+  } | null>(null);
+  const [routeToPinRequest, setRouteToPinRequest] = useState<{
+    latitude: number;
+    longitude: number;
+    name: string;
+  } | null>(null);
+
+  // Dynamic travel areas from backend
+  const [travelAreas, setTravelAreas] = useState<BackendTravelAreaItem[]>([]);
+  const [, startTransition] = useTransition();
+
+  // Adjust state during render when URL params change (official React pattern avoiding effect cascades)
+  const [prevSelectedParam, setPrevSelectedParam] = useState(initialSelectedId);
+  if (initialSelectedId !== prevSelectedParam) {
+    setPrevSelectedParam(initialSelectedId);
     if (initialSelectedId) {
       setSelectedPlaceId(initialSelectedId);
       setUserViewMode("split");
     }
-  }, [initialSelectedId]);
+  }
+
+  const [prevParsedQuery, setPrevParsedQuery] = useState(parsedQuery);
+  if (parsedQuery !== prevParsedQuery) {
+    setPrevParsedQuery(parsedQuery);
+    let filterChanged = false;
+
+    const nextKeyword = parsedQuery.keyword || "";
+    if (keyword !== nextKeyword) {
+      setKeyword(nextKeyword);
+      filterChanged = true;
+    }
+
+    const nextAreaId = parsedQuery.areaId || "all";
+    if (selectedAreaId !== nextAreaId) {
+      setSelectedAreaId(nextAreaId);
+      filterChanged = true;
+    }
+
+    const nextCategory = parsedQuery.category || "all";
+    if (selectedSuperCategoryId !== nextCategory) {
+      setSelectedSuperCategoryId(nextCategory);
+      filterChanged = true;
+    }
+
+    const nextAudience = parsedQuery.suitableFor || "all";
+    if (selectedAudience !== nextAudience) {
+      setSelectedAudience(nextAudience);
+      filterChanged = true;
+    }
+
+    if (parsedQuery.sort && selectedSort !== parsedQuery.sort) {
+      setSelectedSort(parsedQuery.sort);
+      filterChanged = true;
+    }
+
+    if (parsedQuery.view && userViewMode !== parsedQuery.view) {
+      setUserViewMode(parsedQuery.view);
+    }
+
+    if (filterChanged) {
+      setPage(1);
+    }
+  }
 
   // Immediately load target place if initialSelectedId is present so map and card list have it without delay
   useEffect(() => {
@@ -160,51 +246,6 @@ function ExploreContent() {
       router.push(`/places/${place.slug}`);
     }
   };
-
-  // Photo Contribution Modal State
-  const [contributePlace, setContributePlace] = useState<Place | null>(null);
-
-  // Filters
-  const [keyword, setKeyword] = useState("");
-  const [selectedAreaId, setSelectedAreaId] = useState<number | "all">(parsedInitialArea);
-  const [selectedSuperCategoryId, setSelectedSuperCategoryId] = useState<string>("all");
-  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
-  const [selectedAudience, setSelectedAudience] = useState<SuitableAudience | "all">("all");
-
-  // Multi-criteria GPS & Radius & Quality Filters
-  const { coordinate: userLocation, locating, requestLocation } = useGeolocation();
-  const [useGpsSearch, setUseGpsSearch] = useState(false);
-  const [radiusKm, setRadiusKm] = useState<RadiusKm>(5);
-  const [minRating, setMinRating] = useState<number | null>(null);
-  const [selectedBudgetLevels, setSelectedBudgetLevels] = useState<string[]>([]);
-  const [openNow, setOpenNow] = useState<boolean>(false);
-
-  // Pagination & Data
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState<number | "all">(24);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const [places, setPlaces] = useState<Place[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Geocoded Pin (Coordinates / Address search) & Fallback indicator
-  const [geocodedLocation, setGeocodedLocation] = useState<GeocodedLocation | null>(null);
-  const [isFallbackResult, setIsFallbackResult] = useState<boolean>(false);
-  const [pinNearbyCenter, setPinNearbyCenter] = useState<{
-    latitude: number;
-    longitude: number;
-    label: string;
-  } | null>(null);
-  const [routeToPinRequest, setRouteToPinRequest] = useState<{
-    latitude: number;
-    longitude: number;
-    name: string;
-  } | null>(null);
-
-  // Dynamic travel areas from backend
-  const [travelAreas, setTravelAreas] = useState<BackendTravelAreaItem[]>([]);
-
-  const [, startTransition] = useTransition();
 
   // Filter travel areas to PROVINCE and CITY only, sorted alphabetically in Vietnamese
   const provinceAreas = useMemo(() => {
@@ -278,7 +319,7 @@ function ExploreContent() {
         latitude: effectiveLat,
         longitude: effectiveLng,
         radiusMeters: effectiveRadius,
-        sortBy: pinNearbyCenter || useGpsSearch ? "distance" : "rating",
+        sortBy: pinNearbyCenter || useGpsSearch ? "distance" : selectedSort,
         page,
         limit,
       });
@@ -338,6 +379,7 @@ function ExploreContent() {
     activeSuperCategory.slugs,
     selectedAmenities,
     selectedAudience,
+    selectedSort,
     minRating,
     selectedBudgetLevels,
     openNow,
@@ -348,6 +390,7 @@ function ExploreContent() {
     page,
     pageSize,
     initialSelectedId,
+    selectedPlaceId,
   ]);
 
   useEffect(() => {
@@ -490,7 +533,7 @@ function ExploreContent() {
     setRouteToPinRequest(null);
     setKeyword(`${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`);
     setPage(1);
-  }, []);
+  }, [setPage]);
 
   // Drag a pin to a new position on the map
   const handlePinDragEnd = useCallback((coords: { lat: number; lng: number }) => {
@@ -498,7 +541,7 @@ function ExploreContent() {
     setRouteToPinRequest(null);
     setKeyword(`${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`);
     setPage(1);
-  }, []);
+  }, [setPage]);
 
   // Search this area when user pans/zooms map
   const handleSearchThisArea = useCallback((coords: { latitude: number; longitude: number }) => {
@@ -509,7 +552,7 @@ function ExploreContent() {
     });
     setPage(1);
     toast.info("Đang tìm kiếm các địa điểm trong khu vực này...");
-  }, []);
+  }, [setPage]);
 
   // Clear current pin and reset nearby searches
   const handleClearPin = useCallback(() => {
@@ -518,7 +561,7 @@ function ExploreContent() {
     setRouteToPinRequest(null);
     setKeyword("");
     setPage(1);
-  }, []);
+  }, [setPage]);
 
   const handleSelectPlace = useCallback((id: string | null) => {
     setSelectedPlaceId(id);
@@ -529,7 +572,7 @@ function ExploreContent() {
     setPinNearbyCenter(null);
     setPage(1);
     requestLocation();
-  }, [requestLocation]);
+  }, [requestLocation, setPage]);
 
   const isFiltering =
     keyword !== "" ||
@@ -909,7 +952,15 @@ function ExploreContent() {
         {isFiltering && (
           <div className="flex items-center justify-between pt-2 text-xs text-muted-foreground border-t border-border/50">
             <span>
-              Tìm thấy <strong className="text-foreground font-semibold">{totalCount}</strong> địa điểm phù hợp
+              {selectedAudience !== "all" ? (
+                <>
+                  Tìm thấy <strong className="text-foreground font-semibold">{places.length}</strong> địa điểm phù hợp trên trang này (lọc theo đối tượng)
+                </>
+              ) : (
+                <>
+                  Tìm thấy <strong className="text-foreground font-semibold">{totalCount}</strong> địa điểm phù hợp
+                </>
+              )}
             </span>
             <button
               type="button"

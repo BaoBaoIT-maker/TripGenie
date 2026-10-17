@@ -1,279 +1,191 @@
-import Link from "next/link";
 import Image from "next/image";
-import { Sparkles, Compass } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import {
+  ArrowRight,
+  Coffee,
+  Utensils,
+  Palmtree,
+  PartyPopper,
+} from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
 import { SectionHeader } from "@/components/common/SectionHeader";
-import { PlaceGrid } from "@/components/place/PlaceGrid";
-import { PlannerCard } from "@/components/planner/PlannerCard";
-import { PostCard } from "@/components/community/PostCard";
-import { placeService } from "@/services/place.service";
-import { EXPERIENCE_THEMES } from "@/mocks/data/categories";
-import { MOCK_PLACES } from "@/mocks/data/places";
-import { MOCK_PLANNERS } from "@/mocks/data/planners";
-import { MOCK_COMMUNITY_POSTS } from "@/mocks/data/community";
+import { HomeSearchForm } from "@/features/home/components/HomeSearchForm";
+import { DestinationGrid } from "@/features/home/components/DestinationGrid";
+import { HomePlaceTabs } from "@/features/home/components/HomePlaceTabs";
+import { TourTemplates } from "@/features/home/components/TourTemplates";
+import { HOME_CONFIG } from "@/features/home/config/home.config";
+import { homeService } from "@/features/home/services/home.service";
+import { buildExploreHref } from "@/features/map/lib/explore-query";
 
 // Revalidate homepage at most every 120 seconds (ISR)
 export const revalidate = 120;
 
+const EXPERIENCE_ICONS = {
+  Coffee,
+  Utensils,
+  Palmtree,
+  PartyPopper,
+};
+
 export default async function HomePage() {
-  // Concurrently fetch real places from Backend API on the server (0ms client delay)
-  const [featuredRes, coupleRes, familyRes, cafeRes] = await Promise.all([
-    placeService.searchPlaces({ limit: 4, sortBy: "rating" }).catch(() => null),
-    placeService.searchPlaces({ limit: 3, suitableFor: "couple" }).catch(() => null),
-    placeService.searchPlaces({ limit: 3, suitableFor: "family" }).catch(() => null),
-    placeService.searchPlaces({ limit: 3, categorySlugs: ["ca-phe"] }).catch(() => null),
-  ]);
-
-  const featuredPlaces =
-    featuredRes?.places && featuredRes.places.length > 0
-      ? featuredRes.places
-      : MOCK_PLACES.filter((p) => p.featured);
-
-  const couplePlaces =
-    coupleRes?.places && coupleRes.places.length > 0
-      ? coupleRes.places
-      : MOCK_PLACES.filter((p) => p.suitableFor.includes("couple"));
-
-  const familyPlaces =
-    familyRes?.places && familyRes.places.length > 0
-      ? familyRes.places
-      : MOCK_PLACES.filter((p) => p.suitableFor.includes("family"));
-
-  const cafePlaces =
-    cafeRes?.places && cafeRes.places.length > 0
-      ? cafeRes.places
-      : MOCK_PLACES.filter((p) => p.category === "cafe");
+  // Fetch real travel areas on the server; catch locally to ensure page resilience
+  const areas = await homeService.getDestinations().catch((err) => {
+    console.warn("Could not load travel areas on homepage:", err);
+    return [];
+  });
 
   return (
-    <div className="flex flex-col gap-16 sm:gap-20 pb-16">
+    <div className="flex flex-col gap-12 sm:gap-16 pb-16">
       {/* ─────────────────────────────────────────────────────────────
-          SECTION 1: HERO BANNER (TRAVELOKA STYLE)
+          SECTION 1: HERO & SEARCH BANNER
       ───────────────────────────────────────────────────────────── */}
-      <section className="relative w-full overflow-hidden bg-slate-950 text-white min-h-[460px] sm:min-h-[500px] flex items-center justify-center">
+      <section className="relative w-full overflow-hidden bg-slate-950 text-white min-h-[460px] md:min-h-[500px] flex items-center justify-center py-12 sm:py-16">
         {/* Background Travel Cover Image with Smooth Overlay */}
         <div className="absolute inset-0 z-0">
           <Image
-            src="https://images.unsplash.com/photo-1528127269322-539801943592?w=1600&auto=format&fit=crop&q=85"
-            alt="Vietnam Travel Discovery"
+            src={HOME_CONFIG.hero.imageUrl}
+            alt={HOME_CONFIG.hero.imageAlt}
             fill
             priority
-            className="object-cover object-center opacity-40 scale-105 transition-transform duration-1000"
+            sizes="100vw"
+            className="object-cover object-center opacity-45"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
-          <div className="absolute inset-0 bg-radial-[at_center_top] from-transparent via-black/40 to-black/80" />
+          <div className="absolute inset-0 bg-gradient-to-t from-background via-black/40 to-black/60" />
         </div>
 
         {/* Hero Content Box */}
-        <div className="relative z-10 w-full max-w-4xl px-4 sm:px-6 lg:px-8 py-16 sm:py-24 text-center space-y-6">
-          <div className="space-y-2">
-            <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold tracking-tight font-heading leading-tight mx-auto drop-shadow-md">
-              Du lịch & Trải nghiệm
+        <div className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 text-center space-y-6">
+          <div className="max-w-3xl mx-auto space-y-3">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight font-heading leading-tight drop-shadow-md">
+              {HOME_CONFIG.hero.title}
             </h1>
-            <p className="text-xs sm:text-sm md:text-base text-slate-200 max-w-xl mx-auto leading-relaxed drop-shadow-sm">
-              Khám phá điểm đến yêu thích và lên kế hoạch chuyến đi hoàn hảo.
+            <p className="text-sm sm:text-base text-white/90 leading-relaxed max-w-2xl mx-auto drop-shadow-xs">
+              {HOME_CONFIG.hero.description}
             </p>
           </div>
 
-          {/* Quick Search Form */}
-          <form
-            action="/explore"
-            method="GET"
-            className="max-w-2xl mx-auto flex flex-col sm:flex-row items-center gap-2 p-2 bg-background/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 text-foreground"
-          >
-            <div className="relative flex-1 w-full">
-              <input
-                type="text"
-                name="keyword"
-                placeholder="Tìm quán cafe, nhà hàng, điểm check-in..."
-                className="w-full h-11 px-4 text-xs sm:text-sm bg-transparent border-0 outline-none text-foreground placeholder:text-muted-foreground"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              className="w-full sm:w-auto h-11 px-6 rounded-xl font-bold gap-2 bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-all shrink-0"
-            >
-              <Compass className="size-4" />
-              <span>Tìm kiếm</span>
-            </Button>
-          </form>
-
-          {/* Quick Category Navigation Pills */}
-          <div className="flex flex-wrap items-center justify-center gap-2 pt-2">
-            <Link
-              href="/explore"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-colors border border-white/15"
-            >
-              <span>🧭 Khám phá</span>
-            </Link>
-            <Link
-              href="/explore?view=split"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-colors border border-white/15"
-            >
-              <span>🗺️ Bản đồ lân cận</span>
-            </Link>
-            <Link
-              href="/planner"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white/10 hover:bg-white/20 text-white backdrop-blur-md transition-colors border border-white/15"
-            >
-              <span>📅 Lịch trình mẫu</span>
-            </Link>
-            <Link
-              href="/planner/new?mode=ai"
-              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors"
-            >
-              <Sparkles className="size-3" />
-              <span>Tạo lịch với AI</span>
-            </Link>
-          </div>
+          {/* Prominent Search Form */}
+          <HomeSearchForm areas={areas} />
         </div>
       </section>
 
       {/* ─────────────────────────────────────────────────────────────
-          SECTION 2: CHỦ ĐỀ DU LỊCH
+          SECTION 2: ĐIỂM ĐẾN ĐỂ KHÁM PHÁ (DESTINATIONS)
       ───────────────────────────────────────────────────────────── */}
-      <section className="max-w-[1536px] mx-auto w-full px-4 sm:px-6 lg:px-8 xl:px-10">
+      <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 space-y-6">
         <SectionHeader
-          title="Chủ đề du lịch"
-          viewAllHref="/explore"
-          viewAllLabel="Xem tất cả"
+          title={HOME_CONFIG.destinations.title}
+          subtitle={HOME_CONFIG.destinations.description}
+        />
+        <DestinationGrid areas={areas} />
+      </section>
+
+      <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 space-y-6">
+        <SectionHeader title="Tour gợi ý cho chuyến đi của bạn" subtitle="Xem hành trình tham khảo, chọn ngày và tạo lịch trình riêng theo sở thích." />
+        <TourTemplates />
+      </section>
+
+      {/* ─────────────────────────────────────────────────────────────
+          SECTION 4: KHÁM PHÁ THEO SỞ THÍCH (HOME PLACE TABS)
+      ───────────────────────────────────────────────────────────── */}
+
+
+      {/* ─────────────────────────────────────────────────────────────
+          SECTION 5: BẠN THÍCH TRẢI NGHIỆM NÀO? (EXPERIENCES)
+      ───────────────────────────────────────────────────────────── */}
+      <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 space-y-6">
+        <SectionHeader
+          title={HOME_CONFIG.experiences.title}
+          subtitle={HOME_CONFIG.experiences.description}
         />
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
-          {EXPERIENCE_THEMES.map((theme) => (
-            <Link
-              key={theme.id}
-              href={`/explore?theme=${theme.id}`}
-              className="group relative flex flex-col overflow-hidden rounded-2xl border border-border/80 bg-card p-4 transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-md"
-            >
-              <div className="relative aspect-square w-full overflow-hidden rounded-xl bg-muted mb-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 auto-rows-[260px] lg:auto-rows-[240px] gap-4 sm:gap-5">
+          {HOME_CONFIG.experiences.items.map((item) => {
+            const Icon = EXPERIENCE_ICONS[item.iconName];
+            const href = buildExploreHref({ category: item.category });
+
+            return (
+              <Link
+                key={item.id}
+                href={href}
+                className={`group relative isolate flex flex-col justify-between overflow-hidden p-6 sm:p-7 rounded-3xl border ${item.cardColor} ${item.layout} hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 transition-shadow duration-300`}
+              >
                 <Image
-                  src={theme.image}
-                  alt={theme.name}
+                  src={item.imageUrl}
+                  alt=""
                   fill
-                  sizes="(max-width: 768px) 50vw, 16vw"
-                  className="object-cover transition-transform duration-500 group-hover:scale-110"
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 50vw"
+                  className="-z-20 object-cover transition-transform duration-700 group-hover:scale-105 motion-reduce:transition-none motion-reduce:transform-none"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                <span className="absolute bottom-2 left-2 right-2 text-[11px] font-semibold text-white line-clamp-1">
-                  {theme.badgeText}
-                </span>
-              </div>
-
-              <h3 className="text-xs sm:text-sm font-bold text-foreground group-hover:text-primary transition-colors line-clamp-2 leading-tight">
-                {theme.name}
-              </h3>
-            </Link>
-          ))}
+                <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/90 via-black/35 to-black/15" />
+                <div
+                  className="size-11 shrink-0 rounded-2xl flex items-center justify-center border border-white/30 bg-black/20 text-white backdrop-blur-md"
+                >
+                  <Icon className="size-5" aria-hidden="true" />
+                </div>
+                <div className="space-y-3 pt-5">
+                  <div
+                    className="max-w-sm"
+                  >
+                    <h3 className="text-xl sm:text-2xl font-heading font-bold text-white tracking-tight leading-tight">
+                      {item.title}
+                    </h3>
+                    <p className="text-sm text-white/90 leading-relaxed mt-2">
+                      {item.description}
+                    </p>
+                  </div>
+                <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                  <span>Khám phá ngay</span>
+                  <ArrowRight className="size-4 transition-transform group-hover:translate-x-1 motion-reduce:transform-none" aria-hidden="true" />
+                </div>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </section>
-
-      {/* ─────────────────────────────────────────────────────────────
-          SECTION 3: ĐỊA ĐIỂM NỔI BẬT
-      ───────────────────────────────────────────────────────────── */}
-      <section className="max-w-[1536px] mx-auto w-full px-4 sm:px-6 lg:px-8 xl:px-10">
+      <section className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 space-y-6">
         <SectionHeader
-          title="Địa điểm nổi bật"
-          viewAllHref="/explore?sort=rating"
-          viewAllLabel="Xem tất cả"
+          title={HOME_CONFIG.places.title}
+          subtitle={HOME_CONFIG.places.description}
         />
-
-        <PlaceGrid places={featuredPlaces.slice(0, 4)} columns={4} />
+        <HomePlaceTabs />
       </section>
 
-      {/* ─────────────────────────────────────────────────────────────
-          SECTION 4: HẸN HÒ LÃNG MẠN
-      ───────────────────────────────────────────────────────────── */}
-      <section className="max-w-[1536px] mx-auto w-full px-4 sm:px-6 lg:px-8 xl:px-10">
-        <SectionHeader
-          title="Hẹn hò lãng mạn"
-          viewAllHref="/explore?suitableFor=couple"
-          viewAllLabel="Xem tất cả"
-        />
-
-        <PlaceGrid places={couplePlaces.slice(0, 3)} columns={3} />
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────────
-          SECTION 5: DÀNH CHO GIA ĐÌNH
-      ───────────────────────────────────────────────────────────── */}
-      <section className="max-w-[1536px] mx-auto w-full px-4 sm:px-6 lg:px-8 xl:px-10">
-        <SectionHeader
-          title="Dành cho gia đình"
-          viewAllHref="/explore?suitableFor=family"
-          viewAllLabel="Xem tất cả"
-        />
-
-        <PlaceGrid places={familyPlaces.slice(0, 3)} columns={3} />
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────────
-          SECTION 6: LỊCH TRÌNH GỢI Ý
-      ───────────────────────────────────────────────────────────── */}
-      <section className="max-w-[1536px] mx-auto w-full px-4 sm:px-6 lg:px-8 xl:px-10">
-        <SectionHeader
-          title="Lịch trình gợi ý"
-          viewAllHref="/planner"
-          viewAllLabel="Xem tất cả"
-        />
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {MOCK_PLANNERS.map((planner) => (
-            <PlannerCard key={planner.id} planner={planner} />
-          ))}
-        </div>
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────────
-          SECTION 7: CAFE & SỐNG ẢO
-      ───────────────────────────────────────────────────────────── */}
-      <section className="max-w-[1536px] mx-auto w-full px-4 sm:px-6 lg:px-8 xl:px-10">
-        <SectionHeader
-          title="Quán cafe view đẹp"
-          viewAllHref="/explore?category=cafe"
-          viewAllLabel="Xem tất cả"
-        />
-
-        <PlaceGrid places={cafePlaces.slice(0, 3)} columns={3} />
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────────
-          SECTION 8: CHIA SẺ TỪ CỘNG ĐỒNG
-      ───────────────────────────────────────────────────────────── */}
-      <section className="max-w-[1536px] mx-auto w-full px-4 sm:px-6 lg:px-8 xl:px-10">
-        <SectionHeader
-          title="Chia sẻ từ cộng đồng"
-          viewAllHref="/community"
-          viewAllLabel="Xem tất cả"
-        />
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {MOCK_COMMUNITY_POSTS.map((post) => (
-            <PostCard key={post.id} post={post} />
-          ))}
-        </div>
-      </section>
-
-      {/* ─────────────────────────────────────────────────────────────
-          SECTION 9: BOTTOM CTA BANNER
-      ───────────────────────────────────────────────────────────── */}
-      <section className="max-w-[1536px] mx-auto w-full px-4 sm:px-6 lg:px-8 xl:px-10">
-        <div className="relative overflow-hidden rounded-3xl border border-primary/30 bg-gradient-to-br from-secondary/80 via-background to-accent/15 p-6 sm:p-10 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div className="space-y-1.5 text-center sm:text-left">
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground font-heading">
-              Tạo lịch trình du lịch trong 5 giây
-            </h2>
-            <p className="text-xs sm:text-sm text-muted-foreground">
-              Tự động tối ưu thời gian, điểm đến và chi phí cho kỳ nghỉ sắp tới.
-            </p>
+      <section aria-labelledby="planner-heading" className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8">
+        <div className="grid overflow-hidden rounded-2xl border border-border bg-secondary/40 md:grid-cols-2">
+          <div className="relative min-h-64 md:min-h-96">
+            <Image
+              src={HOME_CONFIG.destinations.imagesBySlug["da-nang"]}
+              alt="Phong cảnh Đà Nẵng"
+              fill
+              sizes="(max-width: 768px) 100vw, 50vw"
+              className="object-cover"
+            />
           </div>
-
-          <Link href="/planner/new?mode=ai">
-            <Button size="lg" className="h-11 px-6 rounded-xl font-bold shadow-md gap-2 shrink-0 bg-primary text-primary-foreground hover:bg-primary/90">
-              <Sparkles className="size-4" />
-              <span>Bắt đầu ngay</span>
-            </Button>
-          </Link>
+          <div className="flex flex-col items-start justify-center px-6 py-8 sm:p-10 lg:p-12">
+            <h2 id="planner-heading" className="max-w-md font-heading text-3xl font-bold leading-tight tracking-tight sm:text-4xl">
+              {HOME_CONFIG.plannerBanner.title}
+            </h2>
+            <p className="mt-4 max-w-md text-base leading-relaxed text-muted-foreground">
+              {HOME_CONFIG.plannerBanner.description}
+            </p>
+            <div className="mt-7 flex flex-wrap items-center gap-4">
+              <Link
+                href="/planner/new?mode=ai"
+                className={buttonVariants({ size: "lg", className: "rounded-lg font-semibold" })}
+              >
+                {HOME_CONFIG.plannerBanner.ctaAi}
+                <ArrowRight className="size-4" aria-hidden="true" />
+              </Link>
+              <Link
+                href="/planner/new?mode=manual"
+                className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-4 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {HOME_CONFIG.plannerBanner.ctaManual}
+              </Link>
+            </div>
+          </div>
         </div>
       </section>
     </div>

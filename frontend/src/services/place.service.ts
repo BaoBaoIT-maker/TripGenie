@@ -262,12 +262,16 @@ export const placeService = {
    * Search places with pagination and multi-criteria filters.
    * Connects to backend GET /places/search with fallback to mock data.
    */
-  async searchPlaces(params?: PlaceFilterParams): Promise<PaginatedPlacesResult> {
+  async searchPlaces(
+    params?: PlaceFilterParams,
+    options: { allowMockFallback?: boolean } = { allowMockFallback: true }
+  ): Promise<PaginatedPlacesResult> {
     try {
       const searchParams = new URLSearchParams();
 
       if (params?.keyword?.trim()) searchParams.set("keyword", params.keyword.trim());
       if (params?.areaId) searchParams.set("areaId", String(params.areaId));
+      if (params?.suitableFor) searchParams.set("suitableFor", params.suitableFor);
 
       if (params?.categorySlugs) {
         const val = Array.isArray(params.categorySlugs)
@@ -335,6 +339,9 @@ export const placeService = {
         isFallback: payload.isFallback,
       };
     } catch (err) {
+      if (options?.allowMockFallback === false) {
+        throw err;
+      }
       console.warn("Backend search places unavailable, falling back to mock data:", err);
       let places = [...MOCK_PLACES];
       if (params?.keyword) {

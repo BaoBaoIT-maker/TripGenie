@@ -29,11 +29,13 @@ import { placeService } from '@/services/place.service';
 import { ApiError } from '@/services/itinerary-planner.service';
 import TransitRouteBreakdown from './itinerary/TransitRouteBreakdown';
 import type { TransitMode, IntracityMode, BudgetLevel, TravelPace } from '@/types/itinerary';
+import { getTourDates, getTourPrompt, type TourTemplate } from '../config/tour-templates';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   initialDestination?: string;
+  initialTemplate?: TourTemplate;
 }
 
 interface PhotoDestination {
@@ -178,7 +180,7 @@ const TRAVEL_STYLE_TAGS = [
   'Trải nghiệm thủ công',
 ];
 
-export default function ItineraryWizardModal({ isOpen, onClose, initialDestination }: Props) {
+export default function ItineraryWizardModal({ isOpen, onClose, initialDestination, initialTemplate }: Props) {
   const router = useRouter();
 
   // Wizard Step: 1, 2, 3
@@ -186,19 +188,20 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
 
   // Form State
   const [originCity, setOriginCity] = useState('TP. Hồ Chí Minh');
-  const [destinationCity, setDestinationCity] = useState('Quảng Nam / Hội An');
-  const [startDate, setStartDate] = useState('2026-10-20');
-  const [endDate, setEndDate] = useState('2026-10-22');
+  const [destinationCity, setDestinationCity] = useState(initialTemplate?.destination || initialDestination || 'Quảng Nam / Hội An');
+  const [tripDates] = useState(() => getTourDates(initialTemplate?.days.length || 3));
+  const [startDate, setStartDate] = useState(tripDates.startDate);
+  const [endDate, setEndDate] = useState(tripDates.endDate);
   const [transitMode, setTransitMode] = useState<TransitMode>('FLIGHT');
   const [intracityMode, setIntracityMode] = useState<IntracityMode>('MOTORBIKE_RENTAL');
   const [budgetLevel, setBudgetLevel] = useState<BudgetLevel>('MEDIUM');
   const [pace, setPace] = useState<TravelPace>('BALANCED');
-  const [selectedStyles, setSelectedStyles] = useState<string[]>([
+  const [selectedStyles, setSelectedStyles] = useState<string[]>(initialTemplate?.styles || [
     'Ẩm thực đặc sản',
     'Cafe chill/check-in',
     'Di tích & Văn hóa',
   ]);
-  const [customPrompt, setCustomPrompt] = useState('');
+  const [customPrompt, setCustomPrompt] = useState(initialTemplate ? getTourPrompt(initialTemplate) : '');
 
   // Autocomplete dropdown state
   const [showOriginDropdown, setShowOriginDropdown] = useState(false);

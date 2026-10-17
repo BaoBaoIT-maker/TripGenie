@@ -1,0 +1,20 @@
+import { IsString, IsNotEmpty, IsOptional, IsBoolean, MaxLength } from 'class-validator';
+
+export class CreateCollectionDto {
+  @IsString({ message: 'Tên bộ sưu tập phải là chuỗi' })
+  @IsNotEmpty({ message: 'Tên bộ sưu tập không được để trống' })
+  @MaxLength(255, { message: 'Tên bộ sưu tập tối đa 255 ký tự' })
+  title: string;
+
+  @IsOptional()
+  @IsString({ message: 'Mô tả phải là chuỗi' })
+  description?: string;
+
+  @IsOptional()
+  @IsBoolean({ message: 'isPublic phải là kiểu boolean' })
+  isPublic?: boolean;
+
+  @IsOptional()
+  @IsString({ message: 'Ảnh bìa phải là chuỗi URL' })
+  coverImage?: string;
+}

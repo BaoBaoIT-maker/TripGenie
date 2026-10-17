@@ -705,7 +705,7 @@ function ExploreContent() {
                 if (pinNearbyCenter) setPinNearbyCenter(null);
                 setPage(1);
               }}
-              placeholder="Tìm theo tên địa điểm, món ăn, không gian (tự động hiểu ngữ nghĩa NLP)..."
+              placeholder="Tìm địa điểm, quán ăn, hoặc không gian bạn thích..."
               className="h-11 pl-10 text-sm rounded-xl bg-muted/30"
             />
           </div>

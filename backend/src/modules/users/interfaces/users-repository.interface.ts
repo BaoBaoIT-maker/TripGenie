@@ -1,4 +1,4 @@
-import { User, UserIdentity, Prisma } from '@prisma/client';
+import { User, UserIdentity, UserPreference, Prisma } from '@prisma/client';
 
 export interface IUsersRepository {
   findByEmail(email: string): Promise<User | null>;
@@ -11,4 +11,6 @@ export interface IUsersRepository {
   softDelete(id: string): Promise<User>;
   findIdentity(provider: string, providerUserId: string): Promise<UserIdentity | null>;
   createIdentity(data: Prisma.UserIdentityCreateInput): Promise<UserIdentity>;
+  findPreferences(userId: string): Promise<UserPreference | null>;
+  upsertPreferences(userId: string, data: Prisma.UserPreferenceCreateWithoutUserInput): Promise<UserPreference>;
 }

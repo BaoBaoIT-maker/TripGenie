@@ -27,6 +27,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useGenerateItinerary, useTransitPreview } from '../hooks/use-itinerary-planner';
 import { placeService } from '@/services/place.service';
 import { ApiError } from '@/services/itinerary-planner.service';
+import { useUserPreferences } from '@/features/preferences/hooks/use-user-preferences';
 import TransitRouteBreakdown from './itinerary/TransitRouteBreakdown';
 import type { TransitMode, IntracityMode, BudgetLevel, TravelPace } from '@/types/itinerary';
 
@@ -199,6 +200,34 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
     'Di tích & Văn hóa',
   ]);
   const [customPrompt, setCustomPrompt] = useState('');
+
+  // Pre-fill preferences from Taste Profile if user is logged in
+  const { data: userPref } = useUserPreferences({ enabled: isOpen });
+
+  useEffect(() => {
+    if (userPref) {
+      if (userPref.budgetLevel) {
+        setBudgetLevel(userPref.budgetLevel as BudgetLevel);
+      }
+      if (userPref.travelStyle && userPref.travelStyle.length > 0) {
+        const styleMap: Record<string, string> = {
+          CULTURE: 'Di tích & Văn hóa',
+          FOOD: 'Ẩm thực đặc sản',
+          CHILL: 'Cafe chill/check-in',
+          NATURE: 'Biển đảo',
+          ADVENTURE: 'Trải nghiệm thủ công',
+          CHECKIN: 'Nhiếp ảnh sống ảo',
+          HEALING: 'Chữa lành',
+        };
+        const mapped = userPref.travelStyle
+          .map((s) => styleMap[s] || s)
+          .filter((s) => TRAVEL_STYLE_TAGS.includes(s));
+        if (mapped.length > 0) {
+          setSelectedStyles(mapped);
+        }
+      }
+    }
+  }, [userPref]);
 
   // Autocomplete dropdown state
   const [showOriginDropdown, setShowOriginDropdown] = useState(false);

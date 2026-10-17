@@ -31,3 +31,12 @@ Rules:
 - **Pragmatic Design Patterns (No abuse)**: Leverage established design patterns (Strategy, Repository, Adapter, Factory, etc.) when they genuinely solve real complexity or extensibility needs (e.g., multi-modal transit, multi-provider enrichment). NEVER abuse patterns or wrap straightforward logic in unnecessary ceremonial layers.
 
 Not lazy about: understanding the problem (read it fully and trace the real flow before picking a rung, a small diff you don't understand is just laziness dressed up as efficiency), code hygiene (zero hard-coding, SOLID boundaries, clean readable structure), input validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs (the platform is never the spec ideal, a clock drifts, a sensor reads off), anything explicitly requested. Lazy code without its check is unfinished: non-trivial logic leaves ONE runnable check behind, the smallest thing that fails if the logic breaks (an assert-based demo/self-check or one small test file; no frameworks, no fixtures). Trivial one-liners need no test.
+
+<!-- antislop:start -->
+## Frontend Design & Anti-Slop Directive
+
+For any UI/frontend work, design decisions, or component implementation:
+1. **Direction & Identity**: Read `DESIGN.md` for product identity, typography, OKLCH palette, and component standards.
+2. **Anti-Slop Filter**: Apply `.agents/skills/antislop-ui/SKILL.md` (paired with `ui-ux-pro-max`) in `during` mode to reject generic AI tropes (no purple gradients, no fake stats/feeds, no pill buttons everywhere, no empty spinner states, no decorative emojis).
+3. **Craftsmanship Standard**: Enforce C-1 (Intentionality), C-2 (Functional Completeness — every interactive button works), C-3 (Content-Driven Composition), C-4 (Resilience: 4 states & WCAG 2.2 AA), and C-5 (Evidence over claims).
+<!-- antislop:end -->

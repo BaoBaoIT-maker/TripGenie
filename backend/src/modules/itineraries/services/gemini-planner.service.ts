@@ -44,6 +44,8 @@ export interface PlannerParams {
   budgetLevel: string;
   pace: string;
   travelStyles: string[];
+  dietaryRestrictions?: string[];
+  preferredCategories?: string[];
   customPrompt?: string;
   places: PlannerPlace[];
 }
@@ -108,6 +110,8 @@ export class GeminiPlannerService {
     return `Bạn là TripGenie - Chuyên gia thiết kế lịch trình du lịch thông minh tại Việt Nam.
 Nhiệm vụ: Sắp xếp một lịch trình ${params.totalDays} ngày tại ${params.destCity}, xuất phát từ ${params.originCity}.
 Phong cách: ${params.travelStyles.join(', ')} | Nhịp độ: ${params.pace} | Ngân sách: ${params.budgetLevel}.
+${params.dietaryRestrictions && params.dietaryRestrictions.length > 0 ? `Chế độ ăn / Kiêng cữ: ${params.dietaryRestrictions.join(', ')} (BẮT BUỘC tôn trọng các món ăn/nhà hàng phù hợp tiêu chí này).` : ''}
+${params.preferredCategories && params.preferredCategories.length > 0 ? `Ưu tiên thể loại địa điểm: ${params.preferredCategories.join(', ')}.` : ''}
 ${params.customPrompt ? `Yêu cầu riêng của khách: ${params.customPrompt}` : ''}
 
 Quy tắc bắt buộc:

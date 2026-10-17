@@ -333,8 +333,26 @@ export class ItineraryPlannerService {
       returnDate: dto.endDate,
     });
 
-    // 4. Calculate Living Expenses based on Config
-    const budgetLevel = dto.budgetLevel || BudgetLevelEnum.MEDIUM;
+    // 4. Calculate Living Expenses based on Config & User Preferences
+    let userPref = null;
+    if (creatorId) {
+      userPref = await this.prisma.userPreference.findUnique({
+        where: { userId: creatorId },
+      });
+    }
+
+    const budgetLevel =
+      dto.budgetLevel ||
+      (userPref?.budgetLevel as unknown as BudgetLevelEnum) ||
+      BudgetLevelEnum.MEDIUM;
+
+    const travelStyles =
+      dto.travelStyles && dto.travelStyles.length > 0
+        ? dto.travelStyles
+        : userPref?.travelStyle && userPref.travelStyle.length > 0
+          ? userPref.travelStyle
+          : ['CULTURE', 'FOOD'];
+
     const dailyFood =
       PRICING_CONFIG.LIVING_EXPENSES.FOOD_PER_DAY[budgetLevel] ||
       PRICING_CONFIG.LIVING_EXPENSES.FOOD_PER_DAY.MEDIUM;
@@ -373,7 +391,9 @@ export class ItineraryPlannerService {
       totalDays,
       budgetLevel,
       pace: dto.pace || 'BALANCED',
-      travelStyles: dto.travelStyles || ['CULTURE', 'FOOD'],
+      travelStyles,
+      dietaryRestrictions: userPref?.dietaryRestrictions || [],
+      preferredCategories: userPref?.preferredCategories || [],
       customPrompt: dto.customPrompt,
       places: placesContext,
     });
@@ -572,7 +592,8 @@ export class ItineraryPlannerService {
             transitMode: intercityTransit.mode,
             intracityMode: dto.intracityMode,
             pace: dto.pace,
-            travelStyles: dto.travelStyles,
+            travelStyles,
+            dietaryRestrictions: userPref?.dietaryRestrictions || [],
             intercityTransit,
             budgetBreakdown,
             dayThemes: days.map((d) => d.theme),

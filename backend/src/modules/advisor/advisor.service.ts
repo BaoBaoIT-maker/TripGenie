@@ -1,4 +1,5 @@
 import {
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -373,6 +374,7 @@ export class AdvisorService {
       where: {
         userId,
         linkedItineraryId: null,
+        NOT: { contextCity: ADVISOR_CONSTANTS.GUEST_SESSION_MARKER },
       },
       orderBy: { createdAt: 'desc' },
       take: ADVISOR_CONSTANTS.MAX_SESSIONS_LIST,
@@ -391,6 +393,7 @@ export class AdvisorService {
    */
   async getSessionMessages(
     sessionId: string,
+    userId?: string,
   ): Promise<AdvisorMessageHistoryItem[]> {
     const session = await this.prisma.aiChatSession.findFirst({
       where: {
@@ -402,6 +405,8 @@ export class AdvisorService {
     if (!session) {
       throw new NotFoundException('Không tìm thấy phiên trò chuyện.');
     }
+
+    this.assertSessionOwnership(session, userId);
 
     const messages = await this.prisma.aiChatMessage.findMany({
       where: { sessionId: session.id },
@@ -435,7 +440,6 @@ export class AdvisorService {
       where: {
         id: sessionId,
         linkedItineraryId: null,
-        ...(userId ? { userId } : {}),
       },
     });
 
@@ -443,11 +447,26 @@ export class AdvisorService {
       throw new NotFoundException('Không tìm thấy phiên trò chuyện để xóa.');
     }
 
+    this.assertSessionOwnership(session, userId);
+
     await this.prisma.aiChatSession.delete({
       where: { id: session.id },
     });
 
     return { deleted: true };
+  }
+
+  private assertSessionOwnership(
+    session: { userId: string; contextCity?: string | null },
+    userId?: string,
+  ): void {
+    const isGuestSession =
+      session.contextCity === ADVISOR_CONSTANTS.GUEST_SESSION_MARKER;
+    if (!isGuestSession && session.userId !== userId) {
+      throw new ForbiddenException(
+        'Bạn không có quyền truy cập phiên trò chuyện này.',
+      );
+    }
   }
 
   private async resolveSession(
@@ -463,7 +482,11 @@ export class AdvisorService {
         },
       });
       if (existing) {
-        return existing;
+        const isGuestSession =
+          existing.contextCity === ADVISOR_CONSTANTS.GUEST_SESSION_MARKER;
+        if (isGuestSession || existing.userId === userId) {
+          return existing;
+        }
       }
     }
 
@@ -487,7 +510,9 @@ export class AdvisorService {
         userId: effectiveUserId,
         linkedItineraryId: null,
         title: derivedTitle,
-        contextCity: ADVISOR_CONSTANTS.DEFAULT_CONTEXT_CITY,
+        contextCity: userId
+          ? ADVISOR_CONSTANTS.DEFAULT_CONTEXT_CITY
+          : ADVISOR_CONSTANTS.GUEST_SESSION_MARKER,
       },
     });
   }

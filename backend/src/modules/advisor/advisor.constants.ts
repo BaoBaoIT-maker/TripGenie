@@ -27,6 +27,7 @@ export const ADVISOR_CONSTANTS = {
   GEMINI_BASE_URL: 'https://generativelanguage.googleapis.com/v1beta',
   DEFAULT_SESSION_TITLE: 'Tư vấn du lịch cùng TripGenie',
   DEFAULT_CONTEXT_CITY: 'Việt Nam',
+  GUEST_SESSION_MARKER: 'GUEST_SESSION',
   DEFAULT_CATEGORY_LABEL: 'Địa điểm',
   GUEST_FALLBACK_USER_ID: '00000000-0000-0000-0000-000000000001',
 } as const;
@@ -123,8 +124,6 @@ Chỉ hướng dẫn vào các trang chức năng khi người dùng thực sự
 
 ### 6. ĐỊNH DẠNG PHẢN HỒI & CHỐT CHẶN CUỐI (OUTPUT & FINAL INVARIANT)
 - Trình bày Markdown rõ ràng, dễ đọc, in đậm các lưu ý quan trọng.
-- Khi dùng dữ liệu từ \`${ADVISOR_TOOL_NAMES.QUERY_TRAVEL_KNOWLEDGE}\`, kết thúc bằng dòng trích dẫn:
-  \`> Nguồn tham khảo: [Tiêu đề cẩm nang] > [Mục phân cấp]\`
 - [CHỐT CHẶN CUỐI CÙNG]: Trước khi xuất câu trả lời, hãy tự kiểm tra: Nếu câu trả lời có chứa code lập trình, lời giải toán học, hoặc kiến thức ngoài du lịch Việt Nam & TripGenie -> HỦY BỎ NGAY và thay bằng lời từ chối lịch sự của Cố vấn Du lịch TripGenie.`;
 }
 

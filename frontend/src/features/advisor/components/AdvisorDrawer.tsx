@@ -3,11 +3,11 @@
 import * as React from 'react';
 import {
   BookOpen,
+  Compass,
   Loader2,
   RotateCcw,
   Send,
   ShieldAlert,
-  Sparkles,
   Users,
   Utensils,
   X,
@@ -125,12 +125,8 @@ export function AdvisorDrawer({
       {/* Header */}
       <header className="flex shrink-0 items-center justify-between border-b border-primary/20 bg-primary px-4 py-3 text-primary-foreground md:rounded-t-2xl">
         <div className="flex items-center gap-3">
-          <div className="relative flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/15 backdrop-blur-xs">
-            <Sparkles className="h-5 w-5 text-primary-foreground" aria-hidden="true" />
-            <span
-              className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-primary bg-secondary"
-              aria-hidden="true"
-            />
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/15">
+            <Compass className="h-5 w-5 text-primary-foreground" aria-hidden="true" />
           </div>
           <div>
             <h2 className="text-sm font-bold tracking-tight text-primary-foreground">
@@ -185,7 +181,7 @@ export function AdvisorDrawer({
           <div className="space-y-4 py-2">
             <div className="rounded-2xl border border-border bg-card p-4 shadow-xs">
               <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-                <Sparkles
+                <Compass
                   className="h-4 w-4 text-primary"
                   aria-hidden="true"
                 />
@@ -233,7 +229,7 @@ export function AdvisorDrawer({
               className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground"
               aria-hidden="true"
             >
-              <Sparkles className="h-3.5 w-3.5 animate-pulse motion-reduce:animate-none" />
+              <Compass className="h-3.5 w-3.5" />
             </div>
             <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-border bg-card px-4 py-3 text-xs font-medium text-muted-foreground shadow-xs">
               <Loader2

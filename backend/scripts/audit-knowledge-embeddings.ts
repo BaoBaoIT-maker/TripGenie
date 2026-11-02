@@ -9,9 +9,6 @@ interface DocumentDbRow {
   id: string;
   title: string;
   source_url: string;
-  source_type: string;
-  is_processed: boolean;
-  chunk_count: number;
   area_id: number | null;
   area_name: string | null;
   actual_chunks: bigint;
@@ -65,9 +62,6 @@ async function runAudit() {
         d.id,
         d.title,
         d.source_url,
-        d.source_type,
-        d.is_processed,
-        d.chunk_count,
         d.area_id,
         a.name_vi AS area_name,
         COUNT(c.id) AS actual_chunks,
@@ -82,7 +76,7 @@ async function runAudit() {
       FROM knowledge_documents d
       LEFT JOIN travel_areas a ON d.area_id = a.id
       LEFT JOIN knowledge_chunks c ON d.id = c.document_id
-      GROUP BY d.id, d.title, d.source_url, d.source_type, d.is_processed, d.chunk_count, d.area_id, a.name_vi
+      GROUP BY d.id, d.title, d.source_url, d.area_id, a.name_vi
       ORDER BY d.source_url ASC;
     `);
 
@@ -101,13 +95,13 @@ async function runAudit() {
       totalEmbeddedChunksDb += embedded;
       totalNullEmbeddings += nulls;
 
-      const isComplete = doc.is_processed && actual === doc.chunk_count && actual === embedded && nulls === 0 && dims === 1536;
+      const isComplete = actual > 0 && actual === embedded && nulls === 0 && dims === 1536;
       const statusIcon = isComplete ? '✅ OK' : '❌ THIẾU';
 
       console.log(`[${idx + 1}] ${statusIcon} "${doc.title}"`);
       console.log(`    File URL: ${doc.source_url}`);
       console.log(`    Khu vực: ${doc.area_name ?? 'Toàn quốc (NULL)'} (area_id: ${doc.area_id ?? 'NULL'})`);
-      console.log(`    Số chunk ghi nhận: ${doc.chunk_count} | Số chunk thực tế trong DB: ${actual}`);
+      console.log(`    Số chunk trong DB: ${actual}`);
       console.log(`    Số chunk đã nhúng vector: ${embedded} | Chunk thiếu vector: ${nulls}`);
       console.log(`    Vector Dimension: ${dims} dims (Chuẩn Gemini text-embedding-004 / embedding-2: 1536)`);
       console.log('');
@@ -240,7 +234,7 @@ async function runAudit() {
       }
 
       const topHit = results[0];
-      const isTargetMatched = Boolean(topHit.source_url?.includes(tc.targetFile));
+      const isTargetMatched = topHit.document_title === tc.targetTitle;
       const scorePercent = (topHit.similarity_score * 100).toFixed(2);
 
       if (isTargetMatched) {
@@ -252,13 +246,13 @@ async function runAudit() {
 
       console.log(`   - Similarity Score: ${scorePercent}%`);
       console.log(`   - Document Title: "${topHit.document_title}"`);
-      console.log(`   - Breadcrumbs: ${topHit.metadata.breadcrumbs}`);
+      console.log(`   - Breadcrumbs: ${topHit.breadcrumbs}`);
       const preview = topHit.content.replace(/\n+/g, ' ').slice(0, 160);
       console.log(`   - Trích đoạn: "${preview}..."`);
 
       if (results.length > 1) {
         const secondHit = results[1];
-        console.log(`   - Top #2 (${(secondHit.similarity_score * 100).toFixed(2)}%): "${secondHit.document_title}" > ${secondHit.metadata.breadcrumbs}`);
+        console.log(`   - Top #2 (${(secondHit.similarity_score * 100).toFixed(2)}%): "${secondHit.document_title}" > ${secondHit.breadcrumbs}`);
       }
     }
 

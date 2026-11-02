@@ -5,6 +5,7 @@ import type {
   TransitMode,
   IntercityTransit,
   ItineraryDetail,
+  TourBriefing,
   CopilotChatResponse,
   CopilotHistoryMessage,
   AlternativePlaceItem,
@@ -55,4 +56,7 @@ export const itineraryService = {
 
   updateCoverPhoto: (id: string, coverPhoto: string) =>
     apiClient<ItineraryDetail>(`/itineraries/${id}/cover-photo`, { method: 'PATCH', body: JSON.stringify({ coverPhoto }) }),
+
+  updateTourBriefing: (id: string, dto: TourBriefing) =>
+    apiClient<ItineraryDetail>(`/itineraries/${id}/tour-briefing`, { method: 'PATCH', body: JSON.stringify(dto) }),
 };

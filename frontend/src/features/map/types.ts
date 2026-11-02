@@ -1,4 +1,5 @@
 import type { Place, PlaceCategory } from "@/types/place";
+import type { BackendTravelAreaItem } from "@/services/place.service";
 
 export type { Place, PlaceCategory };
 
@@ -159,6 +160,6 @@ export interface VietMapProps {
   pathSegments?: ItineraryPathSegment[];
   /** Whether to hide directions/origin buttons in the place popup (e.g. inside itineraries view) */
   hidePopupDirections?: boolean;
+  /** Dynamic travel areas fetched from database to resolve geographic centers dynamically */
+  travelAreas?: BackendTravelAreaItem[];
 }
-
-

@@ -176,6 +176,7 @@ model User {
   passwordHash String?   @map("password_hash") @db.VarChar(255)
   fullName     String    @map("full_name") @db.VarChar(255)
   avatarUrl    String?   @map("avatar_url")
+  bio          String?   @db.VarChar(300)
   phoneNumber  String?   @map("phone_number") @db.VarChar(20)
   role         UserRole  @default(USER)
   isActive     Boolean   @default(true) @map("is_active")
@@ -189,7 +190,6 @@ model User {
   identities      UserIdentity[]
   preferences     UserPreference?
   createdPlaces   Place[]              @relation("UserCreatedPlaces")
-  uploadedImages  PlaceImage[]         @relation("UserUploadedImages")
   reviews         PlaceReview[]
   collections     Collection[]
   itineraries     Itinerary[]
@@ -325,11 +325,8 @@ model Place {
   categoryId     Int?         @map("category_id")
   areaId         Int?         @map("area_id")
   address           String
-  addressNormalized String?      @map("address_normalized") @db.VarChar(500)
   latitude          Float
   longitude         Float
-  addressVerified   Boolean      @default(false) @map("address_verified")
-  coordinateSource  String?      @default("unknown") @map("coordinate_source") @db.VarChar(50)
   priceRange     Json?        @map("price_range")
   priceLevel     BudgetLevel? @map("price_level")
   openingHours   Json?        @map("opening_hours")
@@ -378,13 +375,9 @@ model PlaceImage {
   isPrimary    Boolean  @default(false) @map("is_primary")
   caption      String?
   source       String?  @db.VarChar(50)
-  uploadedBy   String?  @map("uploaded_by") @db.Uuid
-  width        Int?
-  height       Int?
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   place    Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
-  uploader User? @relation("UserUploadedImages", fields: [uploadedBy], references: [id])
 
   @@index([placeId])
   @@map("place_images")
@@ -397,7 +390,6 @@ model PlaceEmbedding {
   // Vector 1536 dims managed via pgvector extension and init.sql; indexed via HNSW
   embedding    Unsupported("vector(1536)")?
   modelName    String?  @map("model_name") @db.VarChar(100)
-  modelVersion String?  @map("model_version") @db.VarChar(50)
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
@@ -433,7 +425,6 @@ model PlaceReview {
   title        String?   @db.VarChar(255)
   comment      String?
   images       String[]
-  visitedAt    DateTime? @map("visited_at") @db.Date
   helpfulCount Int       @default(0) @map("helpful_count")
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
@@ -492,7 +483,6 @@ model Itinerary {
   budgetLevel   BudgetLevel?    @map("budget_level")
   estimatedCost Decimal?        @map("estimated_cost") @db.Decimal(12, 2)
   isAiGenerated Boolean         @default(false) @map("is_ai_generated")
-  aiPrompt      String?         @map("ai_prompt")
   aiPreferences Json?           @map("ai_preferences")
   status        ItineraryStatus @default(DRAFT)
   isPublic      Boolean         @default(false) @map("is_public")
@@ -508,7 +498,7 @@ model Itinerary {
   clones       Itinerary[]            @relation("ItineraryCloned")
   destinations ItineraryDestination[]
   tripGroup    TripGroup?
-  post         CommunityPost?
+  posts        CommunityPost[]
   chatSessions AiChatSession[]
 
   @@index([creatorId])
@@ -527,8 +517,6 @@ model ItineraryDestination {
   endTime                  DateTime? @map("end_time") @db.Time
   estimatedDurationMinutes Int?      @default(60) @map("estimated_duration_minutes")
   estimatedCost            Decimal?  @map("estimated_cost") @db.Decimal(10, 2)
-  travelDistanceMeters     Int?      @map("travel_distance_meters")
-  travelDurationSeconds    Int?      @map("travel_duration_seconds")
   notes                    String?
   createdAt                DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
@@ -627,8 +615,6 @@ model AiChatMessage {
   content     String?
   toolCalls   Json?      @map("tool_calls")
   toolResults Json?      @map("tool_results")
-  tokenCount  Int?       @map("token_count")
-  latencyMs   Int?       @map("latency_ms")
   modelName   String?    @map("model_name") @db.VarChar(100)
   createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz
 
@@ -641,22 +627,26 @@ model AiChatMessage {
 model CommunityPost {
   id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   userId       String    @map("user_id") @db.Uuid
-  itineraryId  String    @unique @map("itinerary_id") @db.Uuid
+  itineraryId  String?   @map("itinerary_id") @db.Uuid
   title        String    @db.VarChar(255)
   caption      String?
+  mediaUrls    String[]  @default([]) @map("media_urls")
+  tags         String[]  @default([])
   likeCount    Int       @default(0) @map("like_count")
   commentCount Int       @default(0) @map("comment_count")
   cloneCount   Int       @default(0) @map("clone_count")
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
+  editedAt     DateTime? @map("edited_at") @db.Timestamptz
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  itinerary Itinerary     @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  itinerary Itinerary?    @relation(fields: [itineraryId], references: [id], onDelete: SetNull)
   likes     PostLike[]
   comments  PostComment[]
 
   @@index([userId])
+  @@index([itineraryId])
   @@index([createdAt])
   @@map("community_posts")
 }
@@ -686,6 +676,11 @@ model PostComment {
 
   @@index([postId])
   @@index([userId])
+  parentId    String?   @map("parent_id") @db.Uuid
+  replyToName String?   @map("reply_to_name") @db.VarChar(150)
+  parent      PostComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     PostComment[] @relation("CommentReplies")
+  @@index([parentId])
   @@map("post_comments")
 }
 
@@ -760,19 +755,13 @@ model CrawlJob {
 }
 
 model KnowledgeDocument {
-  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  title        String    @db.VarChar(255)
-  sourceType   String    @map("source_type") @db.VarChar(50)
-  sourceUrl    String?   @map("source_url")
-  content      String
-  language     String?   @default("vi") @db.VarChar(10)
-  areaId       Int?      @map("area_id")
-  categoryTags String[]  @map("category_tags")
-  isProcessed  Boolean   @default(false) @map("is_processed")
-  chunkCount   Int       @default(0) @map("chunk_count")
-  processedAt  DateTime? @map("processed_at") @db.Timestamptz
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  id        String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  title     String   @db.VarChar(255)
+  sourceUrl String?  @map("source_url")
+  content   String
+  areaId    Int?     @map("area_id")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   area   TravelArea?      @relation(fields: [areaId], references: [id])
   chunks KnowledgeChunk[]
@@ -781,15 +770,15 @@ model KnowledgeDocument {
 }
 
 model KnowledgeChunk {
-  id         String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  documentId String   @map("document_id") @db.Uuid
-  chunkIndex Int      @map("chunk_index")
-  content    String
+  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  documentId  String   @map("document_id") @db.Uuid
+  chunkIndex  Int      @map("chunk_index")
+  content     String
   // Vector 1536 dims managed via pgvector extension for RAG retrieval
-  embedding  Unsupported("vector(1536)")?
-  modelName  String?  @map("model_name") @db.VarChar(100)
-  metadata   Json     @default("{}")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+  embedding   Unsupported("vector(1536)")?
+  // "Doc title > H2 > H3" citation label
+  breadcrumbs String
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 

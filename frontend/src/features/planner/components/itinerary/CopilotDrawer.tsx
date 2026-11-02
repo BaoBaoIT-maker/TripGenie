@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Bot,
   Sparkles,
@@ -16,8 +16,10 @@ import {
   Compass,
   Calendar,
   Sparkle,
+  Plus,
+  ArrowLeftRight,
 } from 'lucide-react';
-import { CopilotProposal } from '@/types/itinerary';
+import { CopilotProposal, ItineraryDay } from '@/types/itinerary';
 
 export interface CopilotMessageItem {
   sender: 'ai' | 'user';
@@ -181,6 +183,7 @@ interface CopilotDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   destination: string;
+  days?: ItineraryDay[];
   messages: CopilotMessageItem[];
   isPending: boolean;
   onSendMessage: (msg?: string) => void;
@@ -198,6 +201,7 @@ export default function CopilotDrawer({
   isOpen,
   onClose,
   destination,
+  days,
   messages,
   isPending,
   onSendMessage,
@@ -211,8 +215,23 @@ export default function CopilotDrawer({
   onLocatePlaceOnMap,
 }: CopilotDrawerProps) {
   const [inputValue, setInputValue] = useState('');
+  const [activeActionMenu, setActiveActionMenu] = useState<{
+    msgIndex: number;
+    recIndex: number;
+    type: 'add' | 'swap';
+  } | null>(null);
   const chatScrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const existingActivities = useMemo(() => {
+    if (!days || days.length === 0) return [];
+    return days.flatMap((d) =>
+      (d.activities || []).map((a) => ({
+        ...a,
+        dayNumber: d.dayNumber,
+      }))
+    );
+  }, [days]);
 
   // Sync prefilledInput if provided (e.g. from PlaceAlternativesModal)
   useEffect(() => {
@@ -395,14 +414,14 @@ export default function CopilotDrawer({
 
                 {/* =====================================================================
                     GENERATIVE UI: INTERACTIVE PLACE RECOMMENDATION CARDS (Mindtrip Style)
-                    With 1-Click Map Locate & 1-Click Pick Buttons
+                    With 1-Click Map Locate, [+ Thêm vào ngày], and [⇄ Đổi điểm] Actions
                     ===================================================================== */}
                 {recommendations.length > 0 && (
                   <div className="ml-9 p-3 bg-white/95 border border-slate-200/90 rounded-2xl shadow-xs space-y-2.5 animate-in fade-in duration-200">
                     <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 px-0.5">
                       <span className="flex items-center gap-1.5 text-teal-800">
                         <Sparkles className="size-3 text-teal-600" />
-                        <span>Gợi ý địa điểm tương đương:</span>
+                        <span>Gợi ý địa điểm:</span>
                       </span>
                       <span className="text-[10px] text-slate-400 font-semibold">
                         {recommendations.length} địa điểm
@@ -410,52 +429,232 @@ export default function CopilotDrawer({
                     </div>
 
                     <div className="grid grid-cols-1 gap-2 pt-0.5">
-                      {recommendations.map((rec, recIdx) => (
-                        <div
-                          key={recIdx}
-                          className="group p-2.5 rounded-xl border border-slate-200/80 bg-slate-50/60 hover:bg-teal-50/40 hover:border-teal-300 transition-all flex items-start justify-between gap-2.5 shadow-2xs"
-                        >
-                          <div className="space-y-1 min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="size-5 rounded-md bg-teal-100 text-teal-850 text-[10px] font-bold flex items-center justify-center shrink-0">
-                                {recIdx + 1}
-                              </span>
-                              <h4 className="text-xs font-bold text-slate-900 group-hover:text-teal-900 truncate">
-                                {rec.name}
-                              </h4>
+                      {recommendations.map((rec, recIdx) => {
+                        const isAddOpen =
+                          activeActionMenu?.msgIndex === i &&
+                          activeActionMenu?.recIndex === recIdx &&
+                          activeActionMenu?.type === 'add';
+                        const isSwapOpen =
+                          activeActionMenu?.msgIndex === i &&
+                          activeActionMenu?.recIndex === recIdx &&
+                          activeActionMenu?.type === 'swap';
+
+                        return (
+                          <div
+                            key={recIdx}
+                            className={`group p-2.5 rounded-xl border transition-all flex flex-col gap-2 shadow-2xs ${
+                              isAddOpen || isSwapOpen
+                                ? 'bg-teal-50/20 border-teal-300'
+                                : 'bg-slate-50/60 border-slate-200/80 hover:bg-teal-50/40 hover:border-teal-300'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between gap-2.5">
+                              <div className="space-y-1 min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="size-5 rounded-md bg-teal-100 text-teal-850 text-[10px] font-bold flex items-center justify-center shrink-0">
+                                    {recIdx + 1}
+                                  </span>
+                                  <h4 className="text-xs font-bold text-slate-900 group-hover:text-teal-900 truncate">
+                                    {rec.name}
+                                  </h4>
+                                </div>
+                                {rec.description && (
+                                  <p className="text-[11px] text-slate-500 line-clamp-2 pl-6">
+                                    {rec.description}
+                                  </p>
+                                )}
+                              </div>
+
+                              <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
+                                {onLocatePlaceOnMap && (
+                                  <button
+                                    type="button"
+                                    onClick={() => onLocatePlaceOnMap({ name: rec.name })}
+                                    className="px-2 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-semibold transition-all shadow-2xs flex items-center gap-1 cursor-pointer"
+                                    title="Xem vị trí trên bản đồ"
+                                  >
+                                    <MapPin className="size-3 text-teal-600" />
+                                    <span className="hidden sm:inline">Bản đồ</span>
+                                  </button>
+                                )}
+
+                                {/* [+ Thêm] Button */}
+                                <button
+                                  type="button"
+                                  disabled={isPending}
+                                  onClick={() => {
+                                    setActiveActionMenu((prev) =>
+                                      prev?.msgIndex === i &&
+                                      prev?.recIndex === recIdx &&
+                                      prev?.type === 'add'
+                                        ? null
+                                        : { msgIndex: i, recIndex: recIdx, type: 'add' }
+                                    );
+                                  }}
+                                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50 ${
+                                    isAddOpen
+                                      ? 'bg-teal-700 text-white ring-2 ring-teal-400'
+                                      : 'bg-teal-600 hover:bg-teal-700 text-white'
+                                  }`}
+                                  title="Thêm địa điểm này vào lịch trình"
+                                >
+                                  <Plus className="size-3" />
+                                  <span>Thêm</span>
+                                </button>
+
+                                {/* [⇄ Đổi] Button */}
+                                <button
+                                  type="button"
+                                  disabled={isPending}
+                                  onClick={() => {
+                                    setActiveActionMenu((prev) =>
+                                      prev?.msgIndex === i &&
+                                      prev?.recIndex === recIdx &&
+                                      prev?.type === 'swap'
+                                        ? null
+                                        : { msgIndex: i, recIndex: recIdx, type: 'swap' }
+                                    );
+                                  }}
+                                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50 border ${
+                                    isSwapOpen
+                                      ? 'bg-teal-50 border-teal-500 text-teal-900 ring-2 ring-teal-200'
+                                      : 'bg-white hover:bg-teal-50/70 border-slate-200 hover:border-teal-300 text-slate-700 hover:text-teal-900'
+                                  }`}
+                                  title="Đổi một địa điểm có sẵn thành điểm này"
+                                >
+                                  <ArrowLeftRight className="size-3 text-slate-500" />
+                                  <span>Đổi</span>
+                                </button>
+                              </div>
                             </div>
-                            {rec.description && (
-                              <p className="text-[11px] text-slate-500 line-clamp-2 pl-6">
-                                {rec.description}
-                              </p>
+
+                            {/* Subpanel for [+ Thêm] */}
+                            {isAddOpen && (
+                              <div className="mt-1 pt-2 border-t border-teal-200/60 space-y-2 animate-in fade-in duration-150">
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="font-bold text-teal-900 flex items-center gap-1">
+                                    <Plus className="size-3 text-teal-600" />
+                                    <span>Thêm vào ngày nào trong lịch trình?</span>
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveActionMenu(null)}
+                                    className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                                  >
+                                    <X className="size-3" />
+                                  </button>
+                                </div>
+
+                                <div className="flex flex-wrap gap-1.5">
+                                  {days && days.length > 0 ? (
+                                    days.map((d) => (
+                                      <button
+                                        key={d.dayNumber}
+                                        type="button"
+                                        disabled={isPending}
+                                        onClick={() => {
+                                          handleSend(`Thêm ${rec.name} vào Ngày ${d.dayNumber}`);
+                                          setActiveActionMenu(null);
+                                        }}
+                                        className="px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold text-[11px] transition-all shadow-2xs cursor-pointer flex items-center gap-1"
+                                      >
+                                        <span>Ngày {d.dayNumber}</span>
+                                      </button>
+                                    ))
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      disabled={isPending}
+                                      onClick={() => {
+                                        handleSend(`Thêm ${rec.name} vào Ngày 1`);
+                                        setActiveActionMenu(null);
+                                      }}
+                                      className="px-2.5 py-1 rounded-lg bg-teal-600 hover:bg-teal-700 text-white font-bold text-[11px] transition-all shadow-2xs cursor-pointer flex items-center gap-1"
+                                    >
+                                      <span>Ngày 1</span>
+                                    </button>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    disabled={isPending}
+                                    onClick={() => {
+                                      handleSend(`Thêm ${rec.name} vào ngày phù hợp trong lịch trình`);
+                                      setActiveActionMenu(null);
+                                    }}
+                                    className="px-2.5 py-1 rounded-lg bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-300 text-slate-700 hover:text-teal-900 font-semibold text-[11px] transition-all shadow-2xs cursor-pointer flex items-center gap-1"
+                                  >
+                                    <Sparkles className="size-3 text-teal-600" />
+                                    <span>Tự động chọn ngày</span>
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Subpanel for [⇄ Đổi] */}
+                            {isSwapOpen && (
+                              <div className="mt-1 pt-2 border-t border-teal-200/60 space-y-2 animate-in fade-in duration-150">
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="font-bold text-teal-900 flex items-center gap-1">
+                                    <ArrowLeftRight className="size-3 text-teal-600" />
+                                    <span>Chọn điểm bạn muốn thay thế:</span>
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveActionMenu(null)}
+                                    className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+                                  >
+                                    <X className="size-3" />
+                                  </button>
+                                </div>
+
+                                {existingActivities.length > 0 && (
+                                  <div className="max-h-36 overflow-y-auto space-y-1 pr-0.5">
+                                    {existingActivities.map((act) => (
+                                      <button
+                                        key={`${act.dayNumber}-${act.placeId || act.placeName}`}
+                                        type="button"
+                                        disabled={isPending}
+                                        onClick={() => {
+                                          handleSend(`Đổi ${act.placeName} thành ${rec.name}`);
+                                          setActiveActionMenu(null);
+                                        }}
+                                        className="w-full text-left p-1.5 rounded-lg bg-white hover:bg-teal-50 hover:border-teal-300 border border-slate-200 transition-all flex items-center justify-between text-[11px] group cursor-pointer"
+                                      >
+                                        <div className="min-w-0 pr-2">
+                                          <span className="text-[10px] text-teal-800 font-bold block">
+                                            Ngày {act.dayNumber}
+                                            {act.startTime ? ` • ${act.startTime}` : ''}
+                                            {act.categoryName ? ` • ${act.categoryName}` : ''}
+                                          </span>
+                                          <span className="font-semibold text-slate-800 truncate block group-hover:text-teal-900">
+                                            {act.placeName}
+                                          </span>
+                                        </div>
+                                        <span className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded border border-teal-200 shrink-0">
+                                          Thay điểm này
+                                        </span>
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+
+                                <button
+                                  type="button"
+                                  disabled={isPending}
+                                  onClick={() => {
+                                    handleSend(`Đổi một địa điểm tương đương trong lịch trình thành ${rec.name}`);
+                                    setActiveActionMenu(null);
+                                  }}
+                                  className="w-full text-center py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-teal-50 hover:text-teal-800 text-slate-700 font-semibold text-[11px] transition-all cursor-pointer border border-transparent hover:border-teal-200"
+                                >
+                                  Nhờ AI tự chọn điểm phù hợp để đổi
+                                </button>
+                              </div>
                             )}
                           </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
-                            {onLocatePlaceOnMap && (
-                              <button
-                                type="button"
-                                onClick={() => onLocatePlaceOnMap({ name: rec.name })}
-                                className="px-2 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-semibold transition-all shadow-2xs flex items-center gap-1 cursor-pointer"
-                                title="Xem vị trí trên bản đồ"
-                              >
-                                <MapPin className="size-3 text-teal-600" />
-                                <span className="hidden sm:inline">Bản đồ</span>
-                              </button>
-                            )}
-
-                            <button
-                              type="button"
-                              disabled={isPending}
-                              onClick={() => handleSend(`Đổi thành ${rec.name}`)}
-                              className="px-2.5 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 text-white text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                            >
-                              <span>Chọn</span>
-                              <ArrowRight className="size-3" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}

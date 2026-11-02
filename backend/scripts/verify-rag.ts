@@ -56,7 +56,7 @@ async function bootstrap() {
       } else {
         results.forEach((r, idx) => {
           console.log(`\n  Top #${idx + 1} | Score: ${(r.similarity_score * 100).toFixed(2)}% | Doc: "${r.document_title}"`);
-          console.log(`  Breadcrumbs: ${r.metadata.breadcrumbs}`);
+          console.log(`  Breadcrumbs: ${r.breadcrumbs}`);
           const snippet = r.content.split('\n').slice(0, 4).join(' ');
           console.log(`  Snippet: ${snippet.substring(0, 180)}...`);
         });

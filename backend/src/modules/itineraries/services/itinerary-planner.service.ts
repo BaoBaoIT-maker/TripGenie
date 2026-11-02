@@ -2,6 +2,8 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { BudgetLevel, Prisma, TravelArea } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
@@ -13,11 +15,13 @@ import {
   formatVndCurrency,
 } from './transit.service';
 import { GeminiPlannerService } from './gemini-planner.service';
+import { TourBriefing, normalizeTourBriefing, redactTourBriefing } from './tour-briefing.util';
 import {
   GenerateItineraryDto,
   IntracityModeEnum,
   BudgetLevelEnum,
   TransitModeEnum,
+  UpdateTourBriefingDto,
 } from '../dto/generate-itinerary.dto';
 import { PRICING_CONFIG, getDestinationTierMultiplier, calculatePlaceEstimatedCost } from '../../../config/pricing.config';
 import {
@@ -92,6 +96,9 @@ export interface ItineraryDay {
 /** Single response contract of POST /itineraries/generate and GET /itineraries/:id. */
 export interface ItineraryDetail {
   id: string;
+  creatorId?: string;
+  isPublic?: boolean;
+  isOwner?: boolean;
   title: string;
   description: string | null;
   destination: string | null;
@@ -102,6 +109,7 @@ export interface ItineraryDetail {
   budgetLevel: string;
   intercityTransit: IntercityTransitResult | null;
   budgetBreakdown: BudgetBreakdown | null;
+  tourBriefing?: TourBriefing | null;
   days: ItineraryDay[];
 }
 
@@ -111,6 +119,7 @@ interface StoredPlan {
   budgetBreakdown: BudgetBreakdown;
   dayThemes: string[];
   plannedDays?: PlannedDay[];
+  tourBriefing?: TourBriefing | null;
 }
 
 const DETAIL_INCLUDE = {
@@ -139,6 +148,7 @@ const DETAIL_INCLUDE = {
       },
     },
   },
+  tripGroup: { select: { members: { select: { userId: true } } } },
 } satisfies Prisma.ItineraryInclude;
 
 type ItineraryRow = Prisma.ItineraryGetPayload<{ include: typeof DETAIL_INCLUDE }>;
@@ -516,22 +526,10 @@ export class ItineraryPlannerService {
     };
 
     // 7. Persist to Database (Itinerary & ItineraryDestination in an Atomic Transaction)
-    let effectiveCreatorId = creatorId;
-    if (!effectiveCreatorId) {
-      const fallbackUser = await this.prisma.user.findFirst({ select: { id: true } });
-      if (fallbackUser) {
-        effectiveCreatorId = fallbackUser.id;
-      } else {
-        const bot = await this.prisma.user.create({
-          data: {
-            email: 'genie-bot@tripgenie.vn',
-            fullName: 'TripGenie AI Bot',
-            role: 'ADMIN',
-          },
-        });
-        effectiveCreatorId = bot.id;
-      }
+    if (!creatorId) {
+      throw new UnauthorizedException('Vui lòng đăng nhập để tạo lịch trình du lịch.');
     }
+    const effectiveCreatorId = creatorId;
 
     const savedItinerary = await this.prisma.$transaction(async (tx) => {
       // Ensure all activities have a valid placeId in database within the destination Bounding Box
@@ -585,7 +583,7 @@ export class ItineraryPlannerService {
           estimatedCost: totalEstimated,
           budgetLevel: budgetLevel as BudgetLevel,
           isAiGenerated: true,
-          isPublic: true,
+          isPublic: false,
           totalPlaces: days.reduce((sum, d) => sum + d.activities.length, 0),
           aiPreferences: {
             originCity: dto.originCity,
@@ -635,9 +633,29 @@ export class ItineraryPlannerService {
   }
 
   /**
-   * Retrieve an itinerary in the same shape `generateItinerary` returns.
+   * Shared ownership assertion for itinerary mutations & Copilot actions.
    */
-  async getById(id: string, _requesterId?: string): Promise<ItineraryDetail> {
+  async assertItineraryOwnership(id: string, userId?: string): Promise<void> {
+    if (!userId) {
+      throw new UnauthorizedException('Vui lòng đăng nhập để thực hiện thao tác này.');
+    }
+    const row = await this.prisma.itinerary.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true, creatorId: true },
+    });
+    if (!row) {
+      throw new NotFoundException('Không tìm thấy lịch trình hoặc lịch trình đã bị xóa.');
+    }
+    if (row.creatorId !== userId) {
+      throw new ForbiddenException('Bạn không có quyền chỉnh sửa lịch trình của người khác.');
+    }
+  }
+
+  /**
+   * Retrieve an itinerary in the same shape `generateItinerary` returns.
+   * Allows access if the requester is the owner OR if the itinerary is public.
+   */
+  async getById(id: string, requesterId?: string): Promise<ItineraryDetail> {
     const row = await this.prisma.itinerary.findFirst({
       where: { id, deletedAt: null },
       include: DETAIL_INCLUDE,
@@ -645,7 +663,10 @@ export class ItineraryPlannerService {
     if (!row) {
       throw new NotFoundException(`Itinerary with id "${id}" not found`);
     }
-    return this.toDetail(row);
+    if (!row.isPublic && row.creatorId !== requesterId) {
+      throw new ForbiddenException('Lịch trình này đang ở chế độ riêng tư.');
+    }
+    return this.toDetail(row, requesterId);
   }
 
   /**
@@ -726,7 +747,7 @@ export class ItineraryPlannerService {
     };
   }
 
-  private toDetail(row: ItineraryRow): ItineraryDetail {
+  private toDetail(row: ItineraryRow, requesterId?: string): ItineraryDetail {
     const stored = readStoredPlan(row.aiPreferences);
     const byDay = new Map<number, ItineraryActivity[]>();
     const rows = row.destinations;
@@ -829,8 +850,16 @@ export class ItineraryPlannerService {
       activities: byDay.get(i + 1) ?? [],
     }));
 
+    const isOwner = Boolean(requesterId && row.creatorId === requesterId);
+    const isTripMember = Boolean(
+      requesterId && row.tripGroup?.members.some((m) => m.userId === requesterId),
+    );
+
     return {
       id: row.id,
+      creatorId: row.creatorId,
+      isPublic: row.isPublic,
+      isOwner,
       title: row.title,
       description: row.description,
       destination: row.destination,
@@ -841,38 +870,38 @@ export class ItineraryPlannerService {
       budgetLevel: row.budgetLevel ?? 'MEDIUM',
       intercityTransit: this.normalizeStoredTransit(stored.intercityTransit, row.destination),
       budgetBreakdown: stored.budgetBreakdown ?? null,
+      tourBriefing: redactTourBriefing(stored.tourBriefing, isOwner || isTripMember),
       days,
     };
   }
 
   /**
-   * List recent itineraries from database.
+   * List itineraries belonging ONLY to the currently authenticated user.
    */
-  async listItineraries(_userId?: string): Promise<ItineraryDetail[]> {
+  async listItineraries(userId?: string): Promise<ItineraryDetail[]> {
+    if (!userId) {
+      return [];
+    }
     const rows = await this.prisma.itinerary.findMany({
-      where: { deletedAt: null },
+      where: {
+        creatorId: userId,
+        deletedAt: null,
+      },
       include: DETAIL_INCLUDE,
       orderBy: { createdAt: 'desc' },
       take: 30,
     });
-    return rows.map((r) => this.toDetail(r));
+    return rows.map((r) => this.toDetail(r, userId));
   }
 
   /**
    * Soft-delete an itinerary.
-   * Only marks deletedAt for this itinerary.
+   * Only marks deletedAt for this itinerary if owned by the requester.
    * If other users or trips were cloned from this itinerary (clonedFromId),
    * their cloned itineraries remain 100% active and untouched.
    */
-  async deleteItinerary(id: string, _requesterId?: string): Promise<{ success: boolean; id: string }> {
-    const existing = await this.prisma.itinerary.findFirst({
-      where: { id, deletedAt: null },
-      select: { id: true, creatorId: true },
-    });
-
-    if (!existing) {
-      throw new NotFoundException('Không tìm thấy lịch trình hoặc lịch trình đã bị xóa.');
-    }
+  async deleteItinerary(id: string, requesterId?: string): Promise<{ success: boolean; id: string }> {
+    await this.assertItineraryOwnership(id, requesterId);
 
     await this.prisma.itinerary.update({
       where: { id },
@@ -883,18 +912,21 @@ export class ItineraryPlannerService {
   }
 
   /**
-   * Soft-delete multiple itineraries at once.
-   * Only marks deletedAt for these itineraries.
+   * Soft-delete multiple itineraries owned by the requester at once.
    * Clones belonging to others remain untouched and preserved.
    */
-  async bulkDeleteItineraries(ids: string[], _requesterId?: string): Promise<{ success: boolean; count: number }> {
+  async bulkDeleteItineraries(ids: string[], requesterId?: string): Promise<{ success: boolean; count: number }> {
     if (!ids || ids.length === 0) {
       return { success: true, count: 0 };
+    }
+    if (!requesterId) {
+      throw new UnauthorizedException('Vui lòng đăng nhập để xóa lịch trình.');
     }
 
     const result = await this.prisma.itinerary.updateMany({
       where: {
         id: { in: ids },
+        creatorId: requesterId,
         deletedAt: null,
       },
       data: {
@@ -910,6 +942,10 @@ export class ItineraryPlannerService {
    * Sets clonedFromId to the source itinerary id.
    */
   async cloneItinerary(id: string, userId?: string): Promise<ItineraryDetail> {
+    if (!userId) {
+      throw new UnauthorizedException('Vui lòng đăng nhập để nhân bản lịch trình.');
+    }
+
     const source = await this.prisma.itinerary.findFirst({
       where: { id, deletedAt: null },
       include: DETAIL_INCLUDE,
@@ -919,10 +955,19 @@ export class ItineraryPlannerService {
       throw new NotFoundException('Không tìm thấy lịch trình để sao chép.');
     }
 
-    let effectiveCreatorId = userId;
-    if (!effectiveCreatorId) {
-      const fallbackUser = await this.prisma.user.findFirst({ select: { id: true } });
-      effectiveCreatorId = fallbackUser?.id || source.creatorId;
+    if (!source.isPublic && source.creatorId !== userId) {
+      throw new ForbiddenException('Không thể sao chép lịch trình riêng tư của người khác.');
+    }
+
+    const effectiveCreatorId = userId;
+    const rawPrefs =
+      typeof source.aiPreferences === 'object' &&
+      source.aiPreferences !== null &&
+      !Array.isArray(source.aiPreferences)
+        ? { ...(source.aiPreferences as Record<string, unknown>) }
+        : {};
+    if (source.creatorId !== effectiveCreatorId) {
+      delete rawPrefs.tourBriefing;
     }
 
     const cloned = await this.prisma.$transaction(async (tx) => {
@@ -939,8 +984,7 @@ export class ItineraryPlannerService {
           budgetLevel: source.budgetLevel,
           estimatedCost: source.estimatedCost,
           isAiGenerated: false,
-          aiPrompt: source.aiPrompt,
-          aiPreferences: source.aiPreferences as any,
+          aiPreferences: rawPrefs as unknown as Prisma.InputJsonValue,
           status: 'DRAFT',
           isPublic: false,
           clonedFromId: source.id,
@@ -959,12 +1003,16 @@ export class ItineraryPlannerService {
             endTime: d.endTime,
             estimatedDurationMinutes: d.estimatedDurationMinutes,
             estimatedCost: d.estimatedCost,
-            travelDistanceMeters: d.travelDistanceMeters,
-            travelDurationSeconds: d.travelDurationSeconds,
             notes: d.notes,
           })),
         });
       }
+
+      // ponytail: direct tx update of communityPost.cloneCount couples itinerary planner to community table. Upgrade to domain event (ItineraryClonedEvent) with outbox if community is ever split into a microservice.
+      await tx.communityPost.updateMany({
+        where: { itineraryId: source.id, deletedAt: null },
+        data: { cloneCount: { increment: 1 } },
+      });
 
       return newItin;
     });
@@ -988,6 +1036,9 @@ export class ItineraryPlannerService {
 
     if (!row) {
       throw new NotFoundException(`Itinerary with id "${id}" not found`);
+    }
+    if (row.creatorId !== userId) {
+      throw new ForbiddenException('Bạn không có quyền chỉnh sửa phương tiện của lịch trình này.');
     }
 
     const stored = readStoredPlan(row.aiPreferences);
@@ -1049,29 +1100,70 @@ export class ItineraryPlannerService {
   }
 
   /**
-   * Update the cover photo of an itinerary.
+   * Load the aiPreferences JSON of a live (not soft-deleted) itinerary, asserting caller ownership.
    */
-  async updateCoverPhoto(id: string, coverPhoto: string, userId?: string) {
-    const row = await this.prisma.itinerary.findUnique({
-      where: { id },
-      select: { id: true, aiPreferences: true },
+  private async loadOwnedPreferences(
+    id: string,
+    userId: string | undefined,
+    forbiddenMessage: string,
+  ): Promise<Record<string, unknown>> {
+    const row = await this.prisma.itinerary.findFirst({
+      where: { id, deletedAt: null },
+      select: { creatorId: true, aiPreferences: true },
     });
     if (!row) {
       throw new NotFoundException('Không tìm thấy lịch trình hoặc lịch trình đã bị xóa.');
     }
+    if (row.creatorId !== userId) {
+      throw new ForbiddenException(forbiddenMessage);
+    }
+    return { ...readStoredPlan(row.aiPreferences) };
+  }
 
-    const currentAiPreferences =
-      typeof row.aiPreferences === 'object' && row.aiPreferences !== null
-        ? (row.aiPreferences as Record<string, unknown>)
-        : {};
+  /**
+   * Update the cover photo of an itinerary.
+   */
+  async updateCoverPhoto(id: string, coverPhoto: string, userId?: string) {
+    const current = await this.loadOwnedPreferences(
+      id,
+      userId,
+      'Bạn không có quyền thay đổi ảnh bìa của lịch trình này.',
+    );
 
     await this.prisma.itinerary.update({
       where: { id },
       data: {
         aiPreferences: {
-          ...currentAiPreferences,
+          ...current,
           coverPhoto,
           coverImage: coverPhoto,
+        } as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return this.getById(id, userId);
+  }
+
+  /**
+   * Update the tour leader & assembly briefing info of an itinerary (owner only).
+   */
+  async updateTourBriefing(
+    id: string,
+    dto: UpdateTourBriefingDto,
+    userId?: string,
+  ): Promise<ItineraryDetail> {
+    const current = await this.loadOwnedPreferences(
+      id,
+      userId,
+      'Bạn không có quyền chỉnh sửa thông tin đoàn của lịch trình này.',
+    );
+
+    await this.prisma.itinerary.update({
+      where: { id },
+      data: {
+        aiPreferences: {
+          ...current,
+          tourBriefing: normalizeTourBriefing(dto),
         } as unknown as Prisma.InputJsonValue,
       },
     });

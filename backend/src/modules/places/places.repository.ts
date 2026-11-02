@@ -20,7 +20,6 @@ const PLACE_COLUMNS = `
         p.name,
         p.description,
         p.address,
-        p.address_normalized,
         CASE WHEN a.type::text = 'DISTRICT' THEN a.name END AS district,
         COALESCE(pa.name, a.name) AS city,
         p.latitude,
@@ -90,9 +89,12 @@ export class PlacesRepository implements IPlaceRepository {
       args.push(lng, lat);
     }
 
-    // Filter by Travel Area
+    // ponytail: Covers 3-level AreaType hierarchy (Province -> District -> Zone) via existing PLACE_JOINS (ceiling: 3 levels; upgrade path: WITH RECURSIVE CTE if AreaType depth exceeds 3).
     if (areaId !== undefined) {
-      conditions.push(`p.area_id = $${paramIdx++}`);
+      const areaIdx = paramIdx++;
+      conditions.push(
+        `(p.area_id = $${areaIdx} OR a.parent_id = $${areaIdx} OR pa.parent_id = $${areaIdx})`,
+      );
       args.push(areaId);
     }
 
@@ -132,14 +134,21 @@ export class PlacesRepository implements IPlaceRepository {
       args.push(minRating);
     }
 
-    // Filter by Keyword (name, normalized name, address)
+    // Filter by Keyword (name, normalized unaccented name, address, description, tags)
     if (keyword && keyword.trim() !== '') {
-      const kw = `%${keyword.trim().replace(/[\\%_]/g, '\\$&')}%`; // escape LIKE wildcards
+      const rawTrimmed = keyword.trim().replace(/[\\%_]/g, '\\$&');
+      const kw = `%${rawTrimmed}%`;
+      const normKw = `%${rawTrimmed
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/gi, 'd')
+        .toLowerCase()}%`;
       const kwIdx = paramIdx++;
+      const normIdx = paramIdx++;
       conditions.push(
-        `(p.name ILIKE $${kwIdx} OR p.name_normalized ILIKE $${kwIdx} OR p.address ILIKE $${kwIdx})`,
+        `(p.name ILIKE $${kwIdx} OR p.name_normalized ILIKE $${normIdx} OR p.address ILIKE $${kwIdx} OR p.description ILIKE $${kwIdx} OR array_to_string(p.tags, ' ') ILIKE $${kwIdx})`,
       );
-      args.push(kw);
+      args.push(kw, normIdx ? normKw : kw);
     }
 
     // Filter by Spatial Bounding Radius (PostGIS ST_DWithin)
@@ -332,7 +341,9 @@ export class PlacesRepository implements IPlaceRepository {
   ): Promise<PlaceRow[]> {
     const vectorString = `[${vector.join(',')}]`;
     const areaCondition =
-      areaId !== undefined ? 'AND (p.area_id = $4 OR a.parent_id = $4)' : '';
+      areaId !== undefined
+        ? 'AND (p.area_id = $4 OR a.parent_id = $4 OR pa.parent_id = $4)'
+        : '';
     const args: unknown[] = [vectorString, minSimilarity, limit];
     if (areaId !== undefined) args.push(areaId);
 

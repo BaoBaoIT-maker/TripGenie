@@ -1,30 +1,68 @@
-import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import axios, { AxiosInstance } from 'axios';
 import { PrismaService } from '../../../database/prisma.service';
-import { CopilotToolsService } from './copilot-tools.service';
+import {
+  buildAlternatingGeminiContents,
+  GeminiContent,
+  GeminiPart,
+} from '../../../common/utils/gemini-contents.util';
+import { formatTimeOfDay } from '../../../common/utils/time-of-day.util';
 import { ItineraryPlannerService } from '../services/itinerary-planner.service';
+import { CopilotToolsService } from './copilot-tools.service';
 import {
   COPILOT_CONSTANTS,
   COPILOT_FUNCTION_DECLARATIONS,
-  COPILOT_TOOL_NAMES,
-  COPILOT_SUMMARY_QUEUE,
   COPILOT_SUMMARY_JOB,
+  COPILOT_SUMMARY_QUEUE,
+  COPILOT_TOOL_NAMES,
   CopilotChatResponse,
   CopilotMessageHistoryItem,
   CopilotProposal,
   CopilotToolExecutionResult,
+  CopilotToolName,
 } from './copilot.types';
-import { formatTimeOfDay } from '../../../common/utils/time-of-day.util';
+
+type CopilotToolHandler = (
+  itineraryId: string,
+  args: Record<string, unknown>,
+  dryRun: boolean,
+) => Promise<CopilotToolExecutionResult>;
+
+const PROPOSAL_TITLE_BUILDERS: Record<
+  CopilotToolName,
+  (data?: Record<string, unknown>) => string
+> = {
+  [COPILOT_TOOL_NAMES.SWAP_ACTIVITY]: (data) =>
+    data?.dayNumber ? `Đề xuất đổi địa điểm Ngày ${data.dayNumber}` : 'Đề xuất đổi địa điểm',
+  [COPILOT_TOOL_NAMES.SWAP_DAYS]: (data) =>
+    data?.dayA && data?.dayB
+      ? `Đề xuất hoán đổi Ngày ${data.dayA} và Ngày ${data.dayB}`
+      : 'Đề xuất hoán đổi ngày',
+  [COPILOT_TOOL_NAMES.ADD_ACTIVITY]: (data) =>
+    data?.dayNumber ? `Đề xuất thêm điểm Ngày ${data.dayNumber}` : 'Đề xuất thêm địa điểm',
+  [COPILOT_TOOL_NAMES.REMOVE_ACTIVITY]: (data) =>
+    data?.dayNumber ? `Đề xuất xóa điểm Ngày ${data.dayNumber}` : 'Đề xuất xóa địa điểm',
+  [COPILOT_TOOL_NAMES.MOVE_ACTIVITY]: () => 'Đề xuất chuyển ngày hoạt động',
+  [COPILOT_TOOL_NAMES.CHANGE_DESTINATION]: () => 'Đề xuất đổi điểm đến',
+};
 
 @Injectable()
 export class CopilotAgentService {
   private readonly logger = new Logger(CopilotAgentService.name);
   private readonly apiKey: string;
   private readonly modelName: string;
+  private readonly baseUrl: string;
   private readonly httpClient: AxiosInstance;
+  private readonly toolHandlers: Record<CopilotToolName, CopilotToolHandler>;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -38,9 +76,75 @@ export class CopilotAgentService {
     this.apiKey = this.configService.get<string>('GEMINI_API_KEY', '');
     this.modelName = this.configService.get<string>(
       'GEMINI_MODEL',
-      'gemini-flash-lite-latest',
+      COPILOT_CONSTANTS.DEFAULT_MODEL,
     );
-    this.httpClient = axios.create({ timeout: 25000 });
+    this.baseUrl = this.configService.get<string>(
+      'GEMINI_BASE_URL',
+      COPILOT_CONSTANTS.GEMINI_BASE_URL,
+    );
+    this.httpClient = axios.create({ timeout: COPILOT_CONSTANTS.API_TIMEOUT_MS });
+
+    // Strategy/Dispatcher map: Open/Closed Principle (OCP) without switch/if-else chains
+    this.toolHandlers = {
+      [COPILOT_TOOL_NAMES.CHANGE_DESTINATION]: async (_itineraryId, args) => {
+        const dest = String(args.newDestination || 'điểm đến mới');
+        return {
+          toolName: COPILOT_TOOL_NAMES.CHANGE_DESTINATION,
+          success: false,
+          message: `Đổi sang ${dest} cần khởi tạo một lịch trình mới để tính toán lại điểm đến, thời gian và phương tiện di chuyển phù hợp. Bạn hãy bấm vào nút bên dưới để tạo lịch trình ${dest} mới nhé!`,
+          data: {
+            action: {
+              type: 'CREATE_NEW_TRIP',
+              destination: dest,
+            },
+          },
+        };
+      },
+      [COPILOT_TOOL_NAMES.SWAP_ACTIVITY]: (itineraryId, args, dryRun) =>
+        this.toolsService.swapActivity(itineraryId, {
+          dayNumber: args.dayNumber ? Number(args.dayNumber) : undefined,
+          currentPlaceName: args.currentPlaceName ? String(args.currentPlaceName) : undefined,
+          mealOrActivityType: args.mealOrActivityType
+            ? String(args.mealOrActivityType)
+            : undefined,
+          query: String(args.query || 'địa điểm tương đương'),
+          categorySlug: args.categorySlug ? String(args.categorySlug) : undefined,
+          destinationId: args.destinationId ? String(args.destinationId) : undefined,
+          newPlaceId: args.newPlaceId ? String(args.newPlaceId) : undefined,
+          dryRun,
+        }),
+      [COPILOT_TOOL_NAMES.ADD_ACTIVITY]: (itineraryId, args, dryRun) =>
+        this.toolsService.addActivity(itineraryId, {
+          dayNumber: Number(args.dayNumber || 1),
+          timeSlot: args.timeSlot ? String(args.timeSlot) : undefined,
+          query: String(args.query || 'điểm tham quan'),
+          categorySlug: args.categorySlug ? String(args.categorySlug) : undefined,
+          placeId: args.placeId ? String(args.placeId) : undefined,
+          dryRun,
+        }),
+      [COPILOT_TOOL_NAMES.REMOVE_ACTIVITY]: (itineraryId, args, dryRun) =>
+        this.toolsService.removeActivity(itineraryId, {
+          dayNumber: Number(args.dayNumber || 1),
+          placeName: String(args.placeName || ''),
+          destinationId: args.destinationId ? String(args.destinationId) : undefined,
+          dryRun,
+        }),
+      [COPILOT_TOOL_NAMES.MOVE_ACTIVITY]: (itineraryId, args, dryRun) =>
+        this.toolsService.moveActivity(itineraryId, {
+          placeName: String(args.placeName || ''),
+          fromDay: Number(args.fromDay || 1),
+          toDay: Number(args.toDay || 2),
+          targetTimeSlot: args.targetTimeSlot ? String(args.targetTimeSlot) : undefined,
+          destinationId: args.destinationId ? String(args.destinationId) : undefined,
+          dryRun,
+        }),
+      [COPILOT_TOOL_NAMES.SWAP_DAYS]: (itineraryId, args, dryRun) =>
+        this.toolsService.swapDays(itineraryId, {
+          dayA: Number(args.dayA || 1),
+          dayB: Number(args.dayB || 2),
+          dryRun,
+        }),
+    };
   }
 
   /**
@@ -48,8 +152,8 @@ export class CopilotAgentService {
    * 1. Resolve Session & History
    * 2. Ground prompt with Itinerary context
    * 3. Send to Gemini with Tool Declarations
-   * 4. Handle Function Call (if any)
-   * 5. Persist messages & return updated itinerary delta
+   * 4. Handle Function Call (if any) with proper thoughtSignature & functionResponse
+   * 5. Atomically persist messages & return updated itinerary delta
    */
   async chat(
     itineraryId: string,
@@ -58,6 +162,7 @@ export class CopilotAgentService {
     sessionId?: string,
     autoApply: boolean = false,
   ): Promise<CopilotChatResponse> {
+    const cleanMessage = userMessage.trim();
     const itinerary = await this.prisma.itinerary.findFirst({
       where: { id: itineraryId, deletedAt: null },
       include: {
@@ -72,10 +177,21 @@ export class CopilotAgentService {
       throw new NotFoundException('Không tìm thấy lịch trình du lịch.');
     }
 
-    // 1. Resolve / Create Chat Session
-    const session = await this.resolveSession(itineraryId, itinerary.creatorId, userId, sessionId);
+    if (!userId || itinerary.creatorId !== userId) {
+      throw new ForbiddenException(
+        'Chỉ chủ sở hữu mới có thể sử dụng AI Copilot trên lịch trình này.',
+      );
+    }
 
-    // 2. Fetch recent conversation history using Sliding Window
+    // 1. Resolve / Create Chat Session
+    const session = await this.resolveSession(
+      itineraryId,
+      itinerary.creatorId,
+      userId,
+      sessionId,
+    );
+
+    // 2. Fetch recent conversation history using Sliding Window before persisting the turn
     const recentRows = await this.prisma.aiChatMessage.findMany({
       where: { sessionId: session.id },
       orderBy: { createdAt: 'desc' },
@@ -83,46 +199,46 @@ export class CopilotAgentService {
     });
     const historyRows = recentRows.reverse();
 
-    // 3. Save incoming user message
-    await this.prisma.aiChatMessage.create({
-      data: {
-        sessionId: session.id,
-        sender: 'USER',
-        content: userMessage,
-      },
-    });
-
-    // 4. Build prompt context and contents with destination places grounding
+    // 3. Build prompt context and contents with destination places grounding
     const destinationPlaces = await this.prisma.place.findMany({
       where: {
         deletedAt: null,
         status: 'ACTIVE',
-        OR: [
-          { address: { contains: itinerary.destination || '', mode: 'insensitive' } },
-          { name: { contains: itinerary.destination || '', mode: 'insensitive' } },
-        ],
+        OR: itinerary.areaId
+          ? [
+              { areaId: itinerary.areaId },
+              { area: { parentId: itinerary.areaId } },
+              { area: { parent: { parentId: itinerary.areaId } } },
+            ]
+          : [
+              { address: { contains: itinerary.destination || '', mode: 'insensitive' } },
+              { name: { contains: itinerary.destination || '', mode: 'insensitive' } },
+            ],
       },
       select: {
         name: true,
         category: { select: { nameVi: true, name: true } },
       },
-      take: 25,
+      take: COPILOT_CONSTANTS.GROUNDING_PLACES_LIMIT,
       orderBy: [{ ratingAvg: 'desc' }, { reviewCount: 'desc' }],
     });
 
     const systemInstruction = this.buildSystemInstruction({
-      destination: itinerary.destination || 'Việt Nam',
+      destination: itinerary.destination || COPILOT_CONSTANTS.DEFAULT_DESTINATION,
       destinations: itinerary.destinations,
       availablePlaces: destinationPlaces,
       sessionSummary: session.summary,
     });
-    const contents = this.buildGeminiContents(historyRows, userMessage);
+    const contents: GeminiContent[] = buildAlternatingGeminiContents(
+      historyRows,
+      cleanMessage,
+    );
 
-    // 5. Call Gemini Function Calling API
+    // 4. Call Gemini Function Calling API
     const modelPath = this.modelName.startsWith('models/')
       ? this.modelName
       : `models/${this.modelName}`;
-    const url = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${this.apiKey}`;
+    const url = `${this.baseUrl}/${modelPath}:generateContent?key=${this.apiKey}`;
 
     let agentReply = '';
     let appliedTool: CopilotChatResponse['appliedTool'] = undefined;
@@ -138,23 +254,34 @@ export class CopilotAgentService {
         },
         tools: [{ functionDeclarations: COPILOT_FUNCTION_DECLARATIONS }],
         generationConfig: {
-          temperature: 0.3,
+          temperature: COPILOT_CONSTANTS.TEMPERATURE,
         },
       });
 
-      const candidate = response.data?.candidates?.[0]?.content?.parts?.[0];
-      const functionCall = candidate?.functionCall;
+      const candidateParts: GeminiPart[] =
+        response.data?.candidates?.[0]?.content?.parts || [];
+      const functionCallPart = candidateParts.find(
+        (part) => part.functionCall && part.functionCall.name,
+      );
+      const functionCall = functionCallPart?.functionCall;
 
       if (functionCall) {
         // --- TOOL EXECUTION PATH ---
         const toolName = functionCall.name;
         const toolArgs = functionCall.args || {};
-        this.logger.log(`Gemini invoked tool: ${toolName} with args: ${JSON.stringify(toolArgs)}`);
+        this.logger.log(
+          `Gemini invoked tool: ${toolName} with args: ${JSON.stringify(toolArgs)}`,
+        );
 
         const isModifyingTool = toolName !== COPILOT_TOOL_NAMES.CHANGE_DESTINATION;
         const shouldDryRun = isModifyingTool && !autoApply;
 
-        const toolResult = await this.executeTool(itineraryId, toolName, toolArgs, shouldDryRun);
+        const toolResult = await this.executeTool(
+          itineraryId,
+          toolName,
+          toolArgs,
+          shouldDryRun,
+        );
         appliedTool = {
           name: toolName,
           args: toolArgs,
@@ -175,55 +302,91 @@ export class CopilotAgentService {
             dayNumber: toolResult.data?.dayNumber as number | undefined,
             fromPlaceId: toolResult.data?.oldPlaceId as string | undefined,
             fromPlaceName: toolResult.data?.oldPlaceName as string | undefined,
-            fromPlaceCoordinates: toolResult.data?.oldPlaceCoordinates as { latitude: number; longitude: number } | undefined,
-            toPlaceId: (toolResult.data?.newPlaceId || toolResult.data?.placeId) as string | undefined,
-            toPlaceName: (toolResult.data?.newPlaceName || toolResult.data?.placeName) as string | undefined,
+            fromPlaceCoordinates: toolResult.data?.oldPlaceCoordinates as
+              | { latitude: number; longitude: number }
+              | undefined,
+            toPlaceId: (toolResult.data?.newPlaceId || toolResult.data?.placeId) as
+              | string
+              | undefined,
+            toPlaceName: (toolResult.data?.newPlaceName || toolResult.data?.placeName) as
+              | string
+              | undefined,
             toPlaceRating: toolResult.data?.newPlaceRating as number | undefined,
             toPlaceCategory: toolResult.data?.newPlaceCategory as string | undefined,
-            toPlaceAddress: (toolResult.data?.newPlaceAddress || toolResult.data?.address) as string | undefined,
-            toPlaceCoordinates: toolResult.data?.newPlaceCoordinates as { latitude: number; longitude: number } | undefined,
-            swapDays: toolResult.data?.dayA && toolResult.data?.dayB
-              ? { dayA: toolResult.data.dayA as number, dayB: toolResult.data.dayB as number }
-              : undefined,
+            toPlaceAddress: (toolResult.data?.newPlaceAddress ||
+              toolResult.data?.address) as string | undefined,
+            toPlaceCoordinates: toolResult.data?.newPlaceCoordinates as
+              | { latitude: number; longitude: number }
+              | undefined,
+            swapDays:
+              toolResult.data?.dayA && toolResult.data?.dayB
+                ? {
+                    dayA: toolResult.data.dayA as number,
+                    dayB: toolResult.data.dayB as number,
+                  }
+                : undefined,
             args: (toolResult.data?.args || toolArgs) as Record<string, unknown>,
           };
         } else {
           modified = toolResult.success;
         }
 
-        // Try getting a natural response from LLM summarizing tool result
+        // Synthesize natural response from LLM by preserving candidateParts (thoughtSignature)
+        // and sending a spec-compliant functionResponse turn
         try {
           const secondResponse = await this.httpClient.post(url, {
             contents: [
               ...contents,
               {
                 role: 'model',
-                parts: [{ functionCall }],
+                parts: candidateParts,
               },
               {
                 role: 'user',
                 parts: [
                   {
-                    text: shouldDryRun
-                      ? `[HỆ THỐNG]: Đã lập phương án đề xuất: "${toolResult.message}". Hãy giải thích ngắn gọn, thân thiện lý do tại sao bạn đề xuất thay đổi này và mời người dùng bấm nút [Áp dụng vào lịch trình] ngay bên dưới.`
-                      : `[HỆ THỐNG]: Đã thực thi công cụ ${toolName}. Kết quả: "${toolResult.message}". Hãy phản hồi ngắn gọn, thân thiện và nhiệt tình cho người dùng về sự thay đổi này.`,
+                    functionResponse: {
+                      name: toolName,
+                      response: {
+                        status: toolResult.success ? 'SUCCESS' : 'FAILED',
+                        mode: shouldDryRun ? 'PROPOSAL_DRY_RUN' : 'APPLIED',
+                        resultMessage: toolResult.message,
+                        oldPlaceName: proposal?.fromPlaceName,
+                        proposedPlaceName: proposal?.toPlaceName,
+                        instruction: shouldDryRun
+                          ? `Đây mới là ĐỀ XUẤT (chưa áp dụng vào lịch trình). BẮT BUỘC nêu chính xác tên địa điểm đề xuất trong resultMessage ("${proposal?.toPlaceName || ''}"), tuyệt đối không tự gọi tên quán khác, và mời người dùng bấm nút [Áp dụng vào lịch trình] bên dưới.`
+                          : 'Đã thực thi thay đổi thành công. Hãy phản hồi ngắn gọn, thân thiện và nhiệt tình cho người dùng.',
+                      },
+                    },
                   },
                 ],
               },
             ],
             systemInstruction: { parts: [{ text: systemInstruction }] },
-            generationConfig: { temperature: 0.4 },
+            generationConfig: { temperature: COPILOT_CONSTANTS.SYNTHESIS_TEMPERATURE },
           });
+          const secondParts: GeminiPart[] =
+            secondResponse.data?.candidates?.[0]?.content?.parts || [];
           agentReply =
-            secondResponse.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() ||
-            toolResult.message;
-        } catch {
+            secondParts
+              .filter((p) => p.text)
+              .map((p) => p.text)
+              .join('\n')
+              .trim() || toolResult.message;
+        } catch (synthErr) {
+          this.logger.warn(
+            `Copilot second-turn synthesis fallback: ${(synthErr as Error).message}`,
+          );
           agentReply = toolResult.message;
         }
       } else {
         // --- DIRECT TEXT PATH (Q&A / Guardrails) ---
         agentReply =
-          candidate?.text?.trim() ||
+          candidateParts
+            .filter((p) => p.text)
+            .map((p) => p.text)
+            .join('\n')
+            .trim() ||
           'Genie đã ghi nhận yêu cầu của bạn. Bạn có muốn điều chỉnh thêm hoạt động nào nữa không?';
       }
     } catch (err) {
@@ -233,30 +396,38 @@ export class CopilotAgentService {
         'Genie hiện đang bận tối ưu hóa dữ liệu. Bạn hãy thử lại câu hỏi hoặc dùng nút ✨ Đổi điểm trực tiếp trên thẻ nhé!';
     }
 
-    // 6. Persist Agent response message
-    await this.prisma.aiChatMessage.create({
-      data: {
-        sessionId: session.id,
-        sender: 'AGENT',
-        content: agentReply,
-        toolCalls: appliedTool ? JSON.parse(JSON.stringify(appliedTool)) : undefined,
-        toolResults: proposal ? JSON.parse(JSON.stringify(proposal)) : undefined,
-      },
-    });
+    // 5. Atomically persist USER message, AGENT response, and session messageCount
+    await this.prisma.$transaction([
+      this.prisma.aiChatMessage.create({
+        data: {
+          sessionId: session.id,
+          sender: 'USER',
+          content: cleanMessage,
+        },
+      }),
+      this.prisma.aiChatMessage.create({
+        data: {
+          sessionId: session.id,
+          sender: 'AGENT',
+          content: agentReply,
+          toolCalls: appliedTool ? JSON.parse(JSON.stringify(appliedTool)) : undefined,
+          toolResults: proposal ? JSON.parse(JSON.stringify(proposal)) : undefined,
+        },
+      }),
+      this.prisma.aiChatSession.update({
+        where: { id: session.id },
+        data: { messageCount: { increment: 2 } },
+      }),
+    ]);
 
-    await this.prisma.aiChatSession.update({
-      where: { id: session.id },
-      data: { messageCount: { increment: 2 } },
-    });
-
-    // 6b. Dispatch background session summarization via BullMQ queue (or async fallback)
+    // 5b. Dispatch background session summarization via BullMQ queue (or async fallback)
     if (session.messageCount + 2 >= COPILOT_CONSTANTS.SUMMARIZATION_THRESHOLD) {
       this.enqueueSessionSummarization(session.id).catch((err) =>
         this.logger.warn(`Enqueue summarization error: ${(err as Error).message}`),
       );
     }
 
-    // 7. If modified, fetch the fresh updated itinerary detail
+    // 6. If modified, fetch the fresh updated itinerary detail
     let updatedItinerary: unknown = undefined;
     if (modified) {
       try {
@@ -280,9 +451,17 @@ export class CopilotAgentService {
   /**
    * Fetch chat history for an itinerary session.
    */
-  async getChatHistory(itineraryId: string, sessionId?: string): Promise<CopilotMessageHistoryItem[]> {
+  async getChatHistory(
+    itineraryId: string,
+    sessionId?: string,
+    userId?: string,
+  ): Promise<CopilotMessageHistoryItem[]> {
+    await this.plannerService.assertItineraryOwnership(itineraryId, userId);
+
     const session = sessionId
-      ? await this.prisma.aiChatSession.findFirst({ where: { id: sessionId, linkedItineraryId: itineraryId } })
+      ? await this.prisma.aiChatSession.findFirst({
+          where: { id: sessionId, linkedItineraryId: itineraryId },
+        })
       : await this.prisma.aiChatSession.findFirst({
           where: { linkedItineraryId: itineraryId },
           orderBy: { createdAt: 'desc' },
@@ -293,7 +472,7 @@ export class CopilotAgentService {
     const messages = await this.prisma.aiChatMessage.findMany({
       where: { sessionId: session.id },
       orderBy: { createdAt: 'asc' },
-      take: 30,
+      take: COPILOT_CONSTANTS.HISTORY_MESSAGES_LIMIT,
     });
 
     return messages.map((m) => {
@@ -319,16 +498,24 @@ export class CopilotAgentService {
     userId?: string,
     proposalId?: string,
   ): Promise<{ success: boolean; message: string; itinerary: unknown }> {
-    const toolResult = await this.executeTool(itineraryId, toolName, args, false /* dryRun = false */);
+    await this.plannerService.assertItineraryOwnership(itineraryId, userId);
+
+    const toolResult = await this.executeTool(
+      itineraryId,
+      toolName,
+      args,
+      false /* dryRun = false */,
+    );
     let itinerary: unknown = undefined;
     if (toolResult.success) {
       try {
         itinerary = await this.plannerService.getById(itineraryId, userId);
       } catch (err) {
-        this.logger.warn(`Could not refresh itinerary after proposal apply: ${(err as Error).message}`);
+        this.logger.warn(
+          `Could not refresh itinerary after proposal apply: ${(err as Error).message}`,
+        );
       }
 
-      // Mark proposal status as APPLIED if proposalId is given
       if (proposalId) {
         try {
           const matchingMessages = await this.prisma.aiChatMessage.findMany({
@@ -392,7 +579,6 @@ export class CopilotAgentService {
       );
     }
 
-    // Graceful fallback: direct in-process async summarization
     this.summarizeSession(sessionId).catch((err) =>
       this.logger.warn(`Direct background summarization error: ${(err as Error).message}`),
     );
@@ -400,8 +586,6 @@ export class CopilotAgentService {
 
   /**
    * Summarize older messages in a chat session using Batching (cycle of 8) and Delta extraction.
-   * Only messages outside the 8-message sliding window and accumulated since lastSummarizedMessageId
-   * are sent to Gemini, maintaining concise memory and minimizing API token usage.
    */
   async summarizeSession(sessionId: string): Promise<string | null> {
     const session = await this.prisma.aiChatSession.findUnique({
@@ -413,12 +597,10 @@ export class CopilotAgentService {
       where: { sessionId },
     });
 
-    // 1. Must reach the minimum threshold to begin summarizing
     if (totalMessages < COPILOT_CONSTANTS.SUMMARIZATION_THRESHOLD) {
       return session.summary;
     }
 
-    // 2. Messages outside the 8-message sliding window are eligible for summarization
     const countEligible = totalMessages - COPILOT_CONSTANTS.SLIDING_WINDOW_SIZE;
     if (countEligible <= 0) return session.summary;
 
@@ -431,7 +613,6 @@ export class CopilotAgentService {
 
     if (eligibleMessages.length === 0) return session.summary;
 
-    // 3. Find the index of the last summarized message to extract ONLY the unsummarized Delta
     const lastSummarizedIndex = session.lastSummarizedMessageId
       ? eligibleMessages.findIndex((m) => m.id === session.lastSummarizedMessageId)
       : -1;
@@ -439,9 +620,6 @@ export class CopilotAgentService {
     const deltaMessages = eligibleMessages.slice(lastSummarizedIndex + 1);
     const deltaCount = deltaMessages.length;
 
-    // 4. Batching check:
-    // - Initial summary: requires deltaCount > 0 (reached threshold)
-    // - Subsequent summaries: require at least SUMMARY_BATCH_SIZE (8) new unsummarized messages
     const meetsBatch =
       !session.lastSummarizedMessageId ||
       deltaCount >= COPILOT_CONSTANTS.SUMMARY_BATCH_SIZE;
@@ -465,17 +643,23 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
       const modelPath = this.modelName.startsWith('models/')
         ? this.modelName
         : `models/${this.modelName}`;
-      const url = `https://generativelanguage.googleapis.com/v1beta/${modelPath}:generateContent?key=${this.apiKey}`;
+      const url = `${this.baseUrl}/${modelPath}:generateContent?key=${this.apiKey}`;
 
       const res = await this.httpClient.post(url, {
         contents: [{ role: 'user', parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: 0.2,
+          temperature: COPILOT_CONSTANTS.SUMMARY_TEMPERATURE,
           maxOutputTokens: COPILOT_CONSTANTS.SUMMARY_MAX_TOKENS,
         },
       });
 
-      const newSummary = res.data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      const summaryParts: GeminiPart[] =
+        res.data?.candidates?.[0]?.content?.parts || [];
+      const newSummary = summaryParts
+        .filter((p) => p.text)
+        .map((p) => p.text)
+        .join('\n')
+        .trim();
       if (newSummary) {
         const lastMsg = deltaMessages[deltaMessages.length - 1];
         await this.prisma.aiChatSession.update({
@@ -496,26 +680,12 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
   }
 
   // ===========================================================================
-  // PRIVATE AGENT LOGIC
+  // PRIVATE AGENT LOGIC (OCP Dispatcher)
   // ===========================================================================
 
   private getProposalTitle(toolName: string, data?: Record<string, unknown>): string {
-    switch (toolName) {
-      case COPILOT_TOOL_NAMES.SWAP_ACTIVITY:
-        return data?.dayNumber ? `Đề xuất đổi địa điểm Ngày ${data.dayNumber}` : 'Đề xuất đổi địa điểm';
-      case COPILOT_TOOL_NAMES.SWAP_DAYS:
-        return data?.dayA && data?.dayB
-          ? `Đề xuất hoán đổi Ngày ${data.dayA} và Ngày ${data.dayB}`
-          : 'Đề xuất hoán đổi ngày';
-      case COPILOT_TOOL_NAMES.ADD_ACTIVITY:
-        return data?.dayNumber ? `Đề xuất thêm điểm Ngày ${data.dayNumber}` : 'Đề xuất thêm địa điểm';
-      case COPILOT_TOOL_NAMES.REMOVE_ACTIVITY:
-        return data?.dayNumber ? `Đề xuất xóa điểm Ngày ${data.dayNumber}` : 'Đề xuất xóa địa điểm';
-      case COPILOT_TOOL_NAMES.MOVE_ACTIVITY:
-        return `Đề xuất chuyển ngày hoạt động`;
-      default:
-        return 'Đề xuất thay đổi lịch trình';
-    }
+    const builder = PROPOSAL_TITLE_BUILDERS[toolName as CopilotToolName];
+    return builder ? builder(data) : 'Đề xuất thay đổi lịch trình';
   }
 
   private async executeTool(
@@ -524,74 +694,15 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
     args: Record<string, unknown>,
     dryRun: boolean = false,
   ): Promise<CopilotToolExecutionResult> {
-    switch (toolName) {
-      case COPILOT_TOOL_NAMES.CHANGE_DESTINATION: {
-        const dest = String(args.newDestination || 'điểm đến mới');
-        return {
-          toolName: COPILOT_TOOL_NAMES.CHANGE_DESTINATION,
-          success: false,
-          message: `Đổi sang ${dest} cần khởi tạo một lịch trình mới để tính toán lại điểm đến, thời gian và phương tiện di chuyển phù hợp. Bạn hãy bấm vào nút bên dưới để tạo lịch trình ${dest} mới nhé!`,
-          data: {
-            action: {
-              type: 'CREATE_NEW_TRIP',
-              destination: dest,
-            },
-          },
-        };
-      }
-
-      case COPILOT_TOOL_NAMES.SWAP_ACTIVITY:
-        return this.toolsService.swapActivity(itineraryId, {
-          dayNumber: Number(args.dayNumber || 1),
-          currentPlaceName: args.currentPlaceName ? String(args.currentPlaceName) : undefined,
-          mealOrActivityType: args.mealOrActivityType ? String(args.mealOrActivityType) : undefined,
-          query: String(args.query || 'địa điểm tương đương'),
-          destinationId: args.destinationId ? String(args.destinationId) : undefined,
-          newPlaceId: args.newPlaceId ? String(args.newPlaceId) : undefined,
-          dryRun,
-        });
-
-      case COPILOT_TOOL_NAMES.ADD_ACTIVITY:
-        return this.toolsService.addActivity(itineraryId, {
-          dayNumber: Number(args.dayNumber || 1),
-          timeSlot: args.timeSlot ? String(args.timeSlot) : undefined,
-          query: String(args.query || 'điểm tham quan'),
-          placeId: args.placeId ? String(args.placeId) : undefined,
-          dryRun,
-        });
-
-      case COPILOT_TOOL_NAMES.REMOVE_ACTIVITY:
-        return this.toolsService.removeActivity(itineraryId, {
-          dayNumber: Number(args.dayNumber || 1),
-          placeName: String(args.placeName || ''),
-          destinationId: args.destinationId ? String(args.destinationId) : undefined,
-          dryRun,
-        });
-
-      case COPILOT_TOOL_NAMES.MOVE_ACTIVITY:
-        return this.toolsService.moveActivity(itineraryId, {
-          placeName: String(args.placeName || ''),
-          fromDay: Number(args.fromDay || 1),
-          toDay: Number(args.toDay || 2),
-          targetTimeSlot: args.targetTimeSlot ? String(args.targetTimeSlot) : undefined,
-          destinationId: args.destinationId ? String(args.destinationId) : undefined,
-          dryRun,
-        });
-
-      case COPILOT_TOOL_NAMES.SWAP_DAYS:
-        return this.toolsService.swapDays(itineraryId, {
-          dayA: Number(args.dayA || 1),
-          dayB: Number(args.dayB || 2),
-          dryRun,
-        });
-
-      default:
-        return {
-          toolName,
-          success: false,
-          message: `Công cụ ${toolName} không được hỗ trợ.`,
-        };
+    const handler = this.toolHandlers[toolName as CopilotToolName];
+    if (!handler) {
+      return {
+        toolName,
+        success: false,
+        message: `Công cụ ${toolName} không được hỗ trợ.`,
+      };
     }
+    return handler(itineraryId, args, dryRun);
   }
 
   private async resolveSession(
@@ -613,18 +724,14 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
     });
     if (latest) return latest;
 
-    let effectiveUserId = userId || creatorId;
-    if (!effectiveUserId) {
-      const fallbackUser = await this.prisma.user.findFirst({ select: { id: true } });
-      effectiveUserId = fallbackUser?.id || '00000000-0000-0000-0000-000000000001';
-    }
+    const effectiveUserId = userId || creatorId;
 
     return this.prisma.aiChatSession.create({
       data: {
         userId: effectiveUserId,
         linkedItineraryId: itineraryId,
-        title: 'Trò chuyện cùng Genie Copilot',
-        contextCity: 'Việt Nam',
+        title: COPILOT_CONSTANTS.DEFAULT_SESSION_TITLE,
+        contextCity: COPILOT_CONSTANTS.DEFAULT_DESTINATION,
       },
     });
   }
@@ -635,7 +742,11 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
       dayNumber: number;
       startTime: Date | null;
       endTime: Date | null;
-      place: { name: string; address: string; category?: { nameVi?: string | null; name: string } | null };
+      place: {
+        name: string;
+        address: string;
+        category?: { nameVi?: string | null; name: string } | null;
+      };
     }>;
     availablePlaces?: Array<{
       name: string;
@@ -670,30 +781,30 @@ ${itinerary.sessionSummary ? `\nTHÔNG TIN ĐÃ GHI NHẬN TỪ TRƯỚC (BỘ N
 LỊCH TRÌNH HIỆN TẠI CỦA CHUYẾN ĐI:
 ${scheduleSummary || 'Chưa có hoạt động cụ thể.'}
 
-DANH SÁCH ĐỊA ĐIỂM CÓ SẴN TRONG CƠ SỞ DỮ LIỆU TẠI "${itinerary.destination}":
+MỘT SỐ ĐỊA ĐIỂM TIÊU BIỂU TẠI "${itinerary.destination}" (Hệ thống còn hơn 2.000 địa điểm khác trong DB, các công cụ sẽ tự tra cứu toàn bộ DB):
 ${availableSummary || 'Đang cập nhật'}
 
 QUY TẮC BẮT BUỘC (GUARDRAILS & NGUYÊN TẮC HÀNH XỬ):
 1. QUY TẮC GỢI Ý & ĐỔI ĐỊA ĐIỂM (GROUNDING RULES - CỰC KỲ QUAN TRỌNG):
-   - KHI NGƯỜI DÙNG HỎI GỢI Ý ĐỊA ĐIỂM THAY THẾ HOẶC HỎI CÒN CHỖ NÀO NỮA KHÔNG:
-     BẮT BUỘC CHỈ ĐƯỢC GỢI Ý các địa điểm CÓ TRONG "DANH SÁCH ĐỊA ĐIỂM CÓ SẴN" ở trên.
-     TUYỆT ĐỐI KHÔNG tự bịa hoặc tự ý gợi ý những địa điểm không có trong danh sách trên, vì nếu người dùng chọn điểm đó thì hệ thống sẽ không có dữ liệu để thêm vào lịch trình.
-   - KHI NGƯỜI DÙNG CHỌN HOẶC YÊU CẦU ĐỔI ĐỊA ĐIỂM (Ví dụ: "đổi thành hải sản năm đảnh", "chọn quán 1", "đổi quán trưa"):
-     BẮT BUỘC GỌI TOOL \`swap_activity\` với các tham số:
-     + \`currentPlaceName\`: Tên chính xác của địa điểm cũ đang cần thay thế đã đề cập trong cuộc trò chuyện (Ví dụ: nếu trước đó người dùng hỏi thay thế cho "Mì Quảng Bà Mua (Trần Bình Trọng)", BẮT BUỘC truyền "Mì Quảng Bà Mua (Trần Bình Trọng)").
-     + \`dayNumber\`: Tra cứu trong "LỊCH TRÌNH HIỆN TẠI CỦA CHUYẾN ĐI" ở trên xem địa điểm cũ đó nằm ở Ngày mấy (1, 2, 3...) và truyền đúng số ngày đó.
-     + \`query\`: Tên chính xác của địa điểm mới mà người dùng chọn (Ví dụ: "Hải Sản Năm Đảnh (Trần Quang Khải)").
+   - KHI NGƯỜI DÙNG HỎI GỢI Ý ĐỊA ĐIỂM THAY THẾ HOẶC HỎI CÒN CHỖ NÀO NỮA KHÔNG (chưa quyết định đổi):
+     Hãy ưu tiên gợi ý các địa điểm CÓ TRONG danh sách tiêu biểu ở trên.
+   - KHI NGƯỜI DÙNG YÊU CẦU ĐỔI HOẶC CHỌN ĐỊA ĐIỂM (Ví dụ: "đổi quán ăn trưa ngày 1 sang quán hải sản Bé Mặn", "chọn quán 1", "đổi quán trưa sang quán hải sản"):
+     BẮT BUỘC GỌI NGAY TOOL \`swap_activity\` (kể cả khi tên quán người dùng nêu không nằm trong danh sách rút gọn ở trên, vì công cụ \`swap_activity\` sẽ tự tìm trên toàn bộ cơ sở dữ liệu). TUYỆT ĐỐI KHÔNG tự ý từ chối đổi khi chưa gọi tool:
+     + \`currentPlaceName\`: Tên chính xác của địa điểm cũ đang cần thay thế trong lịch trình.
+     + \`dayNumber\`: Số thứ tự ngày của địa điểm cần đổi trong "LỊCH TRÌNH HIỆN TẠI CỦA CHUYẾN ĐI" (1, 2, 3...).
+     + \`query\`: Truyền đúng tên địa điểm hoặc thể loại mà người dùng vừa yêu cầu.
 2. RANH GIỚI VAI TRÒ (OFF-TOPIC GUARDRAIL):
    - Bạn CHỈ hỗ trợ các câu hỏi liên quan đến chuyến đi, lịch trình, ẩm thực, văn hóa, thời tiết, di chuyển tại "${itinerary.destination}".
    - NẾU người dùng hỏi các chủ đề ngoài lề (lập trình, giải bài tập, giải toán, chính trị, triết học...):
      Hãy TỪ CHỐI LỊCH THIỆP trong 1 câu ngắn gọn và KHÉO LÉO KÉO VỀ CHUYẾN ĐI.
      Ví dụ: "Genie là trợ lý du lịch chuyên trách cho chuyến đi ${itinerary.destination} nên không thể hỗ trợ viết code/giải toán được rồi! Quay lại lịch trình nhé: Bạn có muốn Genie gợi ý quán ăn tối hay tối ưu lại cung đường không?"
 3. ĐIỀU CHỈNH LỊCH TRÌNH (TOOL CALLING):
-   - Khi người dùng muốn đổi quán/đổi điểm $\\rightarrow$ GỌI TOOL \`swap_activity\`.
-   - Khi người dùng muốn thêm điểm mới $\\rightarrow$ GỌI TOOL \`add_activity\`.
-   - Khi người dùng muốn xóa điểm $\\rightarrow$ GỌI TOOL \`remove_activity\`.
-   - Khi người dùng muốn dời điểm sang ngày khác $\\rightarrow$ GỌI TOOL \`move_activity\`.
-   - Khi người dùng muốn đổi thứ tự giữa 2 ngày $\\rightarrow$ GỌI TOOL \`swap_days\`.
+   - Khi người dùng muốn đổi quán/đổi điểm -> GỌI TOOL \`swap_activity\`.
+   - Khi người dùng muốn thêm điểm mới -> GỌI TOOL \`add_activity\`.
+     + LƯU Ý KHI THÊM ĐIỂM ĐÃ CÓ: Nếu địa điểm người dùng muốn thêm ĐÃ CÓ MẶT trong "LỊCH TRÌNH HIỆN TẠI CỦA CHUYẾN ĐI" ở trên, trước tiên hãy hỏi lại 1 câu ngắn gọn xác nhận: Nêu rõ quán đó đã có ở Ngày mấy, và hỏi người dùng muốn DỜI LỊCH (sang ngày mới) hay thực sự muốn GHÉ LẠI LẦN NỮA. Chỉ gọi \`add_activity\` khi người dùng khẳng định muốn ghé lại lần nữa.
+   - Khi người dùng muốn xóa điểm -> GỌI TOOL \`remove_activity\`.
+   - Khi người dùng muốn dời điểm sang ngày khác -> GỌI TOOL \`move_activity\`.
+   - Khi người dùng muốn đổi thứ tự giữa 2 ngày -> GỌI TOOL \`swap_days\`.
    - TUYỆT ĐỐI KHÔNG tự nói rằng bạn đã sửa lịch trình nếu bạn chưa gọi Function Tool tương ứng.
 4. YÊU CẦU MƠ HỒ (CLARIFICATION):
    - Nếu người dùng nói "Đổi quán ăn đi" mà không rõ bữa trưa hay tối ngày nào, hãy hỏi lại 1 câu ngắn để xác nhận.
@@ -701,27 +812,5 @@ QUY TẮC BẮT BUỘC (GUARDRAILS & NGUYÊN TẮC HÀNH XỬ):
    - Nếu người dùng muốn đổi sang tỉnh thành khác (ví dụ từ ${itinerary.destination} sang Phú Quốc), hãy giải thích rằng cần tạo chuyến đi mới để tính toán lại toàn bộ phương tiện và địa danh.
 6. PHONG CÁCH:
    - Nói tiếng Việt tự nhiên, ngắn gọn, nhiệt tình và thực tế.`;
-  }
-
-  private buildGeminiContents(
-    history: Array<{ sender: string; content: string | null }>,
-    currentMessage: string,
-  ) {
-    const contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = [];
-
-    for (const h of history) {
-      if (!h.content) continue;
-      contents.push({
-        role: h.sender === 'USER' ? 'user' : 'model',
-        parts: [{ text: h.content }],
-      });
-    }
-
-    contents.push({
-      role: 'user',
-      parts: [{ text: currentMessage }],
-    });
-
-    return contents;
   }
 }

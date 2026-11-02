@@ -166,6 +166,13 @@ export function estimateDurationMinutes(
 }
 
 /**
+ * In-memory LRU route cache to prevent redundant OSRM network requests
+ * when switching between day tabs or switching to "All days" view.
+ */
+const routeCache = new Map<string, RouteResult>();
+const MAX_ROUTE_CACHE_SIZE = 100;
+
+/**
  * Gọi API OSRM để lấy tuyến đường nhiều chặng (GeoJSON) theo phương tiện
  */
 export async function fetchMultiStopRoute(
@@ -183,6 +190,12 @@ export async function fetchMultiStopRoute(
   const coordsString = points
     .map((p) => `${p.longitude},${p.latitude}`)
     .join(";");
+
+  const cacheKey = `${profile}:${coordsString}`;
+  if (routeCache.has(cacheKey)) {
+    return routeCache.get(cacheKey)!;
+  }
+
   const url = `https://router.project-osrm.org/route/v1/${profile}/${coordsString}?overview=full&geometries=geojson`;
 
   try {
@@ -209,7 +222,7 @@ export async function fetchMultiStopRoute(
       durationMinutes: computeRealisticDurationMinutes(leg.distance / 1000, mode),
     }));
 
-    return {
+    const result: RouteResult = {
       distanceKm,
       durationMinutes,
       geometry: primaryRoute.geometry as GeoJSON.LineString,
@@ -219,6 +232,14 @@ export async function fetchMultiStopRoute(
       waypoints: points,
       legs,
     };
+
+    if (routeCache.size >= MAX_ROUTE_CACHE_SIZE) {
+      const oldestKey = routeCache.keys().next().value;
+      if (oldestKey) routeCache.delete(oldestKey);
+    }
+    routeCache.set(cacheKey, result);
+
+    return result;
   } catch (err) {
     console.warn("OSRM routing unavailable or timed out, generating geometric fallback route:", err);
 
@@ -229,7 +250,7 @@ export async function fetchMultiStopRoute(
     }
     const durationMin = computeRealisticDurationMinutes(totalEstimatedKm, mode);
 
-    return {
+    const fallbackResult: RouteResult = {
       distanceKm: totalEstimatedKm,
       durationMinutes: durationMin,
       geometry: {
@@ -242,6 +263,14 @@ export async function fetchMultiStopRoute(
       waypoints: points,
       fallback: true,
     };
+
+    if (routeCache.size >= MAX_ROUTE_CACHE_SIZE) {
+      const oldestKey = routeCache.keys().next().value;
+      if (oldestKey) routeCache.delete(oldestKey);
+    }
+    routeCache.set(cacheKey, fallbackResult);
+
+    return fallbackResult;
   }
 }
 

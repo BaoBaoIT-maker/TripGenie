@@ -14,6 +14,7 @@ import { ItinerariesModule } from './modules/itineraries/itineraries.module';
 import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { AdvisorModule } from './modules/advisor/advisor.module';
 import { CollectionsModule } from './modules/collections/collections.module';
+import { CommunityModule } from './modules/community/community.module';
 import { appConfig, databaseConfig, jwtConfig, redisConfig, aiConfig, crawlerConfig } from './config';
 import { envValidationSchema } from './config/env.validation';
 
@@ -66,6 +67,7 @@ import { envValidationSchema } from './config/env.validation';
     KnowledgeModule,
     AdvisorModule,
     CollectionsModule,
+    CommunityModule,
   ],
   controllers: [AppController],
   providers: [AppService],

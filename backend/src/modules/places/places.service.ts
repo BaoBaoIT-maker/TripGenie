@@ -135,7 +135,6 @@ export class PlacesService {
       id: row.id,
       name: row.name,
       address: row.address,
-      addressNormalized: row.address_normalized || row.address,
       latitude: Number(row.latitude),
       longitude: Number(row.longitude),
       ratingAvg: row.rating_avg ? Number(row.rating_avg) : null,
@@ -206,7 +205,7 @@ export class PlacesService {
       try {
         const categoryName = place.category?.nameVi || place.category?.name || '';
         const areaName = place.area?.nameVi || place.area?.name || '';
-        const address = place.addressNormalized || place.address || '';
+        const address = place.address || '';
         const tags = Array.isArray(place.tags) && place.tags.length > 0 ? `Đặc trưng: ${place.tags.join(', ')}.` : '';
         const desc = place.description ? `Mô tả: ${place.description}.` : '';
         const areaPart = areaName ? `Khu vực: ${areaName}.` : '';
@@ -249,7 +248,6 @@ export class PlacesService {
       name: place.name,
       description: place.description,
       address: place.address,
-      address_normalized: place.addressNormalized,
       district: null,
       city: place.area?.nameVi || place.area?.name || null,
       latitude: Number(place.latitude),

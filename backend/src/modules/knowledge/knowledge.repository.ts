@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import {
   EmbeddedChunkData,
@@ -13,14 +13,11 @@ export interface IKnowledgeRepository {
     id: string;
     title: string;
     content: string;
-    isProcessed: boolean;
-    chunkCount: number;
   } | null>;
 
   upsertDocumentWithChunks(
     docData: UpsertKnowledgeDocumentData,
     chunks: EmbeddedChunkData[],
-    modelName: string,
   ): Promise<{ id: string; title: string; chunkCount: number }>;
 
   searchSimilarChunks(
@@ -33,20 +30,12 @@ export interface IKnowledgeRepository {
 
 @Injectable()
 export class KnowledgeRepository implements IKnowledgeRepository {
-  private readonly logger = new Logger(KnowledgeRepository.name);
-
   constructor(private readonly prisma: PrismaService) {}
 
   async findDocumentBySourceUrl(sourceUrl: string) {
     return this.prisma.knowledgeDocument.findFirst({
       where: { sourceUrl },
-      select: {
-        id: true,
-        title: true,
-        content: true,
-        isProcessed: true,
-        chunkCount: true,
-      },
+      select: { id: true, title: true, content: true },
     });
   }
 
@@ -58,10 +47,13 @@ export class KnowledgeRepository implements IKnowledgeRepository {
     return area?.id ?? null;
   }
 
+  /**
+   * Atomic: document row (with its raw content) and all chunks commit together,
+   * so a stored document always has a complete chunk set (no separate "processed" flag needed).
+   */
   async upsertDocumentWithChunks(
     docData: UpsertKnowledgeDocumentData,
     chunks: EmbeddedChunkData[],
-    modelName: string,
   ): Promise<{ id: string; title: string; chunkCount: number }> {
     return this.prisma.$transaction(async (tx) => {
       const existing = await tx.knowledgeDocument.findFirst({
@@ -77,32 +69,19 @@ export class KnowledgeRepository implements IKnowledgeRepository {
           where: { id: docId },
           data: {
             title: docData.title,
-            sourceType: docData.sourceType,
             content: docData.content,
-            language: docData.language,
             areaId: docData.areaId,
-            categoryTags: docData.categoryTags,
-            isProcessed: true,
-            chunkCount: docData.chunkCount,
-            processedAt: new Date(),
           },
         });
 
-        // Cascade delete ensures chunks are cleaned up cleanly
         await tx.$executeRaw`DELETE FROM knowledge_chunks WHERE document_id = ${docId}::uuid;`;
       } else {
         const created = await tx.knowledgeDocument.create({
           data: {
             title: docData.title,
-            sourceType: docData.sourceType,
             sourceUrl: docData.sourceUrl,
             content: docData.content,
-            language: docData.language,
             areaId: docData.areaId,
-            categoryTags: docData.categoryTags,
-            isProcessed: true,
-            chunkCount: docData.chunkCount,
-            processedAt: new Date(),
           },
         });
         docId = created.id;
@@ -111,18 +90,16 @@ export class KnowledgeRepository implements IKnowledgeRepository {
       // Insert embedded chunks using raw SQL for Unsupported("vector(1536)")
       for (const item of chunks) {
         const vectorString = `[${item.vector.join(',')}]`;
-        const metadataJson = JSON.stringify(item.metadata);
 
         await tx.$executeRaw`
           INSERT INTO knowledge_chunks (
-            document_id, chunk_index, content, embedding, model_name, metadata, created_at
+            document_id, chunk_index, content, embedding, breadcrumbs, created_at
           ) VALUES (
             ${docId}::uuid,
             ${item.index},
             ${item.content},
             ${vectorString}::vector,
-            ${modelName},
-            ${metadataJson}::jsonb,
+            ${item.breadcrumbs},
             NOW()
           );
         `;
@@ -163,10 +140,8 @@ export class KnowledgeRepository implements IKnowledgeRepository {
         c.document_id,
         c.chunk_index,
         c.content,
-        c.metadata,
+        c.breadcrumbs,
         d.title AS document_title,
-        d.source_type,
-        d.source_url,
         d.area_id,
         ROUND((1 - (c.embedding <=> $1::vector))::numeric, 4) AS similarity_score
       FROM knowledge_chunks c

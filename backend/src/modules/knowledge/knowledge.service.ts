@@ -8,7 +8,6 @@ import {
   IngestionResult,
   KNOWLEDGE_CONSTANTS,
   KnowledgeSearchResult,
-  KnowledgeSourceType,
   SearchChunksOptions,
 } from './knowledge.constants';
 import { IKnowledgeRepository } from './knowledge.repository';
@@ -82,17 +81,12 @@ export class KnowledgeService {
       relativeSourceUrl,
     );
 
-    if (
-      existingDoc &&
-      existingDoc.content === rawContent &&
-      existingDoc.isProcessed
-    ) {
-      this.logger.log(`[SKIP] Unchanged: ${filename} (${existingDoc.chunkCount} chunks)`);
+    if (existingDoc && existingDoc.content === rawContent) {
+      this.logger.log(`[SKIP] Unchanged: ${filename}`);
       return {
         filename,
         status: 'skipped',
         title: existingDoc.title,
-        chunkCount: existingDoc.chunkCount,
       };
     }
 
@@ -105,10 +99,7 @@ export class KnowledgeService {
     }
 
     // 3. Semantic Heading Chunking (Pure utility)
-    const chunks = createSemanticChunks(frontmatter.title, body, {
-      categoryTags: frontmatter.category_tags || [],
-      areaSlug: frontmatter.area_slug,
-    });
+    const chunks = createSemanticChunks(frontmatter.title, body);
 
     if (chunks.length === 0) {
       throw new Error(`Document ${filename} produced 0 chunks.`);
@@ -124,7 +115,7 @@ export class KnowledgeService {
       embeddedChunks.push({
         index: i,
         content: chunk.content,
-        metadata: chunk.metadata,
+        breadcrumbs: chunk.breadcrumbs,
         vector,
       });
 
@@ -135,20 +126,14 @@ export class KnowledgeService {
     }
 
     // 5. Delegate persistence to Repository (DIP Principle)
-    const modelName = this.embeddingService.getModelName();
     const savedDoc = await this.knowledgeRepo.upsertDocumentWithChunks(
       {
         title: frontmatter.title,
-        sourceType: frontmatter.source_type || KnowledgeSourceType.CURATED_GUIDE,
         sourceUrl: relativeSourceUrl,
         content: rawContent,
-        language: frontmatter.language || KNOWLEDGE_CONSTANTS.DEFAULT_LANGUAGE,
         areaId,
-        categoryTags: frontmatter.category_tags || [],
-        chunkCount: embeddedChunks.length,
       },
       embeddedChunks,
-      modelName,
     );
 
     this.logger.log(`[SUCCESS] Ingested ${filename} -> ${savedDoc.chunkCount} chunks saved.`);

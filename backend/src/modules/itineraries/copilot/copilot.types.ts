@@ -127,6 +127,35 @@ export const COPILOT_CONSTANTS = {
   SUMMARIZATION_THRESHOLD: 12,
   SUMMARY_BATCH_SIZE: 8,
   SUMMARY_MAX_TOKENS: 250,
+  API_TIMEOUT_MS: 60000,
+  TEMPERATURE: 0.3,
+  SYNTHESIS_TEMPERATURE: 0.4,
+  SUMMARY_TEMPERATURE: 0.2,
+  GEMINI_BASE_URL: 'https://generativelanguage.googleapis.com/v1beta',
+  DEFAULT_MODEL: 'gemini-flash-lite-latest',
+  GROUNDING_PLACES_LIMIT: 25,
+  HISTORY_MESSAGES_LIMIT: 30,
+  DEFAULT_ALTERNATIVES_LIMIT: 4,
+  DEFAULT_BOUNDING_RADIUS_KM: 45,
+  EARTH_RADIUS_KM: 6371,
+  DEFAULT_CENTER_LAT: 16.0544,
+  DEFAULT_CENTER_LNG: 108.2022,
+  CANDIDATE_POOL_SIZE: 20,
+  KEYWORD_MATCH_WEIGHT: 10,
+  CATEGORY_AFFINITY_WEIGHT: 5,
+  SWAP_TEMP_DAY_NUMBER: 9999,
+  DEFAULT_DURATION_MINUTES: 90,
+  DEFAULT_RATING_FALLBACK: 4.7,
+  GUEST_FALLBACK_USER_ID: '00000000-0000-0000-0000-000000000001',
+  DEFAULT_SESSION_TITLE: 'Trò chuyện cùng Genie Copilot',
+  DEFAULT_DESTINATION: 'Việt Nam',
+  TIME_SLOTS: {
+    MORNING: { start: '08:30', end: '10:00' },
+    LUNCH: { start: '11:30', end: '13:00' },
+    AFTERNOON: { start: '16:00', end: '17:30' },
+    DINNER: { start: '18:30', end: '20:00' },
+    NIGHT: { start: '20:30', end: '22:30' },
+  },
 } as const;
 
 export const COPILOT_SUMMARY_QUEUE = 'copilot-summary';
@@ -183,7 +212,12 @@ export const COPILOT_FUNCTION_DECLARATIONS = [
         query: {
           type: 'STRING',
           description:
-            'Tên hoặc thể loại địa điểm mới người dùng muốn đổi sang (ví dụ: "Hải Sản Năm Đảnh (Trần Quang Khải)", "quán hải sản").',
+            'Tên riêng hoặc từ khóa cốt lõi của địa điểm mới muốn đổi sang (bỏ các từ đệm như "đổi sang", "quán", "nhà hàng"; ví dụ: "Hải Sản Bé Mặn", "hải sản").',
+        },
+        categorySlug: {
+          type: 'STRING',
+          description:
+            'Slug danh mục của địa điểm mới (nếu xác định được): "nha-hang", "ca-phe", "an-vat-via-he", "bar-pub", "diem-tham-quan", "di-tich-lich-su", "thien-nhien", "vui-choi", "cho-sieu-thi", "khach-san", "homestay", "spa".',
         },
       },
       required: ['query'],
@@ -206,7 +240,12 @@ export const COPILOT_FUNCTION_DECLARATIONS = [
         },
         query: {
           type: 'STRING',
-          description: 'Tên hoặc thể loại địa điểm muốn thêm (ví dụ: "quán bar chill nhạc acoustic", "tiệm bánh mì đặc sản").',
+          description: 'Tên riêng hoặc từ khóa cốt lõi của địa điểm muốn thêm (bỏ các từ đệm như "thêm", "quán", "tiệm").',
+        },
+        categorySlug: {
+          type: 'STRING',
+          description:
+            'Slug danh mục của địa điểm muốn thêm (nếu xác định được): "nha-hang", "ca-phe", "an-vat-via-he", "bar-pub", "diem-tham-quan", "di-tich-lich-su", "thien-nhien", "vui-choi", "cho-sieu-thi", "khach-san", "homestay", "spa".',
         },
       },
       required: ['dayNumber', 'query'],

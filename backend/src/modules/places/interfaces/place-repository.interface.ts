@@ -10,7 +10,6 @@ export interface PlaceRow {
   name: string;
   description?: string | null;
   address: string;
-  address_normalized?: string | null;
   district?: string | null;
   city?: string | null;
   latitude: Numeric;

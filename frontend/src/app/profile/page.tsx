@@ -15,12 +15,14 @@ import {
   MapPin,
   Loader2,
   Check,
+  ExternalLink,
+  LogIn,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { PlannerCard } from "@/components/planner/PlannerCard";
 import { PlaceCard } from "@/components/place/PlaceCard";
-import { usePlannersQuery } from "@/features/planner/hooks/use-planner";
+import { useItinerariesListQuery } from "@/features/planner/hooks/use-itinerary-planner";
+import { formatVnd } from "@/features/planner/model/itinerary-format";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { AccountSecuritySection } from "@/features/auth/components/AccountSecuritySection";
 import { mapBackendPlaceToPlace } from "@/services/place.service";
@@ -69,7 +71,7 @@ const BUDGET_LEVELS: { id: BudgetLevel; label: string; desc: string }[] = [
 ];
 
 function ProfileContent() {
-  const { user } = useAuth();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
 
@@ -134,16 +136,8 @@ function ProfileContent() {
     });
   };
 
-  // Real Planners
-  const { data: planners = [] } = usePlannersQuery();
-  const myPlanners = useMemo(() => {
-    return planners.filter(
-      (p) =>
-        p.members?.some((m) => m.userId === user?.id) ||
-        p.authorName?.includes(user?.fullName || "") ||
-        !p.authorName?.includes("AI")
-    );
-  }, [planners, user]);
+  // Real Database Itineraries for the logged-in user (strictly filtered by creatorId on backend)
+  const { data: myItineraries = [], isLoading: isItinLoading } = useItinerariesListQuery();
 
   // Real Collections & Saved Places
   const { data: collections = [] } = useCollections();
@@ -156,6 +150,30 @@ function ProfileContent() {
   );
 
   const savedPlaceCount = favoriteCollection?._count?.places ?? 0;
+
+  if (!isAuthLoading && !user) {
+    return (
+      <div className="max-w-2xl mx-auto w-full px-4 py-16 text-center space-y-5">
+        <div className="rounded-3xl border border-border bg-card p-10 space-y-4 shadow-xs">
+          <ShieldCheck className="size-12 mx-auto text-primary" />
+          <h1 className="text-2xl font-bold font-heading text-foreground">
+            Vui lòng đăng nhập để xem Hồ sơ cá nhân
+          </h1>
+          <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
+            Đăng nhập để quản lý các lịch trình du lịch AI của riêng bạn, bộ sưu tập địa điểm đã lưu và cá nhân hóa sở thích du lịch.
+          </p>
+          <div className="pt-2">
+            <Link href="/login">
+              <Button className="rounded-xl font-semibold gap-2 px-6">
+                <LogIn className="size-4" />
+                <span>Đăng nhập ngay</span>
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-[1400px] mx-auto w-full px-4 py-8 sm:px-6 lg:px-8 xl:px-10 space-y-8 pb-16">
@@ -183,15 +201,29 @@ function ProfileContent() {
             <h1 className="text-2xl sm:text-3xl font-bold font-heading text-foreground">
               {user?.fullName || "Khách du lịch TripGenie"}
             </h1>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setActiveTab("account")}
-              className="text-xs rounded-xl self-center sm:self-auto gap-1.5"
-            >
-              <Settings className="size-3.5" />
-              <span>Chỉnh sửa hồ sơ</span>
-            </Button>
+            <div className="flex items-center justify-center sm:justify-end gap-2">
+              {user?.id && (
+                <Link href={`/community/profile/${encodeURIComponent(user.id)}`}>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-xs rounded-xl gap-1.5 cursor-pointer"
+                  >
+                    <ExternalLink className="size-3.5" />
+                    <span>Xem trang Cộng đồng</span>
+                  </Button>
+                </Link>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setActiveTab("account")}
+                className="text-xs rounded-xl gap-1.5 cursor-pointer"
+              >
+                <Settings className="size-3.5" />
+                <span>Chỉnh sửa hồ sơ</span>
+              </Button>
+            </div>
           </div>
 
           <p className="text-xs sm:text-sm text-muted-foreground max-w-xl">
@@ -212,7 +244,7 @@ function ProfileContent() {
               }`}
             >
               <CalendarDays className="size-3.5" />
-              <span>{myPlanners.length} Lịch trình đã tạo</span>
+              <span>{myItineraries.length} Lịch trình của tôi</span>
             </button>
             <span>•</span>
             <button
@@ -241,7 +273,7 @@ function ProfileContent() {
           }`}
         >
           <CalendarDays className="size-4" />
-          <span>Lịch trình của tôi ({myPlanners.length})</span>
+          <span>Lịch trình của tôi ({myItineraries.length})</span>
         </button>
 
         <button
@@ -287,7 +319,7 @@ function ProfileContent() {
       {/* Tab: Account & Security */}
       {activeTab === "account" && <AccountSecuritySection />}
 
-      {/* Tab 1: Planners List */}
+      {/* Tab 1: Real User Itineraries List */}
       {activeTab === "planners" && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
@@ -296,26 +328,32 @@ function ProfileContent() {
                 Lịch trình chuyến đi của bạn
               </h2>
               <p className="text-xs text-muted-foreground">
-                Các chuyến đi bạn đã lên kế hoạch hoặc tạo bằng AI.
+                Các chuyến đi thực tế do bạn tạo bằng AI hoặc nhân bản từ Cộng đồng.
               </p>
             </div>
-            <Link href="/planner/new">
-              <Button size="sm" className="rounded-xl font-semibold gap-1.5 text-xs">
+            <Link href="/planner">
+              <Button size="sm" className="rounded-xl font-semibold gap-1.5 text-xs cursor-pointer">
                 <Plus className="size-3.5" />
                 <span>Tạo lịch trình mới</span>
               </Button>
             </Link>
           </div>
 
-          {myPlanners.length === 0 ? (
+          {isItinLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="h-52 rounded-2xl bg-muted animate-pulse" />
+              ))}
+            </div>
+          ) : myItineraries.length === 0 ? (
             <div className="rounded-3xl border border-dashed border-border/80 bg-muted/20 p-12 text-center space-y-3">
               <CalendarDays className="size-10 mx-auto text-muted-foreground/50" />
               <p className="text-sm font-semibold text-foreground">Bạn chưa có lịch trình nào</p>
               <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                Bắt đầu chuyến đi mới với sự hỗ trợ của AI hoặc tự thiết kế lịch trình theo ý bạn.
+                Bắt đầu chuyến đi mới với sự hỗ trợ của AI hoặc khám phá Cộng đồng để nhân bản lịch trình yêu thích.
               </p>
-              <Link href="/planner/new">
-                <Button size="sm" className="rounded-xl font-semibold gap-1.5 text-xs">
+              <Link href="/planner">
+                <Button size="sm" className="rounded-xl font-semibold gap-1.5 text-xs cursor-pointer">
                   <Plus className="size-3.5" />
                   <span>Tạo ngay</span>
                 </Button>
@@ -323,9 +361,53 @@ function ProfileContent() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {myPlanners.map((p) => (
-                <PlannerCard key={p.id} planner={p} editHref={`/planner/${p.id}/edit`} />
-              ))}
+              {myItineraries.map((itin) => {
+                const totalPlaces =
+                  itin.days?.reduce((acc, d) => acc + (d.activities?.length || 0), 0) || 0;
+                const budgetText = itin.budgetBreakdown?.totalEstimated
+                  ? formatVnd(itin.budgetBreakdown.totalEstimated)
+                  : null;
+                return (
+                  <Link
+                    key={itin.id}
+                    href={`/itineraries/${itin.id}`}
+                    className="group rounded-2xl border border-border/80 bg-card p-5 flex flex-col justify-between space-y-4 shadow-xs hover:border-primary/50 transition-all"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondary text-secondary-foreground text-xs font-semibold">
+                          <MapPin className="size-3 text-primary" />
+                          <span>{itin.destination || "Việt Nam"}</span>
+                        </span>
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {itin.totalDays || itin.days?.length || 1} ngày • {totalPlaces} điểm
+                        </span>
+                      </div>
+
+                      <h3 className="text-base font-bold font-heading text-foreground group-hover:text-primary transition-colors line-clamp-2">
+                        {itin.title}
+                      </h3>
+
+                      {itin.startDate && (
+                        <p className="text-xs text-muted-foreground">
+                          Khởi hành: {itin.startDate}
+                          {itin.endDate ? ` – ${itin.endDate}` : ""}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-3 border-t border-border/60 text-xs">
+                      <span className="text-muted-foreground">
+                        {budgetText ? `~${budgetText}` : "Chi phí linh hoạt"}
+                      </span>
+                      <span className="font-semibold text-primary inline-flex items-center gap-1">
+                        <span>Xem chi tiết</span>
+                        <ExternalLink className="size-3" />
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>
@@ -377,7 +459,9 @@ function ProfileContent() {
           ) : favDetail?.places && favDetail.places.length > 0 ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {favDetail.places.map((item) => {
-                const place = mapBackendPlaceToPlace(item.place as any);
+                const place = mapBackendPlaceToPlace(
+                  item.place as Parameters<typeof mapBackendPlaceToPlace>[0]
+                );
                 return <PlaceCard key={place.id} place={place} />;
               })}
             </div>

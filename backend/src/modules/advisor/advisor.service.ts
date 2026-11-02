@@ -4,11 +4,17 @@ import {
   Logger,
   NotFoundException,
   Optional,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import axios, { AxiosInstance } from 'axios';
 import { PrismaService } from '../../database/prisma.service';
+import {
+  buildAlternatingGeminiContents,
+  GeminiContent,
+  GeminiPart,
+} from '../../common/utils/gemini-contents.util';
 import { CopilotAgentService } from '../itineraries/copilot/copilot-agent.service';
 import { AdvisorToolsService } from './advisor-tools.service';
 import {
@@ -21,38 +27,18 @@ import {
 import {
   AdvisorChatDto,
   AdvisorChatResponse,
-  AdvisorCitation,
   AdvisorMessageHistoryItem,
   AdvisorPlaceSummary,
   AdvisorSessionSummary,
 } from './advisor.types';
 
-interface GeminiPart {
-  text?: string;
-  functionCall?: {
-    name: string;
-    args?: Record<string, unknown>;
-  };
-  functionResponse?: {
-    name: string;
-    response: Record<string, unknown>;
-  };
-}
-
-interface GeminiContent {
-  role: 'user' | 'model';
-  parts: GeminiPart[];
-}
-
 interface PersistedAdvisorMetadata {
   places?: AdvisorPlaceSummary[];
-  citations?: AdvisorCitation[];
 }
 
 interface CachedAdvisorAnswer {
   reply: string;
   places: AdvisorPlaceSummary[];
-  citations: AdvisorCitation[];
   expiresAt: number;
 }
 
@@ -103,32 +89,22 @@ export class AdvisorService {
       dto.sessionId,
     );
 
-    // 1. Load sliding-window history before persisting the new user message
-    const recentRows = await this.prisma.aiChatMessage.findMany({
-      where: { sessionId: session.id },
-      orderBy: { createdAt: 'desc' },
-      take: ADVISOR_CONSTANTS.SLIDING_WINDOW_SIZE,
-    });
-    const historyRows = recentRows.reverse();
-
-    // 2. Persist incoming user message
-    await this.prisma.aiChatMessage.create({
-      data: {
-        sessionId: session.id,
-        sender: 'USER',
-        content: cleanMessage,
-      },
-    });
-
     if (!this.apiKey) {
       this.logger.warn('GEMINI_API_KEY is missing in AdvisorService.');
       return {
         sessionId: session.id,
         reply: ADVISOR_FALLBACK_MESSAGES.MISSING_API_KEY,
         places: [],
-        citations: [],
       };
     }
+
+    // 1. Load sliding-window history before executing the turn
+    const recentRows = await this.prisma.aiChatMessage.findMany({
+      where: { sessionId: session.id },
+      orderBy: { createdAt: 'desc' },
+      take: ADVISOR_CONSTANTS.SLIDING_WINDOW_SIZE,
+    });
+    const historyRows = recentRows.reverse();
 
     const isInitialTurn = historyRows.length === 0 && !session.summary;
     const cachedHit = isInitialTurn
@@ -137,7 +113,6 @@ export class AdvisorService {
 
     let finalReply = '';
     let places: AdvisorPlaceSummary[] = [];
-    let citations: AdvisorCitation[] = [];
     const executedToolCalls: Array<{
       name: string;
       args: Record<string, unknown>;
@@ -149,9 +124,8 @@ export class AdvisorService {
       );
       finalReply = cachedHit.reply;
       places = cachedHit.places;
-      citations = cachedHit.citations;
     } else {
-      // 3. Build temporal-anchored System Prompt (with long-term session.summary) & conversation contents
+      // 2. Build temporal-anchored System Prompt (with long-term session.summary) & conversation contents
       const { currentDate, dayOfWeek } = getFormattedCurrentTemporalContext();
       const systemInstruction = getAdvisorSystemPrompt(
         currentDate,
@@ -169,7 +143,6 @@ export class AdvisorService {
       const url = `${this.baseUrl}/${modelPath}:generateContent?key=${this.apiKey}`;
 
       const collectedPlacesMap = new Map<string, AdvisorPlaceSummary>();
-      const collectedCitationsMap = new Map<string, AdvisorCitation>();
       let turnCount = 0;
       let hadNetworkError = false;
 
@@ -201,7 +174,7 @@ export class AdvisorService {
             break;
           }
 
-          // Append the model's functionCall request turn to contents
+          // Append the model's functionCall request turn to contents (preserving thoughtSignature)
           contents.push({
             role: 'model',
             parts: candidateParts,
@@ -230,12 +203,6 @@ export class AdvisorService {
 
             for (const place of outcome.discoveredPlaces) {
               collectedPlacesMap.set(place.id, place);
-            }
-            for (const citation of outcome.discoveredCitations) {
-              const key = `${citation.documentTitle}::${citation.breadcrumbs}`;
-              if (!collectedCitationsMap.has(key)) {
-                collectedCitationsMap.set(key, citation);
-              }
             }
 
             functionResponseParts.push({
@@ -294,13 +261,11 @@ export class AdvisorService {
       }
 
       places = Array.from(collectedPlacesMap.values());
-      citations = Array.from(collectedCitationsMap.values());
 
       if (isInitialTurn && !hadNetworkError && finalReply) {
         this.setCachedInitialAnswer(cleanMessage, {
           reply: finalReply,
           places,
-          citations,
           expiresAt: Date.now() + ADVISOR_CONSTANTS.LRU_CACHE_TTL_MS,
         });
       }
@@ -308,39 +273,46 @@ export class AdvisorService {
 
     const metadataPayload: PersistedAdvisorMetadata = {
       places: places.length > 0 ? places : undefined,
-      citations: citations.length > 0 ? citations : undefined,
     };
 
-    // 4. Persist Agent response with discovered places & citations metadata (Single DRY exit path)
-    await this.prisma.aiChatMessage.create({
-      data: {
-        sessionId: session.id,
-        sender: 'AGENT',
-        content: finalReply,
-        modelName: this.modelName,
-        toolCalls:
-          executedToolCalls.length > 0
-            ? (JSON.parse(
-                JSON.stringify(executedToolCalls),
-              ) as Prisma.InputJsonValue)
-            : undefined,
-        toolResults:
-          places.length > 0 || citations.length > 0
-            ? (JSON.parse(
-                JSON.stringify(metadataPayload),
-              ) as Prisma.InputJsonValue)
-            : undefined,
-      },
-    });
+    // 3. Atomically persist USER message, AGENT response, and session messageCount (Single DRY exit path)
+    await this.prisma.$transaction([
+      this.prisma.aiChatMessage.create({
+        data: {
+          sessionId: session.id,
+          sender: 'USER',
+          content: cleanMessage,
+        },
+      }),
+      this.prisma.aiChatMessage.create({
+        data: {
+          sessionId: session.id,
+          sender: 'AGENT',
+          content: finalReply,
+          modelName: this.modelName,
+          toolCalls:
+            executedToolCalls.length > 0
+              ? (JSON.parse(
+                  JSON.stringify(executedToolCalls),
+                ) as Prisma.InputJsonValue)
+              : undefined,
+          toolResults:
+            places.length > 0
+              ? (JSON.parse(
+                  JSON.stringify(metadataPayload),
+                ) as Prisma.InputJsonValue)
+              : undefined,
+        },
+      }),
+      this.prisma.aiChatSession.update({
+        where: { id: session.id },
+        data: {
+          messageCount: { increment: 2 },
+        },
+      }),
+    ]);
 
-    await this.prisma.aiChatSession.update({
-      where: { id: session.id },
-      data: {
-        messageCount: { increment: 2 },
-      },
-    });
-
-    // 5. Reuse existing CopilotAgentService BullMQ delta-summarization engine when threshold is reached (AGENTS.md Rung 2)
+    // 4. Reuse existing CopilotAgentService BullMQ delta-summarization engine when threshold is reached (AGENTS.md Rung 2)
     if (
       this.copilotAgent &&
       session.messageCount + 2 >= ADVISOR_CONSTANTS.SUMMARIZATION_THRESHOLD
@@ -358,7 +330,6 @@ export class AdvisorService {
       sessionId: session.id,
       reply: finalReply,
       places,
-      citations,
     };
   }
 
@@ -389,7 +360,7 @@ export class AdvisorService {
   }
 
   /**
-   * Retrieves chronological message history (including saved place cards & citations) for a session.
+   * Retrieves chronological message history (including saved place cards) for a session.
    */
   async getSessionMessages(
     sessionId: string,
@@ -421,9 +392,6 @@ export class AdvisorService {
         sender: msg.sender === 'USER' ? 'user' : 'agent',
         content: msg.content || '',
         places: Array.isArray(metadata.places) ? metadata.places : undefined,
-        citations: Array.isArray(metadata.citations)
-          ? metadata.citations
-          : undefined,
         createdAt: msg.createdAt,
       };
     });
@@ -474,6 +442,12 @@ export class AdvisorService {
     userId?: string,
     sessionId?: string,
   ) {
+    if (!userId) {
+      throw new UnauthorizedException(
+        'Vui lòng đăng nhập để trò chuyện với Cố Vấn AI.',
+      );
+    }
+
     if (sessionId) {
       const existing = await this.prisma.aiChatSession.findFirst({
         where: {
@@ -482,21 +456,13 @@ export class AdvisorService {
         },
       });
       if (existing) {
-        const isGuestSession =
-          existing.contextCity === ADVISOR_CONSTANTS.GUEST_SESSION_MARKER;
-        if (isGuestSession || existing.userId === userId) {
-          return existing;
+        if (existing.userId !== userId) {
+          throw new ForbiddenException(
+            'Bạn không có quyền truy cập phiên trò chuyện này.',
+          );
         }
+        return existing;
       }
-    }
-
-    let effectiveUserId = userId;
-    if (!effectiveUserId) {
-      const fallbackUser = await this.prisma.user.findFirst({
-        select: { id: true },
-      });
-      effectiveUserId =
-        fallbackUser?.id || ADVISOR_CONSTANTS.GUEST_FALLBACK_USER_ID;
     }
 
     const maxLen = ADVISOR_CONSTANTS.SESSION_TITLE_MAX_LENGTH;
@@ -507,20 +473,16 @@ export class AdvisorService {
 
     return this.prisma.aiChatSession.create({
       data: {
-        userId: effectiveUserId,
+        userId,
         linkedItineraryId: null,
         title: derivedTitle,
-        contextCity: userId
-          ? ADVISOR_CONSTANTS.DEFAULT_CONTEXT_CITY
-          : ADVISOR_CONSTANTS.GUEST_SESSION_MARKER,
+        contextCity: ADVISOR_CONSTANTS.DEFAULT_CONTEXT_CITY,
       },
     });
   }
 
   /**
-   * Builds Gemini conversation history with Observation Masking:
-   * Raw intermediate tool JSONs are omitted, while discovered placeIds are appended
-   * as a compact reference line so follow-up turns can call `get_place_detail(placeId)`.
+   * Builds Gemini conversation history with Observation Masking & strict role alternation.
    */
   private buildGeminiContents(
     history: Array<{
@@ -530,34 +492,19 @@ export class AdvisorService {
     }>,
     currentMessage: string,
   ): GeminiContent[] {
-    const contents: GeminiContent[] = [];
-
-    for (const row of history) {
-      if (!row.content) continue;
-
-      let text = row.content;
+    return buildAlternatingGeminiContents(history, currentMessage, (row) => {
+      const text = row.content || '';
       if (row.sender === 'AGENT' && row.toolResults) {
         const meta = row.toolResults as PersistedAdvisorMetadata;
         if (Array.isArray(meta.places) && meta.places.length > 0) {
           const placeRefs = meta.places
             .map((p) => `${p.name} (placeId: ${p.id})`)
             .join(', ');
-          text = `${text}\n[Mã địa điểm đã gợi ý: ${placeRefs}]`;
+          return `${text}\n[Mã địa điểm đã gợi ý: ${placeRefs}]`;
         }
       }
-
-      contents.push({
-        role: row.sender === 'USER' ? 'user' : 'model',
-        parts: [{ text }],
-      });
-    }
-
-    contents.push({
-      role: 'user',
-      parts: [{ text: currentMessage }],
+      return text;
     });
-
-    return contents;
   }
 
   private normalizeCacheKey(message: string): string {

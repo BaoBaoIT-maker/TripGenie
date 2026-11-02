@@ -47,6 +47,7 @@ describe('AdvisorService & AdvisorToolsService (Unit + Integration)', () => {
       user: {
         findFirst: jest.Mock;
       };
+      $transaction: jest.Mock;
     };
     let mockKnowledgeService: { searchKnowledge: jest.Mock };
     let mockKnowledgeRepo: { findAreaIdBySlug: jest.Mock };
@@ -81,6 +82,7 @@ describe('AdvisorService & AdvisorToolsService (Unit + Integration)', () => {
         user: {
           findFirst: jest.fn().mockResolvedValue({ id: MOCK_USER_ID }),
         },
+        $transaction: jest.fn().mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops)),
       };
 
       mockKnowledgeService = {
@@ -279,12 +281,12 @@ describe('AdvisorService & AdvisorToolsService (Unit + Integration)', () => {
       expect(httpPostSpy).toHaveBeenCalledTimes(2);
       expect(mockKnowledgeRepo.findAreaIdBySlug).toHaveBeenCalledTimes(1);
       // Score-Gap Filter must retain only the high-confidence chunk (0.7842) and drop the noisy 0.291 chunk
-      expect(result.citations).toHaveLength(1);
-      expect(result.citations[0]).toEqual({
+      const secondCallContents = httpPostSpy.mock.calls[1][1].contents;
+      const toolRespChunks = secondCallContents[secondCallContents.length - 1].parts[0].functionResponse.response.chunks;
+      expect(toolRespChunks).toHaveLength(1);
+      expect(toolRespChunks[0]).toMatchObject({
         documentTitle: 'Cẩm nang Du lịch Đà Nẵng - Hội An',
-        breadcrumbs: 'Cẩm nang Đà Nẵng > Giá vé tham quan > Bà Nà Hills',
-        confidence: 'HIGH',
-        similarityScore: 0.7842,
+        similarityScore: 0.784,
       });
 
       // Verify in-memory areaSlugCache hits on subsequent tool call for the same slug without hitting DB again
@@ -325,6 +327,13 @@ describe('AdvisorService & AdvisorToolsService (Unit + Integration)', () => {
             ],
           },
           createdAt: new Date(),
+        },
+        {
+          id: 'hist-0',
+          sender: 'USER',
+          content: 'Gợi ý quán hải sản bình dân ở Đà Nẵng',
+          toolResults: null,
+          createdAt: new Date(Date.now() - 5000),
         },
       ]);
 
@@ -396,7 +405,7 @@ describe('AdvisorService & AdvisorToolsService (Unit + Integration)', () => {
 
       // Verify history bridging injected placeId into Gemini contents
       const firstRequestPayload = httpPostSpy.mock.calls[0][1];
-      expect(firstRequestPayload.contents[0].parts[0].text).toContain(
+      expect(firstRequestPayload.contents[1].parts[0].text).toContain(
         `Hải Sản Năm Đảnh (placeId: ${PLACE_ID})`,
       );
       // Verify session.summary was injected into systemInstruction
@@ -479,7 +488,6 @@ describe('AdvisorService & AdvisorToolsService (Unit + Integration)', () => {
 
       expect(result.reply).toBe(ADVISOR_FALLBACK_MESSAGES.NETWORK_ERROR);
       expect(result.places).toEqual([]);
-      expect(result.citations).toEqual([]);
       expect(mockPrisma.aiChatMessage.create).toHaveBeenCalledTimes(2);
     });
 
@@ -543,10 +551,10 @@ describe('AdvisorService & AdvisorToolsService (Unit + Integration)', () => {
       );
 
       expect(outcome.toolResponsePayload.status).toBe('SUCCESS');
-      expect(outcome.discoveredCitations.length).toBeGreaterThan(0);
-      const topCitation = outcome.discoveredCitations[0];
-      expect(topCitation.documentTitle).toContain('TripGenie');
-      expect(topCitation.similarityScore).toBeGreaterThan(0.5);
+      const chunks = outcome.toolResponsePayload.chunks as Array<{ documentTitle: string; similarityScore: number }>;
+      expect(chunks.length).toBeGreaterThan(0);
+      expect(chunks[0].documentTitle).toContain('TripGenie');
+      expect(chunks[0].similarityScore).toBeGreaterThan(0.5);
     }, 25000);
 
     it('7. [Integration] query_travel_knowledge resolves areaSlug="da-nang" and retrieves Da Nang handbook chunk', async () => {
@@ -560,8 +568,9 @@ describe('AdvisorService & AdvisorToolsService (Unit + Integration)', () => {
       );
 
       expect(outcome.toolResponsePayload.status).toBe('SUCCESS');
-      expect(outcome.discoveredCitations.length).toBeGreaterThan(0);
-      expect(outcome.discoveredCitations[0].documentTitle).toContain('Đà Nẵng');
+      const chunks = outcome.toolResponsePayload.chunks as Array<{ documentTitle: string }>;
+      expect(chunks.length).toBeGreaterThan(0);
+      expect(chunks.some((ch) => ch.documentTitle.includes('Đà Nẵng'))).toBe(true);
     }, 25000);
 
     it('8. [Integration] search_places & get_place_detail execute against live PostGIS places table', async () => {

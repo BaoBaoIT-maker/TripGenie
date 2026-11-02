@@ -10,7 +10,6 @@ import {
   Plus,
   ArrowRight,
   Compass,
-  ShieldAlert,
   Trash2,
   Loader2,
   CheckSquare,
@@ -24,6 +23,7 @@ import {
   useDeleteItinerary,
   useBulkDeleteItineraries,
 } from '@/features/planner/hooks/use-itinerary-planner';
+import { useAuth } from '@/features/auth/hooks/use-auth';
 import { toast } from 'sonner';
 import ItineraryWizardModal from '@/features/planner/components/ItineraryWizardModal';
 import { formatVnd } from '@/features/planner/model/itinerary-format';
@@ -64,10 +64,11 @@ function formatTripDates(start?: string | null, end?: string | null): string {
 
 export default function PlannerListPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [wizardPreselectedDest, setWizardPreselectedDest] = useState<string | undefined>(undefined);
 
-  // Fetch real itineraries from database endpoint GET /api/v1/itineraries
+  // Fetch real itineraries from database endpoint GET /api/v1/itineraries (strictly scoped to logged-in user)
   const { data: itineraries = [], isLoading } = useItinerariesListQuery();
   const deleteMutation = useDeleteItinerary();
   const bulkDeleteMutation = useBulkDeleteItineraries();
@@ -83,8 +84,9 @@ export default function PlannerListPage() {
       await deleteMutation.mutateAsync(deletingItin.id);
       toast.success(`Đã xóa lịch trình "${deletingItin.title}" thành công!`);
       setDeletingItin(null);
-    } catch (err: any) {
-      toast.error(err?.message || "Không thể xóa lịch trình. Vui lòng thử lại!");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Không thể xóa lịch trình. Vui lòng thử lại!";
+      toast.error(msg);
     }
   };
 
@@ -121,12 +123,21 @@ export default function PlannerListPage() {
       setSelectedIds([]);
       setIsSelectMode(false);
       setShowBulkDeleteModal(false);
-    } catch (err: any) {
-      toast.error(err?.message || "Không thể xóa các lịch trình đã chọn. Vui lòng thử lại!");
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Không thể xóa các lịch trình đã chọn. Vui lòng thử lại!";
+      toast.error(msg);
     }
   };
 
   function handleOpenWizard(dest?: string) {
+    if (!user) {
+      toast.error('Vui lòng đăng nhập để tạo và lưu trữ lịch trình cá nhân!');
+      router.push('/login');
+      return;
+    }
     setWizardPreselectedDest(dest);
     setIsWizardOpen(true);
   }
@@ -136,43 +147,33 @@ export default function PlannerListPage() {
       {/* Full-width container spanning wide monitors without empty borders */}
       <main className="w-full px-4 sm:px-6 lg:px-8 xl:px-12 py-8 space-y-10">
         {/* =========================================================================
-            1. HERO PROMO BANNER (Full-width responsive with AI accent)
+            1. HERO PROMO BANNER (Editorial Travel Identity — Anti-Slop Compliant)
             ========================================================================= */}
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-teal-950 to-slate-900 text-white p-8 sm:p-12 shadow-md border border-teal-900/40">
+        <div className="relative overflow-hidden rounded-2xl bg-slate-900 text-white p-8 sm:p-10 shadow-xs border border-slate-800">
           <div className="relative z-10 max-w-3xl space-y-4">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-teal-500/20 border border-teal-400/30 text-teal-300 text-xs font-semibold backdrop-blur-xs">
-              <Sparkles className="size-3.5" />
-              <span>Trí tuệ nhân tạo • Dữ liệu giao thông đa phương thức Việt Nam</span>
-            </div>
-
-            <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight leading-tight text-white">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold font-heading tracking-tight leading-tight text-white">
               Lên kế hoạch du lịch thông minh, chuẩn xác từng chặng đường
             </h1>
 
-            <p className="text-sm sm:text-base text-slate-300 leading-relaxed max-w-2xl">
+            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed max-w-2xl">
               TripGenie tự động tính cự ly nối chặng, đề xuất phương tiện liên tỉnh tối ưu, phân bổ ngân sách 5 phần và sắp xếp điểm đến liên tục tránh đi ziczac.
             </p>
 
-            <div className="pt-3 flex flex-wrap items-center gap-3">
+            <div className="pt-2 flex flex-wrap items-center gap-3">
               <button
                 type="button"
                 onClick={() => handleOpenWizard()}
-                className="inline-flex items-center gap-2 px-6 py-3.5 bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-600 hover:to-emerald-600 text-white text-xs sm:text-sm font-bold rounded-2xl transition-all shadow-md hover:shadow-lg cursor-pointer transform hover:-translate-y-0.5"
+                className="inline-flex items-center gap-2 h-11 px-6 bg-primary hover:opacity-95 text-primary-foreground text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs cursor-pointer"
               >
-                <Sparkles className="size-4" />
-                <span>Tạo lịch trình tự động bằng AI</span>
-                <ArrowRight className="size-4" />
+                <Compass className="size-4" />
+                <span>Tạo lịch trình tự động</span>
               </button>
             </div>
           </div>
-
-          {/* Decorative background blur bubbles */}
-          <div className="absolute -right-20 -top-20 size-96 rounded-full bg-teal-500/10 blur-3xl pointer-events-none" />
-          <div className="absolute right-40 -bottom-20 size-80 rounded-full bg-indigo-500/10 blur-3xl pointer-events-none" />
         </div>
 
         {/* =========================================================================
-            2. MY ITINERARIES SECTION (Real Database Trips Only)
+            2. MY ITINERARIES SECTION (Real Database Trips Owned by Current User)
             ========================================================================= */}
         <div className="space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
@@ -191,7 +192,7 @@ export default function PlannerListPage() {
               <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                 {isSelectMode
                   ? "Nhấp vào các thẻ chuyến đi để chọn hoặc bỏ chọn nhiều lịch trình"
-                  : "Lịch trình du lịch thực tế được tạo và lưu trữ trên tài khoản của bạn"}
+                  : "Lịch trình du lịch thực tế được tạo và lưu trữ riêng trên tài khoản của bạn"}
               </p>
             </div>
 
@@ -273,20 +274,30 @@ export default function PlannerListPage() {
               </div>
               <div className="space-y-1">
                 <h3 className="text-lg font-bold text-slate-900">
-                  Bạn chưa có lịch trình nào
+                  {user ? "Bạn chưa có lịch trình nào" : "Đăng nhập để quản lý lịch trình của bạn"}
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-                  Hãy nhấn nút bên dưới để chọn điểm đến và để AI tự động lập lịch trình tối ưu theo ngân sách và sở thích của bạn!
+                  {user
+                    ? "Hãy nhấn nút bên dưới để chọn điểm đến và để AI tự động lập lịch trình tối ưu theo ngân sách và sở thích của bạn!"
+                    : "Đăng nhập để tạo lịch trình cá nhân bằng AI hoặc khám phá các chuyến đi thú vị từ Cộng đồng TripGenie."}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => handleOpenWizard()}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs cursor-pointer"
-              >
-                <Sparkles className="size-4" />
-                <span>Bắt đầu tạo lịch trình với AI</span>
-              </button>
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleOpenWizard()}
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs cursor-pointer"
+                >
+                  <Sparkles className="size-4" />
+                  <span>{user ? "Bắt đầu tạo lịch trình với AI" : "Đăng nhập & Tạo lịch trình"}</span>
+                </button>
+                <Link
+                  href="/community"
+                  className="inline-flex items-center gap-2 px-5 py-3 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-bold rounded-xl transition-all"
+                >
+                  <span>Khám phá Cộng đồng</span>
+                </Link>
+              </div>
             </div>
           )}
 

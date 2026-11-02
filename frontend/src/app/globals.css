@@ -256,3 +256,27 @@
 .maplibregl-popup-anchor-right .maplibregl-popup-tip {
   border-left-color: var(--background) !important;
 }
+
+
+/* ============================================================================
+   A4 Tour Briefing Sheet Print Rules (Native Browser Print / PDF Export)
+   ============================================================================ */
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
+@media print {
+  html,
+  body {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}

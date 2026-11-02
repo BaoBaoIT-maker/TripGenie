@@ -34,18 +34,10 @@ export interface AdvisorPlaceSummary {
   longitude: number;
 }
 
-export interface AdvisorCitation {
-  documentTitle: string;
-  breadcrumbs: string;
-  confidence: 'HIGH' | 'LOW';
-  similarityScore: number;
-}
-
 export interface AdvisorChatResponse {
   sessionId: string;
   reply: string;
   places: AdvisorPlaceSummary[];
-  citations: AdvisorCitation[];
 }
 
 export interface AdvisorSessionSummary {
@@ -60,12 +52,10 @@ export interface AdvisorMessageHistoryItem {
   sender: 'user' | 'agent';
   content: string;
   places?: AdvisorPlaceSummary[];
-  citations?: AdvisorCitation[];
   createdAt: Date;
 }
 
 export interface ToolExecutionOutcome {
   toolResponsePayload: Record<string, unknown>;
   discoveredPlaces: AdvisorPlaceSummary[];
-  discoveredCitations: AdvisorCitation[];
 }

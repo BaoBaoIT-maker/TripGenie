@@ -19,7 +19,6 @@ export interface PlaceGeoInput {
   id: string;
   name: string;
   address: string;
-  addressNormalized?: string | null;
   latitude: number;
   longitude: number;
   ratingAvg?: number | null;

@@ -5,9 +5,7 @@ import Link from 'next/link';
 import {
   AlertCircle,
   ArrowUpRight,
-  BookOpen,
   Compass,
-  ShieldCheck,
 } from 'lucide-react';
 import { ADVISOR_UI_CONSTANTS, AdvisorMessageItem } from '@/types/advisor';
 import { AdvisorPlaceCard } from './AdvisorPlaceCard';
@@ -78,20 +76,6 @@ export function AdvisorMessageBubble({
     );
   }
 
-  // Strip trailing raw markdown citation line if citations are already rendered as structured badges
-  const hasStructuredCitations =
-    Array.isArray(message.citations) && message.citations.length > 0;
-  const lines = message.content
-    .split('\n')
-    .filter(
-      (line) =>
-        !(
-          hasStructuredCitations &&
-          line.trim().startsWith('>') &&
-          line.includes('Nguồn tham khảo')
-        ),
-    );
-
   return (
     <div className="flex items-start gap-2.5">
       <div
@@ -117,7 +101,7 @@ export function AdvisorMessageBubble({
           )}
 
           <div className="space-y-1.5">
-            {lines.map((rawLine, idx) => {
+            {message.content.split('\n').map((rawLine, idx) => {
               const trimmed = rawLine.trim();
               if (!trimmed) {
                 return <div key={idx} className="h-1" />;
@@ -167,31 +151,6 @@ export function AdvisorMessageBubble({
               );
             })}
           </div>
-
-          {hasStructuredCitations && (
-            <div className="mt-3 border-t border-border pt-2.5">
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <BookOpen className="h-3 w-3 text-primary" aria-hidden="true" />
-                <span>Nguồn Cẩm Nang Xác Thực</span>
-              </div>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {message.citations!.map((cit, index) => (
-                  <div
-                    key={`${cit.documentTitle}-${index}`}
-                    className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-primary/20 bg-secondary px-2.5 py-1 text-xs text-secondary-foreground"
-                  >
-                    <ShieldCheck
-                      className="h-3.5 w-3.5 shrink-0 text-primary"
-                      aria-hidden="true"
-                    />
-                    <span className="truncate font-medium">
-                      {cit.breadcrumbs || cit.documentTitle}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {Array.isArray(message.places) && message.places.length > 0 && (

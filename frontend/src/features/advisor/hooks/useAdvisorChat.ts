@@ -87,7 +87,6 @@ export function useAdvisorChat(isOpen: boolean) {
           sender: 'agent',
           content: response.reply,
           places: response.places,
-          citations: response.citations,
           createdAt: new Date().toISOString(),
         };
 

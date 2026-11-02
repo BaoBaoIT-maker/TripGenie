@@ -26,6 +26,7 @@ import {
   Coffee,
   Check,
   Camera,
+  Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -36,6 +37,7 @@ import {
   useCloneItinerary,
   useUpdateTransitMode,
   useUpdateCoverPhoto,
+  useUpdateTourBriefing,
   useCopilotChat,
   useCopilotHistory,
   useDirectSwapActivity,
@@ -46,23 +48,28 @@ import BudgetBreakdownCard from './BudgetBreakdownCard';
 import ItineraryMap from './ItineraryMap';
 import PlaceAlternativesModal from './PlaceAlternativesModal';
 import CoverPhotoModal from './CoverPhotoModal';
+import { TourBriefingBanner } from './TourBriefingBanner';
+import { TourBriefingPrintModal } from './TourBriefingPrintModal';
+import { ItineraryPrintSheet } from './ItineraryPrintSheet';
+import { DEFAULT_PRINT_SHEET_OPTIONS, EMPTY_TOUR_BRIEFING, type PrintSheetOptions } from './tour-briefing';
+import { BUDGET_LABEL } from '../../itinerary-labels';
 import ItineraryWizardModal from '../ItineraryWizardModal';
 import CopilotDrawer, { LocatePlaceTarget } from './CopilotDrawer';
 import { placeService } from '@/services/place.service';
 import { fetchMultiStopRoute, fetchRoute, Coordinate } from '@/services/routing.service';
-import type { ItineraryDetail, ItineraryActivity, ItineraryDay, TransitMode, CopilotProposal } from '@/types/itinerary';
+import type {
+  ItineraryDetail,
+  ItineraryActivity,
+  ItineraryDay,
+  TransitMode,
+  CopilotProposal,
+  TourBriefing,
+} from '@/types/itinerary';
 import { getDayColor, type ItineraryPathSegment, type DiscoveryPlace } from '@/features/map/types';
 
 interface Props {
   id: string;
 }
-
-const BUDGET_LABEL: Record<string, string> = {
-  LOW: 'Tiết kiệm',
-  MEDIUM: 'Tiêu chuẩn',
-  HIGH: 'Cao cấp',
-  LUXURY: 'Hạng sang',
-};
 
 const PRICE_LEVEL_NUMERIC: Record<string, number> = {
   LOW: 1,
@@ -105,8 +112,8 @@ export default function ItineraryView({ id }: Props) {
       await deleteMutation.mutateAsync(id);
       toast.success('Đã xóa lịch trình thành công!');
       router.push('/planner');
-    } catch (err: any) {
-      toast.error(err?.message || 'Không thể xóa lịch trình. Vui lòng thử lại!');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Không thể xóa lịch trình. Vui lòng thử lại!');
     }
   };
 
@@ -115,8 +122,8 @@ export default function ItineraryView({ id }: Props) {
       const cloned = await cloneMutation.mutateAsync(id);
       toast.success('Đã sao chép lịch trình thành công vào chuyến đi của bạn!');
       router.push(`/itineraries/${cloned.id}`);
-    } catch (err: any) {
-      toast.error(err?.message || 'Không thể sao chép lịch trình. Vui lòng thử lại!');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Không thể sao chép lịch trình. Vui lòng thử lại!');
     }
   };
 
@@ -124,8 +131,8 @@ export default function ItineraryView({ id }: Props) {
     try {
       await updateTransitMutation.mutateAsync({ id, transitMode: newMode });
       toast.success('Đã cập nhật phương tiện di chuyển và tính lại chi phí!');
-    } catch (err: any) {
-      toast.error(err?.message || 'Không thể cập nhật phương tiện di chuyển. Vui lòng thử lại!');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Không thể cập nhật phương tiện di chuyển. Vui lòng thử lại!');
     }
   };
 
@@ -133,10 +140,28 @@ export default function ItineraryView({ id }: Props) {
     try {
       await updateCoverMutation.mutateAsync(newCoverUrl);
       toast.success('Đã cập nhật ảnh bìa lịch trình thành công!');
-    } catch (err: any) {
-      toast.error(err?.message || 'Không thể cập nhật ảnh bìa. Vui lòng thử lại!');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Không thể cập nhật ảnh bìa. Vui lòng thử lại!');
       throw err;
     }
+  };
+
+  // Tour Briefing & Print Preview Modal state.
+  // draftOverride holds unsaved edits; otherwise the saved server value is shown (derived, no effect-sync).
+  const updateTourBriefingMutation = useUpdateTourBriefing(id);
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [draftOverride, setDraftOverride] = useState<TourBriefing | null>(null);
+  const [printOptions, setPrintOptions] = useState<PrintSheetOptions>(DEFAULT_PRINT_SHEET_OPTIONS);
+  const draftBriefing = draftOverride ?? data?.tourBriefing ?? EMPTY_TOUR_BRIEFING;
+
+  const handleSaveTourBriefing = async (briefing: TourBriefing) => {
+    await updateTourBriefingMutation.mutateAsync(briefing);
+    setDraftOverride(null);
+  };
+
+  const handleClosePrintModal = () => {
+    setIsPrintModalOpen(false);
+    setDraftOverride(null);
   };
 
   const [dayScope, setDayScope] = useState<'all' | number>('all');
@@ -156,12 +181,13 @@ export default function ItineraryView({ id }: Props) {
   const [days, setDays] = useState<ItineraryDay[]>([]);
 
   // Copilot mutations and history
+  const isOwner = Boolean(data?.isOwner);
   const chatMutation = useCopilotChat(id);
   const directSwapMutation = useDirectSwapActivity(id);
   const applyProposalMutation = useApplyProposal(id);
   const [applyingProposalId, setApplyingProposalId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
-  const { data: historyMessages } = useCopilotHistory(id, sessionId);
+  const { data: historyMessages } = useCopilotHistory(id, sessionId, isOwner);
 
   // Modal states for 1-click swap and wizard
   const [selectedActivityForSwap, setSelectedActivityForSwap] = useState<ItineraryActivity | null>(null);
@@ -632,7 +658,7 @@ export default function ItineraryView({ id }: Props) {
   function handleShareLink() {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(window.location.href);
-      alert('Đã sao chép liên kết chuyến đi vào bộ nhớ tạm!');
+      toast.success('Đã sao chép liên kết chuyến đi vào bộ nhớ tạm!');
     }
   }
 
@@ -659,8 +685,8 @@ export default function ItineraryView({ id }: Props) {
   const activeCoverPhoto = data.coverPhoto || fallbackCoverPhoto;
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 pb-20 lg:pb-10">
-      <main className="max-w-[1600px] mx-auto p-4 lg:p-6 space-y-5">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 pb-20 lg:pb-10 print:min-h-0 print:bg-white print:pb-0">
+      <main className="max-w-[1600px] mx-auto p-4 lg:p-6 space-y-5 print:hidden">
         {/* =========================================================================
             1. HERO TRIP HEADER (Matches Figma Prompt Screen 2 Item 1)
             ========================================================================= */}
@@ -682,16 +708,18 @@ export default function ItineraryView({ id }: Props) {
               <ArrowLeft className="size-5" />
             </Link>
 
-            {/* Edit Cover Photo Button */}
-            <button
-              type="button"
-              onClick={() => setIsCoverModalOpen(true)}
-              className="absolute top-4 right-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 hover:bg-slate-900/80 text-white backdrop-blur-md text-xs font-semibold shadow-md transition-all cursor-pointer border border-white/20 hover:scale-105 active:scale-95 z-10"
-              title="Chỉnh sửa ảnh bìa lịch trình"
-            >
-              <Camera className="size-3.5" />
-              <span>Đổi ảnh bìa</span>
-            </button>
+            {/* Edit Cover Photo Button (Owner Only) */}
+            {isOwner && (
+              <button
+                type="button"
+                onClick={() => setIsCoverModalOpen(true)}
+                className="absolute top-4 right-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 hover:bg-slate-900/80 text-white backdrop-blur-md text-xs font-semibold shadow-md transition-all cursor-pointer border border-white/20 hover:scale-105 active:scale-95 z-10"
+                title="Chỉnh sửa ảnh bìa lịch trình"
+              >
+                <Camera className="size-3.5" />
+                <span>Đổi ảnh bìa</span>
+              </button>
+            )}
 
             <div className="absolute bottom-4 left-5 right-5 text-white">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -742,11 +770,11 @@ export default function ItineraryView({ id }: Props) {
               </button>
               <button
                 type="button"
-                onClick={() => window.print()}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                onClick={() => setIsPrintModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-teal-200 bg-teal-50/60 hover:bg-teal-100/70 text-teal-900 text-xs font-semibold transition-colors cursor-pointer"
               >
-                <Printer className="size-3.5 text-slate-500" />
-                <span>Xuất PDF/In</span>
+                <Printer className="size-3.5 text-teal-700" />
+                <span>Tờ hướng dẫn / Xuất PDF</span>
               </button>
               <button
                 type="button"
@@ -759,19 +787,37 @@ export default function ItineraryView({ id }: Props) {
                 ) : (
                   <Copy className="size-3.5 text-teal-600" />
                 )}
-                <span>Sao chép</span>
+                <span>{isOwner ? 'Sao chép' : 'Nhân bản về lịch trình của tôi'}</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setShowDeleteModal(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-semibold transition-colors cursor-pointer"
-              >
-                <Trash2 className="size-3.5" />
-                <span>Xóa</span>
-              </button>
+              {isOwner && (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteModal(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Trash2 className="size-3.5" />
+                  <span>Xóa</span>
+                </button>
+              )}
             </div>
           </div>
+          {!isOwner && (
+            <div className="px-4 py-3 bg-teal-50/80 border-t border-teal-200/70 flex flex-wrap items-center justify-between gap-2 text-xs text-teal-900">
+              <span>
+                Bạn đang xem lịch trình chia sẻ công khai ở <strong>chế độ chỉ đọc</strong>. Hãy nhấn <strong>Nhân bản về lịch trình của tôi</strong> để tùy chỉnh lộ trình bằng AI Copilot!
+              </span>
+            </div>
+          )}
         </div>
+
+        {/* =========================================================================
+            1B. TOUR BRIEFING & ASSEMBLY BANNER (Shared with Members & Print Sheet)
+            ========================================================================= */}
+        <TourBriefingBanner
+          briefing={data.tourBriefing}
+          isOwner={isOwner}
+          onOpenModal={() => setIsPrintModalOpen(true)}
+        />
 
         {/* =========================================================================
             SPLIT LAYOUT (50% Timeline, 50% Sticky Map)
@@ -838,10 +884,10 @@ export default function ItineraryView({ id }: Props) {
                 }
               }}
               onHoverPlace={setHoveredPlaceId}
-              onSwapPlace={handleSwapPlace}
-              onDeletePlace={handleDeletePlace}
-              onAddPlace={handleAddPlace}
-              onChangeTransitMode={handleUpdateTransitMode}
+              onSwapPlace={isOwner ? handleSwapPlace : undefined}
+              onDeletePlace={isOwner ? handleDeletePlace : undefined}
+              onAddPlace={isOwner ? handleAddPlace : undefined}
+              onChangeTransitMode={isOwner ? handleUpdateTransitMode : undefined}
               isUpdatingTransitMode={updateTransitMutation.isPending}
             />
 
@@ -884,28 +930,16 @@ export default function ItineraryView({ id }: Props) {
       {/* =========================================================================
           SCREEN 3: SLIDE-OVER AI COPILOT DRAWER (Matches Figma Prompt Screen 3)
           ========================================================================= */}
-      {/* Floating Copilot Bubble Launcher (Messenger Style) */}
-      {!isCopilotOpen && (
-        <div className="fixed bottom-6 right-6 z-40 group">
+      {/* Floating Copilot Bubble Launcher (Owner Only — Anti-Slop MOTION=1) */}
+      {isOwner && !isCopilotOpen && (
+        <div className="fixed bottom-6 right-6 z-40 group print:hidden">
           <button
             type="button"
             onClick={() => setIsCopilotOpen(true)}
-            className="relative size-14 sm:size-15 rounded-full bg-gradient-to-tr from-teal-500 via-emerald-500 to-indigo-600 text-white flex items-center justify-center shadow-xl shadow-teal-600/30 hover:shadow-2xl hover:scale-110 active:scale-95 transition-all duration-300 cursor-pointer border-2 border-white/90"
+            className="relative size-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:opacity-95 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer border-2 border-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             aria-label="Mở Genie Copilot"
           >
-            {/* Ambient Animated Glow Ring */}
-            <span className="absolute -inset-1 rounded-full bg-gradient-to-r from-teal-400 to-indigo-400 opacity-60 blur-xs group-hover:opacity-90 animate-pulse" />
-
-            {/* Inner Content */}
-            <div className="relative flex items-center justify-center">
-              <Bot className="size-7 transition-transform group-hover:scale-110" />
-              <Sparkles className="size-3.5 absolute -top-1.5 -right-1.5 text-amber-300 animate-spin" />
-            </div>
-
-            {/* Active Online Pulse Indicator */}
-            <span className="absolute top-0 right-0 size-4 rounded-full bg-emerald-500 border-2 border-white shadow-xs flex items-center justify-center">
-              <span className="size-2 rounded-full bg-white animate-ping" />
-            </span>
+            <Bot className="size-7 transition-transform group-hover:scale-105" />
           </button>
 
           {/* Floating Pill Label Tooltip on Hover */}
@@ -921,6 +955,7 @@ export default function ItineraryView({ id }: Props) {
         isOpen={isCopilotOpen}
         onClose={() => setIsCopilotOpen(false)}
         destination={data.destination || 'Đà Nẵng'}
+        days={days}
         messages={copilotMessages}
         isPending={chatMutation.isPending}
         onSendMessage={handleSendCopilot}
@@ -940,7 +975,7 @@ export default function ItineraryView({ id }: Props) {
       {/* =========================================================================
           SCREEN 4: MOBILE FLOATING BOTTOM DOCK (Matches Figma Prompt Screen 4)
           ========================================================================= */}
-      <div className="lg:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white/95 backdrop-blur-md border border-slate-200 shadow-xl rounded-full p-1.5 flex items-center gap-1">
+      <div className="lg:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white/95 backdrop-blur-md border border-slate-200 shadow-xl rounded-full p-1.5 flex items-center gap-1 print:hidden">
         <button
           type="button"
           onClick={() => setMobileTab('timeline')}
@@ -988,8 +1023,11 @@ export default function ItineraryView({ id }: Props) {
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
                 Bạn có chắc chắn muốn xóa chuyến đi <strong className="text-slate-900 font-semibold">&quot;{data?.title}&quot;</strong>?
               </p>
-              <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed">
-                ℹ️ <strong>Lưu ý:</strong> Chuyến đi sẽ được gỡ khỏi danh sách của bạn. Nếu có người khác đã sao chép (clone) lịch trình này về tài khoản của họ thì bản sao của họ <strong>hoàn toàn không bị mất</strong>.
+              <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed flex items-start gap-1.5">
+                <Info className="size-4 text-teal-600 shrink-0 mt-0.5" aria-hidden="true" />
+                <span>
+                  <strong>Lưu ý:</strong> Chuyến đi sẽ được gỡ khỏi danh sách của bạn. Nếu có người khác đã sao chép (clone) lịch trình này về tài khoản của họ thì bản sao của họ <strong>hoàn toàn không bị mất</strong>.
+                </span>
               </p>
             </div>
 
@@ -1070,6 +1108,32 @@ export default function ItineraryView({ id }: Props) {
         onSave={handleSaveCoverPhoto}
         isSaving={updateCoverMutation.isPending}
       />
+
+      {/* Tour Briefing Setup & Live A4 Print Preview Modal */}
+      <TourBriefingPrintModal
+        isOpen={isPrintModalOpen}
+        onClose={handleClosePrintModal}
+        data={{ ...data, days }}
+        isOwner={isOwner}
+        transitName={transitName}
+        draftBriefing={draftBriefing}
+        onChangeDraftBriefing={setDraftOverride}
+        printOptions={printOptions}
+        onChangePrintOptions={setPrintOptions}
+        onSaveBriefing={handleSaveTourBriefing}
+        isSaving={updateTourBriefingMutation.isPending}
+        onTriggerPrint={() => window.print()}
+      />
+
+      {/* Top-Level A4 Print Target (Normal document flow for multi-page A4 printing) */}
+      <div className="hidden print:block">
+        <ItineraryPrintSheet
+          data={{ ...data, days }}
+          briefing={draftBriefing}
+          options={printOptions}
+          transitName={transitName}
+        />
+      </div>
     </div>
   );
 }

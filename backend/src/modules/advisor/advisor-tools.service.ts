@@ -16,7 +16,6 @@ import {
   AdvisorToolName,
 } from './advisor.constants';
 import {
-  AdvisorCitation,
   AdvisorPlaceSummary,
   ToolExecutionOutcome,
 } from './advisor.types';
@@ -67,7 +66,6 @@ export class AdvisorToolsService {
           message: `Công cụ "${toolName}" không tồn tại trong hệ thống.`,
         },
         discoveredPlaces: [],
-        discoveredCitations: [],
       };
     }
 
@@ -85,7 +83,6 @@ export class AdvisorToolsService {
           message: `Không thể truy xuất dữ liệu từ công cụ "${toolName}" lúc này.`,
         },
         discoveredPlaces: [],
-        discoveredCitations: [],
       };
     }
   }
@@ -110,7 +107,6 @@ export class AdvisorToolsService {
           chunks: [],
         },
         discoveredPlaces: [],
-        discoveredCitations: [],
       };
     }
 
@@ -131,7 +127,6 @@ export class AdvisorToolsService {
           chunks: [],
         },
         discoveredPlaces: [],
-        discoveredCitations: [],
       };
     }
 
@@ -152,40 +147,18 @@ export class AdvisorToolsService {
           })
         : rawChunks;
 
-    const discoveredCitations: AdvisorCitation[] = filteredChunks.map(
-      (chunk) => {
-        const score = Number(chunk.similarity_score);
-        return {
-          documentTitle: chunk.document_title,
-          breadcrumbs:
-            chunk.metadata?.breadcrumbs ||
-            chunk.metadata?.sectionTitle ||
-            chunk.document_title,
-          confidence:
-            score >= ADVISOR_CONSTANTS.HIGH_CONFIDENCE_THRESHOLD
-              ? 'HIGH'
-              : 'LOW',
-          similarityScore: Number(score.toFixed(4)),
-        };
-      },
-    );
-
     return {
       toolResponsePayload: {
         status: 'SUCCESS',
         confidence: overallConfidence,
         chunks: filteredChunks.map((c) => ({
           documentTitle: c.document_title,
-          breadcrumbs:
-            c.metadata?.breadcrumbs ||
-            c.metadata?.sectionTitle ||
-            c.document_title,
+          breadcrumbs: c.breadcrumbs,
           similarityScore: Number(Number(c.similarity_score).toFixed(3)),
           content: c.content,
         })),
       },
       discoveredPlaces: [],
-      discoveredCitations,
     };
   }
 
@@ -274,7 +247,6 @@ export class AdvisorToolsService {
         })),
       },
       discoveredPlaces,
-      discoveredCitations: [],
     };
   }
 
@@ -292,7 +264,6 @@ export class AdvisorToolsService {
           message: 'Thiếu mã định danh placeId.',
         },
         discoveredPlaces: [],
-        discoveredCitations: [],
       };
     }
 
@@ -304,7 +275,6 @@ export class AdvisorToolsService {
           message: `Không tìm thấy địa điểm với ID "${placeId}".`,
         },
         discoveredPlaces: [],
-        discoveredCitations: [],
       };
     }
 
@@ -332,7 +302,6 @@ export class AdvisorToolsService {
         },
       },
       discoveredPlaces: [placeSummary],
-      discoveredCitations: [],
     };
   }
 

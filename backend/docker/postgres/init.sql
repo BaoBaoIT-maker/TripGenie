@@ -60,6 +60,7 @@ CREATE TABLE users (
     password_hash VARCHAR(255),
     full_name     VARCHAR(255) NOT NULL,
     avatar_url    TEXT,
+    bio           VARCHAR(300),
     phone_number  VARCHAR(20),
     role          user_role_enum DEFAULT 'USER',
     is_active     BOOLEAN DEFAULT true,
@@ -146,9 +147,6 @@ CREATE TABLE places (
 
     -- Ä á»‹a chá»‰ text
     address            TEXT NOT NULL,
-    address_normalized VARCHAR(500),
-    address_verified   BOOLEAN DEFAULT false,
-    coordinate_source  VARCHAR(50) DEFAULT 'unknown',
 
     -- Tá» a Ä‘á»™
     -- [INTENTIONAL] Constraint giá»›i háº¡n lÃ£nh thá»• Viá»‡t Nam â€” quyáº¿t Ä‘á»‹nh product scope cÃ³ chá»§ Ä‘Ã­ch.
@@ -203,9 +201,6 @@ CREATE TABLE place_images (
     caption       TEXT,
     source        VARCHAR(50),       -- 'user_upload', 'google', 'osm'
     -- [MED] Truy váº¿t ai upload áº£nh â€” cáº§n cho kiá»ƒm duyá»‡t báº£n quyá»n
-    uploaded_by   UUID REFERENCES users(id) ON DELETE SET NULL,
-    width         INT,
-    height        INT,
     created_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -216,7 +211,6 @@ CREATE TABLE place_embeddings (
     content_text  TEXT NOT NULL,
     embedding     VECTOR(1536),
     model_name    VARCHAR(100),
-    model_version VARCHAR(50),
     updated_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -254,7 +248,6 @@ CREATE TABLE place_reviews (
     title         VARCHAR(255),
     comment       TEXT,
     images        TEXT[],
-    visited_at    DATE,
     helpful_count INT DEFAULT 0 CHECK (helpful_count >= 0),
     -- [HIGH] Soft-delete: khÃ´ng xÃ³a review, Ä‘á»ƒ láº¡i dáº¥u váº¿t
     deleted_at    TIMESTAMP WITH TIME ZONE,
@@ -310,7 +303,6 @@ CREATE TABLE itineraries (
 
     -- AI metadata
     is_ai_generated BOOLEAN DEFAULT false,
-    ai_prompt       TEXT,
     ai_preferences  JSONB,
 
     -- Sharing & status
@@ -345,8 +337,6 @@ CREATE TABLE itinerary_destinations (
     end_time                   TIME,
     estimated_duration_minutes INT DEFAULT 60 CHECK (estimated_duration_minutes > 0),
     estimated_cost             DECIMAL(10, 2) CHECK (estimated_cost IS NULL OR estimated_cost >= 0),
-    travel_distance_meters     INT CHECK (travel_distance_meters IS NULL OR travel_distance_meters >= 0),
-    travel_duration_seconds    INT CHECK (travel_duration_seconds IS NULL OR travel_duration_seconds >= 0),
     notes                      TEXT,
 
     -- updated_at dÃ¹ng cho optimistic concurrency check (PATCH vá»›i last_seen_at)
@@ -422,8 +412,6 @@ CREATE TABLE ai_chat_messages (
     content      TEXT,
     tool_calls   JSONB,
     tool_results JSONB,
-    token_count  INT CHECK (token_count IS NULL OR token_count >= 0),
-    latency_ms   INT CHECK (latency_ms IS NULL OR latency_ms >= 0),
     model_name   VARCHAR(100),
     created_at   TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -435,14 +423,17 @@ CREATE TABLE ai_chat_messages (
 CREATE TABLE community_posts (
     id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    itinerary_id  UUID UNIQUE NOT NULL REFERENCES itineraries(id) ON DELETE CASCADE,
+    itinerary_id  UUID REFERENCES itineraries(id) ON DELETE SET NULL,
     title         VARCHAR(255) NOT NULL,
     caption       TEXT,
+    media_urls    TEXT[] DEFAULT ARRAY[]::TEXT[],
+    tags          TEXT[] DEFAULT ARRAY[]::TEXT[],
     like_count    INT NOT NULL DEFAULT 0 CHECK (like_count >= 0),
     comment_count INT NOT NULL DEFAULT 0 CHECK (comment_count >= 0),
     clone_count   INT NOT NULL DEFAULT 0 CHECK (clone_count >= 0),
-    -- [HIGH] Soft-delete: giá»¯ láº¡i record cho audit trail
+    -- [HIGH] Soft-delete: giữ lại record cho audit trail
     deleted_at    TIMESTAMP WITH TIME ZONE,
+    edited_at     TIMESTAMP WITH TIME ZONE,
     created_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -455,13 +446,15 @@ CREATE TABLE post_likes (
 );
 
 CREATE TABLE post_comments (
-    id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    post_id    UUID NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
-    user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    content    TEXT NOT NULL,
-    -- [HIGH] Soft-delete: khÃ´ng xÃ³a váº­t lÃ½ â€” giá»¯ thread, hiá»ƒn thá»‹ "[ÄÃ£ xÃ³a]"
-    deleted_at TIMESTAMP WITH TIME ZONE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    post_id       UUID NOT NULL REFERENCES community_posts(id) ON DELETE CASCADE,
+    user_id       UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    parent_id     UUID REFERENCES post_comments(id) ON DELETE CASCADE,
+    reply_to_name VARCHAR(150),
+    content       TEXT NOT NULL,
+    -- [HIGH] Soft-delete: không xóa vật lý — giữ thread, hiển thị "[Đã xóa]"
+    deleted_at    TIMESTAMP WITH TIME ZONE,
+    created_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- [HIGH] Report/Moderation cho ná»™i dung cá»™ng Ä‘á»“ng
@@ -539,19 +532,13 @@ CREATE TABLE crawl_jobs (
 -- =============================================================================
 
 CREATE TABLE knowledge_documents (
-    id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    title         VARCHAR(255) NOT NULL,
-    source_type   VARCHAR(50) NOT NULL,
-    source_url    TEXT,
-    content       TEXT NOT NULL,
-    language      VARCHAR(10) DEFAULT 'vi',
-    area_id       INT REFERENCES travel_areas(id) ON DELETE SET NULL,
-    category_tags TEXT[] DEFAULT '{}',
-    is_processed  BOOLEAN DEFAULT false,
-    chunk_count   INT DEFAULT 0 CHECK (chunk_count >= 0),
-    processed_at  TIMESTAMP WITH TIME ZONE,
-    created_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    title       VARCHAR(255) NOT NULL,
+    source_url  TEXT,
+    content     TEXT NOT NULL,
+    area_id     INT REFERENCES travel_areas(id) ON DELETE SET NULL,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE knowledge_chunks (
@@ -560,8 +547,7 @@ CREATE TABLE knowledge_chunks (
     chunk_index INT NOT NULL CHECK (chunk_index >= 0),
     content     TEXT NOT NULL,
     embedding   VECTOR(1536),
-    model_name  VARCHAR(100),
-    metadata    JSONB DEFAULT '{}',
+    breadcrumbs TEXT NOT NULL,
     created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -635,7 +621,10 @@ CREATE INDEX idx_itinerary_dest_order    ON itinerary_destinations(itinerary_id,
 -- Community & Feed (Cursor Pagination)
 CREATE INDEX idx_community_posts_created      ON community_posts(created_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX idx_community_posts_user_created ON community_posts(user_id, created_at DESC);
+CREATE INDEX idx_community_posts_itinerary    ON community_posts(itinerary_id);
 CREATE INDEX idx_post_comments_post_created   ON post_comments(post_id, created_at DESC) WHERE deleted_at IS NULL;
+CREATE INDEX idx_post_comments_parent         ON post_comments(parent_id);
+CREATE INDEX idx_post_comments_user           ON post_comments(user_id);
 
 -- Content Reports
 CREATE INDEX idx_content_reports_status  ON content_reports(status) WHERE status = 'PENDING';

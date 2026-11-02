@@ -34,11 +34,15 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <Navbar />
+      <div className="print:hidden">
+        <Navbar />
+      </div>
       <main className="flex-1 w-full">{children}</main>
-      <Footer />
-      {!isItineraryCopilotPage && <AdvisorWidget />}
-      <BottomNav />
+      <div className="print:hidden">
+        <Footer />
+        {!isItineraryCopilotPage && <AdvisorWidget />}
+        <BottomNav />
+      </div>
     </>
   );
 }

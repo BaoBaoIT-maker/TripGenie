@@ -1,4 +1,14 @@
-import { IsString, IsNotEmpty, IsOptional, IsNumber, IsEnum, IsArray, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsNumber,
+  IsEnum,
+  IsArray,
+  IsDateString,
+  MaxLength,
+  Matches,
+} from 'class-validator';
 
 export enum TransitModeEnum {
   FLIGHT = 'FLIGHT',
@@ -121,3 +131,36 @@ export class UpdateCoverPhotoDto {
   coverPhoto: string;
 }
 
+
+export const TOUR_BRIEFING_LIMITS = {
+  MAX_LEADER_NAME_LENGTH: 100,
+  MAX_LEADER_PHONE_LENGTH: 30,
+  MAX_MEETING_POINT_LENGTH: 250,
+  MAX_NOTES_LENGTH: 600,
+} as const;
+
+/** Digits plus common phone separators only (empty string clears the field). */
+export const TOUR_BRIEFING_PHONE_REGEX = /^[0-9+().\-\s]*$/;
+
+export class UpdateTourBriefingDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(TOUR_BRIEFING_LIMITS.MAX_LEADER_NAME_LENGTH)
+  leaderName?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(TOUR_BRIEFING_LIMITS.MAX_LEADER_PHONE_LENGTH)
+  @Matches(TOUR_BRIEFING_PHONE_REGEX, { message: 'Số điện thoại chỉ gồm chữ số và các ký tự + ( ) . -' })
+  leaderPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(TOUR_BRIEFING_LIMITS.MAX_MEETING_POINT_LENGTH)
+  meetingPoint?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(TOUR_BRIEFING_LIMITS.MAX_NOTES_LENGTH)
+  notes?: string;
+}

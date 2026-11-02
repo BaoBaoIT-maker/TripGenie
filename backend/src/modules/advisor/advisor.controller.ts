@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { AdvisorService } from './advisor.service';
 import { AdvisorChatDto } from './advisor.types';
@@ -23,12 +24,12 @@ export class AdvisorController {
    * POST /api/v1/advisor/chat
    * Executes the Agentic RAG AI Travel Advisor conversation turn.
    */
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Post('chat')
   @HttpCode(HttpStatus.OK)
   async chat(
     @Body() dto: AdvisorChatDto,
-    @CurrentUser('id') userId?: string,
+    @CurrentUser('id') userId: string,
   ) {
     return this.advisorService.chat(dto, userId);
   }
@@ -45,13 +46,13 @@ export class AdvisorController {
 
   /**
    * GET /api/v1/advisor/sessions/:id/messages
-   * Retrieves chronological messages (with places & citations) for a specific session.
+   * Retrieves chronological messages (with places) for a specific session.
    */
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Get('sessions/:id/messages')
   async getSessionMessages(
     @Param('id', ParseUUIDPipe) sessionId: string,
-    @CurrentUser('id') userId?: string,
+    @CurrentUser('id') userId: string,
   ) {
     return this.advisorService.getSessionMessages(sessionId, userId);
   }
@@ -60,11 +61,11 @@ export class AdvisorController {
    * DELETE /api/v1/advisor/sessions/:id
    * Deletes a chat session and all its associated messages.
    */
-  @UseGuards(OptionalJwtAuthGuard)
+  @UseGuards(JwtAuthGuard)
   @Delete('sessions/:id')
   async deleteSession(
     @Param('id', ParseUUIDPipe) sessionId: string,
-    @CurrentUser('id') userId?: string,
+    @CurrentUser('id') userId: string,
   ) {
     return this.advisorService.deleteSession(sessionId, userId);
   }

@@ -34,7 +34,15 @@ import type {
   SavedPlace,
   MapCoordinate,
 } from "@/features/map/types";
-import { DEFAULT_MAP_ZOOM } from "@/features/map/map-config";
+import {
+  DEFAULT_MAP_ZOOM,
+  DEFAULT_MAP_CENTER,
+  MAX_NEARBY_PROXIMITY_KM,
+  MIN_ROUTE_DISTANCE_KM,
+  ROUTE_ORIGIN_FALLBACK_OFFSET_DEG,
+  MAX_ROUTE_FIT_ZOOM,
+  DANANG_GSO_PROVINCE_CODE,
+} from "@/features/map/map-config";
 import { createPlaceMarkerElement, getMarkerButtonClasses } from "./PlaceMarker";
 import { createMapPopupElement } from "./MapPopup";
 import { MapControls, type MapStyleTheme } from "./MapControls";
@@ -86,7 +94,7 @@ const MULTI_LAYER_MAP_STYLE: StyleSpecification = {
       id: "layer-background",
       type: "background",
       paint: {
-        "background-color": "#18181b",
+        "background-color": "#f8fafc",
       },
     },
     {
@@ -95,7 +103,7 @@ const MULTI_LAYER_MAP_STYLE: StyleSpecification = {
       source: "source-satellite",
       layout: { visibility: "none" },
       minzoom: 0,
-      maxzoom: 19,
+      maxzoom: 24,
     },
     {
       id: "layer-bright",
@@ -103,7 +111,7 @@ const MULTI_LAYER_MAP_STYLE: StyleSpecification = {
       source: "source-bright",
       layout: { visibility: "visible" },
       minzoom: 0,
-      maxzoom: 19,
+      maxzoom: 24,
     },
   ],
 };
@@ -121,6 +129,60 @@ interface ProvinceBoundItem {
 
 const boundsMap = provincesBoundsData as Record<string, ProvinceBoundItem>;
 const SAVED_PLACES_STORAGE_KEY = "tripgenie_saved_places";
+
+import type { BackendTravelAreaItem } from "@/services/place.service";
+
+/**
+ * Resolves geographic center for a destination dynamically without hard-coding
+ * Priority 1: Backend Database Travel Areas (dynamic bounding boxes & transit hubs)
+ * Priority 2: Official 34 Provinces GeoJSON boundary dataset
+ * Priority 3: System default configuration center
+ */
+function resolveTargetAreaCenter(
+  targetPlace: DiscoveryPlace,
+  travelAreas?: BackendTravelAreaItem[],
+  selectedProvinceName?: string | null
+): Coordinate {
+  // 1. Check dynamic travel areas from database
+  if (travelAreas && travelAreas.length > 0) {
+    const area = travelAreas.find((a) => {
+      const matchSlug = targetPlace.areaSlug && a.slug === targetPlace.areaSlug;
+      const matchName = targetPlace.areaName && (
+        a.name.toLowerCase() === targetPlace.areaName.toLowerCase() ||
+        (a.nameVi && a.nameVi.toLowerCase() === targetPlace.areaName.toLowerCase())
+      );
+      const matchSelected = selectedProvinceName && (
+        a.name.toLowerCase() === selectedProvinceName.toLowerCase() ||
+        (a.nameVi && a.nameVi.toLowerCase() === selectedProvinceName.toLowerCase())
+      );
+      return matchSlug || matchName || matchSelected;
+    });
+
+    if (area && typeof area.latitude === "number" && typeof area.longitude === "number") {
+      return { latitude: area.latitude, longitude: area.longitude };
+    }
+  }
+
+  // 2. Check boundsMap for general provinces (skipping Da Nang ma_tinh 48 whose islands pull center into ocean)
+  const provinceKey = targetPlace.areaName || selectedProvinceName;
+  if (provinceKey) {
+    const directBound = boundsMap[provinceKey];
+    if (directBound && directBound.ma_tinh !== DANANG_GSO_PROVINCE_CODE) {
+      return { latitude: directBound.centerLat, longitude: directBound.centerLng };
+    }
+    const cleanKey = provinceKey.toLowerCase().replace(/^(tỉnh|thành phố|tp\.)\s+/i, "").trim();
+    const foundKey = Object.keys(boundsMap).find((k) => {
+      const cleanBoundKey = k.toLowerCase().replace(/^(tỉnh|thành phố|tp\.)\s+/i, "").trim();
+      return cleanBoundKey === cleanKey || cleanKey.includes(cleanBoundKey) || cleanBoundKey.includes(cleanKey);
+    });
+    if (foundKey && boundsMap[foundKey].ma_tinh !== DANANG_GSO_PROVINCE_CODE) {
+      return { latitude: boundsMap[foundKey].centerLat, longitude: boundsMap[foundKey].centerLng };
+    }
+  }
+
+  // 3. Fallback to system default map center
+  return DEFAULT_MAP_CENTER;
+}
 
 export default function VietMap({
   places,
@@ -143,6 +205,7 @@ export default function VietMap({
   pathLine,
   pathSegments,
   hidePopupDirections = false,
+  travelAreas,
 }: VietMapProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -344,15 +407,22 @@ export default function VietMap({
             : `Chặng ${index} (${letter})`;
 
           const el = document.createElement("div");
-          el.className = "flex flex-col items-center -translate-y-1/2 pointer-events-none select-none";
+          el.className = "flex flex-col items-center -translate-y-1/2 cursor-pointer select-none group";
           el.innerHTML = `
-            <div class="px-1.5 py-0.5 rounded ${colorBg} text-white text-[10px] font-bold shadow-md mb-0.5 whitespace-nowrap">
+            <div class="px-1.5 py-0.5 rounded ${colorBg} text-white text-[10px] font-bold shadow-md mb-0.5 whitespace-nowrap group-hover:scale-105 transition-transform">
               ${label}
             </div>
-            <div class="w-6 h-6 rounded-full ${colorBg} border-2 border-white shadow-lg flex items-center justify-center text-white font-extrabold text-[11px]">
+            <div class="w-6 h-6 rounded-full ${colorBg} border-2 border-white shadow-lg flex items-center justify-center text-white font-extrabold text-[11px] group-hover:scale-110 transition-transform">
               ${letter}
             </div>
           `;
+
+          el.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (stop.id && stop.id !== "user-origin") {
+              onSelectPlaceRef.current(stop.id);
+            }
+          });
 
           const marker = new Marker({ element: el })
             .setLngLat([stop.coordinate.longitude, stop.coordinate.latitude])
@@ -380,8 +450,10 @@ export default function VietMap({
             type: "geojson",
             data: routeGeoJson,
           });
+        }
 
-          // Route line dark casing
+        // Route line dark casing (ensure layer is present)
+        if (!map.getLayer(casingLayerId)) {
           map.addLayer({
             id: casingLayerId,
             type: "line",
@@ -396,8 +468,10 @@ export default function VietMap({
               "line-opacity": 0.85,
             },
           });
+        }
 
-          // Route main vibrant line
+        // Route main vibrant line (ensure layer is present)
+        if (!map.getLayer(lineLayerId)) {
           map.addLayer({
             id: lineLayerId,
             type: "line",
@@ -422,10 +496,24 @@ export default function VietMap({
             bounds.extend(coord as [number, number]);
           });
         }
-        map.fitBounds(bounds, {
-          padding: { top: 120, bottom: 90, left: 70, right: 70 },
-          duration: 800,
-        });
+
+        const ne = bounds.getNorthEast();
+        const sw = bounds.getSouthWest();
+        const isDegenerate = !ne || !sw || (ne.lng === sw.lng && ne.lat === sw.lat);
+
+        if (isDegenerate) {
+          map.flyTo({
+            center: [stops[0].coordinate.longitude, stops[0].coordinate.latitude],
+            zoom: 15,
+            duration: 800,
+          });
+        } else {
+          map.fitBounds(bounds, {
+            padding: { top: 100, bottom: 80, left: 60, right: 60 },
+            maxZoom: MAX_ROUTE_FIT_ZOOM,
+            duration: 800,
+          });
+        }
       } catch (err) {
         console.error("Failed to compute multi-stop route:", err);
         toast.error("Không thể tải tuyến đường. Vui lòng thử lại sau.");
@@ -454,14 +542,49 @@ export default function VietMap({
   // Request directions handler (initiates or replaces destination)
   const handleStartDirections = useCallback(
     (targetPlace: DiscoveryPlace) => {
-      if (!userLocation && onRequestCurrentLocation) {
-        onRequestCurrentLocation();
+      // Check if user location is nearby in the same city/province
+      const isNearby = userLocation
+        ? routingService.calculateDirectDistanceKm(userLocation, {
+            latitude: targetPlace.latitude,
+            longitude: targetPlace.longitude,
+          }) <= MAX_NEARBY_PROXIMITY_KM
+        : false;
+
+      let originCoord: Coordinate;
+      let originName: string;
+
+      if (userLocation && isNearby) {
+        originCoord = userLocation;
+        originName = "Vị trí của bạn";
+      } else {
+        const provCenter = resolveTargetAreaCenter(
+          targetPlace,
+          travelAreas,
+          selectedProvinceName
+        );
+        const provName = targetPlace.areaName || selectedProvinceName || "thành phố";
+
+        // If fallback center is too close to targetPlace, offset slightly so origin != destination
+        const distToTarget = routingService.calculateDirectDistanceKm(provCenter, {
+          latitude: targetPlace.latitude,
+          longitude: targetPlace.longitude,
+        });
+
+        if (distToTarget < MIN_ROUTE_DISTANCE_KM) {
+          originCoord = {
+            latitude: provCenter.latitude + ROUTE_ORIGIN_FALLBACK_OFFSET_DEG,
+            longitude: provCenter.longitude,
+          };
+          originName = `Khu vực trung tâm ${provName}`;
+        } else {
+          originCoord = provCenter;
+          originName = `Trung tâm ${provName}`;
+        }
       }
 
-      const originCoord = userLocation || { latitude: 16.0544, longitude: 108.2022 };
       const stopA: RouteStop = {
         id: "user-origin",
-        name: userLocation ? "Vị trí của bạn" : "Trung tâm thành phố",
+        name: originName,
         coordinate: originCoord,
       };
       const stopB: RouteStop = {
@@ -472,24 +595,39 @@ export default function VietMap({
 
       const newStops = [stopA, stopB];
       setRouteStops(newStops);
-      drawRoute(newStops, routeMode);
     },
-    [userLocation, onRequestCurrentLocation, routeMode, drawRoute]
+    [userLocation, selectedProvinceName, travelAreas]
   );
 
-  // Auto-upgrade fallback origin ("Trung tâm thành phố") to actual user location once granted
+  // Hide underlying place markers for active route stops so markers never collide or peek underneath
+  useEffect(() => {
+    const routePlaceIds = new Set(routeStops.map((s) => s.id));
+    markerButtonsMapRef.current.forEach((button, placeId) => {
+      const container = button.closest<HTMLDivElement>(".marker-container");
+      if (container) {
+        container.style.display = routePlaceIds.has(placeId) ? "none" : "";
+      }
+    });
+  }, [routeStops]);
+
+  // Auto-upgrade fallback origin ("Trung tâm...") to actual user location ONLY if user is actually nearby (< 45km)
   useEffect(() => {
     if (!userLocation) return;
     setRouteStops((prev) => {
       if (prev.length < 2) return prev;
-      if (prev[0].id === "user-origin" && prev[0].name === "Trung tâm thành phố") {
+      const dest = prev[prev.length - 1];
+      const distToDest = routingService.calculateDirectDistanceKm(userLocation, dest.coordinate);
+      // Do NOT hijack origin if user is far away in another province/city
+      if (distToDest > MAX_NEARBY_PROXIMITY_KM) return prev;
+
+      if (prev[0].id === "user-origin" && prev[0].name.startsWith("Trung tâm")) {
         const updated = [...prev];
         updated[0] = {
           id: "user-origin",
           name: "Vị trí của bạn",
           coordinate: userLocation,
         };
-        toast.info("Đã tự động định vị và cập nhật lộ trình từ vị trí của bạn!");
+        toast.info("Đã tự động cập nhật lộ trình từ vị trí của bạn!");
         return updated;
       }
       return prev;
@@ -929,6 +1067,10 @@ export default function VietMap({
 
       markerButtonsMapRef.current.set(place.id, button);
 
+      if (routeStops.some((s) => s.id === place.id)) {
+        container.style.display = "none";
+      }
+
       const marker = new Marker({ element: container })
         .setLngLat([place.longitude, place.latitude])
         .addTo(map);
@@ -1097,13 +1239,13 @@ export default function VietMap({
         isProgrammaticPopupCloseRef.current = false;
       }
 
-      // Smoothly un-zoom and return to the initial/previous overview
+      // Smoothly zoom out back to overview when closing popup
       if (wasSelected) {
         if (previousViewportRef.current) {
           map.flyTo({
             center: previousViewportRef.current.center,
             zoom: previousViewportRef.current.zoom,
-            duration: 600,
+            duration: 500,
             essential: true,
           });
           previousViewportRef.current = null;
@@ -1118,20 +1260,14 @@ export default function VietMap({
             bounds.extend([p.longitude, p.latitude]);
           });
           try {
-            map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 600 });
+            map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 500 });
           } catch {
             map.flyTo({
               center: [center.longitude, center.latitude],
               zoom: 13,
-              duration: 600,
+              duration: 500,
             });
           }
-        } else {
-          map.flyTo({
-            center: [center.longitude, center.latitude],
-            zoom: 13,
-            duration: 600,
-          });
         }
       }
       return;
@@ -1145,12 +1281,28 @@ export default function VietMap({
     const targetPlace = "place" in targetItem ? (targetItem.place as DiscoveryPlace) : targetItem;
     if (!targetPlace || typeof targetPlace.latitude !== "number" || typeof targetPlace.longitude !== "number") return;
 
-    // If popup is ALREADY showing for this exact place, keep it firmly open!
+    // If popup is ALREADY showing for this exact place, refresh action buttons in-place and keep it firmly open!
     if (currentPopupPlaceIdRef.current === targetPlace.id && popupRef.current && popupRef.current.isOpen()) {
+      const isSaved = savedPlaces.some((p) => p.id === targetPlace.id);
+      const popupEl = createMapPopupElement(
+        targetItem,
+        (placeId) => {
+          router.push(`/places/${targetPlace.slug || placeId}`);
+        },
+        hidePopupDirections ? undefined : (targetPlace) => handleStartDirections(targetPlace),
+        {
+          isRoutingActive: hidePopupDirections ? false : routeStops.length >= 2,
+          isSaved,
+          onToggleSave: handleToggleSave,
+          onAddStopToRoute: hidePopupDirections ? undefined : handleAddStopToRoute,
+          onSetOrigin: hidePopupDirections ? undefined : handleSetOrigin,
+        }
+      );
+      popupRef.current.setDOMContent(popupEl);
       return;
     }
 
-    // Save previous viewport before zooming in, so we can return to it when popup closes
+    // Save previous overview viewport before zooming into selected place
     const currentZoom = map.getZoom();
     if (currentZoom < 15.5 && !previousViewportRef.current) {
       const c = map.getCenter();
@@ -1162,13 +1314,15 @@ export default function VietMap({
 
     map.resize();
 
-    map.flyTo({
-      center: [targetPlace.longitude, targetPlace.latitude],
-      zoom: 16,
-      offset: routeStops.length >= 2 && !isRoutePanelCollapsed ? [130, 0] : [0, 0],
-      duration: 800,
-      essential: true,
-    });
+    // Fly camera smoothly to the selected place
+    if (routeStops.length < 2) {
+      map.flyTo({
+        center: [targetPlace.longitude, targetPlace.latitude],
+        zoom: 16,
+        duration: 500,
+        essential: true,
+      });
+    }
 
     if (popupRef.current) {
       isProgrammaticPopupCloseRef.current = true;

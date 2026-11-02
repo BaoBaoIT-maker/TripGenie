@@ -3,7 +3,8 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import { json, urlencoded } from 'express';
+import { json, urlencoded, static as expressStatic } from 'express';
+import { join } from 'node:path';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/exceptions/all-exceptions.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -34,9 +35,20 @@ async function bootstrap() {
   // Global Prefix
   app.setGlobalPrefix('api/v1');
 
-  // CORS Configuration (credentials: true for HttpOnly cookies)
+  // Serve local community media uploads (supports HTTP Range requests for HTML5 video seeking)
+  app.use('/api/v1/uploads', expressStatic(join(process.cwd(), 'uploads')));
+
+  // CORS Configuration (credentials: true for HttpOnly cookies, supports loopback equivalence)
+  const frontendUrl = configService.getOrThrow<string>('FRONTEND_BASE_URL');
+  const allowedOrigins = Array.from(
+    new Set([
+      ...frontendUrl.split(',').map((o) => o.trim()),
+      frontendUrl.replace('localhost', '127.0.0.1'),
+      frontendUrl.replace('127.0.0.1', 'localhost'),
+    ]),
+  );
   app.enableCors({
-    origin: configService.getOrThrow<string>('FRONTEND_BASE_URL'),
+    origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
     allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'Cookie', 'X-Requested-With'],

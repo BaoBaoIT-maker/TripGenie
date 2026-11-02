@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect, useCallback, useMemo, useTransition } from "react";
+import { Suspense, useState, useEffect, useCallback, useMemo, useTransition, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -42,6 +42,7 @@ import {
 import { Place, SuitableAudience } from "@/types/place";
 import { DiscoveryPlace, RadiusKm } from "@/features/map/types";
 import { SUPER_CATEGORIES, type SuperCategory } from "@/config/categories";
+import { DEFAULT_MAP_CENTER } from "@/features/map/map-config";
 import { useGeolocation } from "@/features/map/hooks/use-geolocation";
 import { parseExploreQuery, type ExploreSort } from "@/features/map/lib/explore-query";
 
@@ -93,6 +94,10 @@ function ExploreContent() {
 
   // Selection & Interactivity for Split Map
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(initialSelectedId || null);
+  const selectedPlaceIdRef = useRef(selectedPlaceId);
+  useEffect(() => {
+    selectedPlaceIdRef.current = selectedPlaceId;
+  }, [selectedPlaceId]);
   const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
 
   // Photo Contribution Modal State
@@ -342,7 +347,7 @@ function ExploreContent() {
           const directPlace = await placeService.getPlaceById(initialSelectedId);
           if (directPlace) {
             items = [directPlace, ...items.filter((p) => p.id !== directPlace.id)];
-            if (selectedPlaceId === initialSelectedId && directPlace.id !== initialSelectedId) {
+            if (selectedPlaceIdRef.current === initialSelectedId && directPlace.id !== initialSelectedId) {
               setSelectedPlaceId(directPlace.id);
             }
           }
@@ -390,7 +395,6 @@ function ExploreContent() {
     page,
     pageSize,
     initialSelectedId,
-    selectedPlaceId,
   ]);
 
   useEffect(() => {
@@ -452,16 +456,10 @@ function ExploreContent() {
     return null;
   }, [geocodedLocation, pinNearbyCenter]);
 
-  // Map Center: prioritize query param lat/lng, selected place, geocoded pin, user location, or Da Nang
+  // Map Center: prioritize query param lat/lng, geocoded pin, user location, first search place, or default
   const mapCenter = useMemo(() => {
     if (initialLat !== null && initialLng !== null && !isNaN(initialLat) && !isNaN(initialLng)) {
       return { latitude: initialLat, longitude: initialLng };
-    }
-    const currentSelected = selectedPlaceId
-      ? places.find((p) => p.id === selectedPlaceId || p.slug === selectedPlaceId)
-      : null;
-    if (currentSelected && currentSelected.latitude && currentSelected.longitude) {
-      return { latitude: currentSelected.latitude, longitude: currentSelected.longitude };
     }
     if (activeGeocodedPin) {
       return { latitude: activeGeocodedPin.lat, longitude: activeGeocodedPin.lng };
@@ -472,8 +470,8 @@ function ExploreContent() {
     if (places.length > 0 && places[0].latitude && places[0].longitude) {
       return { latitude: places[0].latitude, longitude: places[0].longitude };
     }
-    return { latitude: 16.0544, longitude: 108.2022 };
-  }, [initialLat, initialLng, selectedPlaceId, places, activeGeocodedPin, useGpsSearch, userLocation]);
+    return DEFAULT_MAP_CENTER;
+  }, [initialLat, initialLng, places, activeGeocodedPin, useGpsSearch, userLocation]);
 
   // Super Category Select Handler
   const handleSelectSuperCategory = (catId: string) => {
@@ -1385,6 +1383,7 @@ function ExploreContent() {
               routeToPinRequest={routeToPinRequest}
               onPinDragEnd={handlePinDragEnd}
               onSearchThisArea={handleSearchThisArea}
+              travelAreas={travelAreas}
             />
           </div>
         </div>

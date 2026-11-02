@@ -12,13 +12,6 @@ export interface AdvisorPlaceSummary {
   longitude: number;
 }
 
-export interface AdvisorCitation {
-  documentTitle: string;
-  breadcrumbs: string;
-  confidence: 'HIGH' | 'LOW';
-  similarityScore: number;
-}
-
 export interface AdvisorChatRequest {
   message: string;
   sessionId?: string;
@@ -28,7 +21,6 @@ export interface AdvisorChatResponse {
   sessionId: string;
   reply: string;
   places: AdvisorPlaceSummary[];
-  citations: AdvisorCitation[];
 }
 
 export interface AdvisorSessionSummary {
@@ -43,7 +35,6 @@ export interface AdvisorMessageItem {
   sender: 'user' | 'agent';
   content: string;
   places?: AdvisorPlaceSummary[];
-  citations?: AdvisorCitation[];
   createdAt: string;
   isError?: boolean;
 }

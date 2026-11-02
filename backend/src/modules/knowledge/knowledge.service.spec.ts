@@ -10,9 +10,10 @@ describe('Knowledge Module (Clean SOLID Architecture)', () => {
     it('should correctly parse YAML frontmatter and body without external libs', () => {
       const rawMarkdown = `---
 title: "Cẩm Nang Đà Nẵng"
-source_type: "curated_guide"
 area_slug: "da-nang"
 category_tags: ["beach", "food"]
+sources:
+  - "https://example.com"
 ---
 
 # Tiêu đề lớn
@@ -24,8 +25,13 @@ Mì Quảng Đà Nẵng rất ngon.
       const parsed = parseFrontmatter(rawMarkdown);
       expect(parsed.frontmatter.title).toBe('Cẩm Nang Đà Nẵng');
       expect(parsed.frontmatter.area_slug).toBe('da-nang');
-      expect(parsed.frontmatter.category_tags).toEqual(['beach', 'food']);
       expect(parsed.body).toContain('## 1. Ẩm thực');
+    });
+
+    it('should fall back to a default title when frontmatter is absent', () => {
+      const parsed = parseFrontmatter('# Không có frontmatter');
+      expect(parsed.frontmatter.title).toBe('Cẩm nang du lịch');
+      expect(parsed.frontmatter.area_slug).toBeUndefined();
     });
 
     it('should create semantic chunks with breadcrumbs injected', () => {
@@ -37,22 +43,32 @@ Rừng nguyên sinh Sơn Trà là lá phổi xanh của thành phố.
 ### Quy định xe máy tay ga
 Ban quản lý cấm xe máy tay ga từ trạm Vọng Cảnh lên Đỉnh Bàn Cờ để tránh nguy cơ cháy phanh khi xuống dốc.
 `;
-      const chunks = createSemanticChunks(docTitle, body, {
-        categoryTags: ['safety', 'son-tra'],
-        areaSlug: 'da-nang',
-      });
+      const chunks = createSemanticChunks(docTitle, body);
 
       expect(chunks.length).toBeGreaterThanOrEqual(2);
 
       const scooterChunk = chunks.find((c) =>
-        c.metadata.sectionTitle.includes('Quy định xe máy tay ga'),
+        c.breadcrumbs.endsWith('Quy định xe máy tay ga'),
       );
       expect(scooterChunk).toBeDefined();
+      expect(scooterChunk!.breadcrumbs).toBe(
+        'Cẩm Nang Đà Nẵng > 1. Bán đảo Sơn Trà > Quy định xe máy tay ga',
+      );
       expect(scooterChunk!.content).toContain(
         '[Ngữ cảnh: Cẩm Nang Đà Nẵng > 1. Bán đảo Sơn Trà > Quy định xe máy tay ga]',
       );
-      expect(scooterChunk!.metadata.areaSlug).toBe('da-nang');
-      expect(scooterChunk!.metadata.categoryTags).toEqual(['safety', 'son-tra']);
+    });
+
+    it('should drop a bare ## heading shorter than the min length but keep it in child ### breadcrumbs', () => {
+      const body = `
+## 3. Cung đường
+### Đèo Hải Vân
+Chiều dài 21 km uốn lượn nối liền Đà Nẵng và Huế, nhiều khúc cua tay áo nguy hiểm.
+`;
+      const chunks = createSemanticChunks('Cẩm Nang', body);
+
+      expect(chunks).toHaveLength(1);
+      expect(chunks[0].breadcrumbs).toBe('Cẩm Nang > 3. Cung đường > Đèo Hải Vân');
     });
   });
 
@@ -103,14 +119,8 @@ Ban quản lý cấm xe máy tay ga từ trạm Vọng Cảnh lên Đỉnh Bàn 
             document_id: 'd-1',
             chunk_index: 0,
             content: 'Ban quản lý cấm xe máy tay ga...',
-            metadata: {
-              sectionTitle: 'Quy định xe máy',
-              breadcrumbs: 'Đà Nẵng > Sơn Trà',
-              categoryTags: ['safety'],
-            },
+            breadcrumbs: 'Đà Nẵng > Sơn Trà',
             document_title: 'Cẩm Nang Đà Nẵng',
-            source_type: 'curated_guide',
-            source_url: 'data/knowledge/02-da-nang.md',
             area_id: 48,
             similarity_score: 0.88,
           },

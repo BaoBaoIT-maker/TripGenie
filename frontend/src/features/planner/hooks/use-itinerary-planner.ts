@@ -4,6 +4,7 @@ import type {
   GenerateItineraryRequest,
   TransitPreviewRequest,
   ItineraryDetail,
+  TourBriefing,
   TransitMode,
 } from '@/types/itinerary';
 
@@ -15,7 +16,7 @@ export const itineraryKeys = {
   detail: (id: string) => ['itineraries', 'detail', id] as const,
 };
 
-/** List all itineraries created in the system. */
+/** List itineraries owned by the current authenticated user. */
 export function useItinerariesListQuery() {
   return useQuery({
     queryKey: itineraryKeys.lists(),
@@ -123,12 +124,16 @@ export function useCopilotChat(itineraryId: string) {
   });
 }
 
-/** Fetch chat history for an itinerary session. */
-export function useCopilotHistory(itineraryId: string, sessionId?: string) {
+/** Fetch chat history for an itinerary session (enabled only for owners). */
+export function useCopilotHistory(
+  itineraryId: string,
+  sessionId?: string,
+  enabled: boolean = true,
+) {
   return useQuery({
     queryKey: ['copilot-history', itineraryId, sessionId],
     queryFn: () => itineraryService.getChatHistory(itineraryId, sessionId),
-    enabled: Boolean(itineraryId),
+    enabled: Boolean(itineraryId) && enabled,
   });
 }
 
@@ -189,3 +194,14 @@ export function useUpdateCoverPhoto(itineraryId: string) {
   });
 }
 
+/** Update itinerary tour leader & assembly briefing info */
+export function useUpdateTourBriefing(itineraryId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: TourBriefing) => itineraryService.updateTourBriefing(itineraryId, dto),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(itineraryKeys.detail(itineraryId), updated);
+      queryClient.invalidateQueries({ queryKey: itineraryKeys.all });
+    },
+  });
+}

@@ -4,21 +4,9 @@ export const MAP_RADIUS_OPTIONS = [1, 3, 5, 10, 20] as const satisfies readonly 
 export const DEFAULT_MAP_CENTER: MapCoordinate = { latitude: 16.0544, longitude: 108.2022 };
 export const DEFAULT_MAP_ZOOM = 13;
 
-export const AREA_CENTERS: Record<string, MapCoordinate> = {
-  "da-nang": DEFAULT_MAP_CENTER,
-  "hoi-an": { latitude: 15.8801, longitude: 108.338 },
-  "tp-ho-chi-minh": { latitude: 10.7769, longitude: 106.7009 },
-  "da-lat": { latitude: 11.9404, longitude: 108.4583 },
-  "ninh-binh": { latitude: 20.2506, longitude: 105.9745 },
-  "phu-quoc": { latitude: 10.227, longitude: 103.967 },
-};
-
-// Backwards compatibility
-export const CITY_CENTERS: Record<string, MapCoordinate> = {
-  "Đà Nẵng": DEFAULT_MAP_CENTER,
-  "Hội An": { latitude: 15.8801, longitude: 108.338 },
-  "TP. Hồ Chí Minh": { latitude: 10.7769, longitude: 106.7009 },
-  "Đà Lạt": { latitude: 11.9404, longitude: 108.4583 },
-  "Ninh Bình": { latitude: 20.2506, longitude: 105.9745 },
-  "Phú Quốc": { latitude: 10.227, longitude: 103.967 },
-};
+// Domain Constants for Navigation, Directions & Map Framing
+export const MAX_NEARBY_PROXIMITY_KM = 45; // Maximum distance to consider user's device GPS local to the destination province
+export const MIN_ROUTE_DISTANCE_KM = 0.5; // Threshold distance below which fallback origin is offset to prevent identical A-B points
+export const ROUTE_ORIGIN_FALLBACK_OFFSET_DEG = 0.015; // Latitude offset (~1.65km) to generate a realistic local origin
+export const MAX_ROUTE_FIT_ZOOM = 16; // Maximum camera zoom clamp for route framing to prevent canvas blackouts
+export const DANANG_GSO_PROVINCE_CODE = "48"; // GSO code for Da Nang whose maritime islands skew arithmetic bounding box centroid

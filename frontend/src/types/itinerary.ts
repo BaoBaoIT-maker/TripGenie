@@ -141,8 +141,18 @@ export interface ItineraryDay {
   activities: ItineraryActivity[];
 }
 
+export interface TourBriefing {
+  leaderName?: string | null;
+  leaderPhone?: string | null;
+  meetingPoint?: string | null;
+  notes?: string | null;
+}
+
 export interface ItineraryDetail {
   id: string;
+  creatorId?: string;
+  isPublic?: boolean;
+  isOwner?: boolean;
   title: string;
   description: string | null;
   destination: string | null;
@@ -153,6 +163,7 @@ export interface ItineraryDetail {
   budgetLevel: string;
   intercityTransit: IntercityTransit | null;
   budgetBreakdown: BudgetBreakdown | null;
+  tourBriefing?: TourBriefing | null;
   days: ItineraryDay[];
 }
 
@@ -225,4 +236,3 @@ export interface CopilotHistoryMessage {
   proposal?: CopilotProposal;
   proposalStatus?: 'PENDING' | 'APPLIED' | 'REJECTED';
 }
-

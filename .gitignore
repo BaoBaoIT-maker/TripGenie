@@ -55,3 +55,6 @@ Thumbs.db
 tripgenie_backup.*
 *.dump
 
+
+# Local uploaded media
+backend/uploads/

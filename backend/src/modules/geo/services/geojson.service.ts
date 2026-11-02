@@ -41,7 +41,7 @@ export class GeoJsonService {
           properties: {
             id: place.id,
             name: place.name,
-            address: place.addressNormalized || place.address,
+            address: place.address,
             ratingAvg: place.ratingAvg ?? 0,
             reviewCount: place.reviewCount ?? 0,
             priceLevel: place.priceLevel,

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient, skipToken } from '@tanstack/react-query';
 import { itineraryService, ApiError } from '@/services/itinerary-planner.service';
+import { COPILOT_TOOL_NAMES } from '@/features/planner/utils/itinerary-schedule.util';
 import type {
   GenerateItineraryRequest,
   TransitPreviewRequest,
@@ -17,12 +18,13 @@ export const itineraryKeys = {
 };
 
 /** List itineraries owned by the current authenticated user. */
-export function useItinerariesListQuery(scope: 'OWNED' | 'JOINED' = 'OWNED') {
+export function useItinerariesListQuery(scope: 'OWNED' | 'JOINED' = 'OWNED', options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['itineraries', 'list', scope] as const,
     queryFn: () => itineraryService.listItineraries(scope),
     staleTime: 0,
     refetchOnMount: 'always',
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -201,6 +203,38 @@ export function useUpdateTourBriefing(itineraryId: string) {
     mutationFn: (dto: TourBriefing) => itineraryService.updateTourBriefing(itineraryId, dto),
     onSuccess: (updated) => {
       queryClient.setQueryData(itineraryKeys.detail(itineraryId), updated);
+      queryClient.invalidateQueries({ queryKey: itineraryKeys.all });
+    },
+  });
+}
+
+/** Add a specific place directly to a chosen day & time slot of an existing itinerary. */
+export function useAddPlaceToItinerary() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      itineraryId,
+      dayNumber,
+      placeId,
+      placeName,
+      timeSlot,
+    }: {
+      itineraryId: string;
+      dayNumber: number;
+      placeId: string;
+      placeName: string;
+      timeSlot?: string;
+    }) =>
+      itineraryService.applyProposal(itineraryId, COPILOT_TOOL_NAMES.ADD_ACTIVITY, {
+        dayNumber,
+        placeId,
+        query: placeName,
+        timeSlot,
+      }),
+    onSuccess: (res, variables) => {
+      if (res.itinerary) {
+        queryClient.setQueryData(itineraryKeys.detail(variables.itineraryId), res.itinerary);
+      }
       queryClient.invalidateQueries({ queryKey: itineraryKeys.all });
     },
   });

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { getSafeRedirectUrl } from '@/lib/safe-redirect';
+import {
+  getSafeRedirectUrl,
+  persistOAuthReturnUrl,
+  consumeOAuthReturnUrl,
+  OAUTH_RETURN_URL_STORAGE_KEY,
+} from '@/lib/safe-redirect';
 
 describe('getSafeRedirectUrl', () => {
   it('cho phép các đường dẫn nội bộ hợp lệ', () => {
@@ -55,5 +60,25 @@ describe('getSafeRedirectUrl', () => {
     expect(getSafeRedirectUrl('/%20/evil.example')).toBe('/explore');
     expect(getSafeRedirectUrl('/explore\x00evil')).toBe('/explore');
     expect(getSafeRedirectUrl('/explore\x1fevil')).toBe('/explore');
+  });
+it('persistOAuthReturnUrl và consumeOAuthReturnUrl lưu, khôi phục và xóa sạch returnUrl một lần duy nhất', () => {
+    window.sessionStorage.clear();
+    persistOAuthReturnUrl('/planner/trip-123?tab=days');
+    expect(window.sessionStorage.getItem(OAUTH_RETURN_URL_STORAGE_KEY)).toBe(
+      '/planner/trip-123?tab=days',
+    );
+
+    // 1st consume reads and removes from sessionStorage
+    expect(consumeOAuthReturnUrl(null)).toBe('/planner/trip-123?tab=days');
+    expect(window.sessionStorage.getItem(OAUTH_RETURN_URL_STORAGE_KEY)).toBeNull();
+
+    // 2nd consume falls back to /explore
+    expect(consumeOAuthReturnUrl(null)).toBe('/explore');
+
+    // Malicious URLs or auth routes are rejected before touching sessionStorage
+    persistOAuthReturnUrl('//evil.com');
+    expect(window.sessionStorage.getItem(OAUTH_RETURN_URL_STORAGE_KEY)).toBeNull();
+    persistOAuthReturnUrl('/login');
+    expect(window.sessionStorage.getItem(OAUTH_RETURN_URL_STORAGE_KEY)).toBeNull();
   });
 });

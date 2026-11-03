@@ -7,7 +7,12 @@ import {
   COPILOT_CONSTANTS,
   COPILOT_TOOL_NAMES,
 } from './copilot.types';
-import { parseTimeOfDay, formatTimeOfDay } from '../../../common/utils/time-of-day.util';
+import {
+  parseTimeOfDay,
+  formatTimeOfDay,
+  resolveNonOverlappingTimeSlot,
+} from '../../../common/utils/time-of-day.util';
+import { calculatePlaceEstimatedCost } from '../../../config/pricing.config';
 
 interface BoundingBox {
   minLat: number;
@@ -163,18 +168,17 @@ export class CopilotToolsService {
 
     const newPlace = await this.prisma.place.findFirst({
       where: { id: newPlaceId, deletedAt: null },
+      include: { category: true },
     });
     if (!newPlace) {
       throw new NotFoundException('Không tìm thấy địa điểm thay thế.');
     }
 
-    await this.prisma.itineraryDestination.update({
-      where: { id: activityId },
-      data: {
-        placeId: newPlaceId,
-        notes: `Đã đổi từ ${activity.place.name} sang ${newPlace.name}.`,
-      },
-    });
+    await this.persistActivitySwap(
+      activityId,
+      newPlace,
+      `Đã đổi từ ${activity.place.name} sang ${newPlace.name}.`,
+    );
   }
 
   /**
@@ -216,13 +220,11 @@ export class CopilotToolsService {
       });
       if (target && newPlace) {
         if (!dryRun) {
-          await this.prisma.itineraryDestination.update({
-            where: { id: target.id },
-            data: {
-              placeId: newPlace.id,
-              notes: `Đã đổi sang ${newPlace.name} theo yêu cầu: "${query}".`,
-            },
-          });
+          await this.persistActivitySwap(
+            target.id,
+            newPlace,
+            `Đã đổi sang ${newPlace.name} theo yêu cầu: "${query}".`,
+          );
         }
         return {
           toolName: COPILOT_TOOL_NAMES.SWAP_ACTIVITY,
@@ -320,13 +322,11 @@ export class CopilotToolsService {
       };
     }
 
-    await this.prisma.itineraryDestination.update({
-      where: { id: target.id },
-      data: {
-        placeId: newPlace.id,
-        notes: `Đã đổi sang ${newPlace.name} theo yêu cầu: "${query}".`,
-      },
-    });
+    await this.persistActivitySwap(
+      target.id,
+      newPlace,
+      `Đã đổi sang ${newPlace.name} theo yêu cầu: "${query}".`,
+    );
 
     return {
       toolName: COPILOT_TOOL_NAMES.SWAP_ACTIVITY,
@@ -390,7 +390,28 @@ export class CopilotToolsService {
       };
     }
 
-    const { start: startTimeStr, end: endTimeStr } = this.resolveTimeSlotRange(timeSlot);
+    const existingInSameDay = await this.prisma.itineraryDestination.findFirst({
+      where: { itineraryId, dayNumber, placeId: place.id },
+    });
+    if (existingInSameDay) {
+      return {
+        toolName: COPILOT_TOOL_NAMES.ADD_ACTIVITY,
+        success: false,
+        message: `Địa điểm "${place.name}" đã có trong Ngày ${dayNumber} của lịch trình.`,
+      };
+    }
+
+    const dayActivities = await this.prisma.itineraryDestination.findMany({
+      where: { itineraryId, dayNumber },
+      orderBy: [{ startTime: 'asc' }, { visitOrder: 'asc' }],
+    });
+
+    const baseSlot = this.resolveTimeSlotRange(timeSlot);
+    const {
+      start: startTimeStr,
+      end: endTimeStr,
+      durationMinutes,
+    } = resolveNonOverlappingTimeSlot(baseSlot, dayActivities);
 
     const isRevisit =
       (await this.prisma.itineraryDestination.findFirst({
@@ -424,12 +445,17 @@ export class CopilotToolsService {
       };
     }
 
-    const dayActivities = await this.prisma.itineraryDestination.findMany({
-      where: { itineraryId, dayNumber },
-      orderBy: { visitOrder: 'desc' },
-      take: 1,
+    const maxOrder = dayActivities.reduce(
+      (max, item) => Math.max(max, item.visitOrder ? Number(item.visitOrder) : 0),
+      0,
+    );
+    const nextOrder = maxOrder + 1;
+    const { cost: estimatedCost } = calculatePlaceEstimatedCost({
+      category: place.category,
+      priceRange: place.priceRange,
+      priceLevel: place.priceLevel,
+      placeName: place.name,
     });
-    const nextOrder = (dayActivities[0]?.visitOrder ? Number(dayActivities[0].visitOrder) : 0) + 1;
 
     await this.prisma.itineraryDestination.create({
       data: {
@@ -439,7 +465,8 @@ export class CopilotToolsService {
         visitOrder: new Prisma.Decimal(nextOrder),
         startTime: parseTimeOfDay(startTimeStr),
         endTime: parseTimeOfDay(endTimeStr),
-        estimatedDurationMinutes: COPILOT_CONSTANTS.DEFAULT_DURATION_MINUTES,
+        estimatedDurationMinutes: durationMinutes,
+        estimatedCost: new Prisma.Decimal(estimatedCost),
         notes: `Được thêm vào ngày ${dayNumber}${isRevisit ? ' (ghé lại)' : ''}: ${query}`,
       },
     });
@@ -589,18 +616,34 @@ export class CopilotToolsService {
 
     const toDayDestinations = await this.prisma.itineraryDestination.findMany({
       where: { itineraryId, dayNumber: toDay },
-      orderBy: { visitOrder: 'desc' },
-      take: 1,
+      orderBy: [{ startTime: 'asc' }, { visitOrder: 'asc' }],
     });
-    const nextOrder =
-      (toDayDestinations[0]?.visitOrder ? Number(toDayDestinations[0].visitOrder) : 0) + 1;
+    const maxOrder = toDayDestinations.reduce(
+      (max, item) => Math.max(max, item.visitOrder ? Number(item.visitOrder) : 0),
+      0,
+    );
+    const nextOrder = maxOrder + 1;
+    const baseMoveSlot = args.targetTimeSlot
+      ? this.resolveTimeSlotRange(args.targetTimeSlot)
+      : {
+          start: formatTimeOfDay(target.startTime) || COPILOT_CONSTANTS.TIME_SLOTS.AFTERNOON.start,
+          end: formatTimeOfDay(target.endTime) || COPILOT_CONSTANTS.TIME_SLOTS.AFTERNOON.end,
+        };
+    const {
+      start: movedStartStr,
+      end: movedEndStr,
+      durationMinutes: movedDuration,
+    } = resolveNonOverlappingTimeSlot(baseMoveSlot, toDayDestinations);
 
     await this.prisma.itineraryDestination.update({
       where: { id: target.id },
       data: {
         dayNumber: toDay,
         visitOrder: new Prisma.Decimal(nextOrder),
-        notes: `Đã dời từ ngày ${fromDay} sang ngày ${toDay}.`,
+        startTime: parseTimeOfDay(movedStartStr),
+        endTime: parseTimeOfDay(movedEndStr),
+        estimatedDurationMinutes: movedDuration,
+        notes: `Đã dời từ ngày ${fromDay} sang ngày ${toDay} (${movedStartStr} - ${movedEndStr}).`,
       },
     });
 
@@ -928,21 +971,42 @@ export class CopilotToolsService {
     return fallbackCandidates[0] ?? null;
   }
 
+  private async persistActivitySwap(
+    destinationId: string,
+    newPlace: {
+      id: string;
+      name: string;
+      category?: { name?: string | null; nameVi?: string | null; slug?: string | null } | null;
+      priceRange?: unknown;
+      priceLevel?: string | null;
+    },
+    notes: string,
+  ): Promise<void> {
+    const { cost: newEstimatedCost } = calculatePlaceEstimatedCost({
+      category: newPlace.category,
+      priceRange: newPlace.priceRange,
+      priceLevel: newPlace.priceLevel,
+      placeName: newPlace.name,
+    });
+
+    await this.prisma.itineraryDestination.update({
+      where: { id: destinationId },
+      data: {
+        placeId: newPlace.id,
+        estimatedCost: new Prisma.Decimal(newEstimatedCost),
+        notes,
+      },
+    });
+  }
+
   private resolveTimeSlotRange(timeSlot?: string): { start: string; end: string } {
     const slot = (timeSlot || '').toLowerCase();
-    if (slot.includes('morning') || slot.includes('sáng')) {
-      return COPILOT_CONSTANTS.TIME_SLOTS.MORNING;
-    }
-    if (slot.includes('lunch') || slot.includes('trưa')) {
-      return COPILOT_CONSTANTS.TIME_SLOTS.LUNCH;
-    }
-    if (slot.includes('dinner') || slot.includes('tối')) {
-      return COPILOT_CONSTANTS.TIME_SLOTS.DINNER;
-    }
-    if (slot.includes('night') || slot.includes('đêm')) {
-      return COPILOT_CONSTANTS.TIME_SLOTS.NIGHT;
-    }
-    return COPILOT_CONSTANTS.TIME_SLOTS.AFTERNOON;
+    const matched = COPILOT_CONSTANTS.TIME_SLOT_ALIASES.find((rule) =>
+      rule.keywords.some((kw) => slot.includes(kw)),
+    );
+    return matched
+      ? COPILOT_CONSTANTS.TIME_SLOTS[matched.slot]
+      : COPILOT_CONSTANTS.TIME_SLOTS.AFTERNOON;
   }
 
   private async resolveItineraryBbox(

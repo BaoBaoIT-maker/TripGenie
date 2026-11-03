@@ -21,6 +21,7 @@ import {
   ChevronUp,
   ChevronDown,
   GripHorizontal,
+  LocateFixed,
 } from "lucide-react";
 
 // Fix Web Worker URL in Next.js / Turbopack
@@ -31,17 +32,20 @@ import { toast } from "sonner";
 import type {
   VietMapProps,
   DiscoveryPlace,
-  SavedPlace,
   MapCoordinate,
 } from "@/features/map/types";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useSavedPlaceIds, useToggleFavorite } from "@/features/collections/hooks/use-collections";
+import { SaveToCollectionModal } from "@/features/collections/components/SaveToCollectionModal";
+import { DEFAULT_COLLECTION_TITLE } from "@/services/collection.service";
+import { AddPlaceToItineraryModal } from "@/features/planner/components/AddPlaceToItineraryModal";
 import {
   DEFAULT_MAP_ZOOM,
   DEFAULT_MAP_CENTER,
   MAX_NEARBY_PROXIMITY_KM,
-  MIN_ROUTE_DISTANCE_KM,
-  ROUTE_ORIGIN_FALLBACK_OFFSET_DEG,
   MAX_ROUTE_FIT_ZOOM,
   DANANG_GSO_PROVINCE_CODE,
+  ROUTE_STOP_ID_USER_LOCATION,
 } from "@/features/map/map-config";
 import { createPlaceMarkerElement, getMarkerButtonClasses } from "./PlaceMarker";
 import { createMapPopupElement } from "./MapPopup";
@@ -128,7 +132,6 @@ interface ProvinceBoundItem {
 }
 
 const boundsMap = provincesBoundsData as Record<string, ProvinceBoundItem>;
-const SAVED_PLACES_STORAGE_KEY = "tripgenie_saved_places";
 
 import type { BackendTravelAreaItem } from "@/services/place.service";
 
@@ -249,17 +252,30 @@ export default function VietMap({
   const routeStopMarkersRef = useRef<Marker[]>([]);
   const pendingDestinationRef = useRef<DiscoveryPlace | null>(null);
 
-  // Saved Places State (Permanent markers ❤️)
-  const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const stored = localStorage.getItem(SAVED_PLACES_STORAGE_KEY);
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
+  // Synced Collections & Add-to-Itinerary Modals
+  const { user } = useAuth();
+  const isAuthenticated = Boolean(user);
+  const { data: savedIdsSet } = useSavedPlaceIds({ enabled: isAuthenticated });
+  const [placeForSaveModal, setPlaceForSaveModal] = useState<DiscoveryPlace | null>(null);
+  const [placeForItineraryModal, setPlaceForItineraryModal] = useState<DiscoveryPlace | null>(null);
+  const lastToggledPlaceRef = useRef<DiscoveryPlace | null>(null);
+
+  const toggleMutation = useToggleFavorite({
+    onSaved: (data) => {
+      const toggledPlace = lastToggledPlaceRef.current;
+      if (!toggledPlace) return;
+      if (data.isSaved) {
+        toast.success(`Đã lưu "${toggledPlace.name}" vào ${DEFAULT_COLLECTION_TITLE}`, {
+          action: {
+            label: "Đổi bộ sưu tập",
+            onClick: () => setPlaceForSaveModal(toggledPlace),
+          },
+        });
+      } else {
+        toast.info(`Đã bỏ lưu "${toggledPlace.name}"`);
+      }
+    },
   });
-  const savedMarkersRef = useRef<Marker[]>([]);
 
   // "Search This Area" Pill State
   const [showSearchThisArea, setShowSearchThisArea] = useState(false);
@@ -330,44 +346,37 @@ export default function VietMap({
   // When center prop updates, dismiss "Search This Area" button
   useEffect(() => {
     lastSearchCenterRef.current = center;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setShowSearchThisArea(false);
   }, [center]);
 
-  // Save savedPlaces to localStorage
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem(SAVED_PLACES_STORAGE_KEY, JSON.stringify(savedPlaces));
-      } catch (err) {
-        console.warn("Failed to persist saved places to localStorage:", err);
+  // Toggle Save Place Handler (Synced with PostgreSQL Collections)
+  const handleToggleSave = useCallback(
+    (place: DiscoveryPlace) => {
+      if (!isAuthenticated) {
+        toast.info("Vui lòng đăng nhập để lưu địa điểm vào bộ sưu tập");
+        router.push(`/login?next=${encodeURIComponent("/explore")}`);
+        return;
       }
-    }
-  }, [savedPlaces]);
+      if (toggleMutation.isPending) return;
+      lastToggledPlaceRef.current = place;
+      toggleMutation.mutate({ placeId: place.id });
+    },
+    [isAuthenticated, router, toggleMutation]
+  );
 
-
-  // Toggle Save Place Handler
-  const handleToggleSave = useCallback((place: DiscoveryPlace) => {
-    setSavedPlaces((prev) => {
-      const exists = prev.some((p) => p.id === place.id);
-      if (exists) {
-        toast.info(`Đã bỏ lưu "${place.name}"`);
-        return prev.filter((p) => p.id !== place.id);
+  // Add Place to Existing Itinerary Handler
+  const handleAddToItinerary = useCallback(
+    (place: DiscoveryPlace) => {
+      if (!isAuthenticated) {
+        toast.info("Vui lòng đăng nhập để thêm địa điểm vào lịch trình");
+        router.push(`/login?next=${encodeURIComponent("/explore")}`);
+        return;
       }
-      toast.success(`Đã lưu "${place.name}" vào mục Yêu thích ❤️`);
-      return [
-        ...prev,
-        {
-          id: place.id,
-          name: place.name,
-          address: place.address,
-          latitude: place.latitude,
-          longitude: place.longitude,
-          category: "favorite",
-          savedAt: new Date().toISOString(),
-        },
-      ];
-    });
-  }, []);
+      setPlaceForItineraryModal(place);
+    },
+    [isAuthenticated, router]
+  );
 
   // Compute and Draw Multi-Stop Route Line on Map
   const drawRoute = useCallback(
@@ -419,7 +428,7 @@ export default function VietMap({
 
           el.addEventListener("click", (e) => {
             e.stopPropagation();
-            if (stop.id && stop.id !== "user-origin") {
+            if (stop.id && !routingService.isSyntheticRouteOriginId(stop.id)) {
               onSelectPlaceRef.current(stop.id);
             }
           });
@@ -539,61 +548,29 @@ export default function VietMap({
     if (map.getSource("tripgenie-route-source")) map.removeSource("tripgenie-route-source");
   }, []);
 
-  // Request directions handler (initiates or replaces destination)
+  // Request directions handler (initiates 2-stop route from nearby GPS or area center)
+  const pendingUserOriginRequestRef = useRef(false);
+
   const handleStartDirections = useCallback(
     (targetPlace: DiscoveryPlace) => {
-      // Check if user location is nearby in the same city/province
-      const isNearby = userLocation
-        ? routingService.calculateDirectDistanceKm(userLocation, {
-            latitude: targetPlace.latitude,
-            longitude: targetPlace.longitude,
-          }) <= MAX_NEARBY_PROXIMITY_KM
-        : false;
+      const provCenter = resolveTargetAreaCenter(
+        targetPlace,
+        travelAreas,
+        selectedProvinceName
+      );
+      const provName = targetPlace.areaName || selectedProvinceName || "thành phố";
 
-      let originCoord: Coordinate;
-      let originName: string;
-
-      if (userLocation && isNearby) {
-        originCoord = userLocation;
-        originName = "Vị trí của bạn";
-      } else {
-        const provCenter = resolveTargetAreaCenter(
-          targetPlace,
-          travelAreas,
-          selectedProvinceName
-        );
-        const provName = targetPlace.areaName || selectedProvinceName || "thành phố";
-
-        // If fallback center is too close to targetPlace, offset slightly so origin != destination
-        const distToTarget = routingService.calculateDirectDistanceKm(provCenter, {
-          latitude: targetPlace.latitude,
-          longitude: targetPlace.longitude,
-        });
-
-        if (distToTarget < MIN_ROUTE_DISTANCE_KM) {
-          originCoord = {
-            latitude: provCenter.latitude + ROUTE_ORIGIN_FALLBACK_OFFSET_DEG,
-            longitude: provCenter.longitude,
-          };
-          originName = `Khu vực trung tâm ${provName}`;
-        } else {
-          originCoord = provCenter;
-          originName = `Trung tâm ${provName}`;
-        }
-      }
-
-      const stopA: RouteStop = {
-        id: "user-origin",
-        name: originName,
-        coordinate: originCoord,
-      };
-      const stopB: RouteStop = {
-        id: targetPlace.id,
-        name: targetPlace.name,
-        coordinate: { latitude: targetPlace.latitude, longitude: targetPlace.longitude },
-      };
-
-      const newStops = [stopA, stopB];
+      const newStops = routingService.buildInitialRouteStops({
+        targetStop: {
+          id: targetPlace.id,
+          name: targetPlace.name,
+          coordinate: { latitude: targetPlace.latitude, longitude: targetPlace.longitude },
+        },
+        userLocation,
+        areaCenter: provCenter,
+        areaName: provName,
+        maxNearbyKm: MAX_NEARBY_PROXIMITY_KM,
+      });
       setRouteStops(newStops);
     },
     [userLocation, selectedProvinceName, travelAreas]
@@ -610,29 +587,49 @@ export default function VietMap({
     });
   }, [routeStops]);
 
-  // Auto-upgrade fallback origin ("Trung tâm...") to actual user location ONLY if user is actually nearby (< 45km)
+  // Upgrade fallback origin to actual user location when nearby (< 20km) OR when user explicitly clicked "Từ vị trí của tôi"
   useEffect(() => {
     if (!userLocation) return;
-    setRouteStops((prev) => {
-      if (prev.length < 2) return prev;
-      const dest = prev[prev.length - 1];
-      const distToDest = routingService.calculateDirectDistanceKm(userLocation, dest.coordinate);
-      // Do NOT hijack origin if user is far away in another province/city
-      if (distToDest > MAX_NEARBY_PROXIMITY_KM) return prev;
+    const forceUserOrigin = pendingUserOriginRequestRef.current;
+    pendingUserOriginRequestRef.current = false;
 
-      if (prev[0].id === "user-origin" && prev[0].name.startsWith("Trung tâm")) {
-        const updated = [...prev];
-        updated[0] = {
-          id: "user-origin",
-          name: "Vị trí của bạn",
-          coordinate: userLocation,
-        };
-        toast.info("Đã tự động cập nhật lộ trình từ vị trí của bạn!");
+    setRouteStops((prev) => {
+      const { stops: updated, applied } = routingService.applyUserLocationToRoute(
+        prev,
+        userLocation,
+        { force: forceUserOrigin, maxNearbyKm: MAX_NEARBY_PROXIMITY_KM }
+      );
+      if (applied) {
+        toast.info(
+          forceUserOrigin
+            ? "Đã đặt vị trí của bạn làm điểm xuất phát!"
+            : "Đã tự động cập nhật lộ trình từ vị trí của bạn!"
+        );
         return updated;
       }
       return prev;
     });
   }, [userLocation]);
+
+  // Explicitly use user's live GPS as the route origin regardless of 20km threshold
+  const handleUseMyLocationAsOrigin = useCallback(() => {
+    if (userLocation) {
+      setRouteStops((prev) => {
+        const { stops: updated } = routingService.applyUserLocationToRoute(
+          prev,
+          userLocation,
+          { force: true }
+        );
+        return updated;
+      });
+      toast.success("Đã đặt vị trí của bạn làm điểm xuất phát!");
+      return;
+    }
+
+    pendingUserOriginRequestRef.current = true;
+    onRequestCurrentLocation?.();
+    toast.info("Đang lấy vị trí GPS của bạn để cập nhật điểm xuất phát...");
+  }, [userLocation, onRequestCurrentLocation]);
 
   // Set selected place as the starting origin (Point A)
   const handleSetOrigin = useCallback(
@@ -642,44 +639,41 @@ export default function VietMap({
         name: place.name,
         coordinate: { latitude: place.latitude, longitude: place.longitude },
       };
-      setRouteStops((prev) => {
-        if (prev.length === 0) return [newOrigin];
-        const updated = [...prev];
-        updated[0] = newOrigin;
-        return updated;
-      });
+      setRouteStops((prev) => routingService.setOriginInRoute(prev, newOrigin));
       toast.success(`Đã đặt "${place.name}" làm điểm xuất phát!`);
     },
     []
   );
 
-    // Add a stop to the existing route — pure state update, drawRoute triggered by reactive effect
+  // Add a stop to the existing route — pure state update, drawRoute triggered by reactive effect
   const handleAddStopToRoute = useCallback(
     (place: DiscoveryPlace) => {
       if (!place) return;
-      setRouteStops((prev) => {
-        if (prev.length === 0) return prev; // no route started yet
-        return [
-          ...prev,
-          {
-            id: place.id,
-            name: place.name,
-            coordinate: { latitude: place.latitude, longitude: place.longitude },
-          },
-        ];
-      });
+      setRouteStops((prev) =>
+        routingService.addStopToRoute(prev, {
+          id: place.id,
+          name: place.name,
+          coordinate: { latitude: place.latitude, longitude: place.longitude },
+        })
+      );
       toast.success(`Đã thêm "${place.name}" vào chặng dừng!`);
     },
     []
   );
 
-    // Remove a stop — pure state update, reactive effect handles re-draw / clear
+  // Remove a stop by index — pure state update, reactive effect handles re-draw / clear
   const handleRemoveStop = useCallback(
     (index: number) => {
-      setRouteStops((prev) => {
-        if (prev.length <= 2) return []; // reactive effect clears layers on []
-        return prev.filter((_, idx) => idx !== index);
-      });
+      setRouteStops((prev) => routingService.removeStopFromRoute(prev, index));
+    },
+    []
+  );
+
+  // Remove a stop by place ID (from popup) — pure state update
+  const handleRemoveStopById = useCallback(
+    (placeId: string) => {
+      setRouteStops((prev) => routingService.removeStopFromRoute(prev, placeId));
+      toast.info("Đã gỡ địa điểm khỏi lộ trình");
     },
     []
   );
@@ -720,6 +714,7 @@ export default function VietMap({
   // All mutation handlers are pure state updates — no drawRoute inside updaters.
   useEffect(() => {
     if (routeStops.length >= 2) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       drawRoute(routeStops, routeMode);
     } else if (routeStops.length === 0) {
       const map = mapRef.current;
@@ -737,6 +732,7 @@ export default function VietMap({
     // If user requests routing directly to a pinned location
   useEffect(() => {
     if (routeToPinRequest) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       handleStartDirections({
         id: "pinned-pin",
         slug: "pinned-pin",
@@ -865,8 +861,8 @@ export default function VietMap({
         }
       });
 
-      map.on("error", (e) => {
-        const msg = (e as any)?.error?.message || (e as any)?.message;
+      map.on("error", (e: { error?: { message?: string }; message?: string }) => {
+        const msg = e?.error?.message || e?.message;
         if (msg) {
           console.warn("VietMap / MapLibre error:", msg);
         }
@@ -877,8 +873,6 @@ export default function VietMap({
       return () => {
         markersRef.current.forEach((m) => m.remove());
         markersRef.current = [];
-        savedMarkersRef.current.forEach((m) => m.remove());
-        savedMarkersRef.current = [];
         routeStopMarkersRef.current.forEach((m) => m.remove());
         routeStopMarkersRef.current = [];
         if (userMarkerRef.current) {
@@ -1011,36 +1005,6 @@ export default function VietMap({
     }
   }, [geocodedPin]);
 
-  // Render Saved Places Layer (Permanent ❤️ Markers)
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    savedMarkersRef.current.forEach((m) => m.remove());
-    savedMarkersRef.current = [];
-
-    savedPlaces.forEach((saved) => {
-      const el = document.createElement("div");
-      el.className = "flex flex-col items-center cursor-pointer select-none group z-30";
-      el.innerHTML = `
-        <div class="size-6 rounded-full bg-rose-500 border-2 border-white shadow-md flex items-center justify-center text-white text-[11px] group-hover:scale-125 transition-transform">
-          ❤️
-        </div>
-      `;
-
-      const marker = new Marker({ element: el })
-        .setLngLat([saved.longitude, saved.latitude])
-        .addTo(map);
-
-      el.addEventListener("click", (e) => {
-        e.stopPropagation();
-        map.flyTo({ center: [saved.longitude, saved.latitude], zoom: 15.5, duration: 500 });
-      });
-
-      savedMarkersRef.current.push(marker);
-    });
-  }, [savedPlaces]);
-
   // Create / Rebuild places markers when `places` list changes
   useEffect(() => {
     const map = mapRef.current;
@@ -1106,6 +1070,7 @@ export default function VietMap({
         // ignore bounds calculation error
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [places, geocodedPin, markerLabels, markerColors]);
 
 
@@ -1281,9 +1246,11 @@ export default function VietMap({
     const targetPlace = "place" in targetItem ? (targetItem.place as DiscoveryPlace) : targetItem;
     if (!targetPlace || typeof targetPlace.latitude !== "number" || typeof targetPlace.longitude !== "number") return;
 
+    const routeStopIndex = routeStops.findIndex((s) => s.id === targetPlace.id);
+
     // If popup is ALREADY showing for this exact place, refresh action buttons in-place and keep it firmly open!
     if (currentPopupPlaceIdRef.current === targetPlace.id && popupRef.current && popupRef.current.isOpen()) {
-      const isSaved = savedPlaces.some((p) => p.id === targetPlace.id);
+      const isSaved = isAuthenticated ? (savedIdsSet?.has(targetPlace.id) ?? false) : false;
       const popupEl = createMapPopupElement(
         targetItem,
         (placeId) => {
@@ -1292,9 +1259,12 @@ export default function VietMap({
         hidePopupDirections ? undefined : (targetPlace) => handleStartDirections(targetPlace),
         {
           isRoutingActive: hidePopupDirections ? false : routeStops.length >= 2,
+          routeStopIndex,
           isSaved,
           onToggleSave: handleToggleSave,
+          onAddToItinerary: hidePopupDirections ? undefined : handleAddToItinerary,
           onAddStopToRoute: hidePopupDirections ? undefined : handleAddStopToRoute,
+          onRemoveStopFromRoute: hidePopupDirections ? undefined : handleRemoveStopById,
           onSetOrigin: hidePopupDirections ? undefined : handleSetOrigin,
         }
       );
@@ -1332,7 +1302,7 @@ export default function VietMap({
       isProgrammaticPopupCloseRef.current = false;
     }
 
-    const isSaved = savedPlaces.some((p) => p.id === targetPlace.id);
+    const isSaved = isAuthenticated ? (savedIdsSet?.has(targetPlace.id) ?? false) : false;
 
     const popupEl = createMapPopupElement(
       targetItem,
@@ -1342,9 +1312,12 @@ export default function VietMap({
       hidePopupDirections ? undefined : (targetPlace) => handleStartDirections(targetPlace),
       {
         isRoutingActive: hidePopupDirections ? false : routeStops.length >= 2,
+        routeStopIndex,
         isSaved,
         onToggleSave: handleToggleSave,
+        onAddToItinerary: hidePopupDirections ? undefined : handleAddToItinerary,
         onAddStopToRoute: hidePopupDirections ? undefined : handleAddStopToRoute,
+        onRemoveStopFromRoute: hidePopupDirections ? undefined : handleRemoveStopById,
         onSetOrigin: hidePopupDirections ? undefined : handleSetOrigin,
       }
     );
@@ -1369,17 +1342,23 @@ export default function VietMap({
     });
 
     popupRef.current = popup;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     selectedPlaceId,
     places,
     mapLoaded,
-    savedPlaces,
-    routeStops.length,
+    isAuthenticated,
+    savedIdsSet,
+    routeStops,
     isRoutePanelCollapsed,
     handleStartDirections,
+    handleAddToItinerary,
     handleAddStopToRoute,
+    handleRemoveStopById,
     handleSetOrigin,
     handleToggleSave,
+    hidePopupDirections,
+    router,
   ]);
 
   return (
@@ -1607,18 +1586,36 @@ export default function VietMap({
             })}
           </div>
 
-          {/* Quick Action Buttons: Add Stop tip & Swap all stops */}
+          {/* Quick Action Buttons: Use My Location & Swap all stops */}
           <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/50 text-[11px]">
-            <span className="text-muted-foreground italic truncate">
-              💡 Bấm vào quán trên bản đồ để thêm chặng
-            </span>
+            {routeStops[0]?.id === ROUTE_STOP_ID_USER_LOCATION ? (
+              <span className="inline-flex items-center gap-1.5 text-primary font-semibold truncate">
+                <LocateFixed className="size-3.5 shrink-0" aria-hidden="true" />
+                <span className="truncate">Đang tính từ vị trí của bạn</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleUseMyLocationAsOrigin}
+                disabled={Boolean(locating)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary font-semibold border border-primary/25 transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                title="Tính khoảng cách và chỉ đường từ vị trí GPS hiện tại của bạn"
+              >
+                {locating ? (
+                  <Loader2 className="size-3 animate-spin shrink-0" aria-hidden="true" />
+                ) : (
+                  <LocateFixed className="size-3 shrink-0" aria-hidden="true" />
+                )}
+                <span>{locating ? "Đang định vị..." : "Từ vị trí của tôi"}</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={handleSwapRoute}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground font-semibold border border-border/40 transition-colors cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground font-semibold border border-border/60 transition-colors cursor-pointer whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               title="Đổi chiều lộ trình (Đảo ngược tất cả các chặng)"
             >
-              <ArrowUpDown className="size-3" />
+              <ArrowUpDown className="size-3 shrink-0" aria-hidden="true" />
               <span>Đổi chiều</span>
             </button>
           </div>
@@ -1665,6 +1662,20 @@ export default function VietMap({
         locating={locating}
         currentTheme={currentTheme}
         onChangeTheme={setCurrentTheme}
+      />
+
+      {placeForSaveModal && (
+        <SaveToCollectionModal
+          isOpen={Boolean(placeForSaveModal)}
+          onClose={() => setPlaceForSaveModal(null)}
+          place={placeForSaveModal}
+        />
+      )}
+
+      <AddPlaceToItineraryModal
+        isOpen={Boolean(placeForItineraryModal)}
+        onClose={() => setPlaceForItineraryModal(null)}
+        place={placeForItineraryModal}
       />
     </div>
   );

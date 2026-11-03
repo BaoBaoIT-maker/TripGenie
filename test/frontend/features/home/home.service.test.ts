@@ -66,8 +66,7 @@ describe("homeService", () => {
           suitableFor: "couple",
           sortBy: "rating",
           limit: HOME_CONFIG.places.limit,
-        }),
-        { allowMockFallback: false }
+        })
       );
       expect(places).toEqual(mockResultPlaces);
     });

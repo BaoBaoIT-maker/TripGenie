@@ -1,7 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { placeService } from "@/services/place.service";
 import { apiClient } from "@/lib/api-client";
-import { MOCK_PLACES } from "@/mocks/data/places";
 
 vi.mock("@/lib/api-client", () => ({
   apiClient: vi.fn(),
@@ -47,19 +46,17 @@ describe("placeService.searchPlaces", () => {
     expect(result.total).toBe(0);
   });
 
-  it("falls back to MOCK_PLACES by default when backend throws error", async () => {
+  it("propagates backend error by default instead of fabricating mock places", async () => {
     vi.mocked(apiClient).mockRejectedValueOnce(new Error("Network Error"));
 
-    const result = await placeService.searchPlaces({ limit: 5 });
-    expect(result.places.length).toBeGreaterThan(0);
-    expect(MOCK_PLACES.map((p) => p.id)).toContain(result.places[0].id);
+    await expect(placeService.searchPlaces({ limit: 5 })).rejects.toThrow("Network Error");
   });
 
   it("throws error without mock fallback when allowMockFallback is false", async () => {
     vi.mocked(apiClient).mockRejectedValueOnce(new Error("Database connection down"));
 
     await expect(
-      placeService.searchPlaces({ limit: 5 }, { allowMockFallback: false })
+      placeService.searchPlaces({ limit: 5 })
     ).rejects.toThrow("Database connection down");
   });
 });

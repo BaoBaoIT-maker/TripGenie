@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { useAuth } from '@/features/auth/hooks/use-auth';
+import { persistOAuthReturnUrl } from '@/lib/safe-redirect';
 
 interface GoogleAuthButtonProps {
   label?: string;
@@ -15,6 +16,7 @@ export function GoogleAuthButton({
   const { googleAuthUrl } = useAuth();
 
   const handleGoogleClick = () => {
+    persistOAuthReturnUrl();
     window.location.href = googleAuthUrl;
   };
 

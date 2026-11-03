@@ -11,6 +11,7 @@ import {
 import { usePlannerDraftStore } from "@/features/planner/stores/planner-draft-store";
 import { Planner } from "@/types/planner";
 import { plannerService } from "@/services/planner.service";
+import { placeService } from "@/services/place.service";
 import { MOCK_PLACES } from "@/mocks/data/places";
 
 const push = vi.fn();
@@ -23,6 +24,12 @@ vi.mock("@/features/planner/hooks/use-planner", () => ({
   useUpdatePlannerMutation: vi.fn(),
   useCreatePlannerInvitationMutation: vi.fn(),
   useUpdateMockInvitationStatusMutation: vi.fn(),
+}));
+
+vi.mock("@/services/place.service", () => ({
+  placeService: {
+    getPlaces: vi.fn(),
+  },
 }));
 
 vi.mock("@/services/planner.service", () => ({
@@ -71,6 +78,7 @@ describe("PlannerEditor editor lifecycle", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     usePlannerDraftStore.getState().reset();
+    vi.mocked(placeService.getPlaces).mockResolvedValue(MOCK_PLACES);
 
     vi.mocked(useUpdatePlannerMutation).mockReturnValue({
       mutateAsync,
@@ -296,6 +304,7 @@ const emptyManualPlanner: Planner = {
 function prepareEmptyManualPlanner(planner: Planner = emptyManualPlanner) {
   vi.clearAllMocks();
   usePlannerDraftStore.getState().reset();
+    vi.mocked(placeService.getPlaces).mockResolvedValue(MOCK_PLACES);
   vi.mocked(useUpdatePlannerMutation).mockReturnValue({
     mutateAsync: vi.fn(),
     isPending: false,
@@ -312,6 +321,7 @@ describe("PlannerEditor itinerary", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     usePlannerDraftStore.getState().reset();
+    vi.mocked(placeService.getPlaces).mockResolvedValue(MOCK_PLACES);
     vi.mocked(useUpdatePlannerMutation).mockReturnValue({
       mutateAsync: vi.fn(),
       isPending: false,
@@ -502,6 +512,7 @@ describe("PlannerEditor invitation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     usePlannerDraftStore.getState().reset();
+    vi.mocked(placeService.getPlaces).mockResolvedValue(MOCK_PLACES);
 
     vi.mocked(useUpdatePlannerMutation).mockReturnValue({
       mutateAsync: vi.fn(),

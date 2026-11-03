@@ -24,14 +24,15 @@ const props: VietMapProps = {
 describe("VietMap DOM factories and controls", () => {
   it("creates an accessible active marker", () => {
     const onSelect = vi.fn();
-    const element = createPlaceMarkerElement(nearbyPlace, {
+    const { container, button } = createPlaceMarkerElement(nearbyPlace, {
       selected: true,
       hovered: false,
       onSelect,
     });
-    expect(element).toHaveAttribute("aria-label", `Xem ${nearbyPlace.place.name} trên bản đồ`);
-    expect(element.dataset.active).toBe("true");
-    element.click();
+    expect(container.dataset.placeId).toBe(nearbyPlace.place.id);
+    expect(button).toHaveAttribute("aria-label", `Xem ${nearbyPlace.place.name} trên bản đồ`);
+    expect(button.dataset.active).toBe("true");
+    button.click();
     expect(onSelect).toHaveBeenCalledWith(nearbyPlace.place.id);
   });
 
@@ -42,10 +43,95 @@ describe("VietMap DOM factories and controls", () => {
     expect(popup.querySelector("a")).toHaveAttribute("href", `/places/${nearbyPlace.place.slug}`);
   });
 
-  it("keeps a result-compatible fallback when the key is missing", () => {
-    vi.stubEnv("NEXT_PUBLIC_VIETMAP_API_KEY", "");
+  it("renders routing popup actions without 'Đích mới' when place is not yet in route", () => {
+    const onAddStopToRoute = vi.fn();
+    const onSetOrigin = vi.fn();
+    const onRequestDirections = vi.fn();
+
+    const popup = createMapPopupElement(
+      nearbyPlace,
+      vi.fn(),
+      onRequestDirections,
+      {
+        isRoutingActive: true,
+        routeStopIndex: -1,
+        onAddStopToRoute,
+        onSetOrigin,
+      }
+    );
+
+    expect(popup).toHaveTextContent("Thêm chặng");
+    expect(popup).toHaveTextContent("Điểm xuất phát");
+    expect(popup).not.toHaveTextContent("Đích mới");
+
+    const buttons = Array.from(popup.querySelectorAll("button"));
+    const addStopBtn = buttons.find((b) => b.textContent?.includes("Thêm chặng"));
+    const originBtn = buttons.find((b) => b.textContent?.includes("Điểm xuất phát"));
+
+    addStopBtn?.click();
+    expect(onAddStopToRoute).toHaveBeenCalledWith(nearbyPlace.place);
+
+    originBtn?.click();
+    expect(onSetOrigin).toHaveBeenCalledWith(nearbyPlace.place);
+  });
+
+  it("renders active stop badge and 'Gỡ chặng' button when place is already in route", () => {
+    const onAddStopToRoute = vi.fn();
+    const onRemoveStopFromRoute = vi.fn();
+    const onSetOrigin = vi.fn();
+
+    const popup = createMapPopupElement(
+      nearbyPlace,
+      vi.fn(),
+      vi.fn(),
+      {
+        isRoutingActive: true,
+        routeStopIndex: 2, // Stop C (#3)
+        onAddStopToRoute,
+        onRemoveStopFromRoute,
+        onSetOrigin,
+      }
+    );
+
+    expect(popup).toHaveTextContent("Đang là Chặng C (#3)");
+    expect(popup).toHaveTextContent("Gỡ chặng");
+    expect(popup).not.toHaveTextContent("Thêm chặng");
+    expect(popup).not.toHaveTextContent("Đích mới");
+
+    const buttons = Array.from(popup.querySelectorAll("button"));
+    const removeBtn = buttons.find((b) => b.textContent?.includes("Gỡ chặng"));
+    removeBtn?.click();
+    expect(onRemoveStopFromRoute).toHaveBeenCalledWith(nearbyPlace.place.id);
+  });
+
+  it("renders 'Thêm lịch trình' button in popup and invokes onAddToItinerary", () => {
+    const onAddToItinerary = vi.fn();
+    const onSetOrigin = vi.fn();
+
+    const popup = createMapPopupElement(
+      nearbyPlace,
+      vi.fn(),
+      vi.fn(),
+      {
+        isRoutingActive: false,
+        onAddToItinerary,
+        onSetOrigin,
+      }
+    );
+
+    expect(popup).toHaveTextContent("Thêm lịch trình");
+    const buttons = Array.from(popup.querySelectorAll("button"));
+    const addItineraryBtn = buttons.find((b) =>
+      b.textContent?.includes("Thêm lịch trình")
+    );
+    expect(addItineraryBtn).toBeDefined();
+    addItineraryBtn?.click();
+    expect(onAddToItinerary).toHaveBeenCalledWith(nearbyPlace.place);
+  });
+
+  it("renders accessible loading skeleton while VietMapLoader initializes", () => {
     render(<VietMapLoader {...props} />);
-    expect(screen.getByText(/chưa cấu hình khóa VietMap/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("Đang tải bản đồ")).toBeInTheDocument();
   });
 
   it("renders map controls and triggers zoom and location actions", async () => {

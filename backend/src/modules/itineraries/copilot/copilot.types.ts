@@ -1,4 +1,5 @@
 import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean } from 'class-validator';
+import { TIME_SCHEDULING_CONSTANTS } from '../../../common/utils/time-of-day.util';
 
 /** DTO for user chat messages sent to Genie Copilot. */
 export class CopilotChatDto {
@@ -145,6 +146,9 @@ export const COPILOT_CONSTANTS = {
   CATEGORY_AFFINITY_WEIGHT: 5,
   SWAP_TEMP_DAY_NUMBER: 9999,
   DEFAULT_DURATION_MINUTES: 90,
+  TRANSIT_BUFFER_MINUTES: TIME_SCHEDULING_CONSTANTS.DEFAULT_TRANSIT_BUFFER_MINUTES,
+  MIN_ACTIVITY_DURATION_MINUTES: TIME_SCHEDULING_CONSTANTS.DEFAULT_MIN_DURATION_MINUTES,
+  MAX_MINUTE_OF_DAY: TIME_SCHEDULING_CONSTANTS.DEFAULT_MAX_ACTIVITY_END_MINUTE,
   DEFAULT_RATING_FALLBACK: 4.7,
   GUEST_FALLBACK_USER_ID: '00000000-0000-0000-0000-000000000001',
   DEFAULT_SESSION_TITLE: 'Trò chuyện cùng Genie Copilot',
@@ -156,6 +160,12 @@ export const COPILOT_CONSTANTS = {
     DINNER: { start: '18:30', end: '20:00' },
     NIGHT: { start: '20:30', end: '22:30' },
   },
+  TIME_SLOT_ALIASES: [
+    { keywords: ['morning', 'sáng'], slot: 'MORNING' },
+    { keywords: ['lunch', 'trưa'], slot: 'LUNCH' },
+    { keywords: ['dinner', 'tối', 'evening'], slot: 'DINNER' },
+    { keywords: ['night', 'đêm'], slot: 'NIGHT' },
+  ],
 } as const;
 
 export const COPILOT_SUMMARY_QUEUE = 'copilot-summary';

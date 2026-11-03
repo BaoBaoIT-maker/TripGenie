@@ -106,6 +106,7 @@ export const PRICING_CONFIG = {
 
   // 4. Default Daily Living Expenses by Budget Level
   LIVING_EXPENSES: {
+    MEALS_PER_DAY: 3,
     FOOD_PER_DAY: {
       LOW: 120_000,    // 3 budget meals (street food, pho, banh mi)
       MEDIUM: 280_000, // Good local specialties & comfortable dining
@@ -118,6 +119,27 @@ export const PRICING_CONFIG = {
       HIGH: 1_800_000, // 4-5 star resorts & luxury hotels
       LUXURY: 4_500_000,
     },
+  },
+  PLACE_COST_ESTIMATES: {
+    DEFAULT_PRICE_LEVEL: 'MEDIUM',
+    DINING_FALLBACK_BY_LEVEL: {
+      LOW: 45_000,
+      MEDIUM: 85_000,
+      HIGH: 250_000,
+      LUXURY: 600_000,
+    },
+    TICKET_FALLBACK_BY_LEVEL: {
+      LOW: 30_000,
+      MEDIUM: 60_000,
+      HIGH: 180_000,
+      LUXURY: 450_000,
+    },
+    DINING_CATEGORY_SLUGS: ['nha-hang', 'ca-phe', 'an-vat', 'bar'],
+    DINING_CATEGORY_KEYWORDS: ['ẩm thực', 'nhà hàng', 'cà phê', 'quán ăn'],
+    DINING_NAME_KEYWORDS: ['quán', 'phở', 'bún', 'cơm'],
+    FREE_PUBLIC_CATEGORY_SLUGS: ['thien-nhien', 'cho-sieu-thi'],
+    FREE_PUBLIC_CATEGORY_KEYWORDS: ['thiên nhiên', 'biển', 'chợ'],
+    FREE_PUBLIC_NAME_KEYWORDS: ['công viên', 'hồ ', 'bãi biển', 'cầu ', 'phố đi bộ'],
   },
 
   // 5. Road Transit Safety Thresholds
@@ -241,23 +263,18 @@ export function calculatePlaceEstimatedCost(params: {
   priceLevel?: string | null;
   placeName?: string | null;
 }): PlaceCostEstimate {
+  const cfg = PRICING_CONFIG.PLACE_COST_ESTIMATES;
   const catSlug = params.category?.slug?.toLowerCase() || '';
   const catName = (params.category?.nameVi || params.category?.name || '').toLowerCase();
   const placeName = (params.placeName || '').toLowerCase();
+  const levelKey = (
+    params.priceLevel || cfg.DEFAULT_PRICE_LEVEL
+  ).toUpperCase() as keyof typeof cfg.DINING_FALLBACK_BY_LEVEL;
 
   const isDining =
-    catSlug.includes('nha-hang') ||
-    catSlug.includes('ca-phe') ||
-    catSlug.includes('an-vat') ||
-    catSlug.includes('bar') ||
-    catName.includes('ẩm thực') ||
-    catName.includes('nhà hàng') ||
-    catName.includes('cà phê') ||
-    catName.includes('quán ăn') ||
-    placeName.includes('quán') ||
-    placeName.includes('phở') ||
-    placeName.includes('bún') ||
-    placeName.includes('cơm');
+    cfg.DINING_CATEGORY_SLUGS.some((s) => catSlug.includes(s)) ||
+    cfg.DINING_CATEGORY_KEYWORDS.some((kw) => catName.includes(kw)) ||
+    cfg.DINING_NAME_KEYWORDS.some((kw) => placeName.includes(kw));
 
   const min = params.priceRange?.min != null ? Number(params.priceRange.min) : null;
   const max = params.priceRange?.max != null ? Number(params.priceRange.max) : null;
@@ -271,28 +288,18 @@ export function calculatePlaceEstimatedCost(params: {
     } else if (max != null && max > 0) {
       cost = max;
     } else {
-      // Fallback by price level for dining
-      const level = params.priceLevel || 'MEDIUM';
-      if (level === 'LOW') cost = 45_000;
-      else if (level === 'HIGH') cost = 250_000;
-      else if (level === 'LUXURY') cost = 600_000;
-      else cost = 85_000;
+      cost =
+        cfg.DINING_FALLBACK_BY_LEVEL[levelKey] ??
+        cfg.DINING_FALLBACK_BY_LEVEL.MEDIUM;
     }
     return { cost, isFree: false, isDining: true };
   }
 
   // Attractions & Sightseeing
   const isNaturalOrPublic =
-    catSlug.includes('thien-nhien') ||
-    catSlug.includes('cho-sieu-thi') ||
-    catName.includes('thiên nhiên') ||
-    catName.includes('biển') ||
-    catName.includes('chợ') ||
-    placeName.includes('công viên') ||
-    placeName.includes('hồ ') ||
-    placeName.includes('bãi biển') ||
-    placeName.includes('cầu ') ||
-    placeName.includes('phố đi bộ');
+    cfg.FREE_PUBLIC_CATEGORY_SLUGS.some((s) => catSlug.includes(s)) ||
+    cfg.FREE_PUBLIC_CATEGORY_KEYWORDS.some((kw) => catName.includes(kw)) ||
+    cfg.FREE_PUBLIC_NAME_KEYWORDS.some((kw) => placeName.includes(kw));
 
   if (min === 0 || (min == null && isNaturalOrPublic)) {
     return { cost: 0, isFree: true, isDining: false };
@@ -302,13 +309,9 @@ export function calculatePlaceEstimatedCost(params: {
     return { cost: min, isFree: false, isDining: false };
   }
 
-  // Fallback for ticketed attraction by price level
-  const level = params.priceLevel || 'MEDIUM';
-  let ticketCost = 0;
-  if (level === 'LOW') ticketCost = 30_000;
-  else if (level === 'HIGH') ticketCost = 180_000;
-  else if (level === 'LUXURY') ticketCost = 450_000;
-  else ticketCost = 60_000;
+  const ticketCost =
+    cfg.TICKET_FALLBACK_BY_LEVEL[levelKey] ??
+    cfg.TICKET_FALLBACK_BY_LEVEL.MEDIUM;
 
   return { cost: ticketCost, isFree: false, isDining: false };
 }

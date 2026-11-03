@@ -6,7 +6,7 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 
-import { getSafeRedirectUrl } from '@/lib/safe-redirect';
+import { consumeOAuthReturnUrl } from '@/lib/safe-redirect';
 
 function SafeCallbackHandler() {
   const router = useRouter();
@@ -19,6 +19,7 @@ function SafeCallbackHandler() {
   React.useEffect(() => {
     async function handleCallback() {
       if (error) {
+        consumeOAuthReturnUrl(rawNext);
         toast.error('Đăng nhập với Google không thành công.');
         router.push('/login');
         return;
@@ -28,7 +29,7 @@ function SafeCallbackHandler() {
         const result = await refetchUser();
         if (result.data) {
           toast.success(`Chào mừng trở lại, ${result.data.fullName || 'bạn'}!`);
-          const target = getSafeRedirectUrl(rawNext, '/');
+          const target = consumeOAuthReturnUrl(rawNext, '/');
           router.push(target);
           router.refresh();
         } else {

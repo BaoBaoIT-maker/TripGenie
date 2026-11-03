@@ -10,6 +10,28 @@ datasource db {
 // ENUMS
 // =============================================================================
 
+
+enum NotificationType {
+  POST_LIKED
+  POST_COMMENTED
+  COMMENT_REPLIED
+  TRIP_INVITED
+  TRIP_INVITATION_ACCEPTED
+  TRIP_INVITATION_DECLINED
+
+  @@map("notification_type_enum")
+}
+
+enum TripInvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  REVOKED
+  EXPIRED
+
+  @@map("trip_invitation_status_enum")
+}
+
 enum UserRole {
   ADMIN
   USER
@@ -204,6 +226,10 @@ model User {
   reviewedReports ContentReport[]      @relation("AdminReviewedReports")
   auditLogs       AuditLog[]
   crawlJobs       CrawlJob[]           @relation("UserCrawlJobs")
+  receivedNotifications  Notification[]  @relation("ReceivedNotifications")
+  triggeredNotifications Notification[] @relation("TriggeredNotifications")
+  sentTripInvitations    TripInvitation[] @relation("SentTripInvitations")
+  receivedTripInvitations TripInvitation[] @relation("ReceivedTripInvitations")
 
   @@map("users")
 }
@@ -499,6 +525,7 @@ model Itinerary {
   destinations ItineraryDestination[]
   tripGroup    TripGroup?
   posts        CommunityPost[]
+  notifications Notification[]
   chatSessions AiChatSession[]
 
   @@index([creatorId])
@@ -538,8 +565,9 @@ model TripGroup {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   itinerary Itinerary            @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
-  members   GroupMember[]
-  proposals GroupPlaceProposal[]
+  members     GroupMember[]
+  proposals   GroupPlaceProposal[]
+  invitations TripInvitation[]
 
   @@map("trip_groups")
 }
@@ -555,6 +583,27 @@ model GroupMember {
 
   @@id([tripGroupId, userId])
   @@map("group_members")
+}
+
+model TripInvitation {
+  id          String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tripGroupId String               @map("trip_group_id") @db.Uuid
+  inviterId   String               @map("inviter_id") @db.Uuid
+  inviteeId   String               @map("invitee_id") @db.Uuid
+  status      TripInvitationStatus @default(PENDING)
+  expiresAt   DateTime             @map("expires_at") @db.Timestamptz
+  respondedAt DateTime?            @map("responded_at") @db.Timestamptz
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz
+
+  tripGroup TripGroup @relation(fields: [tripGroupId], references: [id], onDelete: Cascade)
+  inviter   User      @relation("SentTripInvitations", fields: [inviterId], references: [id], onDelete: Cascade)
+  invitee   User      @relation("ReceivedTripInvitations", fields: [inviteeId], references: [id], onDelete: Cascade)
+
+  notifications Notification[]
+
+  @@index([inviteeId, status, createdAt])
+  @@index([tripGroupId, status])
+  @@map("trip_invitations")
 }
 
 model GroupPlaceProposal {
@@ -644,6 +693,7 @@ model CommunityPost {
   itinerary Itinerary?    @relation(fields: [itineraryId], references: [id], onDelete: SetNull)
   likes     PostLike[]
   comments  PostComment[]
+  notifications Notification[]
 
   @@index([userId])
   @@index([itineraryId])
@@ -680,6 +730,7 @@ model PostComment {
   replyToName String?   @map("reply_to_name") @db.VarChar(150)
   parent      PostComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies     PostComment[] @relation("CommentReplies")
+  notifications Notification[]
   @@index([parentId])
   @@map("post_comments")
 }
@@ -806,4 +857,34 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([targetType, targetId])
   @@map("audit_logs")
+}
+
+model Notification {
+  id           String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  recipientId  String           @map("recipient_id") @db.Uuid
+  actorId      String?          @map("actor_id") @db.Uuid
+  type         NotificationType
+  postId       String?          @map("post_id") @db.Uuid
+  commentId    String?          @map("comment_id") @db.Uuid
+  itineraryId  String?          @map("itinerary_id") @db.Uuid
+  invitationId String?          @map("invitation_id") @db.Uuid
+  eventKey     String           @map("event_key") @db.VarChar(128)
+  readAt       DateTime?        @map("read_at") @db.Timestamptz
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz
+
+  recipient  User            @relation("ReceivedNotifications", fields: [recipientId], references: [id], onDelete: Cascade)
+  actor      User?           @relation("TriggeredNotifications", fields: [actorId], references: [id], onDelete: SetNull)
+  post       CommunityPost?  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment    PostComment?    @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  itinerary  Itinerary?      @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  invitation TripInvitation? @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+
+  @@unique([recipientId, eventKey])
+  @@index([recipientId, createdAt, id])
+  @@index([recipientId, readAt, createdAt, id])
+  @@index([postId])
+  @@index([commentId])
+  @@index([itineraryId])
+  @@index([invitationId])
+  @@map("notifications")
 }

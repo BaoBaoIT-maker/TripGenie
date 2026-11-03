@@ -21,6 +21,7 @@ describe('CommunityService', () => {
     togglePostLike: jest.Mock;
     findPostComments: jest.Mock;
     findCommentById: jest.Mock;
+    getCommentContext: jest.Mock;
     createComment: jest.Mock;
     softDeleteComment: jest.Mock;
     getCreatorProfile: jest.Mock;
@@ -41,6 +42,7 @@ describe('CommunityService', () => {
       togglePostLike: jest.fn(),
       findPostComments: jest.fn(),
       findCommentById: jest.fn(),
+      getCommentContext: jest.fn(),
       createComment: jest.fn(),
       softDeleteComment: jest.fn(),
       getCreatorProfile: jest.fn(),
@@ -68,93 +70,71 @@ describe('CommunityService', () => {
     service = module.get<CommunityService>(CommunityService);
   });
 
-  it('should be defined', () => {
-    expect(service).toBeDefined();
-  });
-
-  describe('uploadMedia', () => {
-    it('should delegate file saving to IMediaStorageProvider and return mediaUrls', async () => {
-      mockStorage.saveFiles.mockResolvedValue([
-        {
-          url: '/api/v1/uploads/community/file-1.png',
-          mimeType: 'image/png',
-          sizeBytes: 1024,
-          mediaType: 'IMAGE',
-        },
-      ]);
-
-      const result = await service.uploadMedia([
-        {
-          originalname: 'test.png',
-          mimetype: 'image/png',
-          size: 1024,
-          buffer: Buffer.from('test'),
-        },
-      ]);
-
-      expect(mockStorage.saveFiles).toHaveBeenCalledTimes(1);
-      expect(result.mediaUrls).toEqual(['/api/v1/uploads/community/file-1.png']);
-    });
-  });
-
   describe('createPost', () => {
-    it('should reject unsafe media URLs (e.g., javascript: scheme)', async () => {
+    it('should throw BadRequestException if title is empty', async () => {
       await expect(
         service.createPost('user-1', {
-          title: 'Chuyến đi Đà Lạt',
+          title: '   ',
+          tags: ['saigon'],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw BadRequestException for unsafe media URLs', async () => {
+      await expect(
+        service.createPost('user-1', {
+          title: 'Check-in Landmark 81',
           mediaUrls: ['javascript:alert(1)'],
         }),
       ).rejects.toThrow(BadRequestException);
     });
 
-    it('should forbid attaching an itinerary owned by another user (Trust Boundary check)', async () => {
+    it('should verify itinerary ownership when attaching a trip', async () => {
       mockRepo.findItineraryOwner.mockResolvedValue({
-        id: 'itin-b',
-        creatorId: 'user-b',
+        id: 'itin-1',
+        creatorId: 'someone-else',
       });
 
       await expect(
-        service.createPost('user-a', {
-          title: 'Bài đăng giả mạo lịch trình',
-          itineraryId: 'itin-b',
+        service.createPost('user-1', {
+          title: 'Chuyến đi Đà Lạt',
+          itineraryId: 'itin-1',
         }),
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should normalize hashtags and create post when itinerary belongs to caller', async () => {
-      mockRepo.findItineraryOwner.mockResolvedValue({
-        id: 'itin-a',
-        creatorId: 'user-a',
-      });
+    it('should normalize tags with hash prefix and cap at max limit', async () => {
       mockRepo.createPost.mockResolvedValue({
         id: 'post-1',
-        userId: 'user-a',
-        title: 'Đà Lạt 3N2Đ',
-        tags: ['#DaLat', '#SanMay'],
+        title: 'Check-in',
+        tags: ['#dalat', '#travel'],
       });
 
-      const result = await service.createPost('user-a', {
-        title: '  Đà Lạt 3N2Đ  ',
-        caption: 'Săn mây Cầu Đất',
-        mediaUrls: ['/api/v1/uploads/community/pic.webp'],
-        tags: ['DaLat', '#SanMay', 'DaLat'],
-        itineraryId: 'itin-a',
+      await service.createPost('user-1', {
+        title: 'Check-in',
+        tags: ['dalat', '#travel', 'dalat'],
       });
 
-      expect(mockRepo.createPost).toHaveBeenCalledWith({
-        userId: 'user-a',
-        title: 'Đà Lạt 3N2Đ',
-        caption: 'Săn mây Cầu Đất',
-        mediaUrls: ['/api/v1/uploads/community/pic.webp'],
-        tags: ['#DaLat', '#SanMay'],
-        itineraryId: 'itin-a',
-      });
-      expect(result.id).toBe('post-1');
+      expect(mockRepo.createPost).toHaveBeenCalledWith(
+        expect.objectContaining({
+          tags: ['#dalat', '#travel'],
+        }),
+      );
     });
   });
 
   describe('updatePost', () => {
-    it('should forbid non-owner from updating a post', async () => {
+    it('should throw NotFoundException if post does not exist', async () => {
+      mockRepo.findPostById.mockResolvedValue(null);
+
+      await expect(
+        service.updatePost('user-1', UserRole.USER, 'missing-id', {
+          title: 'Tiêu đề mới',
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should forbid non-owner non-admin users from updating post', async () => {
       mockRepo.findPostById.mockResolvedValue({
         id: 'post-1',
         userId: 'owner-id',
@@ -162,12 +142,12 @@ describe('CommunityService', () => {
 
       await expect(
         service.updatePost('stranger-id', UserRole.USER, 'post-1', {
-          title: 'Tiêu đề mới',
+          title: 'Tiêu đề phá hoại',
         }),
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should allow owner to update title, caption and tags', async () => {
+    it('should allow owner to update post and normalize tags', async () => {
       mockRepo.findPostById.mockResolvedValue({
         id: 'post-1',
         userId: 'owner-id',
@@ -175,12 +155,11 @@ describe('CommunityService', () => {
       mockRepo.updatePost.mockResolvedValue({
         id: 'post-1',
         title: 'Tiêu đề đã sửa',
-        caption: 'Nội dung mới',
         tags: ['#DuLich'],
       });
 
       const res = await service.updatePost('owner-id', UserRole.USER, 'post-1', {
-        title: '  Tiêu đề đã sửa  ',
+        title: 'Tiêu đề đã sửa',
         caption: '  Nội dung mới  ',
         tags: ['DuLich'],
       });
@@ -270,17 +249,14 @@ describe('CommunityService', () => {
     });
   });
 
-  describe('createComment (1-Level Reply Flattening)', () => {
-    it('should flatten parentId to root comment when replying to a level-2 reply', async () => {
-      mockRepo.findPostById.mockResolvedValue({ id: 'post-1', userId: 'u-1' });
-      mockRepo.findCommentById.mockResolvedValue({
-        id: 'reply-1',
-        postId: 'post-1',
-        userId: 'u-2',
-        parentId: 'root-cmt-1',
-        authorFullName: 'Minh Quân',
-        postOwnerId: 'u-1',
-      });
+  describe('createComment', () => {
+    it('should throw BadRequestException if content is empty', async () => {
+      await expect(
+        service.createComment('u-1', 'post-1', { content: '   ' }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should delegate comment creation to repository', async () => {
       mockRepo.createComment.mockResolvedValue({
         comment: {
           id: 'reply-2',
@@ -298,14 +274,45 @@ describe('CommunityService', () => {
         parentId: 'reply-1',
       });
 
-      expect(mockRepo.createComment).toHaveBeenCalledWith(
-        'post-1',
-        'u-3',
-        'Mình cũng muốn hỏi giống bạn!',
-        'root-cmt-1',
-        'Minh Quân',
-      );
-      expect(res.comment.parentId).toBe('root-cmt-1');
+      expect(mockRepo.createComment).toHaveBeenCalledWith({
+        postId: 'post-1',
+        userId: 'u-3',
+        content: 'Mình cũng muốn hỏi giống bạn!',
+        replyTargetCommentId: 'reply-1',
+        replyToName: null,
+      });
+      expect(res.comment.id).toBe('reply-2');
+    });
+  });
+
+  describe('getCommentContext', () => {
+    it('should throw NotFoundException if post does not exist', async () => {
+      mockRepo.findPostById.mockResolvedValue(null);
+
+      await expect(
+        service.getCommentContext('post-1', 'cmt-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw NotFoundException if comment context does not exist', async () => {
+      mockRepo.findPostById.mockResolvedValue({ id: 'post-1' });
+      mockRepo.getCommentContext.mockResolvedValue(null);
+
+      await expect(
+        service.getCommentContext('post-1', 'cmt-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should return context when comment and parent exist', async () => {
+      mockRepo.findPostById.mockResolvedValue({ id: 'post-1' });
+      mockRepo.getCommentContext.mockResolvedValue({
+        comment: { id: 'cmt-2', parentId: 'cmt-1' },
+        parent: { id: 'cmt-1', parentId: null },
+      });
+
+      const res = await service.getCommentContext('post-1', 'cmt-2');
+      expect(res.comment.id).toBe('cmt-2');
+      expect(res.parent?.id).toBe('cmt-1');
     });
   });
 

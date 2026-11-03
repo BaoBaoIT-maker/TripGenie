@@ -25,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
@@ -126,6 +127,7 @@ export function Navbar() {
               </Link>
 
               {/* User Dropdown Menu */}
+              <NotificationBell />
               <DropdownMenu>
                 <DropdownMenuTrigger className="outline-none cursor-pointer">
                   <Avatar className="size-8.5 border border-border/80 transition-transform hover:scale-105">
@@ -182,6 +184,7 @@ export function Navbar() {
 
         {/* Mobile Top Bar Right: Profile / Avatar only */}
         <div className="flex md:hidden items-center gap-2">
+          {isAuthenticated && <NotificationBell />}
           {!isAuthenticated ? (
             <Link href="/login">
               <Button size="xs" variant="outline" className="rounded-lg text-xs font-medium px-2.5">

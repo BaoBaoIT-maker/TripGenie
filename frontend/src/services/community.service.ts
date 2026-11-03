@@ -126,6 +126,14 @@ export const communityService = {
       `/community/posts/${postId}/comments`
     ),
 
+  getCommentContext: async (
+    postId: string,
+    commentId: string
+  ): Promise<{ comment: CommunityCommentItem; parent: CommunityCommentItem | null }> =>
+    apiClient<{ comment: CommunityCommentItem; parent: CommunityCommentItem | null }>(
+      `/community/posts/${postId}/comments/${commentId}/context`
+    ),
+
   createComment: async (
     postId: string,
     content: string,

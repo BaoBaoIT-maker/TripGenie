@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma, NotificationType } from '@prisma/client';
 import { PrismaService } from '@/database/prisma.service';
+import { writeNotification } from '../notifications/notification-writer';
 import {
   COMMUNITY_CONSTANTS,
   FEED_SORT_STRATEGIES,
@@ -8,9 +9,11 @@ import {
 } from './community.constants';
 import {
   CommentAccessView,
+  CommentContextResult,
   CommunityCommentView,
   CommunityLinkedItinerarySummary,
   CommunityPostView,
+  CreateCommentData,
   CreatePostData,
   CreatorProfileData,
   FeedPageResult,
@@ -276,9 +279,34 @@ export class CommunityRepository implements ICommunityRepository {
   }
 
   async softDeletePost(postId: string): Promise<void> {
-    await this.prisma.communityPost.update({
-      where: { id: postId },
-      data: { deletedAt: new Date() },
+    await this.prisma.$transaction(async (tx) => {
+      const post = await tx.communityPost.findUnique({
+        where: { id: postId },
+        select: { itineraryId: true },
+      });
+
+      await tx.communityPost.update({
+        where: { id: postId },
+        data: { deletedAt: new Date() },
+      });
+      await tx.notification.deleteMany({
+        where: { postId },
+      });
+
+      if (post?.itineraryId) {
+        const remainingActivePosts = await tx.communityPost.count({
+          where: {
+            itineraryId: post.itineraryId,
+            deletedAt: null,
+          },
+        });
+        if (remainingActivePosts === 0) {
+          await tx.itinerary.update({
+            where: { id: post.itineraryId },
+            data: { isPublic: false },
+          });
+        }
+      }
     });
   }
 
@@ -294,6 +322,14 @@ export class CommunityRepository implements ICommunityRepository {
         },
       });
 
+      const post = await tx.communityPost.findUnique({
+        where: { id: postId },
+        select: { userId: true },
+      });
+      if (!post) {
+        throw new NotFoundException('Không tìm thấy bài viết');
+      }
+
       if (existingLike) {
         await tx.postLike.delete({
           where: {
@@ -306,6 +342,14 @@ export class CommunityRepository implements ICommunityRepository {
             likeCount: { decrement: 1 },
           },
           select: { likeCount: true },
+        });
+
+        // Delete like notification if exists
+        await tx.notification.deleteMany({
+          where: {
+            recipientId: post.userId,
+            eventKey: `post-like:${postId}:${userId}`,
+          },
         });
 
         const safeLikeCount = Math.max(0, updated.likeCount);
@@ -329,6 +373,17 @@ export class CommunityRepository implements ICommunityRepository {
         },
         select: { likeCount: true },
       });
+
+      // Write notification for post owner if not self-like
+      if (post.userId !== userId) {
+        await writeNotification(tx, {
+          recipientId: post.userId,
+          actorId: userId,
+          type: NotificationType.POST_LIKED,
+          postId,
+          eventKey: `post-like:${postId}:${userId}`,
+        });
+      }
 
       return { isLiked: true, likeCount: updated.likeCount };
     });
@@ -379,33 +434,136 @@ export class CommunityRepository implements ICommunityRepository {
     };
   }
 
-  async createComment(
+  async getCommentContext(
     postId: string,
-    userId: string,
-    content: string,
-    parentId?: string | null,
-    replyToName?: string | null,
+    commentId: string,
+  ): Promise<CommentContextResult | null> {
+    const comment = await this.prisma.postComment.findFirst({
+      where: { id: commentId, postId, deletedAt: null },
+      include: {
+        user: { select: AUTHOR_SELECT },
+      },
+    });
+
+    if (!comment) return null;
+
+    let parent: CommunityCommentView | null = null;
+    if (comment.parentId) {
+      const parentRow = await this.prisma.postComment.findFirst({
+        where: { id: comment.parentId, postId, deletedAt: null },
+        include: {
+          user: { select: AUTHOR_SELECT },
+        },
+      });
+      if (parentRow) {
+        parent = mapCommentView(parentRow);
+      }
+    }
+
+    return {
+      comment: mapCommentView(comment),
+      parent,
+    };
+  }
+
+  async createComment(
+    data: CreateCommentData,
   ): Promise<{ comment: CommunityCommentView; commentCount: number }> {
     return this.prisma.$transaction(async (tx) => {
+      const post = await tx.communityPost.findFirst({
+        where: { id: data.postId, deletedAt: null },
+        select: { id: true, userId: true },
+      });
+      if (!post) {
+        throw new NotFoundException('Không tìm thấy bài viết hoặc bài viết đã bị xóa');
+      }
+
+      let effectiveParentId: string | null = null;
+      let effectiveReplyToName: string | null = null;
+      let targetAuthorId: string | null = null;
+
+      if (data.replyTargetCommentId) {
+        const targetComment = await tx.postComment.findFirst({
+          where: {
+            id: data.replyTargetCommentId,
+            postId: data.postId,
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+            userId: true,
+            parentId: true,
+            user: { select: { fullName: true } },
+          },
+        });
+
+        if (!targetComment) {
+          throw new NotFoundException('Không tìm thấy bình luận gốc để trả lời');
+        }
+
+        effectiveParentId = targetComment.parentId || targetComment.id;
+        effectiveReplyToName =
+          data.replyToName?.trim() || targetComment.user.fullName;
+        targetAuthorId = targetComment.userId;
+      }
+
       const created = await tx.postComment.create({
         data: {
-          postId,
-          userId,
-          content,
-          parentId: parentId ?? null,
-          replyToName: replyToName ?? null,
+          postId: data.postId,
+          userId: data.userId,
+          content: data.content,
+          parentId: effectiveParentId,
+          replyToName: effectiveReplyToName,
         },
         include: {
           user: { select: AUTHOR_SELECT },
         },
       });
 
+      // Notifications:
+      // 1. Reply: notify target author with COMMENT_REPLIED (if not self).
+      //    If post owner is someone else (not actor, not target author), notify post owner with POST_COMMENTED.
+      // 2. Root comment: notify post owner with POST_COMMENTED (if not self).
+      if (targetAuthorId) {
+        if (targetAuthorId !== data.userId) {
+          await writeNotification(tx, {
+            recipientId: targetAuthorId,
+            actorId: data.userId,
+            type: NotificationType.COMMENT_REPLIED,
+            postId: data.postId,
+            commentId: created.id,
+            eventKey: `comment-reply:${created.id}`,
+          });
+        }
+        if (post.userId !== data.userId && post.userId !== targetAuthorId) {
+          await writeNotification(tx, {
+            recipientId: post.userId,
+            actorId: data.userId,
+            type: NotificationType.POST_COMMENTED,
+            postId: data.postId,
+            commentId: created.id,
+            eventKey: `post-comment:${created.id}`,
+          });
+        }
+      } else {
+        if (post.userId !== data.userId) {
+          await writeNotification(tx, {
+            recipientId: post.userId,
+            actorId: data.userId,
+            type: NotificationType.POST_COMMENTED,
+            postId: data.postId,
+            commentId: created.id,
+            eventKey: `post-comment:${created.id}`,
+          });
+        }
+      }
+
       const activeCount = await tx.postComment.count({
-        where: { postId, deletedAt: null },
+        where: { postId: data.postId, deletedAt: null },
       });
 
       const updatedPost = await tx.communityPost.update({
-        where: { id: postId },
+        where: { id: data.postId },
         data: { commentCount: activeCount },
         select: { commentCount: true },
       });
@@ -423,14 +581,30 @@ export class CommunityRepository implements ICommunityRepository {
   ): Promise<{ commentCount: number }> {
     return this.prisma.$transaction(async (tx) => {
       const now = new Date();
-      await tx.postComment.updateMany({
+      const targets = await tx.postComment.findMany({
         where: {
           postId,
           deletedAt: null,
           OR: [{ id: commentId }, { parentId: commentId }],
         },
+        select: { id: true },
+      });
+      const targetIds = targets.map((t) => t.id);
+
+      await tx.postComment.updateMany({
+        where: {
+          id: { in: targetIds },
+        },
         data: { deletedAt: now },
       });
+
+      if (targetIds.length > 0) {
+        await tx.notification.deleteMany({
+          where: {
+            commentId: { in: targetIds },
+          },
+        });
+      }
 
       const activeCount = await tx.postComment.count({
         where: { postId, deletedAt: null },

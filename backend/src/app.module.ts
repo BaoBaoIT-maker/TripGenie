@@ -15,6 +15,7 @@ import { KnowledgeModule } from './modules/knowledge/knowledge.module';
 import { AdvisorModule } from './modules/advisor/advisor.module';
 import { CollectionsModule } from './modules/collections/collections.module';
 import { CommunityModule } from './modules/community/community.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { appConfig, databaseConfig, jwtConfig, redisConfig, aiConfig, crawlerConfig } from './config';
 import { envValidationSchema } from './config/env.validation';
 
@@ -68,6 +69,7 @@ import { envValidationSchema } from './config/env.validation';
     AdvisorModule,
     CollectionsModule,
     CommunityModule,
+    NotificationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -29,6 +29,8 @@ export const COMMUNITY_QUERY_KEYS = {
     ["community", "feed", filters] as const,
   post: (postId: string) => ["community", "post", postId] as const,
   comments: (postId: string) => ["community", "comments", postId] as const,
+  commentContext: (postId: string, commentId: string) =>
+    ["community", "comments", postId, "context", commentId] as const,
   creator: (identifier: string) =>
     ["community", "creator", identifier] as const,
 };
@@ -74,6 +76,34 @@ export function usePostComments(postId: string | null, enabled = true) {
       return res.comments;
     },
     enabled: Boolean(postId) && enabled,
+  });
+}
+
+export function useCommunityPost(postId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: COMMUNITY_QUERY_KEYS.post(postId || ""),
+    queryFn: async () => {
+      if (!postId) return null;
+      const res = await communityService.getPostById(postId);
+      return res.post;
+    },
+    enabled: Boolean(postId) && enabled,
+  });
+}
+
+export function useCommentContext(
+  postId: string | null,
+  commentId: string | null,
+  enabled = true
+) {
+  return useQuery({
+    queryKey: COMMUNITY_QUERY_KEYS.commentContext(postId || "", commentId || ""),
+    queryFn: async () => {
+      if (!postId || !commentId) return null;
+      return communityService.getCommentContext(postId, commentId);
+    },
+    enabled: Boolean(postId && commentId) && enabled,
+    retry: false,
   });
 }
 

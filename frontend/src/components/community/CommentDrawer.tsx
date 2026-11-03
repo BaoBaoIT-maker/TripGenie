@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Send, Trash2, MessageSquare, CornerDownRight, X } from "lucide-react";
+import { Send, Trash2, MessageSquare, CornerDownRight, X, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -32,6 +32,7 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
   const { user } = useAuth();
   const [content, setContent] = useState("");
   const [replyTarget, setReplyTarget] = useState<ReplyTargetState | null>(null);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   const { data: comments = [], isLoading } = usePostComments(postId, true);
@@ -70,13 +71,13 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
     }));
   }, [comments]);
 
-  const handleSelectReply = (rootCommentId: string, targetAuthorName: string) => {
+  const handleSelectReply = (targetCommentId: string, targetAuthorName: string) => {
     if (!user) {
       toast.error("Vui lòng đăng nhập để trả lời bình luận");
       return;
     }
     setReplyTarget({
-      parentId: rootCommentId,
+      parentId: targetCommentId,
       replyToName: targetAuthorName,
     });
     setTimeout(() => {
@@ -91,6 +92,7 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
     const activeReply = replyTarget;
     setContent("");
     setReplyTarget(null);
+
     createCommentMutation.mutate({
       postId,
       content: trimmed,
@@ -101,7 +103,6 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
 
   const renderCommentCard = (
     cmt: CommunityCommentItem,
-    rootIdForReply: string,
     isReply: boolean
   ) => {
     const canDelete =
@@ -118,30 +119,30 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
     return (
       <div
         key={cmt.id}
-        className={`flex items-start gap-2.5 p-2.5 rounded-xl border ${
+        className={`flex items-start gap-2.5 p-2.5 rounded-xl border transition-colors ${
           isReply
-            ? "bg-muted/25 border-border/50"
-            : "bg-muted/45 border-border/70"
+            ? "bg-muted/30 border-border/40"
+            : "bg-muted/50 border-border/60 hover:border-border"
         }`}
       >
-        <Link href={profileHref} className="shrink-0">
-          <Avatar className={`${isReply ? "size-7" : "size-8"} border border-border`}>
+        <Link href={profileHref} className="shrink-0 pt-0.5">
+          <Avatar className={`${isReply ? "size-6" : "size-7"} border border-border`}>
             <AvatarImage
               src={cmt.author.avatarUrl || undefined}
               alt={cmt.author.fullName}
             />
-            <AvatarFallback className="text-xs font-bold bg-secondary text-secondary-foreground">
+            <AvatarFallback className="text-[10px] font-bold bg-secondary text-secondary-foreground">
               {cmt.author.fullName.slice(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
         </Link>
 
-        <div className="flex-1 min-w-0 space-y-1">
-          <div className="flex items-center justify-between gap-2">
+        <div className="flex-1 min-w-0 space-y-0.5">
+          <div className="flex items-center justify-between gap-1.5">
             <div className="flex flex-wrap items-center gap-1.5 min-w-0">
               <Link
                 href={profileHref}
-                className="text-xs font-bold text-foreground hover:text-primary truncate transition-colors"
+                className="text-xs font-bold text-foreground hover:text-primary transition-colors truncate"
               >
                 {cmt.author.fullName}
               </Link>
@@ -170,12 +171,8 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
             {canDelete && (
               <button
                 type="button"
-                onClick={() =>
-                  deleteCommentMutation.mutate({
-                    commentId: cmt.id,
-                    postId,
-                  })
-                }
+                onClick={() => setDeletingCommentId(cmt.id)}
+                disabled={deleteCommentMutation.isPending}
                 aria-label="Xóa bình luận"
                 title="Xóa bình luận"
                 className="min-h-[34px] min-w-[34px] inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-muted transition-colors cursor-pointer shrink-0"
@@ -194,7 +191,7 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
               <button
                 type="button"
                 onClick={() =>
-                  handleSelectReply(rootIdForReply, cmt.author.fullName)
+                  handleSelectReply(cmt.id, cmt.author.fullName)
                 }
                 className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-primary transition-colors cursor-pointer py-0.5"
               >
@@ -226,12 +223,12 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
         <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
           {threadedComments.map(({ root, replies }) => (
             <div key={root.id} className="space-y-2">
-              {renderCommentCard(root, root.id, false)}
+              {renderCommentCard(root, false)}
 
               {replies.length > 0 && (
                 <div className="ml-7 sm:ml-9 pl-3 border-l-2 border-border/80 space-y-2">
                   {replies.map((reply) =>
-                    renderCommentCard(reply, root.id, true)
+                    renderCommentCard(reply, true)
                   )}
                 </div>
               )}
@@ -299,6 +296,81 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
           >
             Đăng nhập
           </Link>
+        </div>
+      )}
+      {/* Confirm Delete Comment Modal */}
+      {deletingCommentId !== null && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="drawer-confirm-delete-comment-title"
+          aria-describedby="drawer-confirm-delete-comment-desc"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+          onClick={() => {
+            if (!deleteCommentMutation.isPending) {
+              setDeletingCommentId(null);
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-border bg-card p-5 text-foreground shadow-2xl space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="size-10 rounded-xl bg-destructive/15 text-destructive flex items-center justify-center shrink-0">
+                <Trash2 className="size-5" />
+              </div>
+              <div className="space-y-1 flex-1 min-w-0">
+                <h4
+                  id="drawer-confirm-delete-comment-title"
+                  className="text-base font-bold text-foreground"
+                >
+                  Xác nhận xóa bình luận?
+                </h4>
+                <p
+                  id="drawer-confirm-delete-comment-desc"
+                  className="text-xs sm:text-sm text-muted-foreground leading-relaxed"
+                >
+                  Bạn có chắc chắn muốn xóa bình luận này không? Hành động này không thể hoàn tác.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2.5 pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={deleteCommentMutation.isPending}
+                onClick={() => setDeletingCommentId(null)}
+                className="h-9 px-4 rounded-xl text-xs font-medium cursor-pointer"
+              >
+                Hủy
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={deleteCommentMutation.isPending}
+                onClick={async () => {
+                  if (!deletingCommentId) return;
+                  try {
+                    await deleteCommentMutation.mutateAsync({
+                      commentId: deletingCommentId,
+                      postId,
+                    });
+                    setDeletingCommentId(null);
+                  } catch {
+                    // Handled by react-query onError
+                  }
+                }}
+                className="h-9 px-4 rounded-xl text-xs font-semibold gap-1.5 cursor-pointer shadow-xs"
+              >
+                {deleteCommentMutation.isPending && (
+                  <Loader2 className="size-3.5 animate-spin" />
+                )}
+                <span>Xóa bình luận</span>
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -149,6 +149,19 @@ export class CommunityController {
     };
   }
 
+  @Get('posts/:id/comments/:commentId/context')
+  @UseGuards(OptionalJwtAuthGuard)
+  async getCommentContext(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('commentId', ParseUUIDPipe) commentId: string,
+  ) {
+    const context = await this.communityService.getCommentContext(id, commentId);
+    return {
+      message: 'Lấy thông tin ngữ cảnh bình luận thành công',
+      ...context,
+    };
+  }
+
   @Post('posts/:id/comments')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)

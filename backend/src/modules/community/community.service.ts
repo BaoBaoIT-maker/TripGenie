@@ -19,6 +19,7 @@ import {
   UpdateCommunityPostDto,
 } from './dto/community.dto';
 import {
+  CommentContextResult,
   CommunityCommentView,
   CommunityPostView,
   CreatorProfileData,
@@ -222,6 +223,23 @@ export class CommunityService {
     return this.communityRepository.findPostComments(postId);
   }
 
+  async getCommentContext(
+    postId: string,
+    commentId: string,
+  ): Promise<CommentContextResult> {
+    const post = await this.communityRepository.findPostById(postId);
+    if (!post) {
+      throw new NotFoundException('Không tìm thấy bài viết');
+    }
+
+    const context = await this.communityRepository.getCommentContext(postId, commentId);
+    if (!context) {
+      throw new NotFoundException('Không tìm thấy bình luận hoặc bình luận đã bị xóa');
+    }
+
+    return context;
+  }
+
   async createComment(
     userId: string,
     postId: string,
@@ -232,35 +250,13 @@ export class CommunityService {
       throw new BadRequestException('Nội dung bình luận không được để trống');
     }
 
-    const post = await this.communityRepository.findPostById(postId, userId);
-    if (!post) {
-      throw new NotFoundException('Không tìm thấy bài viết');
-    }
-
-    let effectiveParentId: string | null = null;
-    let effectiveReplyToName: string | null = null;
-
-    if (dto.parentId) {
-      const targetComment = await this.communityRepository.findCommentById(
-        dto.parentId,
-      );
-      if (!targetComment || targetComment.postId !== postId) {
-        throw new NotFoundException('Không tìm thấy bình luận gốc để trả lời');
-      }
-      // TikTok / FB / YouTube 1-Level Indentation Rule:
-      // Replying to a level-2 reply still attaches to the level-1 root comment while preserving @replyToName.
-      effectiveParentId = targetComment.parentId || targetComment.id;
-      effectiveReplyToName =
-        dto.replyToName?.trim() || targetComment.authorFullName;
-    }
-
-    return this.communityRepository.createComment(
+    return this.communityRepository.createComment({
       postId,
       userId,
-      trimmed,
-      effectiveParentId,
-      effectiveReplyToName,
-    );
+      content: trimmed,
+      replyTargetCommentId: dto.parentId ?? null,
+      replyToName: dto.replyToName ?? null,
+    });
   }
 
   async deleteComment(

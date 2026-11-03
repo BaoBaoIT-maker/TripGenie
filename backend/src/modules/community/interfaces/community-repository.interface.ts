@@ -16,7 +16,7 @@ export interface CommunityLinkedItinerarySummary {
   destination: string | null;
   areaId: number | null;
   areaName: string | null;
-   areaSlug: string | null;
+  areaSlug: string | null;
   startDate: Date | null;
   endDate: Date | null;
   totalPlaces: number;
@@ -85,6 +85,19 @@ export interface CreatePostData {
   itineraryId?: string | null;
 }
 
+export interface CreateCommentData {
+  postId: string;
+  userId: string;
+  content: string;
+  replyTargetCommentId?: string | null;
+  replyToName?: string | null;
+}
+
+export interface CommentContextResult {
+  comment: CommunityCommentView;
+  parent: CommunityCommentView | null;
+}
+
 export interface CreatorProfileData {
   user: CommunityAuthorSummary & { createdAt: Date };
   stats: {
@@ -124,12 +137,12 @@ export interface ICommunityRepository {
   ): Promise<{ isLiked: boolean; likeCount: number }>;
   findPostComments(postId: string, limit?: number): Promise<CommunityCommentView[]>;
   findCommentById(commentId: string): Promise<CommentAccessView | null>;
-  createComment(
+  getCommentContext(
     postId: string,
-    userId: string,
-    content: string,
-    parentId?: string | null,
-    replyToName?: string | null,
+    commentId: string,
+  ): Promise<CommentContextResult | null>;
+  createComment(
+    data: CreateCommentData,
   ): Promise<{ comment: CommunityCommentView; commentCount: number }>;
   softDeleteComment(
     commentId: string,

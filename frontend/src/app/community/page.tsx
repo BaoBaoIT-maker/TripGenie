@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { PostDetailModal } from "@/components/community/PostDetailModal";
 import {
   Plus,
   Search,
@@ -21,7 +23,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PostCard } from "@/components/community/PostCard";
 import { CreatePostModal } from "@/components/community/CreatePostModal";
-import { useCommunityFeed } from "@/features/community/hooks/use-community";
+import { useCommunityFeed, useCommunityPost } from "@/features/community/hooks/use-community";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { COMMUNITY_UI_CONSTANTS } from "@/services/community.service";
 import type { CommunitySortMode } from "@/types/community";
@@ -33,7 +35,40 @@ const SORT_TABS: { id: CommunitySortMode; label: string; icon: typeof Clock }[] 
   { id: "MOST_CLONED", label: "Được nhân bản nhiều", icon: Copy },
 ];
 
-export default function CommunityPage() {
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function CommunityPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  // Deep linking: read postId and commentId from URL
+  const deepPostId = searchParams.get("postId");
+  const deepCommentId = searchParams.get("commentId");
+  const isValidPostId = deepPostId ? UUID_REGEX.test(deepPostId) : false;
+
+  const {
+    data: deepPost,
+    isError: isDeepPostError,
+  } = useCommunityPost(isValidPostId ? deepPostId : null, Boolean(isValidPostId));
+
+  const handleCloseDeepLinkModal = () => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("postId");
+    params.delete("commentId");
+    const nextQs = params.toString();
+    router.replace(`/community${nextQs ? `?${nextQs}` : ""}`, { scroll: false });
+  };
+
+  useEffect(() => {
+    if (deepPostId && !isValidPostId) {
+      toast.error("Đường dẫn bài viết không hợp lệ");
+      handleCloseDeepLinkModal();
+    } else if (isDeepPostError) {
+      toast.error("Bài viết không còn tồn tại hoặc đã bị xóa");
+      handleCloseDeepLinkModal();
+    }
+  }, [deepPostId, isValidPostId, isDeepPostError]);
+
+
   const { user } = useAuth();
   const [sort, setSort] = useState<CommunitySortMode>("LATEST");
   const [selectedTag, setSelectedTag] = useState<string>("");
@@ -461,6 +496,30 @@ export default function CommunityPage() {
         open={isComposeOpen}
         onClose={() => setIsComposeOpen(false)}
       />
+      {/* Deep Link Post Detail Modal */}
+      {deepPost && (
+        <PostDetailModal
+          open={Boolean(deepPost)}
+          onClose={handleCloseDeepLinkModal}
+          post={deepPost}
+          highlightCommentId={deepCommentId || undefined}
+        />
+      )}
     </div>
+  );
+}
+
+export default function CommunityPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="max-w-5xl mx-auto w-full px-4 py-8 sm:px-6 lg:px-8 space-y-6">
+          <div className="h-16 rounded-2xl bg-muted/40 animate-pulse" />
+          <div className="h-64 rounded-2xl bg-muted/30 animate-pulse" />
+        </div>
+      }
+    >
+      <CommunityPageContent />
+    </Suspense>
   );
 }

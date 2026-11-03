@@ -1,0 +1,10 @@
+export const AUTH_CONSTANTS = {
+  PASSWORD_MIN_LENGTH: 8,
+  PASSWORD_MAX_BYTES: 72,
+  EMAIL_VERIFICATION_TTL_SECONDS: 1800, // 30 minutes
+  EMAIL_VERIFICATION_COOLDOWN_SECONDS: 60, // 60 seconds
+  PASSWORD_RESET_OTP_TTL_SECONDS: 600, // 10 minutes
+  PASSWORD_RESET_TICKET_TTL_SECONDS: 300, // 5 minutes
+  MAIL_QUEUE: 'auth-mail-queue',
+  REGISTRATION_COMPLETION_TTL_SECONDS: 120, // 2 minutes window to claim session across tabs/devices
+};

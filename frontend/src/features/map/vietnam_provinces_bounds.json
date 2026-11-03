@@ -1,0 +1,342 @@
+{
+  "An Giang": {
+    "minLng": 103.45793340000006,
+    "minLat": 9.254304900000022,
+    "maxLng": 105.57572,
+    "maxLat": 10.961932,
+    "centerLng": 104.51682670000002,
+    "centerLat": 10.10811845000001,
+    "ma_tinh": "91",
+    "loai": "Tỉnh"
+  },
+  "Bắc Ninh": {
+    "minLng": 105.881138,
+    "minLat": 20.969346,
+    "maxLng": 107.03352,
+    "maxLat": 21.626484,
+    "centerLng": 106.457329,
+    "centerLat": 21.297915000000003,
+    "ma_tinh": "24",
+    "loai": "Tỉnh"
+  },
+  "Cà Mau": {
+    "minLng": 104.52214890000005,
+    "minLat": 8.41262690000002,
+    "maxLng": 105.860463,
+    "maxLat": 9.637433,
+    "centerLng": 105.19130595000001,
+    "centerLat": 9.025029950000011,
+    "ma_tinh": "96",
+    "loai": "Tỉnh"
+  },
+  "Cần Thơ": {
+    "minLng": 105.225759,
+    "minLat": 9.245156,
+    "maxLng": 106.298168,
+    "maxLat": 10.324991,
+    "centerLng": 105.76196350000001,
+    "centerLat": 9.7850735,
+    "ma_tinh": "92",
+    "loai": "Thành phố"
+  },
+  "Cao Bằng": {
+    "minLng": 105.265716,
+    "minLat": 22.356642,
+    "maxLng": 106.8373,
+    "maxLat": 23.119845,
+    "centerLng": 106.051508,
+    "centerLat": 22.738243500000003,
+    "ma_tinh": "04",
+    "loai": "Tỉnh"
+  },
+  "Đà Nẵng": {
+    "minLng": 107.21054,
+    "minLat": 14.951316,
+    "maxLng": 112.77733500000011,
+    "maxLat": 17.121125,
+    "centerLng": 109.99393750000004,
+    "centerLat": 16.0362205,
+    "ma_tinh": "48",
+    "loai": "Thành phố"
+  },
+  "Đắk Lắk": {
+    "minLng": 107.484181,
+    "minLat": 12.160547,
+    "maxLng": 109.458875,
+    "maxLat": 13.695296,
+    "centerLng": 108.471528,
+    "centerLat": 12.9279215,
+    "ma_tinh": "66",
+    "loai": "Tỉnh"
+  },
+  "Điện Biên": {
+    "minLng": 102.143914,
+    "minLat": 20.884804,
+    "maxLng": 103.598477,
+    "maxLat": 22.548166,
+    "centerLng": 102.8711955,
+    "centerLat": 21.716485,
+    "ma_tinh": "11",
+    "loai": "Tỉnh"
+  },
+  "Đồng Nai": {
+    "minLng": 106.411616,
+    "minLat": 10.579113,
+    "maxLng": 107.577774,
+    "maxLat": 12.298408,
+    "centerLng": 106.99469500000001,
+    "centerLat": 11.4387605,
+    "ma_tinh": "75",
+    "loai": "Tỉnh"
+  },
+  "Đồng Tháp": {
+    "minLng": 105.187232,
+    "minLat": 10.134823,
+    "maxLng": 106.807813,
+    "maxLat": 10.973446,
+    "centerLng": 105.9975225,
+    "centerLat": 10.5541345,
+    "ma_tinh": "82",
+    "loai": "Tỉnh"
+  },
+  "Gia Lai": {
+    "minLng": 107.45136,
+    "minLat": 12.99602,
+    "maxLng": 109.363449,
+    "maxLat": 14.703128,
+    "centerLng": 108.4074045,
+    "centerLat": 13.849574,
+    "ma_tinh": "52",
+    "loai": "Tỉnh"
+  },
+  "Hà Nội": {
+    "minLng": 105.285352,
+    "minLat": 20.564283,
+    "maxLng": 106.020128,
+    "maxLat": 21.385421,
+    "centerLng": 105.65274,
+    "centerLat": 20.974852,
+    "ma_tinh": "01",
+    "loai": "Thành phố"
+  },
+  "Hà Tĩnh": {
+    "minLng": 105.10387,
+    "minLat": 17.913805,
+    "maxLng": 106.510723,
+    "maxLat": 18.766263,
+    "centerLng": 105.8072965,
+    "centerLat": 18.340034,
+    "ma_tinh": "42",
+    "loai": "Tỉnh"
+  },
+  "Hải Phòng": {
+    "minLng": 106.124276,
+    "minLat": 20.124200100000053,
+    "maxLng": 107.74144960000007,
+    "maxLat": 21.237375,
+    "centerLng": 106.93286280000004,
+    "centerLat": 20.680787550000026,
+    "ma_tinh": "31",
+    "loai": "Thành phố"
+  },
+  "Huế": {
+    "minLng": 107.034486,
+    "minLat": 15.994675,
+    "maxLng": 108.19492855700008,
+    "maxLat": 16.742918,
+    "centerLng": 107.61470727850005,
+    "centerLat": 16.368796500000002,
+    "ma_tinh": "46",
+    "loai": "Thành phố"
+  },
+  "Hưng Yên": {
+    "minLng": 105.893511,
+    "minLat": 20.24901,
+    "maxLng": 106.659473,
+    "maxLat": 21.00703,
+    "centerLng": 106.276492,
+    "centerLat": 20.62802,
+    "ma_tinh": "33",
+    "loai": "Tỉnh"
+  },
+  "Khánh Hòa": {
+    "minLng": 108.551542,
+    "minLat": 6.931062,
+    "maxLng": 117.393262,
+    "maxLat": 12.869069,
+    "centerLng": 112.97240199999999,
+    "centerLat": 9.9000655,
+    "ma_tinh": "56",
+    "loai": "Tỉnh"
+  },
+  "Lai Châu": {
+    "minLng": 102.320675,
+    "minLat": 21.685743,
+    "maxLng": 103.985094,
+    "maxLat": 22.811227,
+    "centerLng": 103.1528845,
+    "centerLat": 22.248485,
+    "ma_tinh": "12",
+    "loai": "Tỉnh"
+  },
+  "Lâm Đồng": {
+    "minLng": 107.206173,
+    "minLat": 9.970093100000042,
+    "maxLng": 109.08506440000008,
+    "maxLat": 12.812495,
+    "centerLng": 108.14561870000004,
+    "centerLat": 11.39129405000002,
+    "ma_tinh": "68",
+    "loai": "Tỉnh"
+  },
+  "Lạng Sơn": {
+    "minLng": 106.095314,
+    "minLat": 21.325233,
+    "maxLng": 107.363944,
+    "maxLat": 22.461645,
+    "centerLng": 106.729629,
+    "centerLat": 21.893439,
+    "ma_tinh": "20",
+    "loai": "Tỉnh"
+  },
+  "Lào Cai": {
+    "minLng": 103.530833,
+    "minLat": 21.32594,
+    "maxLng": 105.100413,
+    "maxLat": 22.844892,
+    "centerLng": 104.315623,
+    "centerLat": 22.085416000000002,
+    "ma_tinh": "15",
+    "loai": "Tỉnh"
+  },
+  "Nghệ An": {
+    "minLng": 103.874793,
+    "minLat": 18.55212,
+    "maxLng": 105.98902750000008,
+    "maxLat": 19.99777,
+    "centerLng": 104.93191025000004,
+    "centerLat": 19.274945,
+    "ma_tinh": "40",
+    "loai": "Tỉnh"
+  },
+  "Ninh Bình": {
+    "minLng": 105.542773,
+    "minLat": 19.867344,
+    "maxLng": 106.596357,
+    "maxLat": 20.703681,
+    "centerLng": 106.069565,
+    "centerLat": 20.2855125,
+    "ma_tinh": "37",
+    "loai": "Tỉnh"
+  },
+  "Phú Thọ": {
+    "minLng": 104.813866,
+    "minLat": 20.305121,
+    "maxLng": 105.858077,
+    "maxLat": 21.719531,
+    "centerLng": 105.3359715,
+    "centerLat": 21.012326,
+    "ma_tinh": "25",
+    "loai": "Tỉnh"
+  },
+  "Quảng Ngãi": {
+    "minLng": 107.332208,
+    "minLat": 13.92365,
+    "maxLng": 109.14754930000004,
+    "maxLat": 15.433210700000075,
+    "centerLng": 108.23987865000001,
+    "centerLat": 14.678430350000038,
+    "ma_tinh": "51",
+    "loai": "Tỉnh"
+  },
+  "Quảng Ninh": {
+    "minLng": 106.438835,
+    "minLat": 20.716593,
+    "maxLng": 108.093373,
+    "maxLat": 21.663807,
+    "centerLng": 107.266104,
+    "centerLat": 21.190199999999997,
+    "ma_tinh": "22",
+    "loai": "Tỉnh"
+  },
+  "Quảng Trị": {
+    "minLng": 105.608026,
+    "minLat": 16.299517,
+    "maxLng": 107.389464,
+    "maxLat": 18.090157,
+    "centerLng": 106.498745,
+    "centerLat": 17.194837,
+    "ma_tinh": "44",
+    "loai": "Tỉnh"
+  },
+  "Sơn La": {
+    "minLng": 103.212048,
+    "minLat": 20.573602,
+    "maxLng": 105.032913,
+    "maxLat": 22.030504,
+    "centerLng": 104.1224805,
+    "centerLat": 21.302053,
+    "ma_tinh": "14",
+    "loai": "Tỉnh"
+  },
+  "Tây Ninh": {
+    "minLng": 105.500114,
+    "minLat": 10.394556,
+    "maxLng": 106.748357,
+    "maxLat": 11.782858,
+    "centerLng": 106.1242355,
+    "centerLat": 11.088707,
+    "ma_tinh": "80",
+    "loai": "Tỉnh"
+  },
+  "Thái Nguyên": {
+    "minLng": 105.430832,
+    "minLat": 21.325724,
+    "maxLng": 106.247189,
+    "maxLat": 22.741266,
+    "centerLng": 105.8390105,
+    "centerLat": 22.033495000000002,
+    "ma_tinh": "19",
+    "loai": "Tỉnh"
+  },
+  "Thanh Hóa": {
+    "minLng": 104.374163,
+    "minLat": 19.287075,
+    "maxLng": 106.07595,
+    "maxLat": 20.670085,
+    "centerLng": 105.2250565,
+    "centerLat": 19.97858,
+    "ma_tinh": "38",
+    "loai": "Tỉnh"
+  },
+  "TP. Hồ Chí Minh": {
+    "minLng": 106.08809480000008,
+    "minLat": 8.577512600000034,
+    "maxLng": 107.571928,
+    "maxLat": 11.50104,
+    "centerLng": 106.83001140000005,
+    "centerLat": 10.039276300000017,
+    "ma_tinh": "79",
+    "loai": "Thành phố"
+  },
+  "Tuyên Quang": {
+    "minLng": 104.33423,
+    "minLat": 21.497579,
+    "maxLng": 105.599155,
+    "maxLat": 23.392643,
+    "centerLng": 104.9666925,
+    "centerLat": 22.445111,
+    "ma_tinh": "08",
+    "loai": "Tỉnh"
+  },
+  "Vĩnh Long": {
+    "minLng": 105.681642,
+    "minLat": 9.527162,
+    "maxLng": 106.791831,
+    "maxLat": 10.34014,
+    "centerLng": 106.2367365,
+    "centerLat": 9.933651000000001,
+    "ma_tinh": "86",
+    "loai": "Tỉnh"
+  }
+}

@@ -1,6 +1,5 @@
 import { apiClient } from "@/lib/api-client";
 import { Place, PlaceCategory, SuitableAudience, TravelStyle } from "@/types/place";
-import { MOCK_PLACES } from "@/mocks/data/places";
 
 export interface BackendCategoryItem {
   id: number;
@@ -262,11 +261,7 @@ export const placeService = {
    * Search places with pagination and multi-criteria filters.
    * Connects to backend GET /places/search with fallback to mock data.
    */
-  async searchPlaces(
-    params?: PlaceFilterParams,
-    options: { allowMockFallback?: boolean } = { allowMockFallback: true }
-  ): Promise<PaginatedPlacesResult> {
-    try {
+  async searchPlaces(params?: PlaceFilterParams): Promise<PaginatedPlacesResult> {
       const searchParams = new URLSearchParams();
 
       if (params?.keyword?.trim()) searchParams.set("keyword", params.keyword.trim());
@@ -338,31 +333,6 @@ export const placeService = {
         geocoded: payload.geocoded,
         isFallback: payload.isFallback,
       };
-    } catch (err) {
-      if (options?.allowMockFallback === false) {
-        throw err;
-      }
-      console.warn("Backend search places unavailable, falling back to mock data:", err);
-      let places = [...MOCK_PLACES];
-      if (params?.keyword) {
-        const q = params.keyword.toLowerCase().trim();
-        places = places.filter(
-          (p) => p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q) ||
-            p.city.toLowerCase().includes(q) || p.tags.some((t) => t.toLowerCase().includes(q))
-        );
-      }
-      if (params?.category && params.category !== "all") {
-        places = places.filter((p) => p.category === params.category);
-      }
-      const fallbackLimit = params?.limit || 20;
-      return {
-        places: places.slice(0, fallbackLimit),
-        total: places.length,
-        page: 1,
-        limit: fallbackLimit,
-        totalPages: Math.ceil(places.length / fallbackLimit) || 1,
-      };
-    }
   },
 
   /**
@@ -385,7 +355,7 @@ export const placeService = {
       const json = await apiClient<BackendPlaceItem[] | { data: BackendPlaceItem[] }>(
         `/places/semantic-search?${searchParams.toString()}`
       );
-      const items = Array.isArray(json) ? json : (Array.isArray((json as any).data) ? (json as any).data : []);
+      const items = Array.isArray(json) ? json : (Array.isArray(json?.data) ? json.data : []);
       return items.map(mapBackendPlaceToPlace);
     } catch (err) {
       console.warn("Semantic search failed or offline, fallback to keyword search:", err);
@@ -437,43 +407,42 @@ export const placeService = {
   },
 
   /**
-   * Get single place by UUID or slug.
+   * Get single place by UUID or slug from the backend.
+   * Propagates unexpected network/server errors so the caller can render an ErrorState;
+   * returns null only when the place is not found.
    */
   async getPlaceBySlug(slug: string): Promise<Place | null> {
-    try {
-      const decoded = decodeURIComponent(slug);
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(decoded);
-      if (isUuid) {
-        try {
-          const data = await apiClient<BackendPlaceItem>(`/places/${decoded}`);
-          return mapBackendPlaceToPlace(data);
-        } catch {
-          // fall through to mock/search fallback
+    const decoded = decodeURIComponent(slug);
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(decoded);
+    if (isUuid) {
+      try {
+        const data = await apiClient<BackendPlaceItem>(`/places/${decoded}`);
+        return mapBackendPlaceToPlace(data);
+      } catch (err: unknown) {
+        const status = (err as { status?: number })?.status;
+        if (status && status !== 404) {
+          throw err;
         }
+        return null;
       }
+    }
 
-      const found = MOCK_PLACES.find((p) => p.slug === slug || p.slug === decoded || p.id === slug);
-      if (found) return found;
+    const cleanKeyword = decoded.replace(/-/g, " ").trim();
+    if (!cleanKeyword) return null;
 
-      const cleanKeyword = decoded.replace(/-/g, " ").trim();
-      let searchRes = await this.searchPlaces({ keyword: cleanKeyword, limit: 1 });
+    let searchRes = await this.searchPlaces({ keyword: cleanKeyword, limit: 1 });
+    if (searchRes.places.length > 0) {
+      return searchRes.places[0];
+    }
+    const words = cleanKeyword.split(/\s+/);
+    if (words.length > 2) {
+      searchRes = await this.searchPlaces({ keyword: words.slice(0, 2).join(" "), limit: 1 });
       if (searchRes.places.length > 0) {
         return searchRes.places[0];
       }
-      const words = cleanKeyword.split(/\s+/);
-      if (words.length > 2) {
-        searchRes = await this.searchPlaces({ keyword: words.slice(0, 2).join(" "), limit: 1 });
-        if (searchRes.places.length > 0) {
-          return searchRes.places[0];
-        }
-      }
-
-      return null;
-    } catch (err) {
-      console.warn("Failed to get place by slug:", err);
-      const found = MOCK_PLACES.find((p) => p.slug === slug);
-      return found || null;
     }
+
+    return null;
   },
 
   async getPlaceById(id: string): Promise<Place | null> {
@@ -489,9 +458,7 @@ export const placeService = {
       const filtered = searchRes.places.filter((p) => p.id !== currentPlaceId);
       return filtered.slice(0, limit);
     } catch {
-      const current = MOCK_PLACES.find((p) => p.id === currentPlaceId);
-      if (!current) return MOCK_PLACES.slice(0, limit);
-      return MOCK_PLACES.filter((p) => p.id !== currentPlaceId).slice(0, limit);
+      return [];
     }
   },
 };

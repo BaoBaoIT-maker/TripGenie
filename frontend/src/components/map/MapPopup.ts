@@ -7,9 +7,12 @@ export function createMapPopupElement(
   onRequestDirections?: (place: DiscoveryPlace) => void,
   options?: {
     isRoutingActive?: boolean;
+    routeStopIndex?: number;
     isSaved?: boolean;
     onToggleSave?: (place: DiscoveryPlace) => void;
+    onAddToItinerary?: (place: DiscoveryPlace) => void;
     onAddStopToRoute?: (place: DiscoveryPlace) => void;
+    onRemoveStopFromRoute?: (placeId: string) => void;
     onSetOrigin?: (place: DiscoveryPlace) => void;
   }
 ): HTMLDivElement {
@@ -173,82 +176,162 @@ export function createMapPopupElement(
 
   body.appendChild(addressRow);
 
-  // 3. Action Buttons Row (2 spacious rows so 'Chi tiết →' is NEVER cut off)
+  // 3. Action Buttons Row
   const actionsRow = document.createElement("div");
   actionsRow.className = "pt-2 border-t border-border/60 space-y-1.5";
 
   if (options?.isRoutingActive) {
-    // When routing is active: Row 1 has Add Stop & Set Destination; Row 2 has Set Start & View Detail
-    const row1 = document.createElement("div");
-    row1.className = "flex items-center gap-1.5";
+    const isAlreadyInRoute =
+      typeof options.routeStopIndex === "number" && options.routeStopIndex >= 0;
 
-    if (options.onAddStopToRoute) {
-      const addStopBtn = document.createElement("button");
-      addStopBtn.type = "button";
-      addStopBtn.className = "flex-1 min-w-0 inline-flex items-center justify-center gap-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 py-1.5 px-2 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer active:scale-95";
-      addStopBtn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        <span>Thêm chặng</span>
+    if (isAlreadyInRoute) {
+      const stopIdx = options.routeStopIndex!;
+      const stopLetter = String.fromCharCode(65 + stopIdx);
+
+      const row1 = document.createElement("div");
+      row1.className = "flex items-center gap-1.5";
+
+      const statusBadge = document.createElement("div");
+      statusBadge.className =
+        "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary/10 border border-primary/25 py-1.5 px-2 text-[11px] font-bold text-primary";
+      statusBadge.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+        <span class="truncate">Đang là Chặng ${stopLetter} (#${stopIdx + 1})</span>
       `;
-      addStopBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        options.onAddStopToRoute!(place as DiscoveryPlace);
-      });
-      row1.appendChild(addStopBtn);
-    }
+      row1.appendChild(statusBadge);
 
-    if (onRequestDirections) {
-      const setDestBtn = document.createElement("button");
-      setDestBtn.type = "button";
-      setDestBtn.className = "flex-1 min-w-0 inline-flex items-center justify-center gap-1 rounded-xl bg-primary hover:bg-primary/90 py-1.5 px-2 text-xs font-bold text-primary-foreground shadow-xs transition-colors cursor-pointer active:scale-95";
-      setDestBtn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
-        <span>Đích mới</span>
-      `;
-      setDestBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        onRequestDirections(place as DiscoveryPlace);
-      });
-      row1.appendChild(setDestBtn);
-    }
-    actionsRow.appendChild(row1);
+      if (options.onRemoveStopFromRoute) {
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className =
+          "shrink-0 inline-flex items-center justify-center gap-1 rounded-xl border border-destructive/30 bg-destructive/10 hover:bg-destructive/20 py-1.5 px-2.5 text-[11px] font-bold text-destructive transition-colors cursor-pointer active:scale-95";
+        removeBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <span>Gỡ chặng</span>
+        `;
+        removeBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          options.onRemoveStopFromRoute!(place.id);
+        });
+        row1.appendChild(removeBtn);
+      }
 
-    const row2 = document.createElement("div");
-    row2.className = "flex items-center gap-1.5";
+      actionsRow.appendChild(row1);
 
-    if (options.onSetOrigin) {
-      const originBtn = document.createElement("button");
-      originBtn.type = "button";
-      originBtn.className = "flex-1 min-w-0 inline-flex items-center justify-center gap-1 rounded-xl border border-border/80 bg-muted/50 hover:bg-muted py-1.5 px-2 text-[11px] font-semibold text-foreground transition-colors cursor-pointer";
-      originBtn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>
-        <span>Điểm xuất phát</span>
-      `;
-      originBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        options.onSetOrigin!(place as DiscoveryPlace);
-      });
-      row2.appendChild(originBtn);
-    }
+      const row2 = document.createElement("div");
+      row2.className = "flex items-center gap-1.5";
 
-    const detailLink = document.createElement("a");
-    detailLink.href = `/places/${place.slug || place.id}`;
-    detailLink.className = "shrink-0 inline-flex items-center justify-center rounded-xl border border-border/80 bg-background hover:bg-muted py-1.5 px-3 text-[11px] font-bold text-foreground transition-colors cursor-pointer whitespace-nowrap no-underline";
-    detailLink.textContent = "Chi tiết →";
-    if (onOpenDetail) {
-      detailLink.addEventListener("click", (e) => {
-        e.preventDefault();
-        onOpenDetail(place.id);
-      });
+      if (stopIdx > 0 && options.onSetOrigin) {
+        const originBtn = document.createElement("button");
+        originBtn.type = "button";
+        originBtn.className =
+          "flex-1 min-w-0 inline-flex items-center justify-center gap-1 rounded-xl border border-border/80 bg-muted/50 hover:bg-muted py-1.5 px-2 text-[11px] font-semibold text-foreground transition-colors cursor-pointer";
+        originBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>
+          <span>Điểm xuất phát</span>
+        `;
+        originBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          options.onSetOrigin!(place as DiscoveryPlace);
+        });
+        row2.appendChild(originBtn);
+      }
+
+      const detailLink = document.createElement("a");
+      detailLink.href = `/places/${place.slug || place.id}`;
+      detailLink.className =
+        stopIdx > 0 && options.onSetOrigin
+          ? "shrink-0 inline-flex items-center justify-center rounded-xl border border-border/80 bg-background hover:bg-muted py-1.5 px-3 text-[11px] font-bold text-foreground transition-colors cursor-pointer whitespace-nowrap no-underline"
+          : "w-full inline-flex items-center justify-center rounded-xl border border-border/80 bg-background hover:bg-muted py-1.5 px-3 text-[11px] font-bold text-foreground transition-colors cursor-pointer whitespace-nowrap no-underline";
+      detailLink.textContent = "Xem chi tiết";
+      if (onOpenDetail) {
+        detailLink.addEventListener("click", (e) => {
+          e.preventDefault();
+          onOpenDetail(place.id);
+        });
+      }
+      row2.appendChild(detailLink);
+      actionsRow.appendChild(row2);
+    } else {
+      // Place is NOT yet in the active route: Row 1 has Add Stop & Set Origin; Row 2 has View Detail
+      const row1 = document.createElement("div");
+      row1.className = "flex items-center gap-1.5";
+
+      if (options.onAddStopToRoute) {
+        const addStopBtn = document.createElement("button");
+        addStopBtn.type = "button";
+        addStopBtn.className =
+          "flex-1 min-w-0 inline-flex items-center justify-center gap-1 rounded-xl bg-primary hover:bg-primary/90 py-1.5 px-2 text-xs font-bold text-primary-foreground shadow-xs transition-colors cursor-pointer active:scale-95";
+        addStopBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          <span>Thêm chặng</span>
+        `;
+        addStopBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          options.onAddStopToRoute!(place as DiscoveryPlace);
+        });
+        row1.appendChild(addStopBtn);
+      }
+
+      if (options.onSetOrigin) {
+        const originBtn = document.createElement("button");
+        originBtn.type = "button";
+        originBtn.className =
+          "flex-1 min-w-0 inline-flex items-center justify-center gap-1 rounded-xl border border-border/80 bg-muted/50 hover:bg-muted py-1.5 px-2 text-[11px] font-semibold text-foreground transition-colors cursor-pointer active:scale-95";
+        originBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>
+          <span>Điểm xuất phát</span>
+        `;
+        originBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          options.onSetOrigin!(place as DiscoveryPlace);
+        });
+        row1.appendChild(originBtn);
+      }
+
+      actionsRow.appendChild(row1);
+
+      const row2 = document.createElement("div");
+      row2.className = "flex items-center gap-1.5";
+
+      if (options.onAddToItinerary) {
+        const addItineraryBtn = document.createElement("button");
+        addItineraryBtn.type = "button";
+        addItineraryBtn.className =
+          "flex-1 min-w-0 inline-flex items-center justify-center gap-1 rounded-xl border border-primary/35 bg-primary/10 hover:bg-primary/20 py-1.5 px-2 text-[11px] font-bold text-primary transition-colors cursor-pointer active:scale-95";
+        addItineraryBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><line x1="12" x2="12" y1="14" y2="18"/><line x1="10" x2="14" y1="16" y2="16"/></svg>
+          <span class="truncate">Thêm lịch trình</span>
+        `;
+        addItineraryBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          options.onAddToItinerary!(place as DiscoveryPlace);
+        });
+        row2.appendChild(addItineraryBtn);
+      }
+
+      const detailLink = document.createElement("a");
+      detailLink.href = `/places/${place.slug || place.id}`;
+      detailLink.className = options.onAddToItinerary
+        ? "shrink-0 inline-flex items-center justify-center rounded-xl border border-border/80 bg-background hover:bg-muted py-1.5 px-3 text-[11px] font-bold text-foreground transition-colors cursor-pointer whitespace-nowrap no-underline"
+        : "w-full inline-flex items-center justify-center rounded-xl border border-border/80 bg-background hover:bg-muted py-1.5 px-3 text-[11px] font-bold text-foreground transition-colors cursor-pointer whitespace-nowrap no-underline";
+      detailLink.textContent = "Xem chi tiết";
+      if (onOpenDetail) {
+        detailLink.addEventListener("click", (e) => {
+          e.preventDefault();
+          onOpenDetail(place.id);
+        });
+      }
+      row2.appendChild(detailLink);
+      actionsRow.appendChild(row2);
     }
-    row2.appendChild(detailLink);
-    actionsRow.appendChild(row2);
   } else {
     // When routing is NOT active:
-    // Row 1: [ Chỉ đường (flex-1) ] + [ Chi tiết → (shrink-0) ]
     const row1 = document.createElement("div");
     row1.className = "flex items-center gap-2";
 
@@ -273,7 +356,7 @@ export function createMapPopupElement(
     detailLink.className = onRequestDirections
       ? "shrink-0 inline-flex items-center justify-center rounded-xl border border-border/80 bg-background hover:bg-muted py-2 px-3 text-xs font-bold text-foreground transition-colors cursor-pointer whitespace-nowrap shadow-2xs no-underline"
       : "w-full inline-flex items-center justify-center rounded-xl bg-primary hover:bg-primary/90 py-2 px-3 text-xs font-bold text-primary-foreground transition-colors cursor-pointer shadow-xs no-underline";
-    detailLink.textContent = onRequestDirections ? "Chi tiết →" : "Xem chi tiết →";
+    detailLink.textContent = onRequestDirections ? "Chi tiết" : "Xem chi tiết";
     if (onOpenDetail) {
       detailLink.addEventListener("click", (e) => {
         e.preventDefault();
@@ -283,24 +366,45 @@ export function createMapPopupElement(
     row1.appendChild(detailLink);
     actionsRow.appendChild(row1);
 
-    // Row 2: Full-width Set Origin button
-    if (options?.onSetOrigin) {
+    // Row 2: Add to Itinerary & Set Origin buttons
+    if (options?.onAddToItinerary || options?.onSetOrigin) {
       const row2 = document.createElement("div");
-      row2.className = "flex items-center pt-0.5";
+      row2.className = "flex items-center gap-1.5 pt-0.5";
 
-      const originBtn = document.createElement("button");
-      originBtn.type = "button";
-      originBtn.className = "w-full inline-flex items-center justify-center gap-1.5 rounded-lg border border-border/70 bg-muted/30 hover:bg-muted/70 py-1 px-2.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer";
-      originBtn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>
-        <span>Đặt quán này làm điểm xuất phát</span>
-      `;
-      originBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        options.onSetOrigin!(place as DiscoveryPlace);
-      });
-      row2.appendChild(originBtn);
+      if (options.onAddToItinerary) {
+        const addItineraryBtn = document.createElement("button");
+        addItineraryBtn.type = "button";
+        addItineraryBtn.className =
+          "flex-1 min-w-0 inline-flex items-center justify-center gap-1 rounded-xl border border-primary/35 bg-primary/10 hover:bg-primary/20 py-1.5 px-2 text-[11px] font-bold text-primary transition-colors cursor-pointer active:scale-95";
+        addItineraryBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><line x1="12" x2="12" y1="14" y2="18"/><line x1="10" x2="14" y1="16" y2="16"/></svg>
+          <span class="truncate">${options.onSetOrigin ? "Thêm lịch trình" : "Thêm vào lịch trình"}</span>
+        `;
+        addItineraryBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          options.onAddToItinerary!(place as DiscoveryPlace);
+        });
+        row2.appendChild(addItineraryBtn);
+      }
+
+      if (options.onSetOrigin) {
+        const originBtn = document.createElement("button");
+        originBtn.type = "button";
+        originBtn.className =
+          "flex-1 min-w-0 inline-flex items-center justify-center gap-1 rounded-xl border border-border/70 bg-muted/40 hover:bg-muted/80 py-1.5 px-2 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer active:scale-95";
+        originBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="shrink-0" aria-hidden="true"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" x2="4" y1="22" y2="15"/></svg>
+          <span class="truncate">${options.onAddToItinerary ? "Điểm xuất phát" : "Đặt làm điểm xuất phát"}</span>
+        `;
+        originBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          options.onSetOrigin!(place as DiscoveryPlace);
+        });
+        row2.appendChild(originBtn);
+      }
+
       actionsRow.appendChild(row2);
     }
   }

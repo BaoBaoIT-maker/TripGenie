@@ -1,4 +1,12 @@
 import { distance, point } from "@turf/turf";
+import {
+  MAX_NEARBY_PROXIMITY_KM,
+  MIN_ROUTE_DISTANCE_KM,
+  ROUTE_ORIGIN_FALLBACK_OFFSET_DEG,
+  ROUTE_STOP_ID_AREA_CENTER,
+  ROUTE_STOP_ID_USER_LOCATION,
+  USER_LOCATION_STOP_LABEL,
+} from "@/features/map/map-config";
 
 export type RouteVehicleMode = "motorcycle" | "driving" | "walking";
 
@@ -347,6 +355,174 @@ export function getGoogleMapsMultiStopUrl(
   return url;
 }
 
+/**
+ * Checks whether a stop ID belongs to an automatically generated / synthetic origin
+ * (either area center fallback or the user's live GPS location) rather than a real place.
+ */
+export function isSyntheticRouteOriginId(stopId: string): boolean {
+  return (
+    stopId === ROUTE_STOP_ID_AREA_CENTER ||
+    stopId === ROUTE_STOP_ID_USER_LOCATION
+  );
+}
+
+/**
+ * Builds the initial 2-stop route [Origin, Target].
+ * Uses user's live GPS if within maxNearbyKm (default 20km), otherwise uses the area center.
+ */
+export function buildInitialRouteStops(params: {
+  targetStop: RouteWaypoint;
+  userLocation?: Coordinate | null;
+  areaCenter: Coordinate;
+  areaName?: string | null;
+  maxNearbyKm?: number;
+}): RouteWaypoint[] {
+  const {
+    targetStop,
+    userLocation,
+    areaCenter,
+    areaName,
+    maxNearbyKm = MAX_NEARBY_PROXIMITY_KM,
+  } = params;
+
+  const isNearby = userLocation
+    ? calculateDirectDistanceKm(userLocation, targetStop.coordinate) <= maxNearbyKm
+    : false;
+
+  if (userLocation && isNearby) {
+    return [
+      {
+        id: ROUTE_STOP_ID_USER_LOCATION,
+        name: USER_LOCATION_STOP_LABEL,
+        coordinate: userLocation,
+      },
+      targetStop,
+    ];
+  }
+
+  const labelArea = areaName || "thành phố";
+  const distToTarget = calculateDirectDistanceKm(areaCenter, targetStop.coordinate);
+  const originCoord: Coordinate =
+    distToTarget < MIN_ROUTE_DISTANCE_KM
+      ? {
+          latitude: areaCenter.latitude + ROUTE_ORIGIN_FALLBACK_OFFSET_DEG,
+          longitude: areaCenter.longitude,
+        }
+      : areaCenter;
+  const originName =
+    distToTarget < MIN_ROUTE_DISTANCE_KM
+      ? `Khu vực trung tâm ${labelArea}`
+      : `Trung tâm ${labelArea}`;
+
+  return [
+    {
+      id: ROUTE_STOP_ID_AREA_CENTER,
+      name: originName,
+      coordinate: originCoord,
+    },
+    targetStop,
+  ];
+}
+
+/**
+ * Appends a stop to the end of an active route while preventing duplicates.
+ */
+export function addStopToRoute(
+  stops: RouteWaypoint[],
+  newStop: RouteWaypoint
+): RouteWaypoint[] {
+  if (stops.length === 0) return stops;
+  if (stops.some((s) => s.id === newStop.id)) return stops;
+  return [...stops, newStop];
+}
+
+/**
+ * Sets a place as the starting origin (Stop A):
+ * - If current Stop A is a synthetic origin (area center or user GPS), replaces Stop A.
+ * - If current Stop A is a real user-selected place, pushes Stop A to Stop B so no selected place is lost.
+ * - Deduplicates if newOrigin was already elsewhere in the route.
+ */
+export function setOriginInRoute(
+  stops: RouteWaypoint[],
+  newOrigin: RouteWaypoint
+): RouteWaypoint[] {
+  if (stops.length === 0) return [newOrigin];
+  if (stops[0].id === newOrigin.id) return stops;
+
+  const restWithoutNew = stops.slice(1).filter((s) => s.id !== newOrigin.id);
+
+  if (isSyntheticRouteOriginId(stops[0].id)) {
+    return [newOrigin, ...restWithoutNew];
+  }
+
+  return [newOrigin, stops[0], ...restWithoutNew];
+}
+
+/**
+ * Applies the user's live GPS location as the route origin:
+ * - When `force: true` (explicit user click on "Từ vị trí của tôi"), ignores the 20km limit:
+ *   replaces area-center origin OR prepends before a real place origin.
+ * - When `force: false` (background GPS resolution), only upgrades an area-center origin
+ *   if userLocation is within `maxNearbyKm` (20km) of the destination.
+ */
+export function applyUserLocationToRoute(
+  stops: RouteWaypoint[],
+  userLocation: Coordinate,
+  options?: { force?: boolean; maxNearbyKm?: number }
+): { stops: RouteWaypoint[]; applied: boolean } {
+  const force = options?.force ?? false;
+  const maxNearbyKm = options?.maxNearbyKm ?? MAX_NEARBY_PROXIMITY_KM;
+
+  const userStop: RouteWaypoint = {
+    id: ROUTE_STOP_ID_USER_LOCATION,
+    name: USER_LOCATION_STOP_LABEL,
+    coordinate: userLocation,
+  };
+
+  if (force) {
+    if (stops.length === 0) {
+      return { stops: [userStop], applied: true };
+    }
+    const restWithoutUser = stops
+      .slice(1)
+      .filter((s) => s.id !== ROUTE_STOP_ID_USER_LOCATION);
+
+    if (isSyntheticRouteOriginId(stops[0].id)) {
+      return { stops: [userStop, ...restWithoutUser], applied: true };
+    }
+    return {
+      stops: [userStop, stops[0], ...restWithoutUser],
+      applied: true,
+    };
+  }
+
+  if (stops.length < 2) return { stops, applied: false };
+  if (stops[0].id !== ROUTE_STOP_ID_AREA_CENTER) return { stops, applied: false };
+
+  const dest = stops[stops.length - 1];
+  const distToDest = calculateDirectDistanceKm(userLocation, dest.coordinate);
+  if (distToDest > maxNearbyKm) return { stops, applied: false };
+
+  const updated = [...stops];
+  updated[0] = userStop;
+  return { stops: updated, applied: true };
+}
+
+/**
+ * Removes a stop by index or by stop ID. Clears route (`[]`) if fewer than 2 stops remain.
+ */
+export function removeStopFromRoute(
+  stops: RouteWaypoint[],
+  indexOrId: number | string
+): RouteWaypoint[] {
+  const filtered =
+    typeof indexOrId === "number"
+      ? stops.filter((_, idx) => idx !== indexOrId)
+      : stops.filter((s) => s.id !== indexOrId);
+
+  return filtered.length < 2 ? [] : filtered;
+}
+
 export const routingService = {
   calculateDirectDistanceKm,
   formatDistanceKm,
@@ -358,5 +534,11 @@ export const routingService = {
   fetchMultiStopRoute,
   getGoogleMapsDirectionsUrl,
   getGoogleMapsMultiStopUrl,
+  isSyntheticRouteOriginId,
+  buildInitialRouteStops,
+  addStopToRoute,
+  setOriginInRoute,
+  applyUserLocationToRoute,
+  removeStopFromRoute,
   VEHICLE_MODES,
 };

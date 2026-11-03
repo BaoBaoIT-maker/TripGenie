@@ -52,7 +52,7 @@ export function PlaceSearchDialog({
         const results = await placeService.getPlaces({
           keyword: query.trim() || undefined,
         });
-        setPlaces(results);
+        setPlaces(Array.isArray(results) ? results : []);
       } catch {
         setError("Không thể tải danh sách địa điểm. Vui lòng thử lại.");
       } finally {

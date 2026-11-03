@@ -22,8 +22,16 @@ import {
 import { DEFAULT_COLLECTION_TITLE } from "@/services/collection.service";
 import { Heart, Folder, Check, Plus, Loader2, Camera, Lock, Globe } from "lucide-react";
 
+export interface SaveablePlace {
+  id: string;
+  name: string;
+  address?: string | null;
+  coverImage?: string | null;
+  primaryImage?: string | null;
+}
+
 interface SaveToCollectionModalProps {
-  place: Place | null;
+  place: SaveablePlace | Place | null;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -47,6 +55,9 @@ export function SaveToCollectionModal({
   const createMutation = useCreateCollection();
 
   if (!place) return null;
+
+  const previewImageUrl =
+    place.coverImage || ("primaryImage" in place ? place.primaryImage : null) || null;
 
   const handleToggleCollection = (collectionId: string) => {
     if (togglingId || toggleMutation.isPending) return;
@@ -98,9 +109,9 @@ export function SaveToCollectionModal({
         {/* Place Summary Header */}
         <div className="flex items-center gap-3 p-3 rounded-2xl bg-muted/40 border border-border/70">
           <div className="relative size-12 rounded-xl overflow-hidden bg-muted shrink-0">
-            {place.coverImage ? (
+            {previewImageUrl ? (
               <Image
-                src={place.coverImage}
+                src={previewImageUrl}
                 alt={place.name}
                 fill
                 sizes="48px"
@@ -114,7 +125,7 @@ export function SaveToCollectionModal({
           </div>
           <div className="min-w-0 flex-1">
             <h4 className="text-xs font-bold text-foreground truncate">{place.name}</h4>
-            <p className="text-[11px] text-muted-foreground truncate">{place.address}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{place.address || "Việt Nam"}</p>
           </div>
         </div>
 

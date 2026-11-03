@@ -34,8 +34,7 @@ export const homeService = {
         suitableFor: audience,
         sortBy: "rating",
         limit,
-      },
-      { allowMockFallback: false }
+      }
     );
     return res.places;
   },

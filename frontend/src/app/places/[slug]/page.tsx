@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useEffect, useMemo } from "react";
+import { use, useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -11,6 +11,7 @@ import {
   Heart,
   Share2,
   CalendarPlus,
+  FolderPlus,
   Sparkles,
   CheckCircle2,
   ArrowLeft,
@@ -28,12 +29,17 @@ import { PhotoContributeModal } from "@/components/place/PhotoContributeModal";
 import { SectionHeader } from "@/components/common/SectionHeader";
 import { LoadingState } from "@/components/common/LoadingState";
 import { EmptyState } from "@/components/common/EmptyState";
+import { ErrorState } from "@/components/common/ErrorState";
 import { placeService } from "@/services/place.service";
 import { Place } from "@/types/place";
-import { MOCK_PLACES } from "@/mocks/data/places";
 import { toast } from "sonner";
 import { useGeolocation } from "@/features/map/hooks/use-geolocation";
 import { routingService } from "@/services/routing.service";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useSavedPlaceIds, useToggleFavorite } from "@/features/collections/hooks/use-collections";
+import { SaveToCollectionModal } from "@/features/collections/components/SaveToCollectionModal";
+import { DEFAULT_COLLECTION_TITLE } from "@/services/collection.service";
+import { AddPlaceToItineraryModal } from "@/features/planner/components/AddPlaceToItineraryModal";
 
 interface PlaceDetailPageProps {
   params: Promise<{ slug: string }>;
@@ -43,28 +49,37 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
   const router = useRouter();
   const resolvedParams = use(params);
 
-  // Synchronous initial resolution from static mock data to avoid any stuck loading spinner
   const initialSlug = resolvedParams?.slug || "";
-  let decodedSlug = initialSlug;
-  try {
-    decodedSlug = decodeURIComponent(initialSlug);
-  } catch {
-    // keep initialSlug
-  }
+  const { user } = useAuth();
+  const isAuthenticated = Boolean(user);
+  const { data: savedIdsSet } = useSavedPlaceIds({ enabled: isAuthenticated });
 
-  const initialPlace =
-    MOCK_PLACES.find((p) => p.slug === initialSlug || p.slug === decodedSlug) || null;
-
-  const [place, setPlace] = useState<Place | null>(initialPlace);
-  const [relatedPlaces, setRelatedPlaces] = useState<Place[]>(() => {
-    if (!initialPlace) return [];
-    return MOCK_PLACES.filter((p) => p.id !== initialPlace.id).slice(0, 3);
-  });
-  const [loading, setLoading] = useState(!initialPlace);
-  const [isSaved, setIsSaved] = useState(false);
+  const [place, setPlace] = useState<Place | null>(null);
+  const [relatedPlaces, setRelatedPlaces] = useState<Place[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
+  const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
+  const [isAddToItineraryOpen, setIsAddToItineraryOpen] = useState(false);
   const [isContributePhotoOpen, setIsContributePhotoOpen] = useState(false);
   const [mainImgError, setMainImgError] = useState(false);
   const [failedThumbnails, setFailedThumbnails] = useState<Record<number, boolean>>({});
+
+  const toggleMutation = useToggleFavorite({
+    onSaved: (data) => {
+      if (!place) return;
+      if (data.isSaved) {
+        toast.success(`Đã lưu "${place.name}" vào ${DEFAULT_COLLECTION_TITLE}`, {
+          action: {
+            label: "Đổi bộ sưu tập",
+            onClick: () => setIsSaveModalOpen(true),
+          },
+        });
+      } else {
+        toast.info(`Đã bỏ lưu "${place.name}"`);
+      }
+    },
+  });
 
   // Geolocation for direct distance and directions
   const { coordinate: userLocation, requestLocation, locating } = useGeolocation();
@@ -75,33 +90,46 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
     }
   }, [userLocation, requestLocation]);
 
-  const directDistanceKm = useMemo(() => {
-    if (!userLocation || !place?.latitude || !place?.longitude) return null;
-    return routingService.calculateDirectDistanceKm(userLocation, {
-      latitude: place.latitude,
-      longitude: place.longitude,
-    });
-  }, [userLocation, place?.latitude, place?.longitude]);
+  const directDistanceKm =
+    userLocation && place?.latitude && place?.longitude
+      ? routingService.calculateDirectDistanceKm(userLocation, {
+          latitude: place.latitude,
+          longitude: place.longitude,
+        })
+      : null;
 
   useEffect(() => {
     let isCancelled = false;
-    setMainImgError(false);
-    setFailedThumbnails({});
 
     async function loadData() {
+      await Promise.resolve();
+      if (isCancelled) return;
+      setLoading(true);
+      setErrorMessage(null);
+      setMainImgError(false);
+      setFailedThumbnails({});
+
       try {
         const data = await placeService.getPlaceBySlug(initialSlug);
-        if (!isCancelled && data) {
+        if (!isCancelled) {
           setPlace(data);
-          setMainImgError(false);
-          setFailedThumbnails({});
-          const related = await placeService.getRelatedPlaces(data.id, 3);
-          if (!isCancelled) {
-            setRelatedPlaces(related);
+          if (data) {
+            const related = await placeService.getRelatedPlaces(data.id, 3);
+            if (!isCancelled) {
+              setRelatedPlaces(related);
+            }
+          } else {
+            setRelatedPlaces([]);
           }
         }
       } catch (err) {
-        console.error("Failed to load place details:", err);
+        if (!isCancelled) {
+          setErrorMessage(
+            err instanceof Error
+              ? err.message
+              : "Không thể tải thông tin địa điểm vào lúc này. Vui lòng thử lại sau."
+          );
+        }
       } finally {
         if (!isCancelled) {
           setLoading(false);
@@ -114,12 +142,24 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
     return () => {
       isCancelled = true;
     };
-  }, [initialSlug]);
+  }, [initialSlug, reloadNonce]);
 
   if (loading) {
     return (
       <div className="max-w-[1536px] mx-auto w-full px-4 py-16 sm:px-6 lg:px-8 xl:px-10">
         <LoadingState message="Đang tải chi tiết địa điểm..." />
+      </div>
+    );
+  }
+
+  if (errorMessage) {
+    return (
+      <div className="max-w-[1536px] mx-auto w-full px-4 py-16 sm:px-6 lg:px-8 xl:px-10">
+        <ErrorState
+          title="Không thể tải địa điểm"
+          message={errorMessage}
+          onRetry={() => setReloadNonce((n) => n + 1)}
+        />
       </div>
     );
   }
@@ -137,22 +177,34 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
     );
   }
 
+  const isSaved = isAuthenticated ? (savedIdsSet?.has(place.id) ?? false) : false;
+
   const toggleSave = () => {
-    setIsSaved(!isSaved);
-    if (!isSaved) {
-      toast.success(`Đã lưu "${place.name}" vào danh sách yêu thích!`);
-    } else {
-      toast.info(`Đã gỡ "${place.name}" khỏi danh sách lưu.`);
+    if (!isAuthenticated) {
+      toast.info("Vui lòng đăng nhập để lưu địa điểm vào bộ sưu tập");
+      router.push(`/login?next=${encodeURIComponent(`/places/${initialSlug}`)}`);
+      return;
     }
+    if (toggleMutation.isPending) return;
+    toggleMutation.mutate({ placeId: place.id });
   };
 
-  const handleAddToPlanner = () => {
-    toast.success(`Đã thêm "${place.name}" vào lịch trình của bạn!`);
+  const handleOpenSaveCollectionModal = () => {
+    if (!isAuthenticated) {
+      toast.info("Vui lòng đăng nhập để lưu địa điểm vào bộ sưu tập");
+      router.push(`/login?next=${encodeURIComponent(`/places/${initialSlug}`)}`);
+      return;
+    }
+    setIsSaveModalOpen(true);
   };
 
-  const handleCreatePlanWithAi = () => {
-    toast.success(`AI đang tạo lịch trình du lịch xoay quanh "${place.name}"...`);
-    router.push(`/planner/planner-dalat-3n2d`);
+  const handleOpenAddToItineraryModal = () => {
+    if (!isAuthenticated) {
+      toast.info("Vui lòng đăng nhập để thêm địa điểm vào lịch trình");
+      router.push(`/login?next=${encodeURIComponent(`/places/${initialSlug}`)}`);
+      return;
+    }
+    setIsAddToItineraryOpen(true);
   };
 
   return (
@@ -309,7 +361,8 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
                 <>
                   <span>•</span>
                   <span className="inline-flex items-center gap-1 font-semibold text-primary bg-primary/10 px-2.5 py-0.5 rounded-full text-xs">
-                    <span>📍 Cách bạn ~{routingService.formatDistanceKm(directDistanceKm)}</span>
+                    <MapPin className="size-3 shrink-0" aria-hidden="true" />
+                    <span>Cách bạn ~{routingService.formatDistanceKm(directDistanceKm)}</span>
                     <span className="text-[11px] text-muted-foreground font-normal">(đường chim bay)</span>
                   </span>
                 </>
@@ -457,7 +510,7 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
                   <div className="flex items-center justify-between">
                     <span>Ước tính di chuyển:</span>
                     <span className="text-foreground font-semibold text-emerald-600 dark:text-emerald-400">
-                      🏍️ ~{routingService.formatDurationMinutes(routingService.estimateDurationMinutes(directDistanceKm, "motorcycle"))}
+                      ~{routingService.formatDurationMinutes(routingService.estimateDurationMinutes(directDistanceKm, "motorcycle"))}
                     </span>
                   </div>
                 </div>
@@ -500,27 +553,27 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
             {/* Action Buttons */}
             <div className="space-y-2.5 pt-1">
               <Button
-                onClick={handleAddToPlanner}
-                className="w-full h-11 font-bold gap-2 rounded-xl bg-primary text-primary-foreground shadow-xs"
+                onClick={handleOpenAddToItineraryModal}
+                className="w-full h-11 font-bold gap-2 rounded-xl bg-primary text-primary-foreground shadow-xs cursor-pointer"
               >
                 <CalendarPlus className="size-4" />
                 <span>Thêm vào lịch trình</span>
               </Button>
 
               <Button
-                onClick={handleCreatePlanWithAi}
+                onClick={handleOpenSaveCollectionModal}
                 variant="outline"
-                className="w-full h-11 font-semibold gap-2 rounded-xl border-primary/40 text-primary hover:bg-primary/10"
+                className="w-full h-11 font-semibold gap-2 rounded-xl border-primary/40 text-primary hover:bg-primary/10 cursor-pointer"
               >
-                <Sparkles className="size-4 text-accent-foreground" />
-                <span>✨ Tạo lịch trình AI từ điểm này</span>
+                <FolderPlus className="size-4" />
+                <span>Lưu vào bộ sưu tập</span>
               </Button>
 
               <div className="grid grid-cols-2 gap-2 pt-1">
                 <Button
                   variant="ghost"
                   onClick={toggleSave}
-                  className={`h-9 text-xs rounded-xl border border-border/70 ${
+                  className={`h-9 text-xs rounded-xl border border-border/70 cursor-pointer ${
                     isSaved ? "text-rose-500 font-bold bg-rose-50 dark:bg-rose-950/30" : ""
                   }`}
                 >
@@ -534,7 +587,7 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
                     navigator.clipboard?.writeText(window.location.href);
                     toast.success("Đã sao chép liên kết địa điểm!");
                   }}
-                  className="h-9 text-xs rounded-xl border border-border/70 text-muted-foreground hover:text-foreground"
+                  className="h-9 text-xs rounded-xl border border-border/70 text-muted-foreground hover:text-foreground cursor-pointer"
                 >
                   <Share2 className="size-3.5 mr-1.5" />
                   <span>Chia sẻ</span>
@@ -545,7 +598,7 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
                 type="button"
                 variant="outline"
                 onClick={() => setIsContributePhotoOpen(true)}
-                className="w-full h-9 text-xs font-semibold gap-1.5 rounded-xl border-dashed border-border hover:border-primary/50 text-muted-foreground hover:text-foreground"
+                className="w-full h-9 text-xs font-semibold gap-1.5 rounded-xl border-dashed border-border hover:border-primary/50 text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 <Camera className="size-3.5 text-primary" />
                 <span>Đóng góp ảnh thực tế</span>
@@ -578,6 +631,22 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
         place={place}
         open={isContributePhotoOpen}
         onOpenChange={setIsContributePhotoOpen}
+      />
+
+      {/* Save to Collection Modal */}
+      {isSaveModalOpen && (
+        <SaveToCollectionModal
+          isOpen={isSaveModalOpen}
+          onClose={() => setIsSaveModalOpen(false)}
+          place={place}
+        />
+      )}
+
+      {/* Add Place to Existing Itinerary Modal */}
+      <AddPlaceToItineraryModal
+        isOpen={isAddToItineraryOpen}
+        onClose={() => setIsAddToItineraryOpen(false)}
+        place={place}
       />
     </div>
   );

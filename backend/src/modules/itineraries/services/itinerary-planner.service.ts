@@ -124,7 +124,7 @@ interface StoredPlan {
 
 const DETAIL_INCLUDE = {
   destinations: {
-    orderBy: [{ dayNumber: 'asc' }, { visitOrder: 'asc' }],
+    orderBy: [{ dayNumber: 'asc' }, { startTime: 'asc' }, { visitOrder: 'asc' }],
     include: {
       place: {
         select: {
@@ -138,7 +138,7 @@ const DETAIL_INCLUDE = {
           priceLevel: true,
           priceRange: true,
           openingHours: true,
-          category: { select: { name: true, nameVi: true } },
+          category: { select: { name: true, nameVi: true, slug: true } },
           images: {
             where: { isPrimary: true },
             take: 1,
@@ -152,6 +152,71 @@ const DETAIL_INCLUDE = {
 } satisfies Prisma.ItineraryInclude;
 
 type ItineraryRow = Prisma.ItineraryGetPayload<{ include: typeof DETAIL_INCLUDE }>;
+
+/**
+ * Pure bottom-up cost aggregator for itinerary activities (tickets & food).
+ * Shared between initial generation (`generate`) and live detail projection (`toDetail`)
+ * so adding, removing, or swapping activities automatically keeps `budgetBreakdown` accurate.
+ */
+export function computeBottomUpActivityCosts(
+  items: Array<{ isDining?: boolean; estimatedCost?: number | null }>,
+  totalDays: number,
+  budgetLevel: string | null | undefined,
+  destinationCity: string | null | undefined,
+): { food: number; tickets: number } {
+  const levelKey = (budgetLevel || 'MEDIUM') as keyof typeof PRICING_CONFIG.LIVING_EXPENSES.FOOD_PER_DAY;
+  const dailyFood =
+    PRICING_CONFIG.LIVING_EXPENSES.FOOD_PER_DAY[levelKey] ||
+    PRICING_CONFIG.LIVING_EXPENSES.FOOD_PER_DAY.MEDIUM;
+  const tierMultiplier = getDestinationTierMultiplier(destinationCity || '');
+
+  let bottomUpTickets = 0;
+  let bottomUpFood = 0;
+  let diningCount = 0;
+
+  for (const act of items) {
+    if (act.isDining) {
+      bottomUpFood += act.estimatedCost || 0;
+      diningCount++;
+    } else {
+      bottomUpTickets += act.estimatedCost || 0;
+    }
+  }
+
+  // Safety fallback for meals: If fewer than MEALS_PER_DAY meals/day are scheduled, add baseline for remaining meals
+  const mealsPerDay = PRICING_CONFIG.LIVING_EXPENSES.MEALS_PER_DAY;
+  const targetMeals = Math.max(1, totalDays) * mealsPerDay;
+  if (diningCount < targetMeals) {
+    const missingMeals = targetMeals - diningCount;
+    const baselineMealCost = Math.round((dailyFood / mealsPerDay) * tierMultiplier);
+    bottomUpFood += missingMeals * baselineMealCost;
+  }
+
+  return { food: bottomUpFood, tickets: bottomUpTickets };
+}
+
+export function assembleBudgetBreakdown(parts: {
+  transitRoundTrip: number;
+  accommodation: number;
+  food: number;
+  tickets: number;
+  localTransit: number;
+}): BudgetBreakdown {
+  const transitRoundTrip = parts.transitRoundTrip || 0;
+  const accommodation = parts.accommodation || 0;
+  const food = parts.food || 0;
+  const tickets = parts.tickets || 0;
+  const localTransit = parts.localTransit || 0;
+  return {
+    transitRoundTrip,
+    accommodation,
+    food,
+    tickets,
+    localTransit,
+    totalEstimated:
+      transitRoundTrip + accommodation + food + tickets + localTransit,
+  };
+}
 
 @Injectable()
 export class ItineraryPlannerService {
@@ -483,47 +548,22 @@ export class ItineraryPlannerService {
       });
     }
 
-    // Bottom-Up calculation for Tickets and Food
-    let bottomUpTickets = 0;
-    let bottomUpFood = 0;
-    let diningCount = 0;
+    // Bottom-Up calculation for Tickets and Food using shared pure aggregator
+    const { food: bottomUpFood, tickets: bottomUpTickets } = computeBottomUpActivityCosts(
+      days.flatMap((d) => d.activities),
+      totalDays,
+      budgetLevel,
+      dto.destinationCity,
+    );
 
-    for (const day of days) {
-      for (const act of day.activities) {
-        if (act.isDining) {
-          bottomUpFood += act.estimatedCost || 0;
-          diningCount++;
-        } else {
-          bottomUpTickets += act.estimatedCost || 0;
-        }
-      }
-    }
-
-    // Safety fallback for meals: If planner scheduled fewer than 3 meals/day, add baseline for remaining meals
-    const targetMeals = totalDays * 3;
-    if (diningCount < targetMeals) {
-      const missingMeals = targetMeals - diningCount;
-      const baselineMealCost = Math.round(
-        (dailyFood / 3) * tierMultiplier,
-      );
-      bottomUpFood += missingMeals * baselineMealCost;
-    }
-
-    const totalEstimated =
-      intercityTransit.estimatedPriceRoundTrip +
-      totalHotelCost +
-      bottomUpFood +
-      bottomUpTickets +
-      totalLocalTransitCost;
-
-    const budgetBreakdown: BudgetBreakdown = {
+    const budgetBreakdown = assembleBudgetBreakdown({
       transitRoundTrip: intercityTransit.estimatedPriceRoundTrip,
       accommodation: totalHotelCost,
       food: bottomUpFood,
       tickets: bottomUpTickets,
       localTransit: totalLocalTransitCost,
-      totalEstimated,
-    };
+    });
+    const { totalEstimated } = budgetBreakdown;
 
     // 7. Persist to Database (Itinerary & ItineraryDestination in an Atomic Transaction)
     if (!creatorId) {
@@ -751,6 +791,7 @@ export class ItineraryPlannerService {
     const stored = readStoredPlan(row.aiPreferences);
     const byDay = new Map<number, ItineraryActivity[]>();
     const rows = row.destinations;
+    const liveCostItems: Array<{ isDining: boolean; estimatedCost: number }> = [];
 
     rows.forEach((dest, i) => {
       const next = rows[i + 1];
@@ -768,6 +809,19 @@ export class ItineraryPlannerService {
 
       const transitInfo = this.computeIntracityTransit(distanceToNextKm, (stored as any).intracityMode);
       const image = dest.place.images[0];
+      const placeCostInfo = calculatePlaceEstimatedCost({
+        category: dest.place.category,
+        priceRange: dest.place.priceRange,
+        priceLevel: dest.place.priceLevel || row.budgetLevel,
+        placeName: dest.place.name,
+      });
+      const resolvedCost =
+        dest.estimatedCost != null ? Number(dest.estimatedCost) : placeCostInfo.cost;
+      liveCostItems.push({
+        isDining: placeCostInfo.isDining,
+        estimatedCost: resolvedCost,
+      });
+
       const list = byDay.get(dest.dayNumber) ?? [];
       list.push({
         id: dest.id,
@@ -776,7 +830,7 @@ export class ItineraryPlannerService {
         startTime: formatTimeOfDay(dest.startTime),
         endTime: formatTimeOfDay(dest.endTime),
         durationMinutes: dest.estimatedDurationMinutes,
-        visitOrder: Number(dest.visitOrder),
+        visitOrder: list.length + 1,
         notes: dest.notes,
         latitude: dest.place.latitude,
         longitude: dest.place.longitude,
@@ -790,7 +844,7 @@ export class ItineraryPlannerService {
         reviewCount: dest.place.reviewCount ?? 120,
         priceLevel: dest.place.priceLevel ?? 'MEDIUM',
         priceRange: dest.place.priceRange ?? null,
-        estimatedCost: dest.estimatedCost != null ? Number(dest.estimatedCost) : null,
+        estimatedCost: resolvedCost,
         openingHours: dest.place.openingHours ?? null,
       });
       byDay.set(dest.dayNumber, list);
@@ -855,6 +909,23 @@ export class ItineraryPlannerService {
       requesterId && row.tripGroup?.members.some((m) => m.userId === requesterId),
     );
 
+    let liveBudgetBreakdown: BudgetBreakdown | null = stored.budgetBreakdown ?? null;
+    if (liveBudgetBreakdown && liveCostItems.length > 0) {
+      const { food, tickets } = computeBottomUpActivityCosts(
+        liveCostItems,
+        totalDays,
+        row.budgetLevel,
+        row.destination,
+      );
+      liveBudgetBreakdown = assembleBudgetBreakdown({
+        transitRoundTrip: liveBudgetBreakdown.transitRoundTrip,
+        accommodation: liveBudgetBreakdown.accommodation,
+        food,
+        tickets,
+        localTransit: liveBudgetBreakdown.localTransit,
+      });
+    }
+
     return {
       id: row.id,
       creatorId: row.creatorId,
@@ -869,7 +940,7 @@ export class ItineraryPlannerService {
       totalDays,
       budgetLevel: row.budgetLevel ?? 'MEDIUM',
       intercityTransit: this.normalizeStoredTransit(stored.intercityTransit, row.destination),
-      budgetBreakdown: stored.budgetBreakdown ?? null,
+      budgetBreakdown: liveBudgetBreakdown,
       tourBriefing: redactTourBriefing(stored.tourBriefing, isOwner || isTripMember),
       days,
     };
@@ -1059,24 +1130,17 @@ export class ItineraryPlannerService {
       returnDate,
     });
 
-    // Recalculate budget breakdown with updated round-trip transit price
-    const oldBreakdown = stored.budgetBreakdown;
-    const accommodation = oldBreakdown?.accommodation ?? 0;
-    const food = oldBreakdown?.food ?? 0;
-    const tickets = oldBreakdown?.tickets ?? 0;
-    const localTransit = oldBreakdown?.localTransit ?? 0;
-    const transitRoundTrip = intercityTransit.estimatedPriceRoundTrip;
-    const totalEstimated =
-      transitRoundTrip + accommodation + food + tickets + localTransit;
-
-    const budgetBreakdown: BudgetBreakdown = {
-      transitRoundTrip,
-      accommodation,
-      food,
-      tickets,
-      localTransit,
-      totalEstimated,
-    };
+    // Recalculate budget breakdown with updated round-trip transit price and live activity costs
+    const currentDetail = this.toDetail(row, userId);
+    const baseBreakdown = currentDetail.budgetBreakdown ?? stored.budgetBreakdown;
+    const budgetBreakdown = assembleBudgetBreakdown({
+      transitRoundTrip: intercityTransit.estimatedPriceRoundTrip,
+      accommodation: baseBreakdown?.accommodation ?? 0,
+      food: baseBreakdown?.food ?? 0,
+      tickets: baseBreakdown?.tickets ?? 0,
+      localTransit: baseBreakdown?.localTransit ?? 0,
+    });
+    const { totalEstimated } = budgetBreakdown;
 
     const updatedAiPreferences = {
       ...(typeof row.aiPreferences === 'object' && row.aiPreferences !== null

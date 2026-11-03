@@ -68,8 +68,10 @@ export default function PlannerListPage() {
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [wizardPreselectedDest, setWizardPreselectedDest] = useState<string | undefined>(undefined);
 
-  // Fetch real itineraries from database endpoint GET /api/v1/itineraries (strictly scoped to logged-in user)
-  const { data: itineraries = [], isLoading } = useItinerariesListQuery();
+  const [activeScope, setActiveScope] = useState<'OWNED' | 'JOINED'>('OWNED');
+
+  // Fetch real itineraries from database endpoint GET /api/v1/itineraries
+  const { data: itineraries = [], isLoading } = useItinerariesListQuery(activeScope);
   const deleteMutation = useDeleteItinerary();
   const bulkDeleteMutation = useBulkDeleteItineraries();
 
@@ -173,13 +175,58 @@ export default function PlannerListPage() {
         </div>
 
         {/* =========================================================================
-            2. MY ITINERARIES SECTION (Real Database Trips Owned by Current User)
+            2. ITINERARIES SCOPE TABS & SECTION
             ========================================================================= */}
         <div className="space-y-5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-4">
+          {/* Scope Filter Tabs */}
+          <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveScope('OWNED');
+                setSelectedIds([]);
+                setIsSelectMode(false);
+              }}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                activeScope === 'OWNED'
+                  ? 'bg-teal-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200'
+              }`}
+            >
+              <span>Chuyến đi của tôi</span>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                activeScope === 'OWNED' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+              }`}>
+                {activeScope === 'OWNED' ? itineraries.length : 'Tôi tạo'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveScope('JOINED');
+                setSelectedIds([]);
+                setIsSelectMode(false);
+              }}
+              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                activeScope === 'JOINED'
+                  ? 'bg-teal-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200'
+              }`}
+            >
+              <span>Được mời tham gia</span>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
+                activeScope === 'JOINED' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+              }`}>
+                {activeScope === 'JOINED' ? itineraries.length : 'Đồng hành'}
+              </span>
+            </button>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/80 pb-4">
             <div>
               <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-                <span>Chuyến đi của bạn</span>
+                <span>{activeScope === 'OWNED' ? 'Chuyến đi bạn đã tạo' : 'Chuyến đi cùng bạn bè'}</span>
                 <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800">
                   {itineraries.length}
                 </span>
@@ -190,14 +237,16 @@ export default function PlannerListPage() {
                 )}
               </h2>
               <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                {isSelectMode
-                  ? "Nhấp vào các thẻ chuyến đi để chọn hoặc bỏ chọn nhiều lịch trình"
-                  : "Lịch trình du lịch thực tế được tạo và lưu trữ riêng trên tài khoản của bạn"}
+                {activeScope === 'OWNED'
+                  ? (isSelectMode
+                      ? "Nhấp vào các thẻ chuyến đi để chọn hoặc bỏ chọn nhiều lịch trình"
+                      : "Lịch trình du lịch do bạn trực tiếp lên kế hoạch và quản lý")
+                  : "Lịch trình bạn được chủ chuyến đi mời cùng đồng hành và lên kế hoạch"}
               </p>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
-              {!isLoading && itineraries.length > 0 && (
+              {activeScope === 'OWNED' && !isLoading && itineraries.length > 0 && (
                 <>
                   {isSelectMode ? (
                     <>
@@ -274,12 +323,16 @@ export default function PlannerListPage() {
               </div>
               <div className="space-y-1">
                 <h3 className="text-lg font-bold text-slate-900">
-                  {user ? "Bạn chưa có lịch trình nào" : "Đăng nhập để quản lý lịch trình của bạn"}
+                  {activeScope === 'JOINED'
+                    ? 'Bạn chưa tham gia chuyến đi chung nào'
+                    : (user ? 'Bạn chưa có lịch trình nào' : 'Đăng nhập để quản lý lịch trình của bạn')}
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-                  {user
-                    ? "Hãy nhấn nút bên dưới để chọn điểm đến và để AI tự động lập lịch trình tối ưu theo ngân sách và sở thích của bạn!"
-                    : "Đăng nhập để tạo lịch trình cá nhân bằng AI hoặc khám phá các chuyến đi thú vị từ Cộng đồng TripGenie."}
+                  {activeScope === 'JOINED'
+                    ? 'Khi chủ lịch trình mời bạn bằng email, thông báo sẽ hiển thị trên TripGenie. Bạn có thể chấp nhận để cùng lên kế hoạch tại đây!'
+                    : (user
+                        ? 'Hãy nhấn nút bên dưới để chọn điểm đến và để AI tự động lập lịch trình tối ưu theo ngân sách và sở thích của bạn!'
+                        : 'Đăng nhập để tạo lịch trình cá nhân bằng AI hoặc khám phá các chuyến đi thú vị từ Cộng đồng TripGenie.')}
                 </p>
               </div>
               <div className="flex flex-wrap items-center justify-center gap-3">
@@ -364,7 +417,7 @@ export default function PlannerListPage() {
                         <span className="px-2.5 py-0.5 bg-slate-900/90 backdrop-blur text-white text-[10px] font-semibold rounded-md shadow-xs">
                           {BUDGET_LABELS[itin.budgetLevel] || 'Tiêu chuẩn'}
                         </span>
-                        {!isSelectMode && (
+                        {!isSelectMode && activeScope === 'OWNED' && (
                           <button
                             type="button"
                             title="Xóa lịch trình này"
@@ -377,6 +430,13 @@ export default function PlannerListPage() {
                           >
                             <Trash2 className="size-3" />
                           </button>
+                        )}
+                        {activeScope === 'JOINED' && (
+                          <span className={`px-2 py-0.5 backdrop-blur text-[10px] font-bold rounded-md shadow-xs ${
+                            itin.viewerRole === 'EDITOR' ? 'bg-blue-600/90 text-white' : 'bg-slate-700/90 text-white'
+                          }`}>
+                            {itin.viewerRole === 'EDITOR' ? 'Có quyền sửa' : 'Chỉ xem'}
+                          </span>
                         )}
                       </div>
 

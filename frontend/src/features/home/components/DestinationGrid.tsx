@@ -22,7 +22,7 @@ function DestinationCard({ area, className = "" }: { area: BackendTravelAreaItem
   return (
     <Link
       href={`/explore?areaId=${area.id}`}
-      className={`group relative flex flex-col overflow-hidden rounded-2xl border border-border/80 bg-card transition-all duration-300 hover:shadow-md hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${className}`}
+      className={`group relative flex flex-col overflow-hidden rounded-2xl border border-border/80 bg-card transition-[border-color,box-shadow] duration-200 hover:shadow-md hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 ${className}`}
     >
       <div className="relative h-full w-full overflow-hidden bg-muted">
         <Image
@@ -30,7 +30,7 @@ function DestinationCard({ area, className = "" }: { area: BackendTravelAreaItem
           alt={displayName}
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 66vw"
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          className="object-cover transition-transform duration-200 [@media(hover:hover)_and_(pointer:fine)]:group-hover:scale-[1.025] motion-reduce:transform-none"
           onError={() => setImgError(true)}
           loading="lazy"
         />

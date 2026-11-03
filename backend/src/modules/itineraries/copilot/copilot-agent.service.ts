@@ -17,6 +17,7 @@ import {
 } from '../../../common/utils/gemini-contents.util';
 import { formatTimeOfDay } from '../../../common/utils/time-of-day.util';
 import { ItineraryPlannerService } from '../services/itinerary-planner.service';
+import { ItineraryAccessService } from '../services/itinerary-access.service';
 import { CopilotToolsService } from './copilot-tools.service';
 import {
   COPILOT_CONSTANTS,
@@ -69,6 +70,7 @@ export class CopilotAgentService {
     private readonly configService: ConfigService,
     private readonly toolsService: CopilotToolsService,
     private readonly plannerService: ItineraryPlannerService,
+    private readonly accessService: ItineraryAccessService,
     @Optional()
     @InjectQueue(COPILOT_SUMMARY_QUEUE)
     private readonly summaryQueue?: Queue,
@@ -177,11 +179,7 @@ export class CopilotAgentService {
       throw new NotFoundException('Không tìm thấy lịch trình du lịch.');
     }
 
-    if (!userId || itinerary.creatorId !== userId) {
-      throw new ForbiddenException(
-        'Chỉ chủ sở hữu mới có thể sử dụng AI Copilot trên lịch trình này.',
-      );
-    }
+    await this.accessService.assertCanEdit(itineraryId, userId);
 
     // 1. Resolve / Create Chat Session
     const session = await this.resolveSession(
@@ -275,6 +273,10 @@ export class CopilotAgentService {
 
         const isModifyingTool = toolName !== COPILOT_TOOL_NAMES.CHANGE_DESTINATION;
         const shouldDryRun = isModifyingTool && !autoApply;
+
+        if (!shouldDryRun && isModifyingTool) {
+          await this.accessService.assertCanEdit(itineraryId, userId);
+        }
 
         const toolResult = await this.executeTool(
           itineraryId,
@@ -456,14 +458,14 @@ export class CopilotAgentService {
     sessionId?: string,
     userId?: string,
   ): Promise<CopilotMessageHistoryItem[]> {
-    await this.plannerService.assertItineraryOwnership(itineraryId, userId);
+    await this.accessService.assertCanView(itineraryId, userId);
 
     const session = sessionId
       ? await this.prisma.aiChatSession.findFirst({
-          where: { id: sessionId, linkedItineraryId: itineraryId },
+          where: { id: sessionId, linkedItineraryId: itineraryId, userId },
         })
       : await this.prisma.aiChatSession.findFirst({
-          where: { linkedItineraryId: itineraryId },
+          where: { linkedItineraryId: itineraryId, userId },
           orderBy: { createdAt: 'desc' },
         });
 
@@ -498,7 +500,7 @@ export class CopilotAgentService {
     userId?: string,
     proposalId?: string,
   ): Promise<{ success: boolean; message: string; itinerary: unknown }> {
-    await this.plannerService.assertItineraryOwnership(itineraryId, userId);
+    await this.accessService.assertCanEdit(itineraryId, userId);
 
     const toolResult = await this.executeTool(
       itineraryId,

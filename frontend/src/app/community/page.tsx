@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, useRef, Suspense } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { PostDetailModal } from "@/components/community/PostDetailModal";
+import { useSearchParams, useRouter } from "next/navigation";
 import {
   Plus,
   Search,
@@ -18,12 +17,23 @@ import {
   CheckCircle2,
   Users,
   X,
+  MapPin,
+  Hash,
 } from "lucide-react";
+import {
+  POPULAR_COMMUNITY_TAGS,
+  POPULAR_COMMUNITY_DESTINATIONS,
+  normalizeKeyword,
+} from "@/features/community/config/community-suggestions";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PostCard } from "@/components/community/PostCard";
 import { CreatePostModal } from "@/components/community/CreatePostModal";
-import { useCommunityFeed, useCommunityPost } from "@/features/community/hooks/use-community";
+import { PostDetailModal } from "@/components/community/PostDetailModal";
+import {
+  useCommunityFeed,
+  useCommunityPost,
+} from "@/features/community/hooks/use-community";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { COMMUNITY_UI_CONSTANTS } from "@/services/community.service";
 import type { CommunitySortMode } from "@/types/community";
@@ -35,11 +45,67 @@ const SORT_TABS: { id: CommunitySortMode; label: string; icon: typeof Clock }[] 
   { id: "MOST_CLONED", label: "Được nhân bản nhiều", icon: Copy },
 ];
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function CommunityPageContent() {
+  const { user } = useAuth();
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+  const currentUser = isMounted ? user : null;
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  const [sort, setSort] = useState<CommunitySortMode>("LATEST");
+  const [selectedTag, setSelectedTag] = useState<string>("");
+  const [searchInput, setSearchInput] = useState<string>("");
+  const [appliedSearch, setAppliedSearch] = useState<string>("");
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Unified search suggestions (Tags & Destinations)
+  const trimmedSearch = searchInput.trim();
+  const rawSearchKeyword = trimmedSearch.replace(/^[@#]/, '');
+  const normalizedSearch = normalizeKeyword(rawSearchKeyword);
+  const isSearchingHash = trimmedSearch.startsWith('#');
+  const isSearchingAt = trimmedSearch.startsWith('@');
+
+  const suggestedSearchTags = normalizedSearch.length > 0 && !isSearchingAt
+    ? POPULAR_COMMUNITY_TAGS.filter((tag) =>
+        normalizeKeyword(tag.replace(/^#/, '')).includes(normalizedSearch)
+      ).slice(0, 5)
+    : [];
+
+  const suggestedDestinations = normalizedSearch.length > 0 && !isSearchingHash && !isSearchingAt
+    ? POPULAR_COMMUNITY_DESTINATIONS.filter(
+        (dest) =>
+          normalizeKeyword(dest.name).includes(normalizedSearch) ||
+          normalizeKeyword(dest.province).includes(normalizedSearch)
+      ).slice(0, 4)
+    : [];
+
+  const hasSearchSuggestions = suggestedSearchTags.length > 0 || suggestedDestinations.length > 0;
+
+  const handleSelectSearchTag = (tag: string) => {
+    setSearchInput(tag);
+    setAppliedSearch(tag);
+    setIsSearchDropdownOpen(false);
+  };
+
+  const handleSelectDestination = (destName: string) => {
+    setSearchInput(destName);
+    setAppliedSearch(destName);
+    setIsSearchDropdownOpen(false);
+  };
+  const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [composeInitialFiles, setComposeInitialFiles] = useState<File[]>([]);
+  const [composeFocusItinerary, setComposeFocusItinerary] = useState(false);
+
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const videoInputRef = useRef<HTMLInputElement | null>(null);
+
   // Deep linking: read postId and commentId from URL
   const deepPostId = searchParams.get("postId");
   const deepCommentId = searchParams.get("commentId");
@@ -68,13 +134,21 @@ function CommunityPageContent() {
     }
   }, [deepPostId, isValidPostId, isDeepPostError]);
 
-
-  const { user } = useAuth();
-  const [sort, setSort] = useState<CommunitySortMode>("LATEST");
-  const [selectedTag, setSelectedTag] = useState<string>("");
-  const [searchInput, setSearchInput] = useState<string>("");
-  const [appliedSearch, setAppliedSearch] = useState<string>("");
-  const [isComposeOpen, setIsComposeOpen] = useState(false);
+  // Click outside to close search suggestions dropdown
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsSearchDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Debounce search input (300ms) for smooth TikTok/Xiaohongshu-style unified discovery
   useEffect(() => {
@@ -108,12 +182,68 @@ function CommunityPageContent() {
       toast.error("Vui lòng đăng nhập để đăng bài chia sẻ lên cộng đồng");
       return;
     }
+    setComposeInitialFiles([]);
+    setComposeFocusItinerary(false);
+    setIsComposeOpen(true);
+  };
+
+  const handlePickImages = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      toast.error("Vui lòng đăng nhập để đăng bài chia sẻ lên cộng đồng");
+      return;
+    }
+    imageInputRef.current?.click();
+  };
+
+  const handleImageFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (fileList && fileList.length > 0) {
+      setComposeInitialFiles(Array.from(fileList));
+      setComposeFocusItinerary(false);
+      setIsComposeOpen(true);
+    }
+    if (imageInputRef.current) {
+      imageInputRef.current.value = "";
+    }
+  };
+
+  const handlePickVideos = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      toast.error("Vui lòng đăng nhập để đăng bài chia sẻ lên cộng đồng");
+      return;
+    }
+    videoInputRef.current?.click();
+  };
+
+  const handleVideoFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    if (fileList && fileList.length > 0) {
+      setComposeInitialFiles(Array.from(fileList));
+      setComposeFocusItinerary(false);
+      setIsComposeOpen(true);
+    }
+    if (videoInputRef.current) {
+      videoInputRef.current.value = "";
+    }
+  };
+
+  const handleAttachItinerary = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!user) {
+      toast.error("Vui lòng đăng nhập để đăng bài chia sẻ lên cộng đồng");
+      return;
+    }
+    setComposeInitialFiles([]);
+    setComposeFocusItinerary(true);
     setIsComposeOpen(true);
   };
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setAppliedSearch(searchInput.trim());
+    setIsSearchDropdownOpen(false);
   };
 
   const handleClearFilters = () => {
@@ -130,91 +260,84 @@ function CommunityPageContent() {
 
   return (
     <div className="max-w-5xl mx-auto w-full px-4 py-8 sm:px-6 lg:px-8 space-y-6 pb-20">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-heading text-foreground">
-            Cộng đồng du lịch
-          </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground">
-            Khám phá video trải nghiệm thực tế, thả tim, bình luận và nhân bản lịch trình từ các thành viên.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          {user && (
+      {/* Facebook/TikTok-style Quick Composer Trigger Card */}
+      <div className="rounded-2xl border border-border/80 bg-card p-3.5 shadow-xs">
+        <div className="flex items-center gap-3">
+          {currentUser ? (
             <Link
               href={`/community/profile/${encodeURIComponent(
-                user.username || user.id
+                currentUser.username || currentUser.id
               )}`}
+              title="Xem trang cá nhân của bạn"
+              className="shrink-0 transition-transform active:scale-95 group/avatar"
             >
-              <Button
-                variant="outline"
-                className="h-10 px-4 rounded-xl text-xs font-semibold cursor-pointer"
-              >
-                Kênh của tôi
-              </Button>
+              <Avatar className="size-10 border border-border transition-colors group-hover/avatar:border-primary shrink-0 cursor-pointer">
+                <AvatarImage
+                  src={currentUser?.avatarUrl || undefined}
+                  alt={currentUser?.fullName || "Khách"}
+                />
+                <AvatarFallback className="text-xs font-bold bg-secondary text-secondary-foreground">
+                  {currentUser?.fullName ? currentUser.fullName.slice(0, 2).toUpperCase() : "TG"}
+                </AvatarFallback>
+              </Avatar>
             </Link>
+          ) : (
+            <Avatar className="size-10 border border-border shrink-0">
+              <AvatarImage
+                src={undefined}
+                alt="Khách"
+              />
+              <AvatarFallback className="text-xs font-bold bg-secondary text-secondary-foreground">
+                TG
+              </AvatarFallback>
+            </Avatar>
           )}
-          <Button
+          <div
             onClick={handleOpenComposer}
-            className="h-10 px-4 rounded-xl font-bold gap-2 bg-primary text-primary-foreground shadow-xs cursor-pointer"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                handleOpenComposer();
+              }
+            }}
+            className="group flex-1 h-11 px-4 rounded-xl border border-border bg-muted/40 hover:bg-muted/70 hover:border-primary/40 text-left text-xs sm:text-sm text-muted-foreground transition-all cursor-pointer flex items-center justify-between gap-3"
           >
-            <Plus className="size-4" />
-            <span>Đăng bài</span>
-          </Button>
-        </div>
-      </div>
-
-      {/* Facebook/TikTok-style Quick Composer Trigger Card */}
-      <div className="rounded-2xl border border-border/80 bg-card p-4 shadow-xs space-y-3">
-        <div className="flex items-center gap-3">
-          <Avatar className="size-10 border border-border shrink-0">
-            <AvatarImage
-              src={user?.avatarUrl || undefined}
-              alt={user?.fullName || "Khách"}
-            />
-            <AvatarFallback className="text-xs font-bold bg-secondary text-secondary-foreground">
-              {user?.fullName ? user.fullName.slice(0, 2).toUpperCase() : "TG"}
-            </AvatarFallback>
-          </Avatar>
-          <button
-            type="button"
-            onClick={handleOpenComposer}
-            className="flex-1 h-11 px-4 rounded-xl border border-border bg-muted/40 hover:bg-muted/70 hover:border-primary/40 text-left text-xs sm:text-sm text-muted-foreground transition-all cursor-pointer"
-          >
-            {user
-              ? `${user.fullName} ơi, chia sẻ ảnh, video hoặc lịch trình chuyến đi vừa qua của bạn nhé...`
-              : "Chia sẻ khoảnh khắc, video review hoặc lịch trình chuyến đi của bạn..."}
-          </button>
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/60">
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleOpenComposer}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-muted text-xs font-semibold text-foreground transition-colors cursor-pointer"
-            >
-              <ImageIcon className="size-4 text-primary" />
-              <span>Ảnh check-in</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleOpenComposer}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-muted text-xs font-semibold text-foreground transition-colors cursor-pointer"
-            >
-              <Film className="size-4 text-primary" />
-              <span>Video ngắn</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleOpenComposer}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl hover:bg-muted text-xs font-semibold text-foreground transition-colors cursor-pointer"
-            >
-              <CalendarDays className="size-4 text-primary" />
-              <span>Đính kèm lịch trình</span>
-            </button>
+            <span className="truncate select-none">
+              {currentUser
+                ? `${currentUser.fullName} ơi, chia sẻ ảnh, video hoặc lịch trình chuyến đi vừa qua của bạn nhé...`
+                : "Chia sẻ khoảnh khắc, video review hoặc lịch trình chuyến đi của bạn..."}
+            </span>
+            <div className="inline-flex items-center gap-1 sm:gap-1.5 shrink-0 text-primary">
+              <button
+                type="button"
+                onClick={handlePickImages}
+                className="p-1.5 rounded-lg hover:bg-primary/15 active:scale-95 text-primary transition-all cursor-pointer"
+                title="Chọn ảnh check-in từ máy"
+                aria-label="Chọn ảnh check-in từ máy"
+              >
+                <ImageIcon className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handlePickVideos}
+                className="p-1.5 rounded-lg hover:bg-primary/15 active:scale-95 text-primary transition-all cursor-pointer"
+                title="Chọn video ngắn từ máy"
+                aria-label="Chọn video ngắn từ máy"
+              >
+                <Film className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleAttachItinerary}
+                className="p-1.5 rounded-lg hover:bg-primary/15 active:scale-95 text-primary transition-all cursor-pointer"
+                title="Đính kèm lịch trình chuyến đi"
+                aria-label="Đính kèm lịch trình chuyến đi"
+              >
+                <CalendarDays className="size-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -249,14 +372,26 @@ function CommunityPageContent() {
           onSubmit={handleSearchSubmit}
           className="flex items-center gap-2 w-full md:w-88"
         >
-          <div className="relative flex-1">
-            <Search className="size-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+          <div ref={searchContainerRef} className="relative flex-1">
+            <Search className="size-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
+              onFocus={() => {
+                if (hasSearchSuggestions) setIsSearchDropdownOpen(true);
+              }}
+              onChange={(e) => {
+                setSearchInput(e.target.value);
+                setIsSearchDropdownOpen(true);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') {
+                  setIsSearchDropdownOpen(false);
+                }
+              }}
               placeholder="Tìm bài viết, #hashtag, @tác_giả, điểm đến..."
               aria-label="Tìm bài viết, hashtag, tác giả hoặc điểm đến"
+              autoComplete="off"
               className="w-full h-10 pl-8 pr-8 rounded-xl border border-border bg-card text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
             {searchInput && (
@@ -265,12 +400,67 @@ function CommunityPageContent() {
                 onClick={() => {
                   setSearchInput("");
                   setAppliedSearch("");
+                  setIsSearchDropdownOpen(false);
                 }}
                 aria-label="Xóa từ khóa tìm kiếm"
                 className="absolute right-2 top-1/2 -translate-y-1/2 size-6 inline-flex items-center justify-center rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
               >
                 <X className="size-3.5" />
               </button>
+            )}
+
+            {/* Search Autocomplete Suggestions Dropdown */}
+            {isSearchDropdownOpen && hasSearchSuggestions && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-xl border border-border bg-card shadow-xl p-2 space-y-2 animate-in fade-in slide-in-from-top-1 duration-150">
+                {/* Hashtags */}
+                {suggestedSearchTags.length > 0 && (
+                  <div className="space-y-1">
+                    <div className="px-2 py-0.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      Hashtag đề xuất
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 px-1">
+                      {suggestedSearchTags.map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => handleSelectSearchTag(tag)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-muted/80 hover:bg-primary hover:text-primary-foreground text-foreground transition-all cursor-pointer"
+                        >
+                          <Hash className="size-3 text-primary group-hover:text-primary-foreground" />
+                          <span>{tag}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Destinations */}
+                {suggestedDestinations.length > 0 && (
+                  <div className="space-y-1 pt-1 border-t border-border/60">
+                    <div className="px-2 py-0.5 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                      Điểm đến phổ biến
+                    </div>
+                    <div className="space-y-0.5 px-1">
+                      {suggestedDestinations.map((dest) => (
+                        <button
+                          key={dest.name}
+                          type="button"
+                          onClick={() => handleSelectDestination(dest.name)}
+                          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs hover:bg-primary/10 hover:text-primary text-foreground transition-colors cursor-pointer text-left"
+                        >
+                          <span className="flex items-center gap-1.5 font-medium">
+                            <MapPin className="size-3.5 text-rose-500 shrink-0" />
+                            <span>{dest.name}</span>
+                          </span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {dest.province}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
           <Button
@@ -330,7 +520,7 @@ function CommunityPageContent() {
           )}
       </div>
 
-      {/* Matched Creators Strip (TikTok / Xiaohongshu-style People Strip on Search) */}
+      {/* Matched Creators Strip */}
       {appliedSearch && matchedCreators.length > 0 && (
         <section className="rounded-2xl border border-border/80 bg-card p-4 space-y-3 shadow-xs">
           <div className="flex items-center justify-between gap-2">
@@ -393,7 +583,7 @@ function CommunityPageContent() {
         </section>
       )}
 
-      {/* Main Social Feed Stream (4 States: Loading, Error, Empty, Data) */}
+      {/* Main Social Feed Stream */}
       {isLoading ? (
         <div className="space-y-6">
           {[1, 2, 3].map((i) => (
@@ -491,11 +681,35 @@ function CommunityPageContent() {
         </div>
       )}
 
+      {/* Hidden file inputs for direct trigger from composer bar */}
+      <input
+        ref={imageInputRef}
+        type="file"
+        multiple
+        accept="image/jpeg,image/png,image/webp,image/gif"
+        onChange={handleImageFilesSelected}
+        className="hidden"
+      />
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/mp4,video/webm,video/quicktime"
+        onChange={handleVideoFileSelected}
+        className="hidden"
+      />
+
       {/* Create Post Modal */}
       <CreatePostModal
         open={isComposeOpen}
-        onClose={() => setIsComposeOpen(false)}
+        onClose={() => {
+          setIsComposeOpen(false);
+          setComposeInitialFiles([]);
+          setComposeFocusItinerary(false);
+        }}
+        initialFiles={composeInitialFiles}
+        focusItinerary={composeFocusItinerary}
       />
+
       {/* Deep Link Post Detail Modal */}
       {deepPost && (
         <PostDetailModal

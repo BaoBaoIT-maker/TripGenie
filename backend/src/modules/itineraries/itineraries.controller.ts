@@ -13,6 +13,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ItineraryPlannerService } from './services/itinerary-planner.service';
+import { ItineraryAccessService } from './services/itinerary-access.service';
 import { TransitService } from './services/transit.service';
 import { CopilotAgentService } from './copilot/copilot-agent.service';
 import { CopilotToolsService } from './copilot/copilot-tools.service';
@@ -33,6 +34,7 @@ import {
 export class ItinerariesController {
   constructor(
     private readonly plannerService: ItineraryPlannerService,
+    private readonly accessService: ItineraryAccessService,
     private readonly transitService: TransitService,
     private readonly copilotAgent: CopilotAgentService,
     private readonly copilotTools: CopilotToolsService,
@@ -79,8 +81,11 @@ export class ItinerariesController {
    */
   @UseGuards(OptionalJwtAuthGuard)
   @Get()
-  list(@CurrentUser('id') userId?: string) {
-    return this.plannerService.listItineraries(userId);
+  list(
+    @CurrentUser('id') userId?: string,
+    @Query('scope') scope?: 'OWNED' | 'JOINED',
+  ) {
+    return this.plannerService.listItineraries(userId, scope);
   }
 
   /**
@@ -225,7 +230,7 @@ export class ItinerariesController {
     @Param('destinationId', ParseUUIDPipe) destinationId: string,
     @CurrentUser('id') userId: string,
   ) {
-    await this.plannerService.assertItineraryOwnership(id, userId);
+    await this.accessService.assertCanView(id, userId);
     return this.copilotTools.getAlternativesForActivity(id, destinationId);
   }
 
@@ -242,7 +247,7 @@ export class ItinerariesController {
     @Body() dto: DirectSwapDto,
     @CurrentUser('id') userId: string,
   ) {
-    await this.plannerService.assertItineraryOwnership(id, userId);
+    await this.accessService.assertCanEdit(id, userId);
     await this.copilotTools.swapActivityDirect(id, destinationId, dto.newPlaceId);
     return this.plannerService.getById(id, userId);
   }

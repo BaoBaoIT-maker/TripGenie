@@ -11,6 +11,10 @@ vi.mock("@/features/home/services/home.service", () => ({
   },
 }));
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 function createTestQueryClient() {
   return new QueryClient({
     defaultOptions: {

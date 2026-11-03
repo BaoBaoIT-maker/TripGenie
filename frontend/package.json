@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 0.0.0.0 -p 3001",
+    "dev": "next dev -H 0.0.0.0 -p 3000",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "postinstall": "node -e \"const fs=require('fs');const src='node_modules/maplibre-gl/dist';['maplibre-gl-worker.mjs','maplibre-gl-shared.mjs'].forEach(f=>{try{fs.copyFileSync(src+'/'+f,'public/'+f);console.log('copied',f)}catch(e){console.warn('skip',f,e.message)}})\""
+    "postinstall": "node -e \"const fs=require('fs');const src='node_modules/maplibre-gl/dist';['maplibre-gl-worker.mjs','maplibre-gl-shared.mjs','maplibre-gl-worker.mjs.map','maplibre-gl-shared.mjs.map'].forEach(f=>{try{fs.copyFileSync(src+'/'+f,'public/'+f);console.log('copied',f)}catch(e){console.warn('skip',f,e.message)}})\""
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

@@ -13,7 +13,7 @@
 |---|---|---|
 | **ENERGY** | `2` (Balanced) | Giao diện tươi sáng, khơi gợi cảm hứng xê dịch nhưng giữ được sự trang nhã; không màu mè khoa trương, không dùng màu neon. |
 | **RHYTHM** | `2` (Harmonic) | Nhịp điệu bố cục đa dạng: Hero trực quan $\to$ Bảng tra cứu & Bộ lọc $\to$ Thẻ địa điểm $\to$ Timeline lộ trình ngày $\to$ Bản đồ VietMap tương tác. |
-| **MOTION** | `1` (Subtle) | Chuyển động nhẹ nhàng (150ms–250ms) cho micro-interactions (hover, active, modal fade-in). Tuyệt đối **không có endless animation loops** (trừ live indicator của hệ thống). |
+| **MOTION** | `1` (Subtle) | Chuyển động nhẹ nhàng (150ms–200ms, easing `cubic-bezier(0.22, 1, 0.36, 1)`) cho micro-interactions (Drawer, Popup, Step change, Hover ảnh scale 1.025, mũi tên shift 3px). Tuyệt đối **không có endless animation loops** (trừ live indicator của hệ thống). Tôn trọng `prefers-reduced-motion`. |
 
 ---
 
@@ -84,7 +84,7 @@ flowchart LR
 
 ### 5.2 Shadows & Elevation (Độ nổi)
 - Thẻ thông thường: `border border-border/80 shadow-xs`.
-- Thẻ khi hover: `hover:-translate-y-1 hover:border-primary/40 hover:shadow-md transition-all duration-300`.
+- Thẻ khi hover: Ảnh scale nhẹ 1.025 (`transition-transform duration-200 ease-out`), mũi tên dịch 3px (`hover:translate-x-0.75`), viền `hover:border-primary/40 hover:shadow-md`. Thẻ giữ nguyên vị trí, không nảy toàn bộ card (`hover:-translate-y-1` đã bỏ).
 - Modals, Popups, Floating Action Buttons: `shadow-xl border border-border/80 backdrop-blur-md`.
 - ❌ **Cấm kỵ**: Không dùng shadow quá to, quá mềm khiến trang web bay bổng thiếu điểm tựa.
 

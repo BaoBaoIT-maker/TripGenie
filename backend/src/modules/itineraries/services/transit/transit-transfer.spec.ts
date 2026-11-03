@@ -15,6 +15,7 @@ import { PrismaService } from '../../../../database/prisma.service';
 import { TransitModeEnum } from '../../dto/generate-itinerary.dto';
 import { ItinerariesController } from '../../itineraries.controller';
 import { ItineraryPlannerService } from '../itinerary-planner.service';
+import { ItineraryAccessService } from '../itinerary-access.service';
 import { GeminiPlannerService } from '../gemini-planner.service';
 import { CopilotAgentService } from '../../copilot/copilot-agent.service';
 import { CopilotToolsService } from '../../copilot/copilot-tools.service';
@@ -581,6 +582,7 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
             inject: [FlightTransitStrategy, BusTransitStrategy, TrainTransitStrategy],
           },
           TransitService,
+          ItineraryAccessService,
           ItineraryPlannerService,
           { provide: GeminiPlannerService, useValue: {} },
           { provide: CopilotAgentService, useValue: {} },

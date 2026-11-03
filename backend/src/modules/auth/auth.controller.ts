@@ -9,6 +9,7 @@ import {
   HttpStatus,
   Res,
   Req,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { Response, Request } from 'express';
 import { AuthGuard } from '@nestjs/passport';
@@ -134,10 +135,7 @@ export class AuthController {
     const refreshToken = req.cookies?.refreshToken;
     if (!refreshToken) {
       this.clearAuthCookies(res);
-      return res.status(HttpStatus.UNAUTHORIZED).json({
-        statusCode: HttpStatus.UNAUTHORIZED,
-        message: 'Không tìm thấy refresh token trong cookie',
-      });
+      throw new UnauthorizedException('Không tìm thấy refresh token trong cookie');
     }
 
     try {

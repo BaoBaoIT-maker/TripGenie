@@ -20,7 +20,7 @@ import { getSafeRedirectUrl } from '@/lib/safe-redirect';
 function VerifyEmailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextParam = getSafeRedirectUrl(searchParams.get('next'));
+  const nextParam = getSafeRedirectUrl(searchParams.get('next'), '/');
 
   const [token, setToken] = React.useState<string | null>(null);
   const [hasCheckedToken, setHasCheckedToken] = React.useState(false);
@@ -62,7 +62,7 @@ function VerifyEmailContent() {
 
       toast.success('Xác thực email thành công! Chào mừng bạn đến với TripGenie.');
       setTimeout(() => {
-        router.push(nextParam || '/explore');
+        router.push(nextParam || '/');
       }, 1200);
     } catch (err: unknown) {
       const message =

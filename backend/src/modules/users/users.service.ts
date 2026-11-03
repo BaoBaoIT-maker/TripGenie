@@ -28,6 +28,17 @@ export class UsersService {
     });
   }
 
+  async updateAvatar(userId: string, avatarUrl: string): Promise<User> {
+    const user = await this.usersRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy người dùng');
+    }
+
+    return this.usersRepository.update(userId, {
+      avatarUrl: avatarUrl.trim(),
+    });
+  }
+
   async getUserPreferences(userId: string): Promise<UserPreference> {
     const existing = await this.usersRepository.findPreferences(userId);
     if (existing) {
@@ -63,4 +74,3 @@ export class UsersService {
     });
   }
 }
-

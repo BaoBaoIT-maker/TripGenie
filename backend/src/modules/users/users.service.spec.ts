@@ -40,6 +40,32 @@ describe('UsersService', () => {
     expect(service).toBeDefined();
   });
 
+  describe('updateAvatar', () => {
+    it('should throw NotFoundException if user does not exist', async () => {
+      mockRepo.findById.mockResolvedValue(null);
+
+      await expect(service.updateAvatar('user-999', '/avatars/avatar-1.jpg')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should successfully update avatarUrl', async () => {
+      mockRepo.findById.mockResolvedValue({ id: 'user-1', fullName: 'Nguyen Van A' });
+      mockRepo.update.mockResolvedValue({
+        id: 'user-1',
+        fullName: 'Nguyen Van A',
+        avatarUrl: '/avatars/avatar-1.jpg',
+      });
+
+      const result = await service.updateAvatar('user-1', '  /avatars/avatar-1.jpg  ');
+
+      expect(mockRepo.update).toHaveBeenCalledWith('user-1', {
+        avatarUrl: '/avatars/avatar-1.jpg',
+      });
+      expect(result.avatarUrl).toBe('/avatars/avatar-1.jpg');
+    });
+  });
+
   describe('getUserPreferences', () => {
     it('should return existing preferences if found', async () => {
       const mockPref = {
@@ -54,17 +80,20 @@ describe('UsersService', () => {
       mockRepo.findPreferences.mockResolvedValue(mockPref);
 
       const result = await service.getUserPreferences('user-1');
+
       expect(result).toEqual(mockPref);
       expect(mockRepo.findPreferences).toHaveBeenCalledWith('user-1');
     });
 
-    it('should return default preferences if none found', async () => {
+    it('should return default taste profile if none found in DB', async () => {
       mockRepo.findPreferences.mockResolvedValue(null);
 
       const result = await service.getUserPreferences('user-1');
-      expect(result.userId).toBe('user-1');
+
       expect(result.budgetLevel).toBe(BudgetLevel.MEDIUM);
       expect(result.travelStyle).toContain('CULTURE');
+      expect(result.preferredCategories).toContain('am-thuc');
+      expect(result.dietaryRestrictions).toEqual([]);
     });
   });
 
@@ -73,16 +102,13 @@ describe('UsersService', () => {
       mockRepo.findById.mockResolvedValue(null);
 
       await expect(
-        service.updateUserPreferences('non-existent', {
+        service.updateUserPreferences('user-999', {
           budgetLevel: BudgetLevel.LOW,
-          travelStyle: ['BACKPACKING'],
-          preferredCategories: ['hostel'],
-          dietaryRestrictions: [],
         }),
       ).rejects.toThrow(NotFoundException);
     });
 
-    it('should upsert preferences when user exists', async () => {
+    it('should call upsertPreferences with mapped payload', async () => {
       mockRepo.findById.mockResolvedValue({ id: 'user-1' });
       const expectedPref = {
         id: 'pref-1',
@@ -112,4 +138,3 @@ describe('UsersService', () => {
     });
   });
 });
-

@@ -11,16 +11,21 @@ import {
   Compass,
   Settings,
   ShieldCheck,
+  Camera,
   Heart,
   MapPin,
   Loader2,
   Check,
   ExternalLink,
   LogIn,
+  MessageSquare,
+  Grid,
 } from "lucide-react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { PlaceCard } from "@/components/place/PlaceCard";
+import { PostCard } from "@/components/community/PostCard";
+import { useCreatorProfile } from "@/features/community/hooks/use-community";
 import { useItinerariesListQuery } from "@/features/planner/hooks/use-itinerary-planner";
 import { formatVnd } from "@/features/planner/model/itinerary-format";
 import { useAuth } from "@/features/auth/hooks/use-auth";
@@ -35,6 +40,8 @@ import {
   useUpdateUserPreferences,
 } from "@/features/preferences/hooks/use-user-preferences";
 import { BudgetLevel } from "@/services/user-preference.service";
+import { DEFAULT_AVATAR } from "@/config/avatars";
+import { AvatarPickerModal } from "@/features/auth/components/AvatarPickerModal";
 
 const TRAVEL_STYLES = [
   { id: "CULTURE", label: "Văn hóa & Di sản" },
@@ -74,11 +81,24 @@ function ProfileContent() {
   const { user, isLoading: isAuthLoading } = useAuth();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<"planners" | "saved" | "preferences" | "account">(() => {
+  const userInitials = useMemo(() => {
+    if (!user?.fullName) return "TG";
+    return user.fullName
+      .split(" ")
+      .filter(Boolean)
+      .map((w) => w[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  }, [user?.fullName]);
+
+  const [activeTab, setActiveTab] = useState<"planners" | "saved" | "community" | "preferences" | "account">(() => {
     if (tabParam === "account") return "account";
     if (tabParam === "preferences") return "preferences";
     if (tabParam === "saved") return "saved";
+    if (tabParam === "community") return "community";
     return "planners";
   });
 
@@ -86,6 +106,7 @@ function ProfileContent() {
     if (tabParam === "account") setActiveTab("account");
     if (tabParam === "preferences") setActiveTab("preferences");
     if (tabParam === "saved") setActiveTab("saved");
+    if (tabParam === "community") setActiveTab("community");
   }, [tabParam]);
 
   // Real Preferences from backend
@@ -137,6 +158,10 @@ function ProfileContent() {
   };
 
   // Real Database Itineraries for the logged-in user (strictly filtered by creatorId on backend)
+  const userIdentifier = user?.username || user?.id || "";
+  const { data: creatorProfile, isLoading: isCommunityLoading } = useCreatorProfile(userIdentifier);
+  const communityPosts = creatorProfile?.posts ?? [];
+
   const { data: myItineraries = [], isLoading: isItinLoading } = useItinerariesListQuery();
 
   // Real Collections & Saved Places
@@ -179,22 +204,23 @@ function ProfileContent() {
     <div className="max-w-[1400px] mx-auto w-full px-4 py-8 sm:px-6 lg:px-8 xl:px-10 space-y-8 pb-16">
       {/* Profile Header */}
       <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 flex flex-col sm:flex-row items-center sm:items-start gap-6 shadow-xs">
-        <Avatar className="size-20 sm:size-24 border-2 border-primary/20 shadow-sm shrink-0">
-          <AvatarImage
-            src={user?.avatarUrl || "/avatar.jpg"}
-            alt={user?.fullName || "Avatar Người dùng"}
-          />
-          <AvatarFallback className="text-xl font-bold bg-primary text-primary-foreground">
-            {user?.fullName
-              ? user.fullName
-                  .split(" ")
-                  .map((w) => w[0])
-                  .join("")
-                  .slice(0, 2)
-                  .toUpperCase()
-              : "TG"}
-          </AvatarFallback>
-        </Avatar>
+        <button
+          type="button"
+          onClick={() => setIsAvatarModalOpen(true)}
+          className="group relative shrink-0 rounded-full transition-transform hover:scale-105 active:scale-95 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          title="Nhấn để đổi ảnh đại diện"
+          aria-label="Đổi ảnh đại diện"
+        >
+          <Avatar className="size-20 sm:size-24 border-2 border-primary/20 shadow-sm group-hover:border-primary transition-colors">
+            <AvatarImage
+              src={user?.avatarUrl || DEFAULT_AVATAR}
+              alt={user?.fullName || "Avatar Người dùng"}
+            />
+            <AvatarFallback className="text-xl font-bold bg-primary text-primary-foreground">
+              {userInitials}
+            </AvatarFallback>
+          </Avatar>
+        </button>
 
         <div className="flex-1 text-center sm:text-left space-y-2">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -203,7 +229,7 @@ function ProfileContent() {
             </h1>
             <div className="flex items-center justify-center sm:justify-end gap-2">
               {user?.id && (
-                <Link href={`/community/profile/${encodeURIComponent(user.id)}`}>
+                <Link href={`/community/profile/${encodeURIComponent(user.username || user.id)}`}>
                   <Button
                     variant="outline"
                     size="sm"
@@ -245,6 +271,17 @@ function ProfileContent() {
             >
               <CalendarDays className="size-3.5" />
               <span>{myItineraries.length} Lịch trình của tôi</span>
+            </button>
+            <span>•</span>
+            <button
+              type="button"
+              onClick={() => setActiveTab("community")}
+              className={`inline-flex items-center gap-1.5 cursor-pointer transition-colors hover:text-primary ${
+                activeTab === "community" ? "font-bold text-primary" : ""
+              }`}
+            >
+              <MessageSquare className="size-3.5" />
+              <span>{communityPosts.length} Bài viết cộng đồng</span>
             </button>
             <span>•</span>
             <button
@@ -291,6 +328,19 @@ function ProfileContent() {
 
         <button
           type="button"
+          onClick={() => setActiveTab("community")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 min-h-[44px] cursor-pointer ${
+            activeTab === "community"
+              ? "bg-primary text-primary-foreground shadow-xs"
+              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+          }`}
+        >
+          <MessageSquare className="size-4" />
+          <span>Bài viết cộng đồng ({communityPosts.length})</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab("preferences")}
           className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 min-h-[44px] cursor-pointer ${
             activeTab === "preferences"
@@ -317,7 +367,9 @@ function ProfileContent() {
       </div>
 
       {/* Tab: Account & Security */}
-      {activeTab === "account" && <AccountSecuritySection />}
+      {activeTab === "account" && (
+        <AccountSecuritySection onOpenAvatarModal={() => setIsAvatarModalOpen(true)} />
+      )}
 
       {/* Tab 1: Real User Itineraries List */}
       {activeTab === "planners" && (
@@ -408,6 +460,72 @@ function ProfileContent() {
                   </Link>
                 );
               })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Tab: User Community Posts */}
+      {activeTab === "community" && (
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-bold font-heading text-foreground">
+                Bài viết cộng đồng của bạn
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Tất cả bài viết, ảnh, video review và lịch trình bạn đã đăng tải lên Cộng đồng du lịch.
+              </p>
+            </div>
+
+            {user && (
+              <Link
+                href={`/community/profile/${encodeURIComponent(
+                  user.username || user.id
+                )}`}
+              >
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-10 px-4 rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
+                >
+                  <ExternalLink className="size-3.5" />
+                  <span>Xem kênh công khai</span>
+                </Button>
+              </Link>
+            )}
+          </div>
+
+          {isCommunityLoading ? (
+            <div className="space-y-4">
+              <div className="h-44 rounded-2xl bg-muted/40 animate-pulse border border-border" />
+              <div className="h-44 rounded-2xl bg-muted/40 animate-pulse border border-border" />
+            </div>
+          ) : communityPosts.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center space-y-3">
+              <MessageSquare className="size-10 mx-auto text-muted-foreground/60" />
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-foreground">
+                  Bạn chưa đăng bài viết nào
+                </h3>
+                <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                  Hãy chia sẻ cảm nhận, hình ảnh check-in và lịch trình chuyến đi của bạn để kết nối cùng cộng đồng du lịch TripGenie!
+                </p>
+              </div>
+              <div className="pt-2">
+                <Link href="/community">
+                  <Button className="h-10 px-5 rounded-xl text-xs font-semibold gap-1.5 cursor-pointer">
+                    <Plus className="size-4" />
+                    <span>Đến bảng tin Cộng đồng</span>
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6 max-w-3xl">
+              {communityPosts.map((post) => (
+                <PostCard key={post.id} post={post} />
+              ))}
             </div>
           )}
         </div>
@@ -625,6 +743,13 @@ function ProfileContent() {
           </div>
         </div>
       )}
+
+      <AvatarPickerModal
+        open={isAvatarModalOpen}
+        onOpenChange={setIsAvatarModalOpen}
+        currentAvatarUrl={user?.avatarUrl}
+        userFullName={user?.fullName}
+      />
     </div>
   );
 }

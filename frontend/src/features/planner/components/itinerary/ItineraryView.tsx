@@ -27,6 +27,7 @@ import {
   Check,
   Camera,
   Info,
+  UserPlus,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -55,6 +56,10 @@ import { DEFAULT_PRINT_SHEET_OPTIONS, EMPTY_TOUR_BRIEFING, type PrintSheetOption
 import { BUDGET_LABEL } from '../../itinerary-labels';
 import ItineraryWizardModal from '../ItineraryWizardModal';
 import CopilotDrawer, { LocatePlaceTarget } from './CopilotDrawer';
+import { TripCompanionCard } from '../companions/TripCompanionCard';
+import { InviteTripCompanionDialog } from '../companions/InviteTripCompanionDialog';
+import { TripCompanionsPanel } from '../companions/TripCompanionsPanel';
+import { useAuth } from '@/features/auth/hooks/use-auth';
 import { placeService } from '@/services/place.service';
 import { fetchMultiStopRoute, fetchRoute, Coordinate } from '@/services/routing.service';
 import type {
@@ -180,14 +185,23 @@ export default function ItineraryView({ id }: Props) {
   // Local state for interactive editing (Micro-AI swap, delete, add)
   const [days, setDays] = useState<ItineraryDay[]>([]);
 
-  // Copilot mutations and history
+  const { user } = useAuth();
+
+  // Access rights & collaborative roles
   const isOwner = Boolean(data?.isOwner);
+  const canEdit = Boolean(data?.canEdit ?? isOwner);
+  const canManageMembers = Boolean(data?.canManageMembers ?? isOwner);
+  const isMemberOrOwner = Boolean(isOwner || data?.viewerRole);
+  const [isHeaderInviteOpen, setIsHeaderInviteOpen] = useState(false);
+  const [isHeaderCompanionsOpen, setIsHeaderCompanionsOpen] = useState(false);
+
+  // Copilot mutations and history
   const chatMutation = useCopilotChat(id);
   const directSwapMutation = useDirectSwapActivity(id);
   const applyProposalMutation = useApplyProposal(id);
   const [applyingProposalId, setApplyingProposalId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
-  const { data: historyMessages } = useCopilotHistory(id, sessionId, isOwner);
+  const { data: historyMessages } = useCopilotHistory(id, sessionId, canEdit);
 
   // Modal states for 1-click swap and wizard
   const [selectedActivityForSwap, setSelectedActivityForSwap] = useState<ItineraryActivity | null>(null);
@@ -708,8 +722,8 @@ export default function ItineraryView({ id }: Props) {
               <ArrowLeft className="size-5" />
             </Link>
 
-            {/* Edit Cover Photo Button (Owner Only) */}
-            {isOwner && (
+            {/* Edit Cover Photo Button (Owner & Editor) */}
+            {canEdit && (
               <button
                 type="button"
                 onClick={() => setIsCoverModalOpen(true)}
@@ -729,6 +743,19 @@ export default function ItineraryView({ id }: Props) {
                 <span className="px-2.5 py-0.5 bg-white/90 backdrop-blur text-slate-900 text-[11px] font-bold rounded-md shadow-xs">
                   {BUDGET_LABEL[data.budgetLevel] || 'Tiêu chuẩn'}
                 </span>
+                {isOwner ? (
+                  <span className="px-2.5 py-0.5 bg-amber-500/95 backdrop-blur text-white text-[11px] font-bold rounded-md shadow-xs">
+                    Chủ chuyến đi
+                  </span>
+                ) : data?.viewerRole === 'EDITOR' ? (
+                  <span className="px-2.5 py-0.5 bg-blue-600/95 backdrop-blur text-white text-[11px] font-bold rounded-md shadow-xs">
+                    Bạn đồng hành • Có quyền sửa
+                  </span>
+                ) : data?.viewerRole === 'VIEWER' ? (
+                  <span className="px-2.5 py-0.5 bg-slate-700/95 backdrop-blur text-white text-[11px] font-bold rounded-md shadow-xs">
+                    Bạn đồng hành • Chỉ xem
+                  </span>
+                ) : null}
               </div>
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-white drop-shadow-sm">
                 {data.title || `Hành trình khám phá ${data.destination || 'Việt Nam'}`}
@@ -760,6 +787,26 @@ export default function ItineraryView({ id }: Props) {
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
+              {canManageMembers && (
+                <button
+                  type="button"
+                  onClick={() => setIsHeaderInviteOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+                >
+                  <UserPlus className="size-3.5" />
+                  <span>Mời bạn đồng hành</span>
+                </button>
+              )}
+              {isMemberOrOwner && (
+                <button
+                  type="button"
+                  onClick={() => setIsHeaderCompanionsOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-teal-200 bg-teal-50/70 hover:bg-teal-100/70 text-teal-900 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Users className="size-3.5 text-teal-700" />
+                  <span>Bạn đồng hành</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={handleShareLink}
@@ -801,7 +848,7 @@ export default function ItineraryView({ id }: Props) {
               )}
             </div>
           </div>
-          {!isOwner && (
+          {!isMemberOrOwner && (
             <div className="px-4 py-3 bg-teal-50/80 border-t border-teal-200/70 flex flex-wrap items-center justify-between gap-2 text-xs text-teal-900">
               <span>
                 Bạn đang xem lịch trình chia sẻ công khai ở <strong>chế độ chỉ đọc</strong>. Hãy nhấn <strong>Nhân bản về lịch trình của tôi</strong> để tùy chỉnh lộ trình bằng AI Copilot!
@@ -829,6 +876,16 @@ export default function ItineraryView({ id }: Props) {
               mobileTab === 'map' ? 'hidden lg:block' : 'block'
             }`}
           >
+            {/* Trip Companions Card (Collaborative Planning) */}
+            {isMemberOrOwner && (
+              <TripCompanionCard
+                itineraryId={id}
+                canManageMembers={canManageMembers}
+                currentUserId={user?.id}
+                isMemberOrOwner={isMemberOrOwner}
+              />
+            )}
+
             {/* Sticky Day Tabs (tripplanner style) */}
             <div className="sticky top-16 z-20 bg-[#F8FAFC]/95 backdrop-blur-md pb-2 pt-1 border-b border-slate-200 flex items-center gap-1.5 overflow-x-auto">
               <button
@@ -884,10 +941,10 @@ export default function ItineraryView({ id }: Props) {
                 }
               }}
               onHoverPlace={setHoveredPlaceId}
-              onSwapPlace={isOwner ? handleSwapPlace : undefined}
-              onDeletePlace={isOwner ? handleDeletePlace : undefined}
-              onAddPlace={isOwner ? handleAddPlace : undefined}
-              onChangeTransitMode={isOwner ? handleUpdateTransitMode : undefined}
+              onSwapPlace={canEdit ? handleSwapPlace : undefined}
+              onDeletePlace={canEdit ? handleDeletePlace : undefined}
+              onAddPlace={canEdit ? handleAddPlace : undefined}
+              onChangeTransitMode={canEdit ? handleUpdateTransitMode : undefined}
               isUpdatingTransitMode={updateTransitMutation.isPending}
             />
 
@@ -930,8 +987,8 @@ export default function ItineraryView({ id }: Props) {
       {/* =========================================================================
           SCREEN 3: SLIDE-OVER AI COPILOT DRAWER (Matches Figma Prompt Screen 3)
           ========================================================================= */}
-      {/* Floating Copilot Bubble Launcher (Owner Only — Anti-Slop MOTION=1) */}
-      {isOwner && !isCopilotOpen && (
+      {/* Floating Copilot Bubble Launcher (Owner & Editor — Anti-Slop MOTION=1) */}
+      {canEdit && !isCopilotOpen && (
         <div className="fixed bottom-6 right-6 z-40 group print:hidden">
           <button
             type="button"
@@ -1001,6 +1058,20 @@ export default function ItineraryView({ id }: Props) {
           <span>Bản đồ</span>
         </button>
       </div>
+
+      {/* Header Trip Companion Dialogs */}
+      <InviteTripCompanionDialog
+        open={isHeaderInviteOpen}
+        onClose={() => setIsHeaderInviteOpen(false)}
+        itineraryId={id}
+      />
+      <TripCompanionsPanel
+        open={isHeaderCompanionsOpen}
+        onClose={() => setIsHeaderCompanionsOpen(false)}
+        itineraryId={id}
+        canManageMembers={canManageMembers}
+        currentUserId={user?.id}
+      />
 
       {/* Delete Confirmation Modal */}
       {showDeleteModal && (

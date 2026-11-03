@@ -771,7 +771,12 @@ BEGIN
                 OLD.trip_group_id;
         END IF;
     END IF;
-    RETURN OLD;
+
+    IF TG_OP = 'DELETE' THEN
+        RETURN OLD;
+    ELSE
+        RETURN NEW;
+    END IF;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -837,4 +842,3 @@ CREATE OR REPLACE VIEW active_places AS
 --      reorder dÃ¹ng fractional DECIMAL â†’ chá»‰ UPDATE 1 row, khÃ´ng cascade renumber
 --   3. Conflict thá»±c táº¿ (xÃ³a Ä‘Ãºng 1 place cÃ¹ng lÃºc) â†’ last-write-wins cháº¥p nháº­n Ä‘Æ°á»£c
 --   4. updated_at Ä‘á»§ lÃ m lightweight conflict hint náº¿u cáº§n á»Ÿ tÆ°Æ¡ng lai
-

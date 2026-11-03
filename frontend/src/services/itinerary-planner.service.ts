@@ -24,8 +24,8 @@ export const itineraryService = {
   getItinerary: (id: string) =>
     apiClient<ItineraryDetail>(`/itineraries/${id}`),
 
-  listItineraries: () =>
-    apiClient<ItineraryDetail[]>('/itineraries'),
+  listItineraries: (scope?: 'OWNED' | 'JOINED') =>
+    apiClient<ItineraryDetail[]>(`/itineraries${scope ? `?scope=${scope}` : ''}`),
 
   deleteItinerary: (id: string) =>
     apiClient<{ success: boolean; id: string }>(`/itineraries/${id}`, { method: 'DELETE' }),

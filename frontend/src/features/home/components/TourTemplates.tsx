@@ -13,11 +13,17 @@ const ItineraryWizardModal = dynamic(() => import("@/features/planner/components
 });
 
 export function TourTemplates() {
-  const [preview, setPreview] = useState<TourTemplate | null>(null);
+  const [selectedTour, setSelectedTour] = useState<TourTemplate | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [planning, setPlanning] = useState<TourTemplate | null>(null);
 
+  const openPreview = (tour: TourTemplate) => {
+    setSelectedTour(tour);
+    setIsPreviewOpen(true);
+  };
+
   const startPlanning = (tour: TourTemplate) => {
-    setPreview(null);
+    setIsPreviewOpen(false);
     setPlanning(tour);
   };
 
@@ -35,7 +41,7 @@ export function TourTemplates() {
               <h3 className="font-heading text-xl font-bold leading-snug">{tour.title}</h3>
               <p className="text-sm leading-relaxed text-muted-foreground">{tour.description}</p>
               <div className="flex flex-wrap gap-2 pt-1">
-                <Button variant="outline" className="min-h-11 rounded-xl" onClick={() => setPreview(tour)} aria-label={`Xem lịch trình ${tour.destination}`}>Xem lịch trình</Button>
+                <Button variant="outline" className="min-h-11 rounded-xl" onClick={() => openPreview(tour)} aria-label={`Xem lịch trình ${tour.destination}`}>Xem lịch trình</Button>
                 <Button className="min-h-11 rounded-xl" onClick={() => startPlanning(tour)} aria-label={`Lên lịch chuyến ${tour.destination}`}>Lên lịch chuyến này<ArrowRight className="size-4" aria-hidden="true" /></Button>
               </div>
             </div>
@@ -43,14 +49,14 @@ export function TourTemplates() {
         ))}
       </div>
 
-      <Dialog open={Boolean(preview)} onOpenChange={(open) => !open && setPreview(null)}>
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
         <DialogContent className="max-h-[85dvh] overflow-y-auto rounded-3xl p-6 sm:max-w-xl sm:p-8">
-          {preview && (
+          {selectedTour && (
             <>
-              <DialogTitle className="pr-6 font-heading text-2xl">{preview.title}</DialogTitle>
-              <DialogDescription>{preview.description} Đây là gợi ý tham khảo; thời gian mở cửa, vé và chi phí cần kiểm tra trước chuyến đi.</DialogDescription>
+              <DialogTitle className="pr-6 font-heading text-2xl">{selectedTour.title}</DialogTitle>
+              <DialogDescription>{selectedTour.description} Đây là gợi ý tham khảo; thời gian mở cửa, vé và chi phí cần kiểm tra trước chuyến đi.</DialogDescription>
               <ol className="space-y-5 py-3">
-                {preview.days.map((day, index) => (
+                {selectedTour.days.map((day, index) => (
                   <li key={day.title} className="border-l-2 border-primary/25 pl-4">
                     <h4 className="font-semibold text-primary">Ngày {index + 1}: {day.title}</h4>
                     <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-muted-foreground">{day.activities.map((activity) => <li key={activity}>{activity}</li>)}</ul>
@@ -58,7 +64,7 @@ export function TourTemplates() {
                 ))}
               </ol>
               <p className="text-sm text-muted-foreground">Bạn có thể đổi ngày, điểm khởi hành và phương tiện. AI sẽ dựa trên gợi ý này để tạo lịch trình riêng theo dữ liệu hiện có.</p>
-              <Button className="min-h-11 rounded-xl" onClick={() => startPlanning(preview)}><CalendarDays className="size-4" aria-hidden="true" />Lên lịch chuyến này</Button>
+              <Button className="min-h-11 rounded-xl" onClick={() => startPlanning(selectedTour)}><CalendarDays className="size-4" aria-hidden="true" />Lên lịch chuyến này</Button>
             </>
           )}
         </DialogContent>

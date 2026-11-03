@@ -2,6 +2,7 @@ import { Controller, Patch, Get, Put, Body, UseGuards, HttpCode, HttpStatus } fr
 import { UsersService } from './users.service';
 import { UpdateUsernameDto } from './dto/update-username.dto';
 import { UpdateUserPreferenceDto } from './dto/update-user-preference.dto';
+import { UpdateAvatarDto } from './dto/update-avatar.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '@/common/types';
@@ -20,6 +21,28 @@ export class UsersController {
     const updated = await this.usersService.updateUsername(user.id, dto.username);
     return {
       message: 'Cập nhật tên tài khoản thành công',
+      user: {
+        id: updated.id,
+        username: updated.username,
+        email: updated.email,
+        fullName: updated.fullName,
+        avatarUrl: updated.avatarUrl,
+        role: updated.role,
+        isVerified: updated.isVerified,
+      },
+    };
+  }
+
+  @Patch('me/avatar')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async updateAvatar(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateAvatarDto,
+  ) {
+    const updated = await this.usersService.updateAvatar(user.id, dto.avatarUrl);
+    return {
+      message: 'Cập nhật ảnh đại diện thành công',
       user: {
         id: updated.id,
         username: updated.username,
@@ -56,4 +79,3 @@ export class UsersController {
     };
   }
 }
-

@@ -123,7 +123,7 @@ export function PlaceCard({
     <div
       onClick={handleCardInteraction}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-2xl border bg-card transition-all duration-300 hover:-translate-y-1 hover:border-primary/40 hover:shadow-md cursor-pointer",
+        "group relative flex flex-col overflow-hidden rounded-2xl border bg-card transition-[border-color,box-shadow] duration-200 hover:border-primary/40 hover:shadow-md cursor-pointer",
         isSelected
           ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background shadow-lg"
           : "border-border/80",
@@ -150,7 +150,7 @@ export function PlaceCard({
                   place.coverImage.includes("wikipedia.org")
                 }
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                className="object-cover transition-transform duration-500 group-hover:scale-105"
+                className="object-cover transition-transform duration-200 [@media(hover:hover)_and_(pointer:fine)]:group-hover:scale-[1.025] motion-reduce:transform-none"
                 onError={() => setImgError(true)}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
@@ -212,7 +212,7 @@ export function PlaceCard({
             onClick={toggleBookmark}
             disabled={toggleMutation.isPending || isCheckingCollections}
             className={cn(
-              "pointer-events-auto flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full backdrop-blur-md transition-all active:scale-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary shadow-xs cursor-pointer",
+              "pointer-events-auto flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full backdrop-blur-md transition-colors duration-150 motion-reduce:transition-none active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary shadow-xs cursor-pointer",
               isBookmarked
                 ? "bg-rose-500 text-white shadow-md hover:bg-rose-600"
                 : "bg-background/85 text-foreground hover:bg-background hover:text-rose-500"
@@ -314,7 +314,7 @@ export function PlaceCard({
             onClick={handleCardInteraction}
             className="font-semibold text-primary hover:underline text-xs"
           >
-            Chi tiết →
+            Chi tiết <span className="inline-block transition-transform duration-200 group-hover:translate-x-[3px] motion-reduce:transform-none" aria-hidden="true">→</span>
           </Link>
         </div>
       </div>

@@ -20,6 +20,10 @@ vi.mock("@/features/auth/hooks/use-auth", () => ({
   })),
 }));
 
+vi.mock("@/features/notifications/components/NotificationBell", () => ({
+  NotificationBell: () => <div data-testid="notification-bell" />,
+}));
+
 describe("Map Navigation", () => {
   beforeEach(() => {
     mockPathname = "/explore";

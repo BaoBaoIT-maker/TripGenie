@@ -153,6 +153,10 @@ export interface ItineraryDetail {
   creatorId?: string;
   isPublic?: boolean;
   isOwner?: boolean;
+  viewerRole?: 'OWNER' | 'EDITOR' | 'VIEWER' | null;
+  canEdit?: boolean;
+  canManageMembers?: boolean;
+  updatedAt?: string;
   title: string;
   description: string | null;
   destination: string | null;

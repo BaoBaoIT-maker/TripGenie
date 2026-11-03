@@ -16,7 +16,7 @@ import { ApiClientError } from '@/lib/api-client';
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextUrl = getSafeRedirectUrl(searchParams.get('next'));
+  const nextUrl = getSafeRedirectUrl(searchParams.get('next'), '/');
   const errorParam = searchParams.get('error');
 
   const [showPassword, setShowPassword] = React.useState(false);

@@ -42,6 +42,7 @@ function AvatarImage({
       src={src}
       alt={alt}
       data-slot="avatar-image"
+      suppressHydrationWarning
       onError={(e) => {
         setHasError(true)
         onError?.(e)
@@ -62,6 +63,7 @@ function AvatarFallback({
   return (
     <div
       data-slot="avatar-fallback"
+      suppressHydrationWarning
       className={cn(
         "flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground group-data-[size=sm]/avatar:text-xs font-semibold",
         className
@@ -92,7 +94,7 @@ function AvatarGroup({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="avatar-group"
       className={cn(
-        "group/avatar-group flex -space-x-2 *:data-[slot=avatar]:ring-2 *:data-[slot=avatar]:ring-background",
+        "flex items-center -space-x-2 group/avatar-group",
         className
       )}
       {...props}
@@ -108,7 +110,7 @@ function AvatarGroupCount({
     <div
       data-slot="avatar-group-count"
       className={cn(
-        "relative flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-sm text-muted-foreground ring-2 ring-background group-has-data-[size=lg]/avatar-group:size-10 group-has-data-[size=sm]/avatar-group:size-6 [&>svg]:size-4 group-has-data-[size=lg]/avatar-group:[&>svg]:size-5 group-has-data-[size=sm]/avatar-group:[&>svg]:size-3",
+        "relative flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-muted-foreground ring-2 ring-background",
         className
       )}
       {...props}
@@ -120,7 +122,7 @@ export {
   Avatar,
   AvatarImage,
   AvatarFallback,
+  AvatarBadge,
   AvatarGroup,
   AvatarGroupCount,
-  AvatarBadge,
 }

@@ -28,7 +28,7 @@ function SafeCallbackHandler() {
         const result = await refetchUser();
         if (result.data) {
           toast.success(`Chào mừng trở lại, ${result.data.fullName || 'bạn'}!`);
-          const target = getSafeRedirectUrl(rawNext, '/explore');
+          const target = getSafeRedirectUrl(rawNext, '/');
           router.push(target);
           router.refresh();
         } else {

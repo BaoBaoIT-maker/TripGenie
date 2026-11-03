@@ -7,6 +7,7 @@ describe('UsersController', () => {
   let controller: UsersController;
   let mockUsersService: {
     updateUsername: jest.Mock;
+    updateAvatar: jest.Mock;
     getUserPreferences: jest.Mock;
     updateUserPreferences: jest.Mock;
   };
@@ -20,6 +21,7 @@ describe('UsersController', () => {
   beforeEach(async () => {
     mockUsersService = {
       updateUsername: jest.fn(),
+      updateAvatar: jest.fn(),
       getUserPreferences: jest.fn(),
       updateUserPreferences: jest.fn(),
     };
@@ -39,6 +41,29 @@ describe('UsersController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  describe('updateAvatar', () => {
+    it('should update avatar and return user info', async () => {
+      const updatedUser = {
+        id: 'user-1',
+        username: 'nguyenvana',
+        email: 'test@example.com',
+        fullName: 'Nguyen Van A',
+        avatarUrl: '/avatars/avatar-1.jpg',
+        role: UserRole.USER,
+        isVerified: true,
+      };
+      mockUsersService.updateAvatar.mockResolvedValue(updatedUser);
+
+      const result = await controller.updateAvatar(mockUser, {
+        avatarUrl: '/avatars/avatar-1.jpg',
+      });
+
+      expect(mockUsersService.updateAvatar).toHaveBeenCalledWith('user-1', '/avatars/avatar-1.jpg');
+      expect(result.message).toBe('Cập nhật ảnh đại diện thành công');
+      expect(result.user.avatarUrl).toBe('/avatars/avatar-1.jpg');
+    });
   });
 
   describe('getPreferences', () => {
@@ -77,4 +102,3 @@ describe('UsersController', () => {
     });
   });
 });
-

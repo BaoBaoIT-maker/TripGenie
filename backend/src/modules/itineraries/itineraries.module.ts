@@ -1,7 +1,11 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ItinerariesController } from './itineraries.controller';
+import { TripCompanionsController } from './trip-companions.controller';
+import { TripCompanionsService } from './trip-companions.service';
+import { TripCompanionsRepository } from './trip-companions.repository';
 import { ItineraryPlannerService } from './services/itinerary-planner.service';
+import { ItineraryAccessService } from './services/itinerary-access.service';
 import { TransitService } from './services/transit.service';
 import { FlightTransitStrategy } from './services/transit/strategies/flight.strategy';
 import { BusTransitStrategy } from './services/transit/strategies/bus.strategy';
@@ -23,7 +27,7 @@ import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
       name: COPILOT_SUMMARY_QUEUE,
     }),
   ],
-  controllers: [ItinerariesController],
+  controllers: [ItinerariesController, TripCompanionsController],
   providers: [
     FlightTransitStrategy,
     BusTransitStrategy,
@@ -43,6 +47,9 @@ import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
       ],
       inject: [FlightTransitStrategy, BusTransitStrategy, TrainTransitStrategy],
     },
+    TripCompanionsRepository,
+    TripCompanionsService,
+    ItineraryAccessService,
     ItineraryPlannerService,
     TransitService,
     GeminiPlannerService,
@@ -50,7 +57,6 @@ import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
     CopilotAgentService,
     CopilotSummaryProcessor,
   ],
-  exports: [ItineraryPlannerService, TransitService, CopilotToolsService, CopilotAgentService],
+  exports: [TripCompanionsService, TripCompanionsRepository, ItineraryAccessService, ItineraryPlannerService, TransitService, CopilotToolsService, CopilotAgentService],
 })
 export class ItinerariesModule {}
-

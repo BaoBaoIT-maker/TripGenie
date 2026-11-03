@@ -9,14 +9,44 @@ import {
   KeyRound,
   User,
   Shield,
+  Camera,
+  LogOut,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '../hooks/use-auth';
+import { DEFAULT_AVATAR } from '@/config/avatars';
+import { AvatarPickerModal } from './AvatarPickerModal';
 
-export function AccountSecuritySection() {
-  const { user } = useAuth();
+interface AccountSecuritySectionProps {
+  onOpenAvatarModal?: () => void;
+}
+
+export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySectionProps = {}) {
+  const { user, logout } = useAuth();
+  const [internalModalOpen, setInternalModalOpen] = React.useState(false);
 
   const isGoogleAuth = user?.authMethods?.includes('GOOGLE');
   const hasLocalPassword = user?.authMethods?.includes('LOCAL');
+
+  const handleOpenModal = () => {
+    if (onOpenAvatarModal) {
+      onOpenAvatarModal();
+    } else {
+      setInternalModalOpen(true);
+    }
+  };
+
+  const userInitials = React.useMemo(() => {
+    if (!user?.fullName) return 'TG';
+    return user.fullName
+      .split(' ')
+      .filter(Boolean)
+      .map((w) => w[0])
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+  }, [user?.fullName]);
 
   return (
     <div className="space-y-6">
@@ -35,9 +65,65 @@ export function AccountSecuritySection() {
               Quản lý tài khoản đăng nhập và phương thức xác thực bảo mật của bạn.
             </p>
           </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => logout()}
+            className="text-xs rounded-xl h-9 px-4 gap-1.5 text-destructive border-destructive/20 hover:bg-destructive/10 hover:text-destructive self-start sm:self-auto cursor-pointer"
+          >
+            <LogOut className="size-3.5" />
+            <span>Đăng xuất</span>
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Avatar Item */}
+          <div className="p-4 rounded-2xl border border-border/80 bg-muted/20 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={handleOpenModal}
+                className="outline-none cursor-pointer rounded-full transition-transform hover:scale-105 active:scale-95 group shrink-0"
+                title="Nhấn để đổi ảnh đại diện"
+              >
+                <Avatar className="size-12 border-2 border-primary/20 group-hover:border-primary transition-colors">
+                  <AvatarImage
+                    src={user?.avatarUrl || DEFAULT_AVATAR}
+                    alt={user?.fullName || 'Avatar'}
+                  />
+                  <AvatarFallback className="text-xs font-bold bg-primary text-primary-foreground">
+                    {userInitials}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+              <div className="min-w-0">
+                <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                  <Camera className="size-3.5 text-primary" />
+                  Ảnh đại diện
+                </span>
+                <p className="text-xs font-bold text-foreground truncate">
+                  {user?.avatarUrl?.startsWith('data:')
+                    ? 'Ảnh tự tải lên'
+                    : user?.avatarUrl?.includes('avatar-')
+                    ? 'Ảnh đã chọn'
+                    : user?.avatarUrl?.includes('default-2')
+                    ? 'Mặc định (Nữ)'
+                    : 'Mặc định (Nam)'}
+                </p>
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleOpenModal}
+              className="text-xs rounded-xl h-8 px-3 shrink-0 cursor-pointer"
+            >
+              Đổi ảnh
+            </Button>
+          </div>
+
           {/* Email Item */}
           <div className="p-4 rounded-2xl border border-border/80 bg-muted/20 space-y-2">
             <div className="flex items-center justify-between">
@@ -52,7 +138,7 @@ export function AccountSecuritySection() {
                 </span>
               )}
             </div>
-            <p className="text-sm font-bold text-foreground">
+            <p className="text-sm font-bold text-foreground truncate">
               {user?.email || (
                 <span className="text-muted-foreground italic font-normal">Chưa có email</span>
               )}
@@ -65,7 +151,7 @@ export function AccountSecuritySection() {
               <User className="size-3.5 text-primary" />
               Họ và tên
             </span>
-            <p className="text-sm font-bold text-foreground">
+            <p className="text-sm font-bold text-foreground truncate">
               {user?.fullName}
             </p>
           </div>
@@ -104,6 +190,15 @@ export function AccountSecuritySection() {
           </div>
         </div>
       </div>
+
+      {!onOpenAvatarModal && (
+        <AvatarPickerModal
+          open={internalModalOpen}
+          onOpenChange={setInternalModalOpen}
+          currentAvatarUrl={user?.avatarUrl}
+          userFullName={user?.fullName}
+        />
+      )}
     </div>
   );
 }

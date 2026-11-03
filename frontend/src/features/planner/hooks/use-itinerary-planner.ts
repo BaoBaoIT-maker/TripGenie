@@ -17,10 +17,10 @@ export const itineraryKeys = {
 };
 
 /** List itineraries owned by the current authenticated user. */
-export function useItinerariesListQuery() {
+export function useItinerariesListQuery(scope: 'OWNED' | 'JOINED' = 'OWNED') {
   return useQuery({
-    queryKey: itineraryKeys.lists(),
-    queryFn: () => itineraryService.listItineraries(),
+    queryKey: ['itineraries', 'list', scope] as const,
+    queryFn: () => itineraryService.listItineraries(scope),
     staleTime: 0,
     refetchOnMount: 'always',
   });

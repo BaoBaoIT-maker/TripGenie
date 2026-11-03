@@ -15,6 +15,7 @@ import {
   formatVndCurrency,
 } from './transit.service';
 import { GeminiPlannerService } from './gemini-planner.service';
+import { ItineraryAccessService } from './itinerary-access.service';
 import { TourBriefing, normalizeTourBriefing, redactTourBriefing } from './tour-briefing.util';
 import {
   GenerateItineraryDto,
@@ -99,6 +100,10 @@ export interface ItineraryDetail {
   creatorId?: string;
   isPublic?: boolean;
   isOwner?: boolean;
+  viewerRole?: 'OWNER' | 'EDITOR' | 'VIEWER' | null;
+  canEdit?: boolean;
+  canManageMembers?: boolean;
+  updatedAt?: string;
   title: string;
   description: string | null;
   destination: string | null;
@@ -148,7 +153,7 @@ const DETAIL_INCLUDE = {
       },
     },
   },
-  tripGroup: { select: { members: { select: { userId: true } } } },
+  tripGroup: { select: { id: true, members: { select: { userId: true, role: true } } } },
 } satisfies Prisma.ItineraryInclude;
 
 type ItineraryRow = Prisma.ItineraryGetPayload<{ include: typeof DETAIL_INCLUDE }>;
@@ -159,6 +164,7 @@ export class ItineraryPlannerService {
     private readonly prisma: PrismaService,
     private readonly transitService: TransitService,
     private readonly geminiPlanner: GeminiPlannerService,
+    private readonly accessService: ItineraryAccessService,
   ) {}
 
   /**
@@ -663,7 +669,14 @@ export class ItineraryPlannerService {
     if (!row) {
       throw new NotFoundException(`Itinerary with id "${id}" not found`);
     }
-    if (!row.isPublic && row.creatorId !== requesterId) {
+    const isOwner = Boolean(requesterId && row.creatorId === requesterId);
+    const isMember = Boolean(
+      requesterId && row.tripGroup?.members.some((m) => m.userId === requesterId),
+    );
+    if (!row.isPublic && !isOwner && !isMember) {
+      if (!requesterId) {
+        throw new UnauthorizedException('Vui lòng đăng nhập để xem lịch trình riêng tư này.');
+      }
       throw new ForbiddenException('Lịch trình này đang ở chế độ riêng tư.');
     }
     return this.toDetail(row, requesterId);
@@ -851,15 +864,29 @@ export class ItineraryPlannerService {
     }));
 
     const isOwner = Boolean(requesterId && row.creatorId === requesterId);
-    const isTripMember = Boolean(
-      requesterId && row.tripGroup?.members.some((m) => m.userId === requesterId),
-    );
+    const memberRole = requesterId
+      ? row.tripGroup?.members.find((m) => m.userId === requesterId)?.role
+      : null;
+    const isTripMember = Boolean(memberRole);
+    const viewerRole: 'OWNER' | 'EDITOR' | 'VIEWER' | null = isOwner
+      ? 'OWNER'
+      : memberRole === 'EDITOR'
+        ? 'EDITOR'
+        : memberRole === 'VIEWER'
+          ? 'VIEWER'
+          : null;
+    const canEdit = isOwner || memberRole === 'EDITOR';
+    const canManageMembers = isOwner;
 
     return {
       id: row.id,
       creatorId: row.creatorId,
       isPublic: row.isPublic,
       isOwner,
+      viewerRole,
+      canEdit,
+      canManageMembers,
+      updatedAt: row.updatedAt ? row.updatedAt.toISOString() : new Date().toISOString(),
       title: row.title,
       description: row.description,
       destination: row.destination,
@@ -878,15 +905,31 @@ export class ItineraryPlannerService {
   /**
    * List itineraries belonging ONLY to the currently authenticated user.
    */
-  async listItineraries(userId?: string): Promise<ItineraryDetail[]> {
+  async listItineraries(
+    userId?: string,
+    scope: 'OWNED' | 'JOINED' = 'OWNED',
+  ): Promise<ItineraryDetail[]> {
     if (!userId) {
       return [];
     }
+    const where: Prisma.ItineraryWhereInput =
+      scope === 'JOINED'
+        ? {
+            creatorId: { not: userId },
+            deletedAt: null,
+            tripGroup: {
+              members: {
+                some: { userId },
+              },
+            },
+          }
+        : {
+            creatorId: userId,
+            deletedAt: null,
+          };
+
     const rows = await this.prisma.itinerary.findMany({
-      where: {
-        creatorId: userId,
-        deletedAt: null,
-      },
+      where,
       include: DETAIL_INCLUDE,
       orderBy: { createdAt: 'desc' },
       take: 30,
@@ -901,7 +944,7 @@ export class ItineraryPlannerService {
    * their cloned itineraries remain 100% active and untouched.
    */
   async deleteItinerary(id: string, requesterId?: string): Promise<{ success: boolean; id: string }> {
-    await this.assertItineraryOwnership(id, requesterId);
+    await this.accessService.assertCanEdit(id, requesterId);
 
     await this.prisma.itinerary.update({
       where: { id },

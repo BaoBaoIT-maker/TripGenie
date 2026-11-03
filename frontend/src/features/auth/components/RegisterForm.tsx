@@ -30,7 +30,7 @@ export function RegisterForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
-  const nextParam = getSafeRedirectUrl(searchParams.get('next'));
+  const nextParam = getSafeRedirectUrl(searchParams.get('next'), '/');
 
   const [showPassword, setShowPassword] = React.useState(false);
   const [serverError, setServerError] = React.useState<string | null>(null);
@@ -89,7 +89,7 @@ export function RegisterForm() {
       isHandled = true;
       toast.success('Tài khoản đã được kích hoạt thành công!');
       queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
-      router.push(nextParam || '/explore');
+      router.push(nextParam || '/');
     };
 
     // 1. BroadcastChannel (Same browser)

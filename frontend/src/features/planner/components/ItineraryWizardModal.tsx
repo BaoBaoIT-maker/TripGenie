@@ -184,8 +184,19 @@ const TRAVEL_STYLE_TAGS = [
 export default function ItineraryWizardModal({ isOpen, onClose, initialDestination, initialTemplate }: Props) {
   const router = useRouter();
 
-  // Wizard Step: 1, 2, 3
+  // Wizard Step: 1, 2, 3 with Directional Motion
   const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [direction, setDirection] = useState<'forward' | 'backward'>('forward');
+  const stepContainerRef = useRef<HTMLDivElement>(null);
+
+  const goToStep = (next: 1 | 2 | 3) => {
+    if (next === step || generate.isPending || isProcessing) return;
+    setDirection(next > step ? 'forward' : 'backward');
+    setStep(next);
+    setTimeout(() => {
+      stepContainerRef.current?.focus();
+    }, 50);
+  };
 
   // Form State
   const [originCity, setOriginCity] = useState('TP. Hồ Chí Minh');
@@ -370,6 +381,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
 
   // Handle Generate Submission
   function handleSubmit() {
+    if (generate.isPending || isProcessing) return;
     setServerError(null);
     setIsProcessing(true);
     setProgressPercent(30);
@@ -468,7 +480,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
             <div className="flex items-center justify-between text-xs sm:text-sm font-semibold py-1">
               {/* Step 1 */}
               <div
-                onClick={() => setStep(1)}
+                onClick={() => goToStep(1)}
                 className={`flex items-center gap-2 cursor-pointer ${
                   step === 1 ? 'text-teal-700 font-bold' : 'text-slate-400'
                 }`}
@@ -495,7 +507,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
 
               {/* Step 2 */}
               <div
-                onClick={() => setStep(2)}
+                onClick={() => goToStep(2)}
                 className={`flex items-center gap-2 cursor-pointer ${
                   step === 2
                     ? 'text-teal-700 font-bold'
@@ -526,7 +538,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
 
               {/* Step 3 */}
               <div
-                onClick={() => setStep(3)}
+                onClick={() => goToStep(3)}
                 className={`flex items-center gap-2 cursor-pointer ${
                   step === 3 ? 'text-teal-700 font-bold' : 'text-slate-400'
                 }`}
@@ -544,6 +556,13 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
               </div>
             </div>
 
+            {/* Step Content Container with Directional Motion */}
+            <div
+              key={step}
+              ref={stepContainerRef}
+              tabIndex={-1}
+              className={`outline-none ${direction === 'forward' ? 'wizard-step-forward' : 'wizard-step-backward'}`}
+            >
             {/* ═════════════════════════════════════════════════════════════
                 STEP 1 CONTENT: Điểm đến (Matches Image 1 exactly)
             ═════════════════════════════════════════════════════════════ */}
@@ -748,7 +767,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                 <div className="pt-3 flex justify-end">
                   <button
                     type="button"
-                    onClick={() => setStep(2)}
+                    onClick={() => goToStep(2)}
                     className="inline-flex items-center gap-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs sm:text-sm font-bold px-7 py-3 transition-colors cursor-pointer shadow-xs"
                   >
                     Tiếp tục: Phương tiện di chuyển
@@ -883,7 +902,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                 <div className="pt-3 flex items-center justify-between border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setStep(1)}
+                    onClick={() => goToStep(1)}
                     className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-600 transition-colors cursor-pointer"
                   >
                     <ChevronLeft className="size-4" />
@@ -891,7 +910,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                   </button>
                   <button
                     type="button"
-                    onClick={() => setStep(3)}
+                    onClick={() => goToStep(3)}
                     className="inline-flex items-center gap-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs sm:text-sm font-bold px-7 py-3 transition-colors cursor-pointer shadow-xs"
                   >
                     Tiếp tục: Gu & Ngân sách
@@ -1022,7 +1041,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                 <div className="pt-3 flex items-center justify-between border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setStep(2)}
+                    onClick={() => goToStep(2)}
                     className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 px-4 py-2.5 text-xs font-semibold text-slate-600 transition-colors cursor-pointer"
                   >
                     <ChevronLeft className="size-4" />
@@ -1032,7 +1051,8 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                   <button
                     type="button"
                     onClick={handleSubmit}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-teal-600 via-emerald-600 to-indigo-600 hover:opacity-95 text-white font-extrabold text-xs sm:text-sm px-8 py-3.5 shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all cursor-pointer"
+                    disabled={generate.isPending || isProcessing}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-teal-600 via-emerald-600 to-indigo-600 hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold text-xs sm:text-sm px-8 py-3.5 shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all cursor-pointer"
                   >
                     <Sparkles className="size-4" />
                     <span>TẠO LỊCH TRÌNH VỚI AI</span>
@@ -1040,6 +1060,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                 </div>
               </div>
             )}
+            </div>
           </div>
         ) : (
           /* ─────────────────────────────────────────────────────────────

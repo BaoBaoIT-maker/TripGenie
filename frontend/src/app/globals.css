@@ -58,31 +58,31 @@
   --card-foreground: oklch(0.18 0.02 240);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.18 0.02 240);
-  
+
   /* Primary: Ocean Discovery Teal */
   --primary: oklch(0.48 0.14 185);
   --primary-foreground: oklch(0.99 0 0);
-  
+
   /* Secondary: Soft Mist Teal */
   --secondary: oklch(0.95 0.025 185);
   --secondary-foreground: oklch(0.35 0.10 185);
-  
+
   /* Muted surfaces & subtle text */
   --muted: oklch(0.96 0.008 240);
   --muted-foreground: oklch(0.48 0.025 240);
-  
+
   /* Accent: Sunset Adventure Coral */
   --accent: oklch(0.95 0.035 55);
   --accent-foreground: oklch(0.42 0.14 45);
-  
+
   /* Status & system */
   --destructive: oklch(0.58 0.22 25);
   --destructive-foreground: oklch(0.99 0 0);
-  
+
   --border: oklch(0.91 0.01 240);
   --input: oklch(0.91 0.01 240);
   --ring: oklch(0.48 0.14 185);
-  
+
   --radius: 0.625rem;
 
   --chart-1: oklch(0.48 0.14 185);
@@ -109,24 +109,24 @@
   --card-foreground: oklch(0.98 0.005 240);
   --popover: oklch(0.18 0.025 240);
   --popover-foreground: oklch(0.98 0.005 240);
-  
+
   /* Primary: Luminous Teal */
   --primary: oklch(0.68 0.13 185);
   --primary-foreground: oklch(0.12 0.03 185);
-  
+
   /* Secondary */
   --secondary: oklch(0.24 0.03 185);
   --secondary-foreground: oklch(0.90 0.04 185);
-  
+
   --muted: oklch(0.22 0.02 240);
   --muted-foreground: oklch(0.70 0.02 240);
-  
+
   --accent: oklch(0.25 0.05 45);
   --accent-foreground: oklch(0.92 0.06 45);
-  
+
   --destructive: oklch(0.62 0.20 25);
   --destructive-foreground: oklch(0.99 0 0);
-  
+
   --border: oklch(0.26 0.02 240);
   --input: oklch(0.26 0.02 240);
   --ring: oklch(0.68 0.13 185);
@@ -278,5 +278,156 @@
     margin: 0 !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+}
+
+
+
+/* =============================================================================
+   TripGenie Subtle Motion Tokens & Utilities (Task 1 - 4)
+   ============================================================================= */
+:root {
+  --motion-duration-fast: 150ms;
+  --motion-duration-normal: 200ms;
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-popup-offset: 8px;
+  --motion-drawer-offset: 12px;
+  --motion-step-offset: 8px;
+  --motion-hover-scale: 1.025;
+  --motion-arrow-shift: 3px;
+}
+
+@keyframes drawerEnter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-drawer-offset, 12px));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes drawerExit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--motion-drawer-offset, 12px));
+  }
+}
+
+@keyframes stepForwardEnter {
+  from {
+    opacity: 0;
+    transform: translateX(var(--motion-step-offset, 8px));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes stepBackwardEnter {
+  from {
+    opacity: 0;
+    transform: translateX(calc(-1 * var(--motion-step-offset, 8px)));
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes popupEnter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-popup-offset, 8px));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes popupExit {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(var(--motion-popup-offset, 8px));
+  }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+.advisor-drawer-popup[data-open] {
+  animation: drawerEnter var(--motion-duration-normal, 200ms) var(--motion-ease, cubic-bezier(0.22, 1, 0.36, 1)) forwards;
+}
+
+.advisor-drawer-popup[data-closed] {
+  animation: drawerExit var(--motion-duration-fast, 150ms) var(--motion-ease, cubic-bezier(0.22, 1, 0.36, 1)) forwards;
+  pointer-events: none;
+}
+
+.wizard-step-forward {
+  animation: stepForwardEnter var(--motion-duration-normal, 200ms) var(--motion-ease, cubic-bezier(0.22, 1, 0.36, 1)) forwards;
+}
+
+.wizard-step-backward {
+  animation: stepBackwardEnter var(--motion-duration-normal, 200ms) var(--motion-ease, cubic-bezier(0.22, 1, 0.36, 1)) forwards;
+}
+
+.dialog-subtle-popup[data-open] {
+  animation: popupEnter var(--motion-duration-normal, 200ms) var(--motion-ease, cubic-bezier(0.22, 1, 0.36, 1)) forwards;
+}
+
+.dialog-subtle-popup[data-closed] {
+  animation: popupExit var(--motion-duration-fast, 150ms) var(--motion-ease, cubic-bezier(0.22, 1, 0.36, 1)) forwards;
+  pointer-events: none;
+}
+
+.dialog-backdrop-subtle[data-open] {
+  animation: fadeIn var(--motion-duration-normal, 200ms) ease-out forwards;
+}
+
+.dialog-backdrop-subtle[data-closed] {
+  animation: fadeOut var(--motion-duration-fast, 150ms) ease-in forwards;
+  pointer-events: none;
+}
+
+/* Reduced motion overrides */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .advisor-drawer-popup[data-open],
+  .advisor-drawer-popup[data-closed],
+  .wizard-step-forward,
+  .wizard-step-backward,
+  .dialog-subtle-popup[data-open],
+  .dialog-subtle-popup[data-closed],
+  .dialog-backdrop-subtle[data-open],
+  .dialog-backdrop-subtle[data-closed] {
+    animation: none !important;
+    transform: none !important;
   }
 }

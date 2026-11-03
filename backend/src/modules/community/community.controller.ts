@@ -86,7 +86,7 @@ export class CommunityController {
   ) {
     const post = await this.communityService.createPost(user.id, dto);
     return {
-      message: 'Đăng bài lên cộng đồng thành công',
+      message: 'Đăng bài viết thành công',
       post,
     };
   }

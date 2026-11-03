@@ -6,13 +6,16 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/explore",
 }));
 
+const mockSendMessage = vi.fn();
+const mockStartNewSession = vi.fn();
+
 vi.mock("@/features/advisor/hooks/useAdvisorChat", () => ({
   useAdvisorChat: vi.fn(() => ({
     messages: [],
     isLoading: false,
     isRestoring: false,
-    sendMessage: vi.fn(),
-    startNewSession: vi.fn(),
+    sendMessage: mockSendMessage,
+    startNewSession: mockStartNewSession,
   })),
 }));
 
@@ -20,6 +23,8 @@ describe("AdvisorWidget — Proactive Prompt & Interaction", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     sessionStorage.clear();
+    mockSendMessage.mockClear();
+    mockStartNewSession.mockClear();
   });
 
   afterEach(() => {
@@ -32,22 +37,19 @@ describe("AdvisorWidget — Proactive Prompt & Interaction", () => {
     render(<AdvisorWidget />);
     const fab = screen.getByRole("button", { name: /Mở trợ lý du lịch AI Advisor/i });
     expect(fab).toBeInTheDocument();
-    expect(screen.getByText(/Hỏi Cố Vấn AI/i)).toBeInTheDocument();
+    expect(fab).toHaveTextContent("Chat");
   });
 
   it("triggers proactive prompt bubble after delay timer", () => {
     render(<AdvisorWidget />);
 
     const promptContainer = screen.getByLabelText(/Gợi ý từ trợ lý ảo Genie/i);
-    // Initially prompt should be hidden
     expect(promptContainer).toHaveClass("opacity-0");
 
-    // Advance timer past APPEAR_DELAY_MS (5s)
     act(() => {
       vi.advanceTimersByTime(PROMPT_CONFIG.APPEAR_DELAY_MS);
     });
 
-    // Prompt container should now be visible
     expect(promptContainer).toHaveClass("opacity-100");
     expect(screen.getByText(PROMPT_CONFIG.EXPLORE_MESSAGE)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: PROMPT_CONFIG.CTA_TEXT })).toBeInTheDocument();
@@ -95,7 +97,50 @@ describe("AdvisorWidget — Proactive Prompt & Interaction", () => {
 
     expect(sessionStorage.getItem(PROMPT_CONFIG.STORAGE_KEY)).toBe("true");
 
-    // Drawer should now be opened, FAB changes label to close
-    expect(screen.getByRole("button", { name: /Đóng trợ lý AI Advisor/i })).toBeInTheDocument();
+    // Drawer should now be opened as an accessible dialog with its close button
+    expect(screen.getByRole("dialog", { name: /TripGenie AI Advisor/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Đóng cửa sổ tư vấn AI/i })).toBeInTheDocument();
+  });
+
+  it("preserves draft input text across open and close cycles", () => {
+    render(<AdvisorWidget />);
+
+    // Open via FAB
+    const fab = screen.getByRole("button", { name: /Mở trợ lý du lịch AI Advisor/i });
+    fireEvent.click(fab);
+
+    // Type a draft
+    const input = screen.getByLabelText("Nhập câu hỏi cho trợ lý du lịch") as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: "Tôi muốn đi Bà Nà 1 ngày" } });
+    expect(input.value).toBe("Tôi muốn đi Bà Nà 1 ngày");
+
+    // Close via close button in drawer
+    const closeBtn = screen.getByRole("button", { name: /Đóng cửa sổ tư vấn AI/i });
+    fireEvent.click(closeBtn);
+
+    // Reopen via FAB
+    const fabReopen = screen.getByRole("button", { name: /Mở trợ lý du lịch AI Advisor/i });
+    fireEvent.click(fabReopen);
+
+    // Draft should still be preserved
+    const reopenedInput = screen.getByLabelText("Nhập câu hỏi cho trợ lý du lịch") as HTMLTextAreaElement;
+    expect(reopenedInput.value).toBe("Tôi muốn đi Bà Nà 1 ngày");
+  });
+
+  it("submits message and clears draft when send button is clicked", () => {
+    render(<AdvisorWidget />);
+
+    // Open via FAB
+    const fab = screen.getByRole("button", { name: /Mở trợ lý du lịch AI Advisor/i });
+    fireEvent.click(fab);
+
+    const input = screen.getByLabelText("Nhập câu hỏi cho trợ lý du lịch");
+    fireEvent.change(input, { target: { value: "Quán ăn ngon gần Cầu Rồng" } });
+
+    const sendBtn = screen.getByRole("button", { name: /Gửi tin nhắn/i });
+    fireEvent.click(sendBtn);
+
+    expect(mockSendMessage).toHaveBeenCalledWith("Quán ăn ngon gần Cầu Rồng");
+    expect((input as HTMLTextAreaElement).value).toBe("");
   });
 });

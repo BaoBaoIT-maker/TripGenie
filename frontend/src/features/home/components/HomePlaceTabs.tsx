@@ -59,7 +59,7 @@ export function HomePlaceTabs() {
                 type="button"
                 onClick={() => setActiveTabId(tab.id)}
                 className={cn(
-                  "px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-all shrink-0 cursor-pointer",
+                  "px-4 py-2 text-xs sm:text-sm font-semibold rounded-lg transition-colors duration-150 motion-reduce:transition-none shrink-0 cursor-pointer",
                   isSelected
                     ? "bg-background text-foreground shadow-xs"
                     : "text-muted-foreground hover:text-foreground hover:bg-background/50"
@@ -86,13 +86,15 @@ export function HomePlaceTabs() {
         role="tabpanel"
         id={`panel-${activeTab.id}`}
         aria-labelledby={`tab-${activeTab.id}`}
+        key={activeTab.id}
+        className="animate-in fade-in-0 duration-150 motion-reduce:animate-none min-h-[340px]"
       >
         {isLoading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6">
             {Array.from({ length: HOME_CONFIG.places.limit }).map((_, idx) => (
               <div
                 key={idx}
-                className="rounded-2xl border border-border/60 bg-muted/30 overflow-hidden flex flex-col h-[340px] animate-pulse"
+                className="rounded-2xl border border-border/60 bg-muted/30 overflow-hidden flex flex-col h-[340px] animate-pulse motion-reduce:animate-none"
               >
                 <div className="h-44 sm:h-48 w-full bg-muted/80" />
                 <div className="p-4 space-y-3 flex-1 flex flex-col justify-between">

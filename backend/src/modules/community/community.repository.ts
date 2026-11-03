@@ -52,28 +52,35 @@ export class CommunityRepository implements ICommunityRepository {
   private async findMatchingTagsCaseInsensitive(term: string): Promise<string[]> {
     const clean = term.replace(/^#/, '').trim();
     if (!clean) return [];
-    const pattern = `%${clean}%`;
-    const rows = await this.prisma.$queryRaw<Array<{ tag: string }>>`
-      SELECT DISTINCT t.tag
-      FROM community_posts p, unnest(p.tags) AS t(tag)
-      WHERE p.deleted_at IS NULL
-        AND t.tag ILIKE ${pattern}
-      LIMIT ${COMMUNITY_CONSTANTS.TAG_QUERY_LIMIT}
-    `;
+
+    const rows = await this.prisma.$queryRaw<{ tag: string }[]>(Prisma.sql`
+      SELECT DISTINCT unnest(tags) AS tag
+      FROM community_posts
+      WHERE "deletedAt" IS NULL
+        AND EXISTS (
+          SELECT 1
+          FROM unnest(tags) t
+          WHERE t ILIKE ${'%' + clean + '%'}
+        )
+      LIMIT 10;
+    `);
+
     return rows.map((r) => r.tag);
   }
 
-  private async findMatchedCreators(searchQuery: string): Promise<MatchedCreatorSummary[]> {
-    const q = searchQuery.trim();
+  // ponytail: ILIKE substring scan on Creator fullname/username. In future, back with pg_trgm trigram index if creator count > 10k.
+  private async findMatchedCreators(
+    q: string,
+  ): Promise<MatchedCreatorSummary[]> {
     const cleanHandle = q.replace(/^@/, '').trim();
     if (!cleanHandle) return [];
 
     const users = await this.prisma.user.findMany({
       where: {
-        isActive: true,
         deletedAt: null,
+        isActive: true,
         OR: [
-          { fullName: { contains: q, mode: 'insensitive' } },
+          { fullName: { contains: cleanHandle, mode: 'insensitive' } },
           { username: { contains: cleanHandle, mode: 'insensitive' } },
         ],
       },
@@ -154,47 +161,43 @@ export class CommunityRepository implements ICommunityRepository {
     if (params.areaId) {
       where.itinerary = {
         is: {
-          areaId: params.areaId,
           deletedAt: null,
+          areaId: params.areaId,
         },
       };
     }
 
     if (params.tag) {
-      const normalizedTag = params.tag.startsWith('#')
-        ? params.tag
-        : `#${params.tag}`;
-      const matchedTags = await this.findMatchingTagsCaseInsensitive(params.tag);
+      const cleanTag = params.tag.replace(/^#/, '').trim();
+      const hashTag = `#${cleanTag}`;
+      const matched = await this.findMatchingTagsCaseInsensitive(cleanTag);
       where.tags = {
-        hasSome: Array.from(new Set([params.tag, normalizedTag, ...matchedTags])),
+        hasSome: Array.from(new Set([cleanTag, hashTag, ...matched])),
       };
     }
 
-    let matchedCreators: MatchedCreatorSummary[] | undefined = undefined;
+    let matchedCreators: MatchedCreatorSummary[] | undefined;
 
     if (params.search) {
-      const q = params.search.trim();
-      where.OR = await this.buildSearchConditions(q);
-
-      if (!params.cursor) {
-        matchedCreators = await this.findMatchedCreators(q);
-      }
+      const conditions = await this.buildSearchConditions(params.search);
+      where.OR = conditions;
+      matchedCreators = await this.findMatchedCreators(params.search);
     }
 
     return { where, matchedCreators };
   }
 
-  // ponytail: ID-based cursor pagination on TRENDING sort may duplicate or skip posts if counters mutate between page fetches. Keyset pagination on (likeCount, id) is the upgrade path if feed churn causes user complaints.
   async findFeedPosts(params: FindFeedParams): Promise<FeedPageResult> {
     const { where, matchedCreators } = await this.buildFeedWhere(params);
+
     const orderBy =
-      FEED_SORT_STRATEGIES[params.sort] ?? FEED_SORT_STRATEGIES.LATEST;
+      FEED_SORT_STRATEGIES[params.sort] || FEED_SORT_STRATEGIES.LATEST;
 
     const rows = await this.prisma.communityPost.findMany({
       where,
-      include: this.buildPostInclude(params.viewerId),
       orderBy,
       take: params.limit + 1,
+      include: this.buildPostInclude(params.viewerId),
       ...(params.cursor
         ? {
             cursor: { id: params.cursor },

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { usePathname } from 'next/navigation';
-import { Compass, Send, X } from 'lucide-react';
+import { Compass, Send, MessageCircle, X } from 'lucide-react';
 import { useAdvisorChat } from '../hooks/useAdvisorChat';
 import { AdvisorDrawer } from './AdvisorDrawer';
 
@@ -36,6 +36,7 @@ export function AdvisorWidget() {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isPromptVisible, setIsPromptVisible] = React.useState(false);
   const [hasBadge, setHasBadge] = React.useState(false);
+  const fabRef = React.useRef<HTMLButtonElement>(null);
   const pathname = usePathname() || '';
 
   const {
@@ -100,13 +101,18 @@ export function AdvisorWidget() {
     setIsOpen(true);
   };
 
+  const handleCloseDrawer = () => {
+    setIsOpen(false);
+    fabRef.current?.focus();
+  };
+
   const contextualMessage = resolveContextualMessage(pathname);
 
   return (
     <>
       <AdvisorDrawer
         isOpen={isOpen}
-        onClose={() => setIsOpen(false)}
+        onClose={handleCloseDrawer}
         messages={messages}
         isLoading={isLoading}
         isRestoring={isRestoring}
@@ -178,45 +184,27 @@ export function AdvisorWidget() {
 
       {/* Floating Action Button (FAB) */}
       <button
+        ref={fabRef}
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
         aria-label={
           isOpen ? 'Đóng trợ lý AI Advisor' : 'Mở trợ lý du lịch AI Advisor'
         }
         aria-expanded={isOpen}
-        className="fixed bottom-20 right-4 z-40 flex min-h-[52px] min-w-[52px] cursor-pointer items-center gap-2.5 rounded-full bg-primary px-4 py-3 text-primary-foreground shadow-lg transition-all duration-200 motion-reduce:transition-none hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:bottom-6 md:right-6"
+        className="fixed bottom-20 right-4 z-40 flex h-14 cursor-pointer items-center gap-2 rounded-full bg-primary py-1 pr-1 pl-5 text-primary-foreground shadow-lg transition-all duration-200 motion-reduce:transition-none hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:bottom-6 md:right-6"
       >
-        {isOpen ? (
-          <X className="h-5 w-5" aria-hidden="true" />
-        ) : (
-          <div className="relative flex items-center gap-2.5">
-            {/* Live Green Online Dot (no endless pulse per DESIGN.md MOTION=1 & antislop R-19) */}
-            <span
-              className="absolute -top-3.5 -left-3.5 flex size-3.5"
-              title="Trợ lý đang trực tuyến"
-            >
-              <span className="relative inline-flex size-3.5 rounded-full border-2 border-background bg-emerald-500" />
-            </span>
-
-            {/* Red Badge Alert */}
-            {hasBadge && (
-              <span
-                role="status"
-                className="absolute -top-4 -right-3 flex size-5 items-center justify-center rounded-full bg-destructive text-[11px] font-bold text-destructive-foreground shadow-md ring-2 ring-background animate-in zoom-in-50 duration-200"
-              >
-                <span className="sr-only">1 thông báo từ cố vấn du lịch</span>
-                1
-              </span>
-            )}
-
-            <Compass className="h-5 w-5" aria-hidden="true" />
-            <span className="hidden text-sm font-semibold sm:inline">
-              Hỏi Cố Vấn AI
-            </span>
-          </div>
+        <span className="text-sm font-semibold">{isOpen ? 'Đóng' : 'Chat'}</span>
+        <span className="flex size-12 items-center justify-center rounded-full bg-primary-foreground/15" aria-hidden="true">
+          {isOpen ? <X className="size-6" /> : <MessageCircle className="size-6 fill-current" />}
+        </span>
+        {!isOpen && <span className="absolute bottom-0 left-0 size-3.5 rounded-full border-2 border-background bg-emerald-400" aria-hidden="true" />}
+        {!isOpen && hasBadge && (
+          <span role="status" className="absolute -top-1 -right-1 flex size-5 items-center justify-center rounded-full bg-destructive text-[11px] font-bold text-destructive-foreground ring-2 ring-background">
+            <span className="sr-only">1 thông báo từ cố vấn du lịch</span>
+            <span aria-hidden="true">1</span>
+          </span>
         )}
       </button>
     </>
   );
 }
-

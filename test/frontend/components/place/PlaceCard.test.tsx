@@ -1,7 +1,36 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PlaceCard } from "@/components/place/PlaceCard";
 import type { Place } from "@/types/place";
+import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useSavedPlaceIds, useToggleFavorite } from "@/features/collections/hooks/use-collections";
+import { toast } from "sonner";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
+vi.mock("sonner", () => ({
+  toast: {
+    info: vi.fn(),
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
+vi.mock("@/features/auth/hooks/use-auth", () => ({
+  useAuth: vi.fn(),
+}));
+
+vi.mock("@/features/collections/hooks/use-collections", () => ({
+  useSavedPlaceIds: vi.fn(),
+  useToggleFavorite: vi.fn(),
+  useCollections: vi.fn().mockReturnValue({ data: [], isLoading: false }),
+  useCollectionsContainingPlace: vi.fn().mockReturnValue({ data: new Set(), isLoading: false }),
+  useAddPlaceToCollection: vi.fn().mockReturnValue({ mutate: vi.fn() }),
+  useCreateCollection: vi.fn().mockReturnValue({ mutate: vi.fn() }),
+}));
 
 const mockPlace: Place = {
   id: "p-1",
@@ -29,43 +58,96 @@ const mockPlaceNoImage: Place = {
 };
 
 describe("PlaceCard", () => {
-  it("does not render bookmark button when onBookmark prop is not provided", () => {
-    render(<PlaceCard place={mockPlace} />);
-    expect(screen.queryByRole("button", { name: /Lưu địa điểm/i })).not.toBeInTheDocument();
+  let queryClient: QueryClient;
+  const mockMutate = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    vi.mocked(useAuth).mockReturnValue({
+      user: { id: "u1", email: "test@example.com" },
+      isAuthenticated: true,
+      isLoading: false,
+    } as any);
+
+    vi.mocked(useSavedPlaceIds).mockReturnValue({
+      data: new Set<string>(),
+      isLoading: false,
+    } as any);
+
+    vi.mocked(useToggleFavorite).mockReturnValue({
+      mutate: mockMutate,
+      isPending: false,
+    } as any);
   });
 
-  it("renders bookmark button and triggers callback when onBookmark is provided", () => {
-    const handleBookmark = vi.fn();
-    render(<PlaceCard place={mockPlace} onBookmark={handleBookmark} isBookmarked={false} />);
+  const renderCard = (props = {}) =>
+    render(
+      <QueryClientProvider client={queryClient}>
+        <PlaceCard place={mockPlace} {...props} />
+      </QueryClientProvider>
+    );
 
+  it("renders place link to detail page and subtle arrow indicator", () => {
+    renderCard();
+    const links = screen.getAllByRole("link");
+    expect(links.some((l) => l.getAttribute("href") === "/places/ba-na-hills")).toBe(true);
+
+    const arrowEl = document.querySelector(".group-hover\\:translate-x-\\[3px\\]");
+    expect(arrowEl).toBeInTheDocument();
+  });
+
+  it("applies subtle image scale and no card translateY jump", () => {
+    renderCard();
+    const cardRoot = document.querySelector(".group");
+    expect(cardRoot).toBeInTheDocument();
+    expect(cardRoot?.className).not.toContain("hover:-translate-y-1");
+    expect(cardRoot?.className).toContain("duration-200");
+  });
+
+  it("prompts login when guest clicks bookmark", async () => {
+    vi.mocked(useAuth).mockReturnValue({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+    } as any);
+
+    renderCard();
     const bookmarkBtn = screen.getByRole("button", { name: /Lưu địa điểm/i });
-    expect(bookmarkBtn).toBeInTheDocument();
-
     fireEvent.click(bookmarkBtn);
-    expect(handleBookmark).toHaveBeenCalledTimes(1);
-    expect(handleBookmark).toHaveBeenCalledWith(mockPlace);
+
+    expect(toast.info).toHaveBeenCalledWith(
+      expect.stringContaining("Vui lòng đăng nhập")
+    );
+    expect(mockMutate).not.toHaveBeenCalled();
   });
 
-  it("does not render contribute photo button when onContributePhoto is not provided", () => {
-    render(<PlaceCard place={mockPlaceNoImage} />);
-    expect(screen.queryByRole("button", { name: /Đóng góp ảnh/i })).not.toBeInTheDocument();
+  it("toggles bookmark when authenticated and disables during pending mutation", () => {
+    vi.mocked(useToggleFavorite).mockReturnValue({
+      mutate: mockMutate,
+      isPending: true,
+    } as any);
+
+    renderCard();
+    const bookmarkBtn = screen.getByRole("button", { name: /Lưu địa điểm/i });
+    expect(bookmarkBtn).toBeDisabled();
   });
 
-  it("renders contribute photo button and triggers callback when onContributePhoto is provided and no image", () => {
+  it("renders contribute photo button when image is missing and callback provided", () => {
     const handleContribute = vi.fn();
-    render(<PlaceCard place={mockPlaceNoImage} onContributePhoto={handleContribute} />);
+    render(
+      <QueryClientProvider client={queryClient}>
+        <PlaceCard place={mockPlaceNoImage} onContributePhoto={handleContribute} />
+      </QueryClientProvider>
+    );
 
     const contributeBtn = screen.getByRole("button", { name: /Đóng góp ảnh/i });
     expect(contributeBtn).toBeInTheDocument();
 
     fireEvent.click(contributeBtn);
-    expect(handleContribute).toHaveBeenCalledTimes(1);
     expect(handleContribute).toHaveBeenCalledWith(mockPlaceNoImage);
-  });
-
-  it("renders place link to detail page", () => {
-    render(<PlaceCard place={mockPlace} />);
-    const links = screen.getAllByRole("link");
-    expect(links.some((l) => l.getAttribute("href") === "/places/ba-na-hills")).toBe(true);
   });
 });

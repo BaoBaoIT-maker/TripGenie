@@ -191,6 +191,7 @@ export class AuthService {
         email: draft.email,
         fullName: draft.fullName,
         passwordHash: draft.passwordHash,
+        avatarUrl: '/avatars/default-1.png',
         isVerified: true,
         verifiedAt: new Date(),
       });
@@ -403,7 +404,7 @@ export class AuthService {
         user = await this.usersRepository.create({
           email: normalizedEmail,
           fullName: oauthProfile.fullName,
-          avatarUrl: oauthProfile.avatarUrl,
+          avatarUrl: oauthProfile.avatarUrl || '/avatars/default-1.png',
           isVerified: true,
           verifiedAt: new Date(),
         });

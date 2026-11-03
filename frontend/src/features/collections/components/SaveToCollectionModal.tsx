@@ -123,7 +123,7 @@ export function SaveToCollectionModal({
           {isCollectionsLoading || isContainingLoading ? (
             <div className="space-y-2 py-4">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-12 rounded-xl bg-muted animate-pulse" />
+                <div key={i} className="h-12 rounded-xl bg-muted animate-pulse motion-reduce:animate-none" />
               ))}
             </div>
           ) : collections.length === 0 ? (
@@ -142,7 +142,7 @@ export function SaveToCollectionModal({
                   type="button"
                   onClick={() => handleToggleCollection(col.id)}
                   disabled={isBusy}
-                  className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-all min-h-[44px] cursor-pointer ${
+                  className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-colors duration-150 motion-reduce:transition-none min-h-[44px] cursor-pointer ${
                     isChecked
                       ? "border-primary/60 bg-primary/5"
                       : "border-border/70 hover:border-border hover:bg-muted/40"

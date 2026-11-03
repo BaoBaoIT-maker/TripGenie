@@ -15,6 +15,9 @@ import {
   CheckCircle2,
   CalendarDays,
   Pencil,
+  Play,
+  X,
+  Loader2,
 } from "lucide-react";
 import type { CommunityPostItem } from "@/types/community";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -30,6 +33,7 @@ import { formatRelativeTime, isVideoUrl } from "@/services/community.service";
 import { CommentDrawer } from "./CommentDrawer";
 import { CloneItineraryPreviewModal } from "./CloneItineraryPreviewModal";
 import { EditPostModal } from "./EditPostModal";
+import { PostDetailModal } from "./PostDetailModal";
 
 interface PostCardProps {
   post: CommunityPostItem;
@@ -46,9 +50,12 @@ export function PostCard({
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const [activeMediaIdx, setActiveMediaIdx] = useState(0);
-  const [showComments, setShowComments] = useState(defaultOpenComments);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [showComments, setShowComments] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(defaultOpenComments);
   const [isClonePreviewOpen, setIsClonePreviewOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false);
 
   const toggleLikeMutation = useTogglePostLike();
   const deletePostMutation = useDeleteCommunityPost();
@@ -86,6 +93,54 @@ export function PostCard({
     observer.observe(videoEl);
     return () => observer.disconnect();
   }, [currentMediaUrl, isCurrentVideo]);
+
+  // Handle Escape key and background scroll lock for Confirm Delete Modal
+  useEffect(() => {
+    if (!isConfirmDeleteOpen) return;
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !deletePostMutation.isPending) {
+        setIsConfirmDeleteOpen(false);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isConfirmDeleteOpen, deletePostMutation.isPending]);
+
+  // Handle keyboard navigation (Escape, ArrowLeft, ArrowRight) and background scroll lock for Lightbox
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setLightboxIndex(null);
+      } else if (e.key === "ArrowLeft") {
+        setLightboxIndex((prev) =>
+          prev !== null ? (prev > 0 ? prev - 1 : mediaList.length - 1) : null
+        );
+      } else if (e.key === "ArrowRight") {
+        setLightboxIndex((prev) =>
+          prev !== null ? (prev < mediaList.length - 1 ? prev + 1 : 0) : null
+        );
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [lightboxIndex, mediaList.length]);
 
   const profileIdentifier = post.author.username || post.author.id;
   const profileHref = `/community/profile/${encodeURIComponent(profileIdentifier)}`;
@@ -215,7 +270,7 @@ export function PostCard({
           {canDeletePost && (
             <button
               type="button"
-              onClick={() => deletePostMutation.mutate(post.id)}
+              onClick={() => setIsConfirmDeleteOpen(true)}
               disabled={deletePostMutation.isPending}
               aria-label="Xóa bài viết"
               title="Xóa bài viết"
@@ -239,61 +294,172 @@ export function PostCard({
         )}
       </div>
 
-      {/* Multimedia Showcase (Video Player or Image Carousel) */}
-      {currentMediaUrl && (
-        <div className="relative w-full overflow-hidden rounded-xl border border-border/60 bg-muted aspect-video">
-          {isCurrentVideo ? (
-            <video
-              ref={videoRef}
-              src={currentMediaUrl}
-              controls
-              playsInline
-              muted
-              loop
-              preload="metadata"
-              className="w-full h-full object-cover bg-black"
-            />
-          ) : (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={currentMediaUrl}
-              alt={post.title}
-              loading="lazy"
-              className="w-full h-full object-cover"
-            />
+      {/* Multimedia Showcase (Facebook/Xiaohongshu-style Collage Grid) */}
+      {mediaList.length > 0 && (
+        <div className="w-full">
+          {/* Case 1: Single Media (Image or Video) */}
+          {mediaList.length === 1 && (
+            <div
+              onClick={() => setLightboxIndex(0)}
+              className="relative w-full overflow-hidden rounded-xl border border-border/60 bg-muted aspect-video cursor-pointer group"
+            >
+              {isVideoUrl(mediaList[0]) ? (
+                <video
+                  ref={videoRef}
+                  src={mediaList[0]}
+                  controls
+                  playsInline
+                  muted
+                  loop
+                  preload="metadata"
+                  className="w-full h-full object-cover bg-black"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={mediaList[0]}
+                  alt={post.title}
+                  loading="lazy"
+                  className="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-300"
+                />
+              )}
+            </div>
           )}
 
-          {/* Multi-media Carousel Navigation */}
-          {mediaList.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveMediaIdx((prev) =>
-                    prev === 0 ? mediaList.length - 1 : prev - 1
-                  )
-                }
-                aria-label="Ảnh hoặc video trước"
-                className="absolute left-2.5 top-1/2 -translate-y-1/2 min-h-[40px] min-w-[40px] inline-flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors cursor-pointer"
+          {/* Case 2: Exactly 2 Media Items Side by Side */}
+          {mediaList.length === 2 && (
+            <div className="grid grid-cols-2 gap-1.5 w-full overflow-hidden rounded-xl border border-border/60 bg-muted aspect-[4/3] sm:aspect-[16/9]">
+              {mediaList.map((url, idx) => (
+                <div
+                  key={idx}
+                  onClick={() => setLightboxIndex(idx)}
+                  className="relative h-full w-full overflow-hidden cursor-pointer group bg-black/5"
+                >
+                  {isVideoUrl(url) ? (
+                    <>
+                      <video
+                        src={url}
+                        className="w-full h-full object-cover"
+                        muted
+                        playsInline
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
+                        <Play className="size-8 text-white fill-white drop-shadow-md" />
+                      </div>
+                    </>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={url}
+                      alt={`${post.title} - ${idx + 1}`}
+                      loading="lazy"
+                      className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Case 3: 3 or More Media Items (1 Big on Left, 2 Stacked on Right, +N Overlay on Bottom Right) */}
+          {mediaList.length >= 3 && (
+            <div className="grid grid-cols-2 gap-1.5 w-full overflow-hidden rounded-xl border border-border/60 bg-muted aspect-[4/3] sm:aspect-[16/10] max-h-[520px]">
+              {/* Left Column: Big tall photo/video (Item 0) */}
+              <div
+                onClick={() => setLightboxIndex(0)}
+                className="relative h-full w-full overflow-hidden cursor-pointer group bg-black/5"
               >
-                <ChevronLeft className="size-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setActiveMediaIdx((prev) =>
-                    prev === mediaList.length - 1 ? 0 : prev + 1
-                  )
-                }
-                aria-label="Ảnh hoặc video tiếp theo"
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 min-h-[40px] min-w-[40px] inline-flex items-center justify-center rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors cursor-pointer"
-              >
-                <ChevronRight className="size-4" />
-              </button>
-              <div className="absolute bottom-2.5 right-2.5 px-2.5 py-0.5 rounded-full bg-black/65 text-white text-xs font-semibold">
-                {activeMediaIdx + 1}/{mediaList.length}
+                {isVideoUrl(mediaList[0]) ? (
+                  <>
+                    <video
+                      src={mediaList[0]}
+                      className="w-full h-full object-cover"
+                      muted
+                      playsInline
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
+                      <Play className="size-10 text-white fill-white drop-shadow-md" />
+                    </div>
+                  </>
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={mediaList[0]}
+                    alt={`${post.title} - 1`}
+                    loading="lazy"
+                    className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                  />
+                )}
               </div>
-            </>
+
+              {/* Right Column: 2 Rows */}
+              <div className="grid grid-rows-2 gap-1.5 h-full w-full">
+                {/* Top-Right Item (Item 1) */}
+                <div
+                  onClick={() => setLightboxIndex(1)}
+                  className="relative h-full w-full overflow-hidden cursor-pointer group bg-black/5"
+                >
+                  {isVideoUrl(mediaList[1]) ? (
+                    <>
+                      <video
+                        src={mediaList[1]}
+                        className="w-full h-full object-cover"
+                        muted
+                        playsInline
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
+                        <Play className="size-7 text-white fill-white drop-shadow-md" />
+                      </div>
+                    </>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={mediaList[1]}
+                      alt={`${post.title} - 2`}
+                      loading="lazy"
+                      className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                    />
+                  )}
+                </div>
+
+                {/* Bottom-Right Item (Item 2) - Shows +N if more than 3 media items */}
+                <div
+                  onClick={() => setLightboxIndex(2)}
+                  className="relative h-full w-full overflow-hidden cursor-pointer group bg-black/5"
+                >
+                  {isVideoUrl(mediaList[2]) ? (
+                    <>
+                      <video
+                        src={mediaList[2]}
+                        className="w-full h-full object-cover"
+                        muted
+                        playsInline
+                      />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
+                        <Play className="size-7 text-white fill-white drop-shadow-md" />
+                      </div>
+                    </>
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={mediaList[2]}
+                      alt={`${post.title} - 3`}
+                      loading="lazy"
+                      className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+                    />
+                  )}
+
+                  {mediaList.length > 3 && (
+                    <div className="absolute inset-0 bg-black/60 hover:bg-black/65 transition-colors flex items-center justify-center backdrop-blur-[2px]">
+                      <span className="text-2xl sm:text-3xl font-extrabold text-white tracking-wider drop-shadow-md">
+                        +{mediaList.length - 3}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           )}
         </div>
       )}
@@ -382,12 +548,8 @@ export function PostCard({
 
           <button
             type="button"
-            onClick={() => setShowComments((prev) => !prev)}
-            className={`inline-flex items-center gap-1.5 min-h-[44px] px-2 rounded-xl transition-colors cursor-pointer ${
-              showComments
-                ? "text-primary font-bold"
-                : "hover:text-foreground hover:bg-muted/50 font-medium"
-            }`}
+            onClick={() => setIsDetailModalOpen(true)}
+            className="inline-flex items-center gap-1.5 min-h-[44px] px-2 rounded-xl transition-colors cursor-pointer hover:text-foreground hover:bg-muted/50 font-medium"
           >
             <MessageCircle className="size-4" />
             <span>{post.commentCount} Bình luận</span>
@@ -419,6 +581,16 @@ export function PostCard({
         />
       )}
 
+      {/* Facebook-style Post Detail & Comments Modal */}
+      {isDetailModalOpen && (
+        <PostDetailModal
+          open={isDetailModalOpen}
+          onClose={() => setIsDetailModalOpen(false)}
+          post={post}
+          onSelectTag={onSelectTag}
+        />
+      )}
+
       {/* Edit Post Modal */}
       {canEditPost && isEditModalOpen && (
         <EditPostModal
@@ -427,6 +599,174 @@ export function PostCard({
           onClose={() => setIsEditModalOpen(false)}
           post={post}
         />
+      )}
+      {/* Confirm Delete Post Modal */}
+      {isConfirmDeleteOpen && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="confirm-delete-title"
+          aria-describedby="confirm-delete-desc"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+          onClick={() => {
+            if (!deletePostMutation.isPending) {
+              setIsConfirmDeleteOpen(false);
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-border bg-card p-6 text-foreground shadow-2xl space-y-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-4">
+              <div className="size-11 rounded-2xl bg-destructive/15 text-destructive flex items-center justify-center shrink-0">
+                <Trash2 className="size-5" />
+              </div>
+              <div className="space-y-1.5 flex-1 min-w-0">
+                <h3
+                  id="confirm-delete-title"
+                  className="text-lg font-bold text-foreground"
+                >
+                  Xác nhận xóa bài viết?
+                </h3>
+                <p
+                  id="confirm-delete-desc"
+                  className="text-sm text-muted-foreground leading-relaxed"
+                >
+                  Bạn có chắc chắn muốn xóa bài viết{" "}
+                  <span className="font-semibold text-foreground">
+                    &ldquo;{post.title}&rdquo;
+                  </span>
+                  ? Toàn bộ hình ảnh, tương tác và bình luận liên quan sẽ bị xóa vĩnh viễn và không thể khôi phục.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={deletePostMutation.isPending}
+                onClick={() => setIsConfirmDeleteOpen(false)}
+                className="h-10 px-4 rounded-xl text-sm font-medium cursor-pointer"
+              >
+                Hủy
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={deletePostMutation.isPending}
+                onClick={async () => {
+                  try {
+                    await deletePostMutation.mutateAsync(post.id);
+                    setIsConfirmDeleteOpen(false);
+                  } catch {
+                    // Handled by react-query onError toast
+                  }
+                }}
+                className="h-10 px-5 rounded-xl text-sm font-semibold gap-2 cursor-pointer shadow-xs"
+              >
+                {deletePostMutation.isPending && (
+                  <Loader2 className="size-4 animate-spin" />
+                )}
+                <span>Xác nhận xóa</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fullscreen Lightbox Modal for Media Inspection */}
+      {lightboxIndex !== null && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Xem ảnh và video chi tiết"
+          className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col items-center justify-center p-4 sm:p-6"
+          onClick={() => setLightboxIndex(null)}
+        >
+          {/* Top Bar with Counter and Close Button */}
+          <div
+            className="absolute top-4 inset-x-4 sm:inset-x-6 flex items-center justify-between text-white z-10"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md text-xs sm:text-sm font-semibold tracking-wide">
+              {lightboxIndex + 1} / {mediaList.length}
+            </span>
+            <button
+              type="button"
+              onClick={() => setLightboxIndex(null)}
+              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 transition-colors text-white cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              aria-label="Đóng xem chi tiết"
+            >
+              <X className="size-5" />
+            </button>
+          </div>
+
+          {/* Media Content Display */}
+          <div
+            className="relative flex items-center justify-center max-w-5xl max-h-[82vh] w-full"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {isVideoUrl(mediaList[lightboxIndex]) ? (
+              <video
+                key={mediaList[lightboxIndex]}
+                src={mediaList[lightboxIndex]}
+                controls
+                autoPlay
+                playsInline
+                className="max-h-[80vh] max-w-full rounded-xl object-contain bg-black shadow-2xl"
+              />
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={mediaList[lightboxIndex]}
+                alt={`${post.title} - Chi tiết`}
+                className="max-h-[80vh] max-w-full rounded-xl object-contain shadow-2xl select-none"
+              />
+            )}
+
+            {/* Prev Button */}
+            {mediaList.length > 1 && (
+              <button
+                type="button"
+                onClick={() =>
+                  setLightboxIndex((prev) =>
+                    prev !== null
+                      ? prev > 0
+                        ? prev - 1
+                        : mediaList.length - 1
+                      : 0
+                  )
+                }
+                className="absolute left-2 sm:-left-14 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                aria-label="Ảnh trước"
+              >
+                <ChevronLeft className="size-6" />
+              </button>
+            )}
+
+            {/* Next Button */}
+            {mediaList.length > 1 && (
+              <button
+                type="button"
+                onClick={() =>
+                  setLightboxIndex((prev) =>
+                    prev !== null
+                      ? prev < mediaList.length - 1
+                        ? prev + 1
+                        : 0
+                      : 0
+                  )
+                }
+                className="absolute right-2 sm:-right-14 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                aria-label="Ảnh tiếp theo"
+              >
+                <ChevronRight className="size-6" />
+              </button>
+            )}
+          </div>
+        </div>
       )}
     </article>
   );

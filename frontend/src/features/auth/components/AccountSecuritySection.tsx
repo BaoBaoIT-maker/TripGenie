@@ -37,16 +37,15 @@ export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySec
     }
   };
 
-  const userInitials = React.useMemo(() => {
-    if (!user?.fullName) return 'TG';
-    return user.fullName
-      .split(' ')
-      .filter(Boolean)
-      .map((w) => w[0])
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
-  }, [user?.fullName]);
+  const userInitials = user?.fullName
+    ? user.fullName
+        .split(' ')
+        .filter(Boolean)
+        .map((w) => w[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase()
+    : 'TG';
 
   return (
     <div className="space-y-6">

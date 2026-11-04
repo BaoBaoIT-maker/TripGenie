@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import Image from 'next/image';
+
 import {
   Star,
   Sparkles,
@@ -697,31 +697,37 @@ export default function ItineraryTimeline({
                         </div>
 
                         {/* Action Buttons: [Đổi điểm] [Xóa] */}
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onSwapPlace?.(act.placeId, act);
-                            }}
-                            title="Đổi điểm tham quan hoặc quán ăn khác"
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white hover:bg-teal-50 hover:border-teal-500 hover:text-teal-700 px-2.5 py-1 text-[11px] font-bold text-slate-700 transition-all cursor-pointer shadow-2xs"
-                          >
-                            <Sparkles className="size-3 text-teal-600" aria-hidden="true" />
-                            <span>Đổi điểm</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDeletePlace?.(act.placeId);
-                            }}
-                            title="Xóa điểm này khỏi lịch trình"
-                            className="size-7 rounded-lg border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-300 hover:text-rose-600 text-slate-400 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-                          >
-                            <Trash2 className="size-3.5" aria-hidden="true" />
-                          </button>
-                        </div>
+                        {(Boolean(onSwapPlace) || Boolean(onDeletePlace)) && (
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {onSwapPlace && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onSwapPlace(act.placeId, act);
+                                }}
+                                title="Đổi điểm tham quan hoặc quán ăn khác"
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white hover:bg-teal-50 hover:border-teal-500 hover:text-teal-700 px-2.5 py-1 text-[11px] font-bold text-slate-700 transition-all cursor-pointer shadow-2xs"
+                              >
+                                <Sparkles className="size-3 text-teal-600" aria-hidden="true" />
+                                <span>Đổi điểm</span>
+                              </button>
+                            )}
+                            {onDeletePlace && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeletePlace(act.placeId);
+                                }}
+                                title="Xóa điểm này khỏi lịch trình"
+                                className="size-7 rounded-lg border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-300 hover:text-rose-600 text-slate-400 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
+                              >
+                                <Trash2 className="size-3.5" aria-hidden="true" />
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       {/* Dynamic Rating & Reviews & Hours */}
@@ -771,16 +777,18 @@ export default function ItineraryTimeline({
           )}
 
           {/* Add Stop Button for this Day */}
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={() => onAddPlace?.(day.dayNumber)}
-              className="w-full py-2.5 rounded-xl border border-dashed border-slate-300 hover:border-teal-500 hover:bg-teal-50/40 text-slate-600 hover:text-teal-700 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              <Plus className="size-4" />
-              <span>Thêm địa điểm vào Ngày {day.dayNumber}</span>
-            </button>
-          </div>
+          {onAddPlace && (
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => onAddPlace(day.dayNumber)}
+                className="w-full py-2.5 rounded-xl border border-dashed border-slate-300 hover:border-teal-500 hover:bg-teal-50/40 text-slate-600 hover:text-teal-700 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="size-4" />
+                <span>Thêm địa điểm vào Ngày {day.dayNumber}</span>
+              </button>
+            </div>
+          )}
         </div>
       );
     })}

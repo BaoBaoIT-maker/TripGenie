@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { TripCompanionsRepository } from './trip-companions.repository';
 import {
   CompanionsListResponseDto,
@@ -20,6 +20,10 @@ export class TripCompanionsService {
       throw new NotFoundException(
         'Không tìm thấy tài khoản người dùng nào với địa chỉ email này trên hệ thống.',
       );
+    }
+
+    if (user.id === inviterId) {
+      throw new BadRequestException('Bạn không thể tự gửi lời mời cho chính mình.');
     }
 
     return this.repository.createInvitation(itineraryId, inviterId, user.id);

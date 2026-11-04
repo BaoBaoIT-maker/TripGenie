@@ -7,6 +7,13 @@ export interface AvatarOption {
 export const DEFAULT_AVATAR = '/avatars/default-1.png';
 export const DEFAULT_FEMALE_AVATAR = '/avatars/default-2.png';
 
+export const AVATAR_PICKER_CONFIG = {
+  MAX_FILE_SIZE_BYTES: 10 * 1024 * 1024, // 10MB
+  MAX_DIMENSION: 400, // 400x400 standard circle avatar
+  IMAGE_QUALITY: 0.88,
+  ALLOWED_IMAGE_TYPES: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+} as const;
+
 export const PRESET_AVATARS: AvatarOption[] = [
   {
     id: 'default-male',

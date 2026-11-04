@@ -26,6 +26,7 @@ import { EmptyState } from "@/components/common/EmptyState";
 import { usePlannerQuery } from "@/features/planner/hooks/use-planner";
 import { PlannerDay, PlannerItem } from "@/types/planner";
 import { toast } from "sonner";
+import { useAuth } from "@/features/auth/hooks/use-auth";
 
 interface PlannerPreviewProps {
   plannerId: string;
@@ -35,6 +36,16 @@ export function PlannerPreview({ plannerId }: PlannerPreviewProps) {
   const router = useRouter();
   const { data: planner, isLoading, isError } = usePlannerQuery(plannerId);
   const [activeDayIndex, setActiveDayIndex] = useState(0);
+  const { user } = useAuth();
+  const canEdit =
+    !planner?.members ||
+    planner.members.length === 0 ||
+    planner.members.some(
+      (m) =>
+        ((!user && m.userId === "user-current") ||
+          (user && (m.userId === user.id || (user.email && m.email === user.email)))) &&
+        (m.role === "owner" || m.role === "editor")
+    );
 
   if (isLoading) {
     return (
@@ -108,16 +119,18 @@ export function PlannerPreview({ plannerId }: PlannerPreviewProps) {
           </Button>
 
           {/* Edit Trip Primary CTA */}
-          <Link
-            href={`/planner/${planner.id}/edit`}
-            className={cn(
-              buttonVariants({ size: "sm" }),
-              "h-9 px-4 rounded-xl font-bold gap-1.5 bg-primary text-primary-foreground shadow-xs"
-            )}
-          >
-            <Edit3 className="size-3.5" />
-            <span>Chỉnh sửa chuyến đi</span>
-          </Link>
+          {canEdit && (
+            <Link
+              href={`/planner/${planner.id}/edit`}
+              className={cn(
+                buttonVariants({ size: "sm" }),
+                "h-9 px-4 rounded-xl font-bold gap-1.5 bg-primary text-primary-foreground shadow-xs"
+              )}
+            >
+              <Edit3 className="size-3.5" />
+              <span>Chỉnh sửa chuyến đi</span>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -300,12 +313,14 @@ export function PlannerPreview({ plannerId }: PlannerPreviewProps) {
                 <p className="text-xs text-muted-foreground">
                   Chưa có điểm dừng nào trong ngày này.
                 </p>
+                {canEdit && (
                 <Link
                   href={`/planner/${planner.id}/edit`}
                   className={cn(buttonVariants({ size: "sm", variant: "outline" }), "text-xs font-bold rounded-xl")}
                 >
                   Chỉnh sửa để thêm điểm dừng
                 </Link>
+              )}
               </div>
             )}
           </div>
@@ -415,16 +430,18 @@ export function PlannerPreview({ plannerId }: PlannerPreviewProps) {
               </div>
             )}
 
-            <Link
-              href={`/planner/${planner.id}/edit`}
-              className={cn(
-                buttonVariants({ variant: "outline" }),
-                "w-full h-10 rounded-xl font-bold text-xs mt-2"
-              )}
-            >
-              <UserPlus className="size-3.5 mr-1.5" />
-              <span>Quản lý bạn đồng hành</span>
-            </Link>
+            {canEdit && (
+              <Link
+                href={`/planner/${planner.id}/edit`}
+                className={cn(
+                  buttonVariants({ variant: "outline" }),
+                  "w-full h-10 rounded-xl font-bold text-xs mt-2"
+                )}
+              >
+                <UserPlus className="size-3.5 mr-1.5" />
+                <span>Quản lý bạn đồng hành</span>
+              </Link>
+            )}
           </div>
         </div>
       </div>

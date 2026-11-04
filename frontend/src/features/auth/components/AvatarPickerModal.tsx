@@ -12,7 +12,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
-import { PRESET_AVATARS, DEFAULT_AVATAR } from '@/config/avatars';
+import { PRESET_AVATARS, DEFAULT_AVATAR, AVATAR_PICKER_CONFIG } from '@/config/avatars';
+import { communityService } from '@/services/community.service';
 import { useUpdateAvatar } from '../hooks/use-update-avatar';
 
 interface AvatarPickerModalProps {
@@ -22,15 +23,27 @@ interface AvatarPickerModalProps {
   userFullName?: string;
 }
 
-function processImageFile(file: File): Promise<string> {
+const noopSubscribe = () => () => {};
+
+/**
+ * Resizes and compresses an image to avatar dimensions and returns an optimized File + blob preview URL.
+ * Never converts to huge base64 strings to prevent DB and network bloat.
+ */
+function optimizeAvatarFile(
+  file: File,
+): Promise<{ optimizedFile: File; previewUrl: string }> {
   return new Promise((resolve, reject) => {
-    if (!file.type.startsWith('image/')) {
-      reject(new Error('Vui lòng chọn tệp hình ảnh (PNG, JPG, WebP)'));
+    if (!AVATAR_PICKER_CONFIG.ALLOWED_IMAGE_TYPES.some((type) => file.type === type)) {
+      reject(new Error('Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, WebP)'));
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      reject(new Error('Kích thước ảnh tối đa là 10MB'));
+    if (file.size > AVATAR_PICKER_CONFIG.MAX_FILE_SIZE_BYTES) {
+      reject(
+        new Error(
+          `Kích thước ảnh tối đa là ${AVATAR_PICKER_CONFIG.MAX_FILE_SIZE_BYTES / (1024 * 1024)}MB`,
+        ),
+      );
       return;
     }
 
@@ -39,7 +52,7 @@ function processImageFile(file: File): Promise<string> {
       const img = new window.Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const maxSize = 400; // 400x400 standard circle avatar
+        const maxSize = AVATAR_PICKER_CONFIG.MAX_DIMENSION;
         let width = img.width;
         let height = img.height;
 
@@ -59,13 +72,25 @@ function processImageFile(file: File): Promise<string> {
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          resolve(e.target?.result as string);
+          resolve({ optimizedFile: file, previewUrl: URL.createObjectURL(file) });
           return;
         }
 
         ctx.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.88);
-        resolve(dataUrl);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve({ optimizedFile: file, previewUrl: URL.createObjectURL(file) });
+              return;
+            }
+            const safeName = file.name.replace(/\.[^/.]+$/, '') + '.jpg';
+            const optimizedFile = new File([blob], safeName, { type: 'image/jpeg' });
+            const previewUrl = URL.createObjectURL(blob);
+            resolve({ optimizedFile, previewUrl });
+          },
+          'image/jpeg',
+          AVATAR_PICKER_CONFIG.IMAGE_QUALITY,
+        );
       };
       img.onerror = () => reject(new Error('Không thể xử lý hình ảnh này'));
       img.src = e.target?.result as string;
@@ -75,13 +100,12 @@ function processImageFile(file: File): Promise<string> {
   });
 }
 
-export function AvatarPickerModal({
+function AvatarPickerContent({
   open,
   onOpenChange,
   currentAvatarUrl,
   userFullName,
 }: AvatarPickerModalProps) {
-  const [mounted, setMounted] = React.useState(false);
   const initialUrl = currentAvatarUrl || DEFAULT_AVATAR;
   const [selectedUrl, setSelectedUrl] = React.useState<string>(initialUrl);
   const [customAvatarUrl, setCustomAvatarUrl] = React.useState<string | null>(() => {
@@ -90,28 +114,20 @@ export function AvatarPickerModal({
   });
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [isProcessingFile, setIsProcessingFile] = React.useState(false);
+  const [pendingUploadFile, setPendingUploadFile] = React.useState<File | null>(null);
 
+  const activeBlobUrlRef = React.useRef<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const updateAvatarMutation = useUpdateAvatar();
 
+  // Revoke object URLs on unmount to prevent browser memory leaks
   React.useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  React.useEffect(() => {
-    if (open) {
-      setSelectedUrl(currentAvatarUrl || DEFAULT_AVATAR);
-      const isPreset = PRESET_AVATARS.some((p) => p.url === currentAvatarUrl);
-      if (!isPreset && currentAvatarUrl) {
-        setCustomAvatarUrl(currentAvatarUrl);
+    return () => {
+      if (activeBlobUrlRef.current) {
+        URL.revokeObjectURL(activeBlobUrlRef.current);
       }
-      setErrorMessage(null);
-    }
-  }, [open, currentAvatarUrl]);
-
-  if (!mounted || !open) {
-    return null;
-  }
+    };
+  }, []);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -120,9 +136,15 @@ export function AvatarPickerModal({
     setErrorMessage(null);
     setIsProcessingFile(true);
     try {
-      const dataUrl = await processImageFile(file);
-      setCustomAvatarUrl(dataUrl);
-      setSelectedUrl(dataUrl);
+      const { optimizedFile, previewUrl } = await optimizeAvatarFile(file);
+      if (activeBlobUrlRef.current) {
+        URL.revokeObjectURL(activeBlobUrlRef.current);
+      }
+      activeBlobUrlRef.current = previewUrl;
+
+      setPendingUploadFile(optimizedFile);
+      setCustomAvatarUrl(previewUrl);
+      setSelectedUrl(previewUrl);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Lỗi khi tải ảnh lên';
       setErrorMessage(msg);
@@ -135,14 +157,26 @@ export function AvatarPickerModal({
   };
 
   const handleSave = async () => {
-    if (selectedUrl === currentAvatarUrl) {
+    if (selectedUrl === currentAvatarUrl && !pendingUploadFile) {
       onOpenChange(false);
       return;
     }
 
     setErrorMessage(null);
     try {
-      await updateAvatarMutation.mutateAsync(selectedUrl);
+      let finalAvatarUrl = selectedUrl;
+
+      // If user selected a custom file, upload it through the media storage provider first
+      if (pendingUploadFile && selectedUrl === customAvatarUrl) {
+        const uploadResult = await communityService.uploadMedia([pendingUploadFile]);
+        const uploadedUrl = uploadResult.mediaUrls?.[0];
+        if (!uploadedUrl) {
+          throw new Error('Không thể tải ảnh lên máy chủ. Vui lòng thử lại.');
+        }
+        finalAvatarUrl = uploadedUrl;
+      }
+
+      await updateAvatarMutation.mutateAsync(finalAvatarUrl);
       onOpenChange(false);
     } catch (err: unknown) {
       const message =
@@ -215,6 +249,7 @@ export function AvatarPickerModal({
                   alt="Ảnh tải lên"
                   fill
                   sizes="64px"
+                  unoptimized={customAvatarUrl.startsWith('blob:')}
                   className="object-cover"
                 />
                 <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -242,7 +277,10 @@ export function AvatarPickerModal({
               <button
                 key={opt.id}
                 type="button"
-                onClick={() => setSelectedUrl(opt.url)}
+                onClick={() => {
+                  setSelectedUrl(opt.url);
+                  setPendingUploadFile(null);
+                }}
                 className={`relative size-16 rounded-full overflow-hidden transition-all cursor-pointer group ${
                   isSelected
                     ? 'ring-3 ring-primary ring-offset-2 scale-105 shadow-md'
@@ -282,7 +320,7 @@ export function AvatarPickerModal({
             size="sm"
             onClick={() => onOpenChange(false)}
             disabled={updateAvatarMutation.isPending || isProcessingFile}
-            className="rounded-xl text-xs h-9 px-4"
+            className="rounded-xl text-xs h-9 px-4 cursor-pointer"
           >
             Hủy
           </Button>
@@ -291,7 +329,7 @@ export function AvatarPickerModal({
             size="sm"
             onClick={handleSave}
             disabled={updateAvatarMutation.isPending || isProcessingFile}
-            className="rounded-xl text-xs h-9 px-5 gap-1.5"
+            className="rounded-xl text-xs h-9 px-5 gap-1.5 cursor-pointer"
           >
             {updateAvatarMutation.isPending ? (
               <>
@@ -306,4 +344,14 @@ export function AvatarPickerModal({
       </DialogContent>
     </Dialog>
   );
+}
+
+export function AvatarPickerModal(props: AvatarPickerModalProps) {
+  const isClient = React.useSyncExternalStore(noopSubscribe, () => true, () => false);
+
+  if (!isClient || !props.open) {
+    return null;
+  }
+
+  return <AvatarPickerContent {...props} />;
 }

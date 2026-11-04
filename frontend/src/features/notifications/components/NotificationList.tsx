@@ -3,6 +3,7 @@
 import React, { useMemo } from "react";
 import Link from "next/link";
 import { Heart, MessageSquare, Reply, AlertCircle, Loader2, UserPlus, Check, X } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { NotificationFilter, NotificationItem } from "@/types/notification";
 import { formatRelativeTime } from "@/services/community.service";
 import { NOTIFICATION_CONFIG } from "../config/notification.config";
@@ -71,7 +72,7 @@ function NotificationRow({
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
             đã thích bài viết:{" "}
             <span className="font-medium text-foreground line-clamp-1 italic">
-              "{postTitle}"
+              &ldquo;{postTitle}&rdquo;
             </span>
           </>
         );
@@ -81,7 +82,7 @@ function NotificationRow({
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
             đã bình luận về bài viết:{" "}
             <span className="font-medium text-foreground line-clamp-1 italic">
-              "{postTitle}"
+              &ldquo;{postTitle}&rdquo;
             </span>
           </>
         );
@@ -91,7 +92,7 @@ function NotificationRow({
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
             đã trả lời bình luận của bạn trong:{" "}
             <span className="font-medium text-foreground line-clamp-1 italic">
-              "{postTitle}"
+              &ldquo;{postTitle}&rdquo;
             </span>
           </>
         );
@@ -101,7 +102,7 @@ function NotificationRow({
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
             đã mời bạn cùng tham gia chuyến đi:{" "}
             <span className="font-medium text-foreground line-clamp-1 italic">
-              "{tripTitle}"
+              &ldquo;{tripTitle}&rdquo;
             </span>
           </>
         );
@@ -111,7 +112,7 @@ function NotificationRow({
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
             đã đồng ý tham gia chuyến đi:{" "}
             <span className="font-medium text-foreground line-clamp-1 italic">
-              "{tripTitle}"
+              &ldquo;{tripTitle}&rdquo;
             </span>
           </>
         );
@@ -121,7 +122,7 @@ function NotificationRow({
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
             đã từ chối lời mời tham gia chuyến đi:{" "}
             <span className="font-medium text-foreground line-clamp-1 italic">
-              "{tripTitle}"
+              &ldquo;{tripTitle}&rdquo;
             </span>
           </>
         );
@@ -189,17 +190,16 @@ function NotificationRow({
       }`}
     >
       <div className="relative shrink-0">
-        {item.actor?.avatarUrl ? (
-          <img
-            src={item.actor.avatarUrl}
+        <Avatar className="size-11 ring-1 ring-border">
+          <AvatarImage
+            src={item.actor?.avatarUrl || undefined}
             alt={actorName}
-            className="size-11 rounded-full object-cover ring-1 ring-border"
+            className="object-cover"
           />
-        ) : (
-          <div className="size-11 rounded-full bg-primary/10 text-primary font-bold flex items-center justify-center ring-1 ring-border text-sm">
+          <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
             {actorName.charAt(0).toUpperCase()}
-          </div>
-        )}
+          </AvatarFallback>
+        </Avatar>
         {renderBadgeIcon()}
       </div>
 

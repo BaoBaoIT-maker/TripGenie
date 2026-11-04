@@ -35,9 +35,13 @@ export function useAuth() {
       if (event.key === AUTH_SYNC_KEY) {
         if (event.newValue?.startsWith('logout')) {
           queryClient.setQueryData(AUTH_QUERY_KEY, null);
+          queryClient.removeQueries({ queryKey: ['itineraries'] });
+          queryClient.removeQueries({ queryKey: ['community'] });
           queryClient.invalidateQueries();
           router.push('/login');
         } else if (event.newValue?.startsWith('login')) {
+          queryClient.removeQueries({ queryKey: ['itineraries'] });
+          queryClient.removeQueries({ queryKey: ['community'] });
           queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEY });
         }
       }
@@ -62,6 +66,8 @@ export function useAuth() {
     mutationFn: authService.login,
     onSuccess: (data) => {
       queryClient.setQueryData(AUTH_QUERY_KEY, data.user);
+      queryClient.removeQueries({ queryKey: ['itineraries'] });
+      queryClient.removeQueries({ queryKey: ['community'] });
       broadcastAuthEvent('login');
     },
   });
@@ -100,6 +106,8 @@ export function useAuth() {
       queryClient.setQueryData(AUTH_QUERY_KEY, null);
       queryClient.removeQueries({ queryKey: ['planners'] });
       queryClient.removeQueries({ queryKey: ['saved-places'] });
+      queryClient.removeQueries({ queryKey: ['itineraries'] });
+      queryClient.removeQueries({ queryKey: ['community'] });
       broadcastAuthEvent('logout');
       router.push('/login');
     },

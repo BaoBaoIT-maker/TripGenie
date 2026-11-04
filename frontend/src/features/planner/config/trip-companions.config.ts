@@ -6,4 +6,8 @@ export const TRIP_COMPANIONS_CONFIG = {
     EDITOR: 'Chỉnh sửa',
     VIEWER: 'Chỉ xem',
   },
+  CONFIRMATIONS: {
+    REMOVE_MEMBER: (name: string) => `Bạn có chắc chắn muốn xóa "${name}" khỏi chuyến đi?`,
+    LEAVE_TRIP: 'Bạn có chắc chắn muốn rời khỏi chuyến đi này không?',
+  },
 } as const;

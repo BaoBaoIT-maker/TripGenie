@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect, useSyncExternalStore } from 'react';
+import { useRouter } from 'next/navigation';
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import {
@@ -19,6 +20,12 @@ import {
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu';
 import {
   useTripCompanions,
   useUpdateMemberRole,
@@ -44,67 +51,12 @@ interface CompanionRoleSelectProps {
 }
 
 function CompanionRoleSelect({ value, onChange, disabled }: CompanionRoleSelectProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const updatePosition = () => {
-    if (!triggerRef.current) return;
-    const rect = triggerRef.current.getBoundingClientRect();
-    const menuWidth = 160;
-    const menuHeight = 90;
-
-    const fitsBelow = rect.bottom + menuHeight + 8 <= window.innerHeight;
-    const top = fitsBelow ? rect.bottom + 6 : Math.max(16, rect.top - menuHeight - 6);
-    const left = Math.max(16, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 16));
-
-    setCoords({ top, left });
-  };
-
-  useEffect(() => {
-    if (!isOpen) return;
-    updatePosition();
-
-    const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (
-        triggerRef.current && !triggerRef.current.contains(target) &&
-        menuRef.current && !menuRef.current.contains(target)
-      ) {
-        setIsOpen(false);
-      }
-    };
-
-    const handleScrollOrResize = () => {
-      setIsOpen(false);
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    window.addEventListener('scroll', handleScrollOrResize, true);
-    window.addEventListener('resize', handleScrollOrResize);
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      window.removeEventListener('scroll', handleScrollOrResize, true);
-      window.removeEventListener('resize', handleScrollOrResize);
-    };
-  }, [isOpen]);
-
   const isEditor = value === 'EDITOR';
 
   return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
+    <DropdownMenu>
+      <DropdownMenuTrigger
         disabled={disabled}
-        onClick={() => setIsOpen((prev) => !prev)}
         className={cn(
           "h-8 px-2.5 rounded-xl border text-xs font-semibold inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs select-none",
           isEditor
@@ -126,71 +78,47 @@ function CompanionRoleSelect({ value, onChange, disabled }: CompanionRoleSelectP
             <span>Chỉ xem</span>
           </>
         )}
-        <ChevronDown
-          className={cn(
-            "size-3 text-muted-foreground/80 transition-transform duration-150",
-            isOpen && "rotate-180"
-          )}
-        />
-      </button>
+        <ChevronDown className="size-3 text-muted-foreground/80" />
+      </DropdownMenuTrigger>
 
-      {isOpen && mounted && coords && createPortal(
-        <div
-          ref={menuRef}
-          style={{
-            position: 'fixed',
-            top: `${coords.top}px`,
-            left: `${coords.left}px`,
+      <DropdownMenuContent align="end" className="w-36">
+        <DropdownMenuItem
+          onClick={() => {
+            if (value !== 'VIEWER') onChange('VIEWER');
           }}
-          className="w-40 rounded-xl border border-border/80 bg-popover p-1 shadow-xl ring-1 ring-black/10 z-[9999] animate-in fade-in-0 zoom-in-95 duration-150 space-y-0.5"
+          className={cn(
+            "flex items-center justify-between gap-2 cursor-pointer text-xs font-semibold",
+            !isEditor && "bg-muted text-foreground"
+          )}
         >
-          {/* Option: VIEWER */}
-          <button
-            type="button"
-            onClick={() => {
-              if (value !== 'VIEWER') onChange('VIEWER');
-              setIsOpen(false);
-            }}
-            className={cn(
-              "w-full text-left px-2.5 py-1.5 rounded-lg transition-all flex items-center justify-between gap-2 cursor-pointer text-xs font-semibold",
-              !isEditor
-                ? "bg-muted text-foreground"
-                : "hover:bg-muted/60 text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <div className="flex items-center gap-2">
-              <Eye className="size-3.5 text-muted-foreground" />
-              <span>Chỉ xem</span>
-            </div>
-            {!isEditor && <Check className="size-3.5 text-primary" />}
-          </button>
+          <div className="flex items-center gap-2">
+            <Eye className="size-3.5 text-muted-foreground" />
+            <span>Chỉ xem</span>
+          </div>
+          {!isEditor && <Check className="size-3.5 text-primary" />}
+        </DropdownMenuItem>
 
-          {/* Option: EDITOR */}
-          <button
-            type="button"
-            onClick={() => {
-              if (value !== 'EDITOR') onChange('EDITOR');
-              setIsOpen(false);
-            }}
-            className={cn(
-              "w-full text-left px-2.5 py-1.5 rounded-lg transition-all flex items-center justify-between gap-2 cursor-pointer text-xs font-semibold",
-              isEditor
-                ? "bg-blue-50 text-blue-900 dark:bg-blue-950/50 dark:text-blue-200"
-                : "hover:bg-muted/60 text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <div className="flex items-center gap-2">
-              <Edit3 className="size-3.5 text-blue-600 dark:text-blue-400" />
-              <span>Chỉnh sửa</span>
-            </div>
-            {isEditor && <Check className="size-3.5 text-blue-600 dark:text-blue-400" />}
-          </button>
-        </div>,
-        document.body
-      )}
-    </>
+        <DropdownMenuItem
+          onClick={() => {
+            if (value !== 'EDITOR') onChange('EDITOR');
+          }}
+          className={cn(
+            "flex items-center justify-between gap-2 cursor-pointer text-xs font-semibold",
+            isEditor && "bg-blue-50 text-blue-900 dark:bg-blue-950/50 dark:text-blue-200"
+          )}
+        >
+          <div className="flex items-center gap-2">
+            <Edit3 className="size-3.5 text-blue-600 dark:text-blue-400" />
+            <span>Chỉnh sửa</span>
+          </div>
+          {isEditor && <Check className="size-3.5 text-blue-600 dark:text-blue-400" />}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
+
+const noopSubscribe = () => () => {};
 
 export function TripCompanionsPanel({
   open,
@@ -199,12 +127,9 @@ export function TripCompanionsPanel({
   canManageMembers,
   currentUserId,
 }: TripCompanionsPanelProps) {
+  const router = useRouter();
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const isClient = useSyncExternalStore(noopSubscribe, () => true, () => false);
 
   useEffect(() => {
     if (open) {
@@ -223,7 +148,7 @@ export function TripCompanionsPanel({
   const leaveTripMutation = useLeaveTrip(itineraryId);
   const revokeInvitationMutation = useRevokeInvitation(itineraryId);
 
-  if (!open || !mounted) return null;
+  if (!open || !isClient) return null;
 
   const members = data?.members || [];
   const pendingInvitations = data?.pendingInvitations || [];
@@ -233,17 +158,17 @@ export function TripCompanionsPanel({
   };
 
   const handleRemoveMember = (userId: string, name: string) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa "${name}" khỏi chuyến đi?`)) {
+    if (window.confirm(TRIP_COMPANIONS_CONFIG.CONFIRMATIONS.REMOVE_MEMBER(name))) {
       removeMemberMutation.mutate(userId);
     }
   };
 
   const handleLeaveTrip = () => {
-    if (window.confirm('Bạn có chắc chắn muốn rời khỏi chuyến đi này không?')) {
+    if (window.confirm(TRIP_COMPANIONS_CONFIG.CONFIRMATIONS.LEAVE_TRIP)) {
       leaveTripMutation.mutate(undefined, {
         onSuccess: () => {
           onClose();
-          window.location.href = '/planner';
+          router.push('/planner');
         },
       });
     }
@@ -256,7 +181,7 @@ export function TripCompanionsPanel({
   return (
     <>
       {createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200">
         <div
           role="dialog"
           aria-modal="true"

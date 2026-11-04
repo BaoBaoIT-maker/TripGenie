@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException } from '@nestjs/common';
+import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { TripCompanionsService } from './trip-companions.service';
 import { TripCompanionsRepository } from './trip-companions.repository';
 
@@ -49,6 +49,17 @@ describe('TripCompanionsService', () => {
       await expect(
         service.inviteCompanion('itin-1', 'owner-1', 'nonexistent@example.com'),
       ).rejects.toThrow(NotFoundException);
+    });
+
+    it('throws BadRequestException if inviter invites self', async () => {
+      mockRepo.findUserByEmail.mockResolvedValue({
+        id: 'owner-1',
+        email: 'owner@example.com',
+      });
+
+      await expect(
+        service.inviteCompanion('itin-1', 'owner-1', 'owner@example.com'),
+      ).rejects.toThrow(BadRequestException);
     });
 
     it('creates invitation when user email exists', async () => {

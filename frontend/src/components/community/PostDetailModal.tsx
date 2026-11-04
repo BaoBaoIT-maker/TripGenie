@@ -608,7 +608,7 @@ export function PostDetailModal({
                 </h5>
               </div>
               <Link
-                href={`/planner/${post.itinerary.id}`}
+                href={`/itineraries/${post.itinerary.id}`}
                 className="inline-flex items-center justify-center h-9 px-4 rounded-xl text-xs font-semibold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors cursor-pointer shrink-0"
               >
                 Xem chi tiết lịch trình

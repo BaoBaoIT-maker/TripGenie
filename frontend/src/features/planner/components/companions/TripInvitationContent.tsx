@@ -121,7 +121,7 @@ export function TripInvitationContent({ invitationId }: TripInvitationContentPro
               Bạn đã tham gia chuyến đi!
             </h1>
             <p className="text-xs text-muted-foreground">
-              Bạn hiện là thành viên đồng hành của chuyến đi <strong>"{itinerary.title}"</strong>.
+              Bạn hiện là thành viên đồng hành của chuyến đi <strong>&ldquo;{itinerary.title}&rdquo;</strong>.
             </p>
           </div>
           <Link href={`/itineraries/${itinerary.id}`}>

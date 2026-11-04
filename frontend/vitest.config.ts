@@ -1,8 +1,5 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
-import { createRequire } from "module";
-
-const require = createRequire(import.meta.url);
 
 export default defineConfig({
   test: {
@@ -20,16 +17,22 @@ export default defineConfig({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    dedupe: ["@tanstack/react-query", "sonner", "react", "react-dom"],
   },
   plugins: [
     {
       name: "resolve-frontend-node-modules",
-      resolveId(id) {
-        if (!id.startsWith(".") && !id.startsWith("/") && !id.startsWith("@/") && !path.isAbsolute(id)) {
-          try {
-            return require.resolve(id, { paths: [path.resolve(__dirname, "node_modules")] });
-          } catch {
-            return null;
+      async resolveId(id, importer) {
+        if (
+          !id.startsWith(".") &&
+          !id.startsWith("/") &&
+          !id.startsWith("@/") &&
+          !path.isAbsolute(id)
+        ) {
+          if (importer && !importer.startsWith(path.resolve(__dirname))) {
+            return this.resolve(id, path.resolve(__dirname, "package.json"), {
+              skipSelf: true,
+            });
           }
         }
         return null;

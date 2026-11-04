@@ -56,7 +56,7 @@ export class CommunityRepository implements ICommunityRepository {
     const rows = await this.prisma.$queryRaw<{ tag: string }[]>(Prisma.sql`
       SELECT DISTINCT unnest(tags) AS tag
       FROM community_posts
-      WHERE "deletedAt" IS NULL
+      WHERE deleted_at IS NULL
         AND EXISTS (
           SELECT 1
           FROM unnest(tags) t

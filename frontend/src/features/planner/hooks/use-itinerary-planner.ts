@@ -44,7 +44,8 @@ export function useItineraryQuery(id: string) {
     queryKey: itineraryKeys.detail(id),
     queryFn: () => itineraryService.getItinerary(id),
     enabled: Boolean(id),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
+    refetchOnMount: 'always',
     retry: (_, err) => {
       if (err instanceof ApiError && [401, 403, 404].includes(err.status)) return false;
       return true;

@@ -115,7 +115,7 @@ export class PlacesRepository implements IPlaceRepository {
           conditions.push(predicate);
         } else {
           const tagIdx = paramIdx++;
-          conditions.push(`($${tagIdx} = ANY(p.tags) OR p.description ILIKE '%' || $${tagIdx} || '%')`);
+          conditions.push(`(p.tags @> ARRAY[$${tagIdx}]::text[] OR p.description ILIKE '%' || $${tagIdx} || '%')`);
           args.push(slug);
         }
       }
@@ -136,19 +136,22 @@ export class PlacesRepository implements IPlaceRepository {
 
     // Filter by Keyword (name, normalized unaccented name, address, description, tags)
     if (keyword && keyword.trim() !== '') {
-      const rawTrimmed = keyword.trim().replace(/[\\%_]/g, '\\$&');
+      const trimmed = keyword.trim();
+      const rawTrimmed = trimmed.replace(/[\\%_]/g, '\\$&');
       const kw = `%${rawTrimmed}%`;
       const normKw = `%${rawTrimmed
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
         .replace(/đ/gi, 'd')
         .toLowerCase()}%`;
+      const tagRaw = trimmed.toLowerCase();
       const kwIdx = paramIdx++;
       const normIdx = paramIdx++;
+      const tagIdx = paramIdx++;
       conditions.push(
-        `(p.name ILIKE $${kwIdx} OR p.name_normalized ILIKE $${normIdx} OR p.address ILIKE $${kwIdx} OR p.description ILIKE $${kwIdx} OR array_to_string(p.tags, ' ') ILIKE $${kwIdx})`,
+        `(p.name ILIKE $${kwIdx} OR p.name_normalized ILIKE $${normIdx} OR p.address ILIKE $${kwIdx} OR p.description ILIKE $${kwIdx} OR p.tags @> ARRAY[$${tagIdx}]::text[])`,
       );
-      args.push(kw, normIdx ? normKw : kw);
+      args.push(kw, normKw, tagRaw);
     }
 
     // Filter by Spatial Bounding Radius (PostGIS ST_DWithin)

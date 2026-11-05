@@ -46,8 +46,8 @@ const VALID_CATEGORY_IDS = new Set(
 export function parseExploreQuery(params: URLSearchParams): ExploreQuery {
   const query: ExploreQuery = {};
 
-  // 1. Keyword
-  const rawKeyword = params.get("keyword")?.trim();
+  // 1. Keyword (supports ?keyword= or ?q=)
+  const rawKeyword = (params.get("keyword") || params.get("q"))?.trim();
   if (rawKeyword) {
     query.keyword = rawKeyword;
   }

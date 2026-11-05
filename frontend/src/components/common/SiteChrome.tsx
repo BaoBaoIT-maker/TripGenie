@@ -23,12 +23,24 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
   const isAuthPage =
     AUTH_EXACT_ROUTES.has(pathname) || pathname.startsWith(AUTH_PREFIX);
   const isItineraryCopilotPage = ITINERARY_DETAIL_PATTERN.test(pathname);
+  const isLandingPage = pathname === '/';
 
   if (isAuthPage) {
     return (
       <main className="flex-1 w-full flex flex-col min-h-screen">
         {children}
       </main>
+    );
+  }
+
+  if (isLandingPage) {
+    return (
+      <>
+        <main className="flex-1 w-full">{children}</main>
+        <div className="print:hidden">
+          <AdvisorWidget />
+        </div>
+      </>
     );
   }
 

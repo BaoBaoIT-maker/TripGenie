@@ -52,7 +52,8 @@ export class CrawlerRepository implements ICrawlerRepository {
     return this.prisma.$queryRaw`
       SELECT id, name, name_normalized, category_id, area_id
       FROM places
-      WHERE ST_DWithin(
+      WHERE deleted_at IS NULL
+      AND ST_DWithin(
         location,
         ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326),
         ${radiusMeters}

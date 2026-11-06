@@ -1284,11 +1284,13 @@ export default function VietMap({
 
     map.resize();
 
+    const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
+
     // Fly camera smoothly to the selected place
     if (routeStops.length < 2) {
       map.flyTo({
         center: [targetPlace.longitude, targetPlace.latitude],
-        zoom: 16,
+        zoom: isMobile ? Math.max(map.getZoom(), 14.5) : 16,
         duration: 500,
         essential: true,
       });
@@ -1300,6 +1302,13 @@ export default function VietMap({
       popupRef.current = null;
       currentPopupPlaceIdRef.current = null;
       isProgrammaticPopupCloseRef.current = false;
+    }
+
+    // On mobile (< 1024px), the bottom carousel card acts as the interactive preview.
+    // Suppress the heavy DOM popup balloon to keep the map clean and prevent UI collisions.
+    if (isMobile) {
+      currentPopupPlaceIdRef.current = targetPlace.id;
+      return;
     }
 
     const isSaved = isAuthenticated ? (savedIdsSet?.has(targetPlace.id) ?? false) : false;

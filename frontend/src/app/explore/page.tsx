@@ -109,9 +109,9 @@ function ExploreSearchBar({ keyword, onSearch, onClear }: ExploreSearchBarProps)
           }
         }}
         placeholder="Tìm điểm đến, món ngon, quán cafe..."
-        className="h-11 pl-10 pr-20 text-sm rounded-xl bg-slate-50 border-slate-200/80 focus:bg-white focus:border-[#0194F3] font-medium"
+        className="h-11 pl-9 pr-12 sm:pl-10 sm:pr-20 text-sm rounded-xl bg-slate-50 border-slate-200/80 focus:bg-white focus:border-[#0194F3] font-medium"
       />
-      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+      <div className="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
         {inputValue && (
           <button
             type="button"
@@ -128,10 +128,12 @@ function ExploreSearchBar({ keyword, onSearch, onClear }: ExploreSearchBarProps)
         <button
           type="button"
           onClick={() => handleExecute(inputValue)}
-          className="px-2.5 py-1 rounded-lg bg-[#0194F3] hover:bg-sky-600 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer"
+          className="size-8 sm:size-auto sm:px-2.5 sm:py-1 rounded-lg bg-[#0194F3] hover:bg-sky-600 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center justify-center gap-1"
           title="Thực hiện tìm kiếm"
+          aria-label="Thực hiện tìm kiếm"
         >
-          Tìm
+          <Search className="size-3.5 sm:hidden" />
+          <span className="hidden sm:inline">Tìm</span>
         </button>
       </div>
 
@@ -179,6 +181,7 @@ interface MobileMapCarouselProps {
   selectedPlaceId: string | null;
   onSelectPlace: (place: Place) => void;
   onNavigateDetail: (place: Place) => void;
+  onRequestDirections?: (place: Place) => void;
 }
 
 function MobileMapCarousel({
@@ -186,6 +189,7 @@ function MobileMapCarousel({
   selectedPlaceId,
   onSelectPlace,
   onNavigateDetail,
+  onRequestDirections,
 }: MobileMapCarouselProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isProgrammaticScrollRef = useRef(false);
@@ -303,15 +307,31 @@ function MobileMapCarousel({
                   <MapPin className="size-3 shrink-0 text-slate-400" />
                   <span className="truncate">{place.address || place.city || "Việt Nam"}</span>
                 </p>
-                <span
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onNavigateDetail(place);
-                  }}
-                  className="text-[10px] font-bold text-[#0194F3] hover:underline shrink-0"
-                >
-                  Chi tiết &rarr;
-                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {onRequestDirections && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onRequestDirections(place);
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 hover:bg-sky-100 text-[#0194F3] text-[10px] font-bold border border-sky-200 transition-colors cursor-pointer"
+                      title="Chỉ đường đến địa điểm này"
+                    >
+                      <Navigation className="size-2.5" />
+                      <span>Chỉ đường</span>
+                    </button>
+                  )}
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onNavigateDetail(place);
+                    }}
+                    className="text-[10px] font-bold text-slate-600 hover:text-[#0194F3] hover:underline"
+                  >
+                    Chi tiết &rarr;
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -978,7 +998,7 @@ function ExploreContent() {
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
           {/* Keyword Input with Autocomplete Popover (Isolated Component to prevent page-level lag) */}
           <ExploreSearchBar
             keyword={keyword}
@@ -987,7 +1007,7 @@ function ExploreContent() {
           />
 
           {/* Province / City Select Dropdown */}
-          <div className="w-full sm:w-56 shrink-0">
+          <div className="w-auto max-w-[125px] sm:max-w-none sm:w-56 shrink-0">
             <Select
               value={selectedAreaId === "all" ? "all" : String(selectedAreaId)}
               onValueChange={(val) => {
@@ -996,13 +1016,15 @@ function ExploreContent() {
                 setPage(1);
               }}
             >
-              <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200/80 text-xs sm:text-sm font-semibold text-slate-800">
-                <div className="flex items-center gap-2 truncate">
-                  <MapPin className="size-4 text-[#0194F3] shrink-0" />
+              <SelectTrigger className="h-11 px-2.5 sm:px-3 rounded-xl bg-slate-50 border-slate-200/80 text-xs sm:text-sm font-semibold text-slate-800">
+                <div className="flex items-center gap-1.5 sm:gap-2 truncate">
+                  <MapPin className="size-3.5 sm:size-4 text-[#0194F3] shrink-0" />
                   <SelectValue placeholder="Chọn Tỉnh / Thành">
                     {selectedAreaId === "all"
-                      ? "Toàn quốc (Tất cả)"
-                      : selectedProvinceName || "Chọn Tỉnh / Thành"}
+                      ? "Toàn quốc"
+                      : (selectedProvinceName
+                          ? selectedProvinceName.replace(/^(Thành phố|Tỉnh)\s+/i, "")
+                          : "Tỉnh/Thành")}
                   </SelectValue>
                 </div>
               </SelectTrigger>
@@ -1022,7 +1044,7 @@ function ExploreContent() {
             type="button"
             onClick={handleToggleGps}
             className={cn(
-              "h-11 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all shrink-0 cursor-pointer",
+              "h-11 px-2.5 sm:px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 sm:gap-2 border transition-all shrink-0 cursor-pointer",
               useGpsSearch
                 ? "bg-[#0194F3] text-white border-[#0194F3] shadow-xs"
                 : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80"
@@ -1369,6 +1391,14 @@ function ExploreContent() {
                 selectedPlaceId={selectedPlaceId}
                 onSelectPlace={(p) => setSelectedPlaceId(p.id)}
                 onNavigateDetail={(p) => router.push(`/places/${p.slug}`)}
+                onRequestDirections={(p) => {
+                  setSelectedPlaceId(p.id);
+                  setRouteToPinRequest({
+                    latitude: p.latitude,
+                    longitude: p.longitude,
+                    name: p.name,
+                  });
+                }}
               />
             </div>
           )}

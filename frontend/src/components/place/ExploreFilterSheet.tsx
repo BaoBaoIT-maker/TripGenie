@@ -80,21 +80,21 @@ export function ExploreFilterSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-md p-0 flex flex-col justify-between bg-white text-slate-900 border-l border-slate-200"
+        className="w-full sm:max-w-md p-0 flex flex-col justify-between bg-card text-foreground border-l border-border font-sans"
       >
         {/* Header */}
-        <SheetHeader className="p-5 border-b border-slate-100 text-left">
+        <SheetHeader className="p-5 border-b border-border/80 text-left">
           <div className="flex items-center justify-between pr-6">
             <div>
-              <SheetTitle className="text-lg font-black tracking-tight text-slate-900">
+              <SheetTitle className="text-xl font-heading font-serif font-bold text-foreground">
                 Bộ lọc nâng cao
               </SheetTitle>
-              <SheetDescription className="text-xs text-slate-500 mt-0.5">
+              <SheetDescription className="text-xs text-muted-foreground mt-0.5">
                 Tinh chỉnh tìm kiếm địa điểm theo nhu cầu của bạn
               </SheetDescription>
             </div>
             {activeFilterCount > 0 && (
-              <span className="px-2.5 py-1 rounded-full bg-sky-50 text-[#0194F3] text-xs font-bold border border-sky-200">
+              <span className="px-2.5 py-1 rounded-full bg-secondary text-primary text-xs font-semibold border border-primary/20">
                 {activeFilterCount} đang bật
               </span>
             )}
@@ -105,7 +105,7 @@ export function ExploreFilterSheet({
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
           {/* Section 1: Rating */}
           <div className="space-y-2.5">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <Star className="size-4 text-amber-500 fill-amber-500" />
               <span>Đánh giá tối thiểu</span>
             </div>
@@ -118,10 +118,10 @@ export function ExploreFilterSheet({
                     type="button"
                     onClick={() => onMinRatingChange(opt.val)}
                     className={cn(
-                      "py-2 px-2.5 rounded-xl text-xs font-bold transition-all text-center cursor-pointer border",
+                      "py-2 px-2.5 rounded-xl text-xs font-semibold transition-all text-center cursor-pointer border",
                       isSelected
-                        ? "bg-[#0194F3] text-white border-[#0194F3] shadow-xs"
-                        : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                        ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                        : "bg-secondary/60 border-border text-foreground hover:bg-secondary"
                     )}
                   >
                     {opt.label}
@@ -132,8 +132,8 @@ export function ExploreFilterSheet({
           </div>
 
           {/* Section 2: Budget */}
-          <div className="space-y-2.5 pt-4 border-t border-slate-100">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">
+          <div className="space-y-2.5 pt-4 border-t border-border/80">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
               <DollarSign className="size-4 text-emerald-600" />
               <span>Khoảng chi phí</span>
             </div>
@@ -149,12 +149,14 @@ export function ExploreFilterSheet({
                     className={cn(
                       "p-3 rounded-xl text-left transition-all cursor-pointer border flex flex-col gap-0.5",
                       isSelected
-                        ? "bg-sky-50 border-[#0194F3] text-[#0194F3] shadow-2xs"
-                        : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                        ? "bg-secondary border-primary text-primary shadow-2xs"
+                        : "bg-secondary/60 border-border text-foreground hover:bg-secondary"
                     )}
                   >
-                    <span className="text-xs font-bold">{opt.label}</span>
-                    <span className="text-[10px] text-slate-500 line-clamp-1">{opt.desc}</span>
+                    <span className={cn("text-xs font-semibold", isSelected ? "text-primary font-bold" : "text-foreground")}>
+                      {opt.label}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground line-clamp-1">{opt.desc}</span>
                   </button>
                 );
               })}
@@ -162,9 +164,9 @@ export function ExploreFilterSheet({
           </div>
 
           {/* Section 3: Audience */}
-          <div className="space-y-2.5 pt-4 border-t border-slate-100">
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">
-              <Users className="size-4 text-[#0194F3]" />
+          <div className="space-y-2.5 pt-4 border-t border-border/80">
+            <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+              <Users className="size-4 text-primary" />
               <span>Phù hợp với đối tượng</span>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -176,10 +178,10 @@ export function ExploreFilterSheet({
                     type="button"
                     onClick={() => onAudienceChange(aud.id)}
                     className={cn(
-                      "py-2 px-3.5 rounded-full text-xs font-bold transition-all cursor-pointer border",
+                      "py-2 px-3.5 rounded-full text-xs font-semibold transition-all cursor-pointer border",
                       isSelected
-                        ? "bg-[#0194F3] text-white border-[#0194F3] shadow-xs"
-                        : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                        ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                        : "bg-secondary/60 border-border text-foreground hover:bg-secondary"
                     )}
                   >
                     {aud.label}
@@ -191,8 +193,8 @@ export function ExploreFilterSheet({
 
           {/* Section 4: GPS Radius (if GPS search active) */}
           {useGpsSearch && (
-            <div className="space-y-2.5 pt-4 border-t border-slate-100">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#0194F3]">
+            <div className="space-y-2.5 pt-4 border-t border-border/80">
+              <div className="flex items-center gap-2 text-sm font-semibold text-primary">
                 <LocateFixed className="size-4" />
                 <span>Bán kính tìm kiếm vị trí hiện tại</span>
               </div>
@@ -205,10 +207,10 @@ export function ExploreFilterSheet({
                       type="button"
                       onClick={() => onRadiusKmChange(r)}
                       className={cn(
-                        "py-2 rounded-xl text-xs font-bold transition-all text-center cursor-pointer border",
+                        "py-2 rounded-xl text-xs font-semibold transition-all text-center cursor-pointer border",
                         isSelected
-                          ? "bg-[#0194F3] text-white border-[#0194F3] shadow-xs"
-                          : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                          ? "bg-primary text-primary-foreground border-primary shadow-xs"
+                          : "bg-secondary/60 border-border text-foreground hover:bg-secondary"
                       )}
                     >
                       {r}km
@@ -221,12 +223,12 @@ export function ExploreFilterSheet({
         </div>
 
         {/* Footer actions */}
-        <SheetFooter className="p-4 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between gap-3">
+        <SheetFooter className="p-4 border-t border-border/80 bg-muted/40 flex items-center justify-between gap-3">
           <Button
             type="button"
             variant="ghost"
             onClick={onReset}
-            className="text-slate-600 hover:text-slate-900 hover:bg-slate-200/50 text-xs font-bold gap-1.5 cursor-pointer"
+            className="text-muted-foreground hover:text-foreground hover:bg-muted text-xs font-semibold gap-1.5 cursor-pointer"
           >
             <RotateCcw className="size-3.5" />
             <span>Xóa tất cả</span>
@@ -235,7 +237,7 @@ export function ExploreFilterSheet({
           <Button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="px-6 py-2.5 rounded-xl bg-[#0194F3] hover:bg-[#0073D1] text-white text-xs font-bold transition-all shadow-md shadow-blue-500/20 cursor-pointer"
+            className="px-6 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-semibold transition-all shadow-md shadow-primary/20 cursor-pointer"
           >
             Xem kết quả
           </Button>

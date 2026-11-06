@@ -234,6 +234,8 @@ export default function VietMap({
   const selectedPlaceIdRef = useRef(selectedPlaceId);
   const lastSearchCenterRef = useRef(center);
   const lastFittedPlacesKeyRef = useRef<string>("");
+  const isUserInteractingRef = useRef(false);
+  const lastCenteredPlaceIdRef = useRef<string | null>(null);
 
   // Multi-Stop Routing State (Unified A -> B -> C...)
   const [routeStops, setRouteStops] = useState<RouteStop[]>([]);
@@ -825,6 +827,24 @@ export default function VietMap({
         }
       });
 
+      // User manual gesture detection: freeze automated camera recentering
+      map.on("dragstart", () => {
+        isUserInteractingRef.current = true;
+      });
+      map.on("zoomstart", (e) => {
+        if (e && e.originalEvent) {
+          isUserInteractingRef.current = true;
+        }
+      });
+      map.on("touchstart", () => {
+        isUserInteractingRef.current = true;
+      });
+      map.on("movestart", (e) => {
+        if (e && e.originalEvent) {
+          isUserInteractingRef.current = true;
+        }
+      });
+
       // Listen to Pan/Move to show "Search This Area" if user pans far (> 1.2km)
       map.on("moveend", () => {
         const c = map.getCenter();
@@ -1025,6 +1045,8 @@ export default function VietMap({
         label: markerLabels?.[place.id],
         customColor,
         onSelect: () => {
+          lastCenteredPlaceIdRef.current = null;
+          isUserInteractingRef.current = false;
           onSelectPlaceRef.current(place.id);
         },
       });
@@ -1195,6 +1217,8 @@ export default function VietMap({
     if (!map || !mapLoaded) return;
 
     if (!selectedPlaceId) {
+      lastCenteredPlaceIdRef.current = null;
+      isUserInteractingRef.current = false;
       const wasSelected = Boolean(currentPopupPlaceIdRef.current || previousViewportRef.current);
       currentPopupPlaceIdRef.current = null;
       if (popupRef.current) {
@@ -1286,21 +1310,30 @@ export default function VietMap({
 
     const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
 
-    // Fly camera smoothly to the selected place
-    if (routeStops.length < 2) {
-      if (isMobile) {
-        // On mobile: smoothly pan camera center while strictly preserving user's chosen zoom level
-        map.panTo([targetPlace.longitude, targetPlace.latitude], {
-          duration: 400,
-          essential: true,
-        });
-      } else {
-        map.flyTo({
-          center: [targetPlace.longitude, targetPlace.latitude],
-          zoom: 16,
-          duration: 500,
-          essential: true,
-        });
+    // Quick camera move to selected place ONLY upon a new intentional selection
+    const isNewSelection = selectedPlaceId !== lastCenteredPlaceIdRef.current;
+    if (isNewSelection) {
+      // User explicitly changed place -> unlock user interaction lock and center immediately
+      isUserInteractingRef.current = false;
+      lastCenteredPlaceIdRef.current = targetPlace.id;
+
+      if (routeStops.length < 2) {
+        if (isMobile) {
+          // On mobile: quick, snappy easeTo (200ms) directly to target place
+          map.easeTo({
+            center: [targetPlace.longitude, targetPlace.latitude],
+            zoom: 15.5,
+            duration: 200,
+            essential: true,
+          });
+        } else {
+          map.flyTo({
+            center: [targetPlace.longitude, targetPlace.latitude],
+            zoom: 16,
+            duration: 350,
+            essential: true,
+          });
+        }
       }
     }
 

@@ -41,18 +41,19 @@ import {
   type GeocodedLocation,
 } from "@/services/place.service";
 import { Place, SuitableAudience } from "@/types/place";
-import { DiscoveryPlace, RadiusKm } from "@/features/map/types";
+import { DiscoveryPlace, RadiusKm, MAP_RADIUS_OPTIONS } from "@/features/map/types";
+import { parseSearchIntent } from "@/features/map/lib/search-intent";
 import { SUPER_CATEGORIES, type SuperCategory } from "@/config/categories";
 import { DEFAULT_MAP_CENTER } from "@/features/map/map-config";
 import { useGeolocation } from "@/features/map/hooks/use-geolocation";
 import { parseExploreQuery, type ExploreSort } from "@/features/map/lib/explore-query";
 
 const AI_SUGGESTIONS = [
-  "Quán cafe yên tĩnh làm việc gần biển Mỹ Khê",
-  "Khách sạn view biển có hồ bơi vô cực",
-  "Quán hải sản tươi sống ngon giá hợp lý",
+  "Quán cafe quanh đây trong khoảng 3km",
+  "Khách sạn view biển gần Mỹ Khê",
+  "Quán hải sản tươi sống gần Cầu Rồng",
   "Địa điểm lãng mạn ngắm hoàng hôn bán đảo Sơn Trà",
-  "Chợ đêm và khu ăn vặt đặc sản Đà Nẵng",
+  "Quán ăn gần Chùa Cầu Hội An",
 ];
 
 function ExploreContent() {
@@ -496,6 +497,42 @@ function ExploreContent() {
     setPage(1);
   };
 
+  // Bilingual spatial intent & search execution handler
+  const handleExecuteSearch = useCallback(
+    (rawQuery: string) => {
+      setIsSearchFocused(false);
+      const parsed = parseSearchIntent(rawQuery);
+
+      if (parsed.extractedRadiusKm) {
+        setRadiusKm(parsed.extractedRadiusKm);
+      }
+
+      if (parsed.isNearbyIntent) {
+        setUseGpsSearch(true);
+        setPinNearbyCenter(null);
+        requestLocation();
+        setKeyword(parsed.cleanedKeyword);
+        setPage(1);
+        toast.info(
+          parsed.extractedRadiusKm
+            ? `Đang tìm "${parsed.cleanedKeyword || "địa điểm"}" quanh bạn (bán kính ${parsed.extractedRadiusKm}km)`
+            : "Đang tìm kiếm quanh vị trí hiện tại của bạn"
+        );
+      } else if (parsed.anchorLandmark) {
+        const targetSearch = parsed.cleanedKeyword
+          ? `${parsed.cleanedKeyword} gần ${parsed.anchorLandmark}`
+          : parsed.anchorLandmark;
+        setKeyword(targetSearch);
+        setPage(1);
+        toast.info(`Đang tìm kiếm "${targetSearch}"`);
+      } else {
+        setKeyword(parsed.cleanedKeyword || rawQuery.trim());
+        setPage(1);
+      }
+    },
+    [requestLocation]
+  );
+
   // Reset all filters
   const resetFilters = () => {
     setKeyword("");
@@ -622,25 +659,70 @@ function ExploreContent() {
 
       {/* Main Unified Search Toolbar */}
       <div className="relative rounded-2xl border border-slate-200/80 bg-white p-2 sm:p-2.5 shadow-sm space-y-2">
-        {/* Pinned Center Indicator (if user clicked 'Tìm quanh đây' on map pin) */}
-        {pinNearbyCenter && (
-          <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-sky-50 border border-sky-200 text-xs text-[#0194F3] font-medium">
-            <div className="flex items-center gap-2 truncate">
-              <LocateFixed className="size-4 shrink-0 " />
-              <span className="truncate">
-                Đang quét quanh: <strong>{pinNearbyCenter.label}</strong> (Bán kính {radiusKm}km)
-              </span>
+        {/* Active Spatial Search & Instant Radius Selector Bar */}
+        {(useGpsSearch || pinNearbyCenter) && (
+          <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl bg-sky-50/90 border border-sky-200 text-xs text-slate-800 transition-all animate-in fade-in-50">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="size-7 rounded-lg bg-[#0194F3]/10 flex items-center justify-center text-[#0194F3] shrink-0">
+                <LocateFixed className="size-4" />
+              </div>
+              <div className="min-w-0">
+                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                  Phạm vi tìm kiếm quanh đây
+                </div>
+                <div className="text-xs font-semibold text-slate-900 truncate">
+                  {pinNearbyCenter ? (
+                    <span>Tâm điểm: <strong className="text-[#0194F3]">{pinNearbyCenter.label}</strong></span>
+                  ) : userLocation ? (
+                    <span>Vị trí GPS của bạn (Cách bạn tối đa <strong className="text-[#0194F3]">{radiusKm}km</strong>)</span>
+                  ) : (
+                    <span className="text-amber-600 font-medium flex items-center gap-1.5">
+                      <Loader2 className="size-3 animate-spin shrink-0" />
+                      Đang lấy tọa độ GPS...
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
-            <button
-              type="button"
-              onClick={() => {
-                setPinNearbyCenter(null);
-                setPage(1);
-              }}
-              className="text-xs hover:underline font-bold ml-2 shrink-0 cursor-pointer"
-            >
-              Hủy bỏ
-            </button>
+
+            {/* Instant 1-tap Radius Selector */}
+            <div className="flex items-center gap-1.5 shrink-0 ml-auto sm:ml-0">
+              <span className="text-[11px] font-bold text-slate-500 mr-1 hidden sm:inline">Bán kính:</span>
+              {MAP_RADIUS_OPTIONS.map((r) => {
+                const isSelected = radiusKm === r;
+                return (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => {
+                      setRadiusKm(r);
+                      setPage(1);
+                    }}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                      isSelected
+                        ? "bg-[#0194F3] text-white shadow-xs"
+                        : "bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/80"
+                    )}
+                  >
+                    {r}km
+                  </button>
+                );
+              })}
+
+              <button
+                type="button"
+                onClick={() => {
+                  if (pinNearbyCenter) setPinNearbyCenter(null);
+                  if (useGpsSearch) setUseGpsSearch(false);
+                  setPage(1);
+                }}
+                className="ml-2 text-xs font-bold text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
+                title="Tắt chế độ tìm quanh đây"
+              >
+                Hủy
+              </button>
+            </div>
           </div>
         )}
 
@@ -656,22 +738,38 @@ function ExploreContent() {
                 if (pinNearbyCenter) setPinNearbyCenter(null);
                 setPage(1);
               }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleExecuteSearch(keyword);
+                }
+              }}
               placeholder="Tìm điểm đến, món ngon, quán cafe..."
-              className="h-11 pl-10 pr-9 text-sm rounded-xl bg-slate-50 border-slate-200/80 focus:bg-white focus:border-[#0194F3] font-medium"
+              className="h-11 pl-10 pr-20 text-sm rounded-xl bg-slate-50 border-slate-200/80 focus:bg-white focus:border-[#0194F3] font-medium"
             />
-            {keyword && (
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              {keyword && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setKeyword("");
+                    setPage(1);
+                  }}
+                  className="p-1 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
+                  title="Xóa tìm kiếm"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
               <button
                 type="button"
-                onClick={() => {
-                  setKeyword("");
-                  setPage(1);
-                }}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
-                title="Xóa tìm kiếm"
+                onClick={() => handleExecuteSearch(keyword)}
+                className="px-2.5 py-1 rounded-lg bg-[#0194F3] hover:bg-sky-600 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer"
+                title="Thực hiện tìm kiếm"
               >
-                <X className="size-3.5" />
+                Tìm
               </button>
-            )}
+            </div>
 
             {/* Search Suggestions Dropdown (appears only when input is focused) */}
             {isSearchFocused && (
@@ -696,9 +794,7 @@ function ExploreContent() {
                       type="button"
                       onMouseDown={(e) => {
                         e.preventDefault();
-                        setKeyword(sug);
-                        setPage(1);
-                        setIsSearchFocused(false);
+                        handleExecuteSearch(sug);
                       }}
                       className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-sky-50 hover:text-[#0194F3] transition-colors flex items-center gap-2 cursor-pointer"
                     >
@@ -949,7 +1045,7 @@ function ExploreContent() {
                     <Compass className="size-3.5 text-rose-600" />
                     <span>Quét quanh đây:</span>
                   </span>
-                  {[1, 3, 5, 10].map((r) => (
+                  {MAP_RADIUS_OPTIONS.map((r) => (
                     <button
                       key={r}
                       type="button"
@@ -1145,7 +1241,7 @@ function ExploreContent() {
                       <Compass className="size-3.5 text-rose-600" />
                       <span>Quét quanh đây:</span>
                     </span>
-                    {[1, 3, 5, 10].map((r) => (
+                    {MAP_RADIUS_OPTIONS.map((r) => (
                       <button
                         key={r}
                         type="button"

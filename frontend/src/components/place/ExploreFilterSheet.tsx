@@ -18,7 +18,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { SuitableAudience } from "@/types/place";
-import { RadiusKm } from "@/features/map/types";
+import { RadiusKm, MAP_RADIUS_OPTIONS } from "@/features/map/types";
 import { cn } from "@/lib/utils";
 
 const AUDIENCES: { id: SuitableAudience | "all"; label: string }[] = [
@@ -43,7 +43,7 @@ const BUDGET_LEVEL_OPTIONS: { id: string; label: string; desc: string }[] = [
   { id: "LUXURY", label: "Trên 1 triệu", desc: "Sang trọng (> 1.000.000đ)" },
 ];
 
-const RADIUS_OPTIONS: RadiusKm[] = [1, 3, 5, 10, 20];
+const RADIUS_OPTIONS = MAP_RADIUS_OPTIONS;
 
 interface ExploreFilterSheetProps {
   open: boolean;

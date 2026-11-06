@@ -35,13 +35,15 @@ export function useCollectionsContainingPlace(
 /**
  * Fetch saved place IDs for fast O(1) bookmark lookup in PlaceCard.
  */
+const selectIdsToSet = (ids: string[]) => new Set<string>(ids);
+
 export function useSavedPlaceIds(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: COLLECTION_KEYS.savedPlaceIds(),
     queryFn: () => collectionService.getSavedPlaceIds(),
     staleTime: 1000 * 60 * 5, // 5 minutes
     enabled: options?.enabled ?? true,
-    select: (ids: string[]) => new Set<string>(ids),
+    select: selectIdsToSet,
   });
 }
 

@@ -860,10 +860,19 @@ export default function VietMap({
             { latitude: c.lat, longitude: c.lng }
           );
           if (distFromLast > 1.2) {
-            setShowSearchThisArea(true);
-            setPendingSearchCenter({ latitude: c.lat, longitude: c.lng });
+            setShowSearchThisArea((prev) => (prev ? prev : true));
+            setPendingSearchCenter((prev) => {
+              if (
+                prev &&
+                Math.abs(prev.latitude - c.lat) < 0.0001 &&
+                Math.abs(prev.longitude - c.lng) < 0.0001
+              ) {
+                return prev;
+              }
+              return { latitude: c.lat, longitude: c.lng };
+            });
           } else {
-            setShowSearchThisArea(false);
+            setShowSearchThisArea((prev) => (prev ? false : prev));
           }
         }
       });
@@ -890,7 +899,18 @@ export default function VietMap({
 
       mapRef.current = map;
 
+      let resizeObserver: ResizeObserver | null = null;
+      if (typeof ResizeObserver !== "undefined" && containerRef.current) {
+        resizeObserver = new ResizeObserver(() => {
+          if (mapRef.current) {
+            mapRef.current.resize();
+          }
+        });
+        resizeObserver.observe(containerRef.current);
+      }
+
       return () => {
+        resizeObserver?.disconnect();
         markersRef.current.forEach((m) => m.remove());
         markersRef.current = [];
         routeStopMarkersRef.current.forEach((m) => m.remove());
@@ -1305,8 +1325,6 @@ export default function VietMap({
         zoom: currentZoom,
       };
     }
-
-    map.resize();
 
     const isMobile = typeof window !== "undefined" && window.innerWidth < 1024;
 

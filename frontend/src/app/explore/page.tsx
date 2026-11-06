@@ -1086,10 +1086,10 @@ function ExploreContent() {
               type="button"
               onClick={() => handleSelectSuperCategory(cat.id)}
               className={cn(
-                "inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-bold transition-all cursor-pointer shadow-2xs",
+                "inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all cursor-pointer shadow-2xs",
                 isSelected
-                  ? "bg-[#0194F3] text-white shadow-md shadow-blue-500/25"
-                  : "bg-white border border-slate-200/80 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                  : "bg-card border border-border text-foreground hover:bg-muted"
               )}
             >
               <span>{cat.label}</span>
@@ -1118,16 +1118,16 @@ function ExploreContent() {
             size="sm"
             onClick={() => setIsFilterSheetOpen(true)}
             className={cn(
-              "h-9 rounded-xl font-bold text-xs gap-2 transition-all cursor-pointer border shadow-2xs",
+              "h-9 rounded-xl font-semibold text-xs gap-2 transition-all cursor-pointer border shadow-2xs",
               activeFilterCount > 0
-                ? "bg-sky-50 border-[#0194F3] text-[#0194F3] hover:bg-sky-100"
-                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                ? "bg-secondary border-primary text-primary hover:bg-secondary/80"
+                : "bg-card border-border text-foreground hover:bg-muted"
             )}
           >
             <SlidersHorizontal className="size-3.5" />
             <span>Bộ lọc</span>
             {activeFilterCount > 0 && (
-              <span className="size-5 rounded-full bg-[#0194F3] text-white text-[10px] font-black flex items-center justify-center ml-0.5">
+              <span className="size-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center ml-0.5">
                 {activeFilterCount}
               </span>
             )}
@@ -1141,10 +1141,10 @@ function ExploreContent() {
               setPage(1);
             }}
             className={cn(
-              "h-9 px-3 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs",
+              "h-9 px-3 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs",
               openNow
                 ? "bg-emerald-50 text-emerald-700 border-emerald-300 font-bold"
-                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                : "bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground"
             )}
           >
             <Clock className="size-3.5 text-emerald-600" />
@@ -1166,7 +1166,7 @@ function ExploreContent() {
 
         {/* Right: Sắp xếp theo */}
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-bold text-slate-500">Sắp xếp:</span>
+          <span className="text-[11px] font-medium text-muted-foreground">Sắp xếp:</span>
           <Select
             value={selectedSort}
             onValueChange={(val) => {
@@ -1174,7 +1174,7 @@ function ExploreContent() {
               setPage(1);
             }}
           >
-            <SelectTrigger className="h-9 w-40 rounded-xl text-xs font-bold bg-white border-slate-200 shadow-2xs">
+            <SelectTrigger className="h-9 w-40 rounded-xl text-xs font-semibold bg-card border-border shadow-2xs text-foreground">
               <SelectValue placeholder="Sắp xếp" />
             </SelectTrigger>
             <SelectContent align="end">

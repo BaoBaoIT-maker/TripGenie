@@ -1288,12 +1288,20 @@ export default function VietMap({
 
     // Fly camera smoothly to the selected place
     if (routeStops.length < 2) {
-      map.flyTo({
-        center: [targetPlace.longitude, targetPlace.latitude],
-        zoom: isMobile ? Math.max(map.getZoom(), 14.5) : 16,
-        duration: 500,
-        essential: true,
-      });
+      if (isMobile) {
+        // On mobile: smoothly pan camera center while strictly preserving user's chosen zoom level
+        map.panTo([targetPlace.longitude, targetPlace.latitude], {
+          duration: 400,
+          essential: true,
+        });
+      } else {
+        map.flyTo({
+          center: [targetPlace.longitude, targetPlace.latitude],
+          zoom: 16,
+          duration: 500,
+          essential: true,
+        });
+      }
     }
 
     if (popupRef.current) {

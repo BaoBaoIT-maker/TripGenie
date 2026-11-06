@@ -353,6 +353,18 @@ function ExploreContent() {
   // Mobile map view toggle (Airbnb-style floating toggle for mobile devices)
   const [showMobileMap, setShowMobileMap] = useState(false);
 
+  // Sync body class when mobile map is active to safely dock global floating widgets
+  useEffect(() => {
+    if (showMobileMap) {
+      document.body.classList.add("mobile-map-active");
+    } else {
+      document.body.classList.remove("mobile-map-active");
+    }
+    return () => {
+      document.body.classList.remove("mobile-map-active");
+    };
+  }, [showMobileMap]);
+
   // Selection & Interactivity for Split Map
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(initialSelectedId || null);
   const selectedPlaceIdRef = useRef(selectedPlaceId);
@@ -998,65 +1010,69 @@ function ExploreContent() {
           </div>
         )}
 
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Keyword Input with Autocomplete Popover (Isolated Component to prevent page-level lag) */}
-          <ExploreSearchBar
-            keyword={keyword}
-            onSearch={handleExecuteSearch}
-            onClear={handleClearPin}
-          />
-
-          {/* Province / City Select Dropdown */}
-          <div className="w-auto max-w-[125px] sm:max-w-none sm:w-56 shrink-0">
-            <Select
-              value={selectedAreaId === "all" ? "all" : String(selectedAreaId)}
-              onValueChange={(val) => {
-                setSelectedAreaId(val === "all" ? "all" : Number(val));
-                setUseGpsSearch(false);
-                setPage(1);
-              }}
-            >
-              <SelectTrigger className="h-11 px-2.5 sm:px-3 rounded-xl bg-slate-50 border-slate-200/80 text-xs sm:text-sm font-semibold text-slate-800">
-                <div className="flex items-center gap-1.5 sm:gap-2 truncate">
-                  <MapPin className="size-3.5 sm:size-4 text-[#0194F3] shrink-0" />
-                  <SelectValue placeholder="Chọn Tỉnh / Thành">
-                    {selectedAreaId === "all"
-                      ? "Toàn quốc"
-                      : (selectedProvinceName
-                          ? selectedProvinceName.replace(/^(Thành phố|Tỉnh)\s+/i, "")
-                          : "Tỉnh/Thành")}
-                  </SelectValue>
-                </div>
-              </SelectTrigger>
-              <SelectContent className="max-h-80">
-                <SelectItem value="all">Toàn quốc (Tất cả)</SelectItem>
-                {provinceAreas.map((area) => (
-                  <SelectItem key={area.id} value={String(area.id)}>
-                    {area.nameVi || area.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+        {/* Search & Location Filter Bar: 2 tiers on mobile, 1 tier on desktop */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          {/* Tier 1 on mobile: Full-width keyword input with autocomplete */}
+          <div className="flex-1">
+            <ExploreSearchBar
+              keyword={keyword}
+              onSearch={handleExecuteSearch}
+              onClear={handleClearPin}
+            />
           </div>
 
-          {/* GPS Button: Tìm quanh đây */}
-          <button
-            type="button"
-            onClick={handleToggleGps}
-            className={cn(
-              "h-11 px-2.5 sm:px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 sm:gap-2 border transition-all shrink-0 cursor-pointer",
-              useGpsSearch
-                ? "bg-[#0194F3] text-white border-[#0194F3] shadow-xs"
-                : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80"
-            )}
-          >
-            {locating ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <LocateFixed className="size-4" />
-            )}
-            <span>{useGpsSearch ? "Đang tìm quanh đây" : "Tìm quanh đây"}</span>
-          </button>
+          {/* Tier 2 on mobile: Location controls (Province dropdown + GPS nearby button) */}
+          <div className="flex items-center gap-2 sm:shrink-0">
+            {/* Province / City Select Dropdown */}
+            <div className="flex-1 sm:w-56 sm:flex-none">
+              <Select
+                value={selectedAreaId === "all" ? "all" : String(selectedAreaId)}
+                onValueChange={(val) => {
+                  setSelectedAreaId(val === "all" ? "all" : Number(val));
+                  setUseGpsSearch(false);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="h-11 px-3 rounded-xl bg-slate-50 border-slate-200/80 text-xs sm:text-sm font-semibold text-slate-800">
+                  <div className="flex items-center gap-2 truncate">
+                    <MapPin className="size-4 text-[#0194F3] shrink-0" />
+                    <SelectValue placeholder="Chọn Tỉnh / Thành">
+                      {selectedAreaId === "all"
+                        ? "Toàn quốc (Tất cả)"
+                        : selectedProvinceName || "Chọn Tỉnh / Thành"}
+                    </SelectValue>
+                  </div>
+                </SelectTrigger>
+                <SelectContent className="max-h-80">
+                  <SelectItem value="all">Toàn quốc (Tất cả)</SelectItem>
+                  {provinceAreas.map((area) => (
+                    <SelectItem key={area.id} value={String(area.id)}>
+                      {area.nameVi || area.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* GPS Button: Tìm quanh đây */}
+            <button
+              type="button"
+              onClick={handleToggleGps}
+              className={cn(
+                "h-11 px-3 sm:px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all shrink-0 cursor-pointer",
+                useGpsSearch
+                  ? "bg-[#0194F3] text-white border-[#0194F3] shadow-xs"
+                  : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80"
+              )}
+            >
+              {locating ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <LocateFixed className="size-4" />
+              )}
+              <span>{useGpsSearch ? "Đang tìm quanh đây" : "Tìm quanh đây"}</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1380,6 +1396,21 @@ function ExploreContent() {
                 onSearchThisArea={handleSearchThisArea}
                 travelAreas={travelAreas}
               />
+
+              {/* Mobile Top-Right AI Advisor Button (Docked safely at top-right, away from carousel) */}
+              {showMobileMap && (
+                <div className="absolute top-3.5 right-3.5 z-20 lg:hidden">
+                  <button
+                    type="button"
+                    onClick={() => window.dispatchEvent(new CustomEvent("tripgenie:open-advisor"))}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/95 backdrop-blur-md text-primary font-bold text-xs shadow-md border border-primary/20 hover:bg-white active:scale-95 transition-all cursor-pointer"
+                    title="Hỏi trợ lý AI về khu vực này"
+                  >
+                    <Sparkles className="size-3.5 text-amber-500 fill-amber-500" />
+                    <span>Hỏi AI</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 

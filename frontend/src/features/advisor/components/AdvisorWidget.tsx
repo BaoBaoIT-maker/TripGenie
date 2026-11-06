@@ -72,6 +72,13 @@ export function AdvisorWidget() {
     }
   }, [isOpen]);
 
+  // Listen for programmatic open requests (e.g. from mobile map view)
+  React.useEffect(() => {
+    const handleOpen = () => setIsOpen(true);
+    window.addEventListener('tripgenie:open-advisor', handleOpen);
+    return () => window.removeEventListener('tripgenie:open-advisor', handleOpen);
+  }, []);
+
   // When drawer opens, automatically dismiss prompt bubble and badge
   React.useEffect(() => {
     if (isOpen) {
@@ -128,7 +135,7 @@ export function AdvisorWidget() {
           isPromptVisible
             ? 'opacity-100 translate-y-0 scale-100 pointer-events-auto'
             : 'opacity-0 translate-y-3 scale-95 pointer-events-none'
-        } bottom-36 right-4 left-4 max-w-[340px] ml-auto md:bottom-24 md:right-6 md:left-auto md:w-[340px]`}
+        } [body.mobile-map-active_&]:max-lg:hidden bottom-36 right-4 left-4 max-w-[340px] ml-auto md:bottom-24 md:right-6 md:left-auto md:w-[340px]`}
       >
         <div className="relative rounded-2xl border border-border/80 bg-card/95 p-4 text-card-foreground shadow-2xl backdrop-blur-md">
           {/* Header */}
@@ -191,7 +198,7 @@ export function AdvisorWidget() {
           isOpen ? 'Đóng trợ lý AI Advisor' : 'Mở trợ lý du lịch AI Advisor'
         }
         aria-expanded={isOpen}
-        className="fixed bottom-20 right-4 z-40 flex h-14 cursor-pointer items-center gap-2 rounded-full bg-primary py-1 pr-1 pl-5 text-primary-foreground shadow-lg transition-all duration-200 motion-reduce:transition-none hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:bottom-6 md:right-6"
+        className="fixed bottom-20 right-4 z-40 [body.mobile-map-active_&]:max-lg:hidden flex h-14 cursor-pointer items-center gap-2 rounded-full bg-primary py-1 pr-1 pl-5 text-primary-foreground shadow-lg transition-all duration-200 motion-reduce:transition-none hover:-translate-y-0.5 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:bottom-6 md:right-6"
       >
         <span className="text-sm font-semibold">{isOpen ? 'Đóng' : 'Chat'}</span>
         <span className="flex size-12 items-center justify-center rounded-full bg-primary-foreground/15" aria-hidden="true">

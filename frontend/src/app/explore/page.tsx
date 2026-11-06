@@ -18,6 +18,7 @@ import {
   Clock,
   Compass,
   Navigation,
+  Star,
   X,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -169,6 +170,153 @@ function ExploreSearchBar({ keyword, onSearch, onClear }: ExploreSearchBarProps)
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+interface MobileMapCarouselProps {
+  places: Place[];
+  selectedPlaceId: string | null;
+  onSelectPlace: (place: Place) => void;
+  onNavigateDetail: (place: Place) => void;
+}
+
+function MobileMapCarousel({
+  places,
+  selectedPlaceId,
+  onSelectPlace,
+  onNavigateDetail,
+}: MobileMapCarouselProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isProgrammaticScrollRef = useRef(false);
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-scroll selected card to center of carousel when selectedPlaceId changes
+  useEffect(() => {
+    if (!selectedPlaceId) return;
+    const cardEl = document.getElementById(`mobile-carousel-card-${selectedPlaceId}`);
+    if (cardEl) {
+      isProgrammaticScrollRef.current = true;
+      cardEl.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      const timer = setTimeout(() => {
+        isProgrammaticScrollRef.current = false;
+      }, 450);
+      return () => clearTimeout(timer);
+    }
+  }, [selectedPlaceId]);
+
+  // Synchronize map marker when user swipes through cards in carousel
+  const handleScroll = () => {
+    if (isProgrammaticScrollRef.current) return;
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+
+    scrollTimeoutRef.current = setTimeout(() => {
+      const container = containerRef.current;
+      if (!container) return;
+
+      const containerCenter =
+        container.getBoundingClientRect().left + container.clientWidth / 2;
+      let closestPlace: Place | null = null;
+      let minDistance = Infinity;
+
+      for (const place of places) {
+        const el = document.getElementById(`mobile-carousel-card-${place.id}`);
+        if (el) {
+          const rect = el.getBoundingClientRect();
+          const cardCenter = rect.left + rect.width / 2;
+          const dist = Math.abs(cardCenter - containerCenter);
+          if (dist < minDistance) {
+            minDistance = dist;
+            closestPlace = place;
+          }
+        }
+      }
+
+      if (closestPlace && closestPlace.id !== selectedPlaceId) {
+        onSelectPlace(closestPlace);
+      }
+    }, 120);
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      className="flex gap-2.5 overflow-x-auto snap-x snap-mandatory px-4 py-2 scrollbar-none pointer-events-auto"
+    >
+      {places.map((place) => {
+        const isSelected = place.id === selectedPlaceId;
+        return (
+          <div
+            key={place.id}
+            id={`mobile-carousel-card-${place.id}`}
+            onClick={() => {
+              if (isSelected) {
+                onNavigateDetail(place);
+              } else {
+                onSelectPlace(place);
+              }
+            }}
+            className={cn(
+              "w-[280px] sm:w-[320px] shrink-0 snap-center rounded-2xl p-2.5 transition-all duration-200 cursor-pointer flex gap-3 items-center",
+              isSelected
+                ? "bg-white shadow-xl border-2 border-[#0194F3] ring-2 ring-[#0194F3]/20 scale-[1.02]"
+                : "bg-white/95 backdrop-blur-md shadow-md border border-slate-200/90 hover:border-slate-300 opacity-95 hover:opacity-100"
+            )}
+          >
+            {/* Thumbnail */}
+            <div className="relative size-18 rounded-xl overflow-hidden bg-slate-100 shrink-0">
+              {place.coverImage ? (
+                <img
+                  src={place.coverImage}
+                  alt={place.name}
+                  className="size-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="size-full flex items-center justify-center text-slate-400">
+                  <MapPin className="size-5 text-[#0194F3]" />
+                </div>
+              )}
+            </div>
+
+            {/* Information */}
+            <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5 space-y-1">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-[10px] font-bold text-[#0194F3] uppercase tracking-wider truncate">
+                  {place.categoryLabel || place.category || "Địa điểm"}
+                </span>
+                {typeof place.rating === "number" && place.rating > 0 && (
+                  <span className="flex items-center gap-0.5 text-[11px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md shrink-0">
+                    <Star className="size-3 fill-amber-500 text-amber-500" />
+                    {place.rating.toFixed(1)}
+                  </span>
+                )}
+              </div>
+
+              <h4 className="font-bold text-xs sm:text-sm text-slate-900 line-clamp-1">
+                {place.name}
+              </h4>
+
+              <div className="flex items-center justify-between gap-1 pt-0.5">
+                <p className="text-[11px] text-slate-500 truncate flex items-center gap-1">
+                  <MapPin className="size-3 shrink-0 text-slate-400" />
+                  <span className="truncate">{place.address || place.city || "Việt Nam"}</span>
+                </p>
+                <span
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onNavigateDetail(place);
+                  }}
+                  className="text-[10px] font-bold text-[#0194F3] hover:underline shrink-0"
+                >
+                  Chi tiết &rarr;
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1212,6 +1360,18 @@ function ExploreContent() {
               />
             </div>
           </div>
+
+          {/* Mobile Carousel Overlay (Only active in mobile map view when places exist) */}
+          {showMobileMap && places.length > 0 && (
+            <div className="fixed bottom-20 inset-x-0 z-40 lg:hidden pointer-events-none">
+              <MobileMapCarousel
+                places={places}
+                selectedPlaceId={selectedPlaceId}
+                onSelectPlace={(p) => setSelectedPlaceId(p.id)}
+                onNavigateDetail={(p) => router.push(`/places/${p.slug}`)}
+              />
+            </div>
+          )}
 
           {/* Mobile Floating View Switcher (Airbnb style) */}
           <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 lg:hidden">

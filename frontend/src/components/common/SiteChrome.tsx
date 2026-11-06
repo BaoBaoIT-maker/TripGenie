@@ -4,7 +4,6 @@ import * as React from 'react';
 import { usePathname } from 'next/navigation';
 import { Navbar } from '@/components/common/Navbar';
 import { Footer } from '@/components/common/Footer';
-import { BottomNav } from '@/components/common/BottomNav';
 import { AdvisorWidget } from '@/features/advisor/components/AdvisorWidget';
 
 const AUTH_EXACT_ROUTES = new Set([
@@ -53,7 +52,6 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
       <div className="print:hidden">
         <Footer />
         {!isItineraryCopilotPage && <AdvisorWidget />}
-        <BottomNav />
       </div>
     </>
   );

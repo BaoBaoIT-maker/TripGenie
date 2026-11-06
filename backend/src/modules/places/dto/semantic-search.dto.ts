@@ -21,6 +21,10 @@ export class SemanticSearchDto {
   areaId?: number;
 
   @IsOptional()
+  @IsString({ each: true })
+  categorySlugs?: string[];
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)

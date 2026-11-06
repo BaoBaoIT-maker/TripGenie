@@ -51,6 +51,7 @@ describe('PlacesService', () => {
     const mockRepo: Partial<jest.Mocked<IPlaceRepository>> = {
       searchPlaces: jest.fn(),
       findLandmarkCoords: jest.fn(),
+      findAreaByName: jest.fn(),
       findNearby: jest.fn(),
       findById: jest.fn(),
       findCategories: jest.fn(),
@@ -158,6 +159,46 @@ describe('PlacesService', () => {
       expect(result.items).toHaveLength(1);
     });
 
+    it('should resolve pure category query without forcing keyword text filter ("quán cafe")', async () => {
+      repository.searchPlaces.mockResolvedValue({
+        items: [mockRawPlaceRow],
+        total: 1,
+      });
+
+      const result = await service.searchPlaces({ keyword: 'quán cafe' });
+
+      expect(repository.searchPlaces).toHaveBeenCalledWith(
+        expect.objectContaining({
+          categorySlugs: ['ca-phe'],
+          keyword: undefined,
+        }),
+      );
+      expect(result.items).toHaveLength(1);
+    });
+
+    it('should resolve category + administrative area query ("quán cafe ở Đà Nẵng")', async () => {
+      (repository.findAreaByName as jest.Mock).mockResolvedValue({
+        id: 5,
+        name: 'Thành phố Đà Nẵng',
+      });
+      repository.searchPlaces.mockResolvedValue({
+        items: [mockRawPlaceRow],
+        total: 1,
+      });
+
+      const result = await service.searchPlaces({ keyword: 'quán cafe ở Đà Nẵng' });
+
+      expect(repository.findAreaByName).toHaveBeenCalledWith('Đà Nẵng');
+      expect(repository.searchPlaces).toHaveBeenCalledWith(
+        expect.objectContaining({
+          areaId: 5,
+          categorySlugs: ['ca-phe'],
+          keyword: undefined,
+        }),
+      );
+      expect(result.items).toHaveLength(1);
+    });
+
     it('should enforce strict spatial guard and not fallback to semantic search when GPS coordinates return 0 places', async () => {
       repository.searchPlaces.mockResolvedValue({
         items: [],
@@ -216,6 +257,7 @@ describe('PlacesService', () => {
         5,
         1,
         0.5,
+        undefined,
       );
       expect(result).toHaveLength(1);
       expect(result[0].similarityScore).toBe(0.895);

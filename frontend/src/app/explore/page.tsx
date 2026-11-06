@@ -1005,8 +1005,8 @@ function ExploreContent() {
         }}
         onReset={resetFilters}
         activeFilterCount={activeFilterCount}
-      />
-
+      />
+
       {/* Place Results Display */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 space-y-3">
@@ -1104,22 +1104,49 @@ function ExploreContent() {
                 </div>
               )}
             </>
-          ) : !geocodedLocation ? (
-            <EmptyState
-              title={
-                useGpsSearch
-                  ? `Không có địa điểm nào trong bán kính ${radiusKm}km quanh vị trí của bạn`
-                  : "Không tìm thấy địa điểm phù hợp"
-              }
-              description={
-                useGpsSearch
-                  ? `Hiện dữ liệu chưa có điểm đến nào nằm trong bán kính ${radiusKm}km quanh tọa độ của bạn. Bạn hãy thử tăng bán kính lên (10km - 20km) hoặc tắt "Tìm quanh đây" để khám phá hơn 3.100 địa điểm khác trên toàn quốc.`
-                  : "Hãy thử bỏ bớt một số tiện ích hoặc chọn 'Tất cả' để xem nhiều gợi ý hơn."
-              }
-              actionLabel={useGpsSearch ? "Tắt tìm quanh đây (Xem toàn quốc)" : "Xóa bộ lọc tìm kiếm"}
-              onAction={useGpsSearch ? () => setUseGpsSearch(false) : resetFilters}
-            />
-          ) : null}
+          ) : (
+              <EmptyState
+                title={
+                  pinNearbyCenter
+                    ? `Không có địa điểm nào quanh "${pinNearbyCenter.label}" trong bán kính ${radiusKm}km`
+                    : geocodedLocation
+                      ? `Không có địa điểm nào quanh "${geocodedLocation.displayName}" trong bán kính ${radiusKm}km`
+                      : useGpsSearch
+                        ? `Không có địa điểm nào trong bán kính ${radiusKm}km quanh vị trí của bạn`
+                        : "Không tìm thấy địa điểm phù hợp"
+                }
+                description={
+                  pinNearbyCenter || geocodedLocation
+                    ? `Khu vực này hiện chưa có dữ liệu địa điểm trong bán kính ${radiusKm}km. Bạn hãy thử tăng bán kính lên (10km - 20km) hoặc xóa từ khóa tìm kiếm để khám phá thêm địa điểm.`
+                    : useGpsSearch
+                      ? `Hiện dữ liệu chưa có điểm đến nào nằm trong bán kính ${radiusKm}km quanh tọa độ của bạn. Bạn hãy thử tăng bán kính lên (10km - 20km) hoặc tắt "Tìm quanh đây" để khám phá hơn 3.100 địa điểm khác trên toàn quốc.`
+                      : keyword
+                        ? `Không tìm thấy địa điểm nào khớp với "${keyword}". Hãy thử tìm kiếm với từ khóa khác hoặc điều chỉnh bộ lọc.`
+                        : "Hãy thử bỏ bớt một số tiện ích hoặc chọn 'Tất cả' để xem nhiều gợi ý hơn."
+                }
+                actionLabel={
+                  pinNearbyCenter || geocodedLocation
+                    ? radiusKm < 20
+                      ? "Tăng bán kính lên 10km"
+                      : "Bỏ ghim vị trí"
+                    : useGpsSearch
+                      ? "Tắt tìm quanh đây (Xem toàn quốc)"
+                      : "Xóa bộ lọc tìm kiếm"
+                }
+                onAction={
+                  pinNearbyCenter || geocodedLocation
+                    ? radiusKm < 20
+                      ? () => {
+                          setRadiusKm(10);
+                          setPage(1);
+                        }
+                      : handleClearPin
+                    : useGpsSearch
+                      ? () => setUseGpsSearch(false)
+                      : resetFilters
+                }
+              />
+          )}
         </div>
       ) : (
         /* ================= MODE 2: AIRBNB SPLIT-VIEW ================= */
@@ -1219,22 +1246,49 @@ function ExploreContent() {
                   </div>
                 )}
               </>
-            ) : !geocodedLocation ? (
+            ) : (
               <EmptyState
                 title={
-                  useGpsSearch
-                    ? `Không có địa điểm nào trong bán kính ${radiusKm}km quanh vị trí của bạn`
-                    : "Không tìm thấy địa điểm phù hợp"
+                  pinNearbyCenter
+                    ? `Không có địa điểm nào quanh "${pinNearbyCenter.label}" trong bán kính ${radiusKm}km`
+                    : geocodedLocation
+                      ? `Không có địa điểm nào quanh "${geocodedLocation.displayName}" trong bán kính ${radiusKm}km`
+                      : useGpsSearch
+                        ? `Không có địa điểm nào trong bán kính ${radiusKm}km quanh vị trí của bạn`
+                        : "Không tìm thấy địa điểm phù hợp"
                 }
                 description={
-                  useGpsSearch
-                    ? `Hiện dữ liệu chưa có điểm đến nào nằm trong bán kính ${radiusKm}km quanh tọa độ của bạn. Bạn hãy thử tăng bán kính lên (10km - 20km) hoặc tắt "Tìm quanh đây" để khám phá hơn 3.100 địa điểm khác trên toàn quốc.`
-                    : "Hãy thử bỏ bớt một số tiện ích hoặc chọn 'Tất cả' để xem nhiều gợi ý hơn."
+                  pinNearbyCenter || geocodedLocation
+                    ? `Khu vực này hiện chưa có dữ liệu địa điểm trong bán kính ${radiusKm}km. Bạn hãy thử tăng bán kính lên (10km - 20km) hoặc xóa từ khóa tìm kiếm để khám phá thêm địa điểm.`
+                    : useGpsSearch
+                      ? `Hiện dữ liệu chưa có điểm đến nào nằm trong bán kính ${radiusKm}km quanh tọa độ của bạn. Bạn hãy thử tăng bán kính lên (10km - 20km) hoặc tắt "Tìm quanh đây" để khám phá hơn 3.100 địa điểm khác trên toàn quốc.`
+                      : keyword
+                        ? `Không tìm thấy địa điểm nào khớp với "${keyword}". Hãy thử tìm kiếm với từ khóa khác hoặc điều chỉnh bộ lọc.`
+                        : "Hãy thử bỏ bớt một số tiện ích hoặc chọn 'Tất cả' để xem nhiều gợi ý hơn."
                 }
-                actionLabel={useGpsSearch ? "Tắt tìm quanh đây (Xem toàn quốc)" : "Xóa bộ lọc tìm kiếm"}
-                onAction={useGpsSearch ? () => setUseGpsSearch(false) : resetFilters}
+                actionLabel={
+                  pinNearbyCenter || geocodedLocation
+                    ? radiusKm < 20
+                      ? "Tăng bán kính lên 10km"
+                      : "Bỏ ghim vị trí"
+                    : useGpsSearch
+                      ? "Tắt tìm quanh đây (Xem toàn quốc)"
+                      : "Xóa bộ lọc tìm kiếm"
+                }
+                onAction={
+                  pinNearbyCenter || geocodedLocation
+                    ? radiusKm < 20
+                      ? () => {
+                          setRadiusKm(10);
+                          setPage(1);
+                        }
+                      : handleClearPin
+                    : useGpsSearch
+                      ? () => setUseGpsSearch(false)
+                      : resetFilters
+                }
               />
-            ) : null}
+            )}
           </div>
 
           {/* Right Column: Sticky Map (VietMap) - ALWAYS MOUNTED AND ACTIVE! */}

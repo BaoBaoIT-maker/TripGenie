@@ -70,6 +70,14 @@ export class PlacesService {
     // ── Tier 2: 2-Stage Spatial Search if Landmark Anchor is present ("X gần Y") ──
     const parsed = rawKeyword ? parseSearchQuery(rawKeyword) : null;
 
+    let effectiveAreaId = dto.areaId;
+    if (!effectiveAreaId && parsed?.areaName) {
+      const area = await this.placeRepo.findAreaByName(parsed.areaName);
+      if (area) {
+        effectiveAreaId = area.id;
+      }
+    }
+
     if (parsed?.landmarkAnchor) {
       // Resolve Landmark to coordinates (DB first, fallback to Nominatim)
       let landmark = await this.placeRepo.findLandmarkCoords(parsed.landmarkAnchor);
@@ -111,10 +119,15 @@ export class PlacesService {
       parsed?.categorySlug && (!dto.categorySlugs || dto.categorySlugs.length === 0)
         ? [parsed.categorySlug]
         : dto.categorySlugs;
-    const effectiveKeyword = parsed ? (parsed.cleanedKeyword || rawKeyword || undefined) : (rawKeyword || undefined);
+
+    const hasParsedConstraint = Boolean(parsed?.categorySlug || parsed?.areaName || parsed?.landmarkAnchor);
+    const effectiveKeyword = parsed
+      ? (parsed.cleanedKeyword.trim() ? parsed.cleanedKeyword.trim() : (hasParsedConstraint ? undefined : rawKeyword?.trim() || undefined))
+      : (rawKeyword?.trim() || undefined);
 
     const searchFilters: SearchPlacesDto = {
       ...dto,
+      areaId: effectiveAreaId,
       categorySlugs: effectiveCategorySlugs,
       keyword: effectiveKeyword,
       page,
@@ -169,7 +182,8 @@ export class PlacesService {
       this.logger.log(`Keyword "${fallbackQuery}" not found in DB — falling back to semantic search`);
       const semantic = await this.searchSemantic({
         query: fallbackQuery,
-        areaId: dto.areaId,
+        areaId: effectiveAreaId ?? dto.areaId,
+        categorySlugs: effectiveCategorySlugs,
         limit,
         minSimilarity: 0.25,
       });
@@ -241,6 +255,7 @@ export class PlacesService {
       dto.limit || 10,
       dto.areaId,
       dto.minSimilarity || 0.3,
+      dto.categorySlugs,
     );
 
     return rawItems.map((row) => {

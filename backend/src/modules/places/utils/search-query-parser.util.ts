@@ -9,6 +9,7 @@ export interface ParsedPlaceSearchQuery {
   cleanedKeyword: string;
   categorySlug?: string;
   landmarkAnchor?: string;
+  areaName?: string;
   extractedRadiusMeters?: number;
   isNearbyIntent: boolean;
 }
@@ -89,12 +90,17 @@ const NEARBY_INTENT_PATTERN =
 const LANDMARK_ANCHOR_PATTERN =
   /^(.*?)\s+(?:gần|quanh|sát|cạnh|kế\s+bên|near|around|close\s+to|by|next\s+to)\s+([^,]+)$/i;
 
+// Administrative area pattern ("quán cafe ở Đà Nẵng", "khách sạn tại Hải Châu", "hotels in Da Nang")
+const AREA_PATTERN =
+  /^(?:(.*?)\s+)?(?:ở|tại|in|at)\s+([^,]+)$/i;
+
 export function parseSearchQuery(rawQuery: string): ParsedPlaceSearchQuery {
   let workingQuery = (rawQuery || '').trim();
   let extractedRadiusMeters: number | undefined = undefined;
   let isNearbyIntent = false;
   let categorySlug: string | undefined = undefined;
   let landmarkAnchor: string | undefined = undefined;
+  let areaName: string | undefined = undefined;
 
   // 1. Extract Distance / Radius
   const distMatch = workingQuery.match(DISTANCE_PATTERN);
@@ -121,9 +127,21 @@ export function parseSearchQuery(rawQuery: string): ParsedPlaceSearchQuery {
     workingQuery = workingQuery.replace(NEARBY_INTENT_PATTERN, ' ').trim();
   }
 
-  // 3. Extract Landmark Anchor if query has format: [target] near [landmark]
+  // 3. Extract Administrative Area if query matches: [target] ở/tại/in/at [area]
+  const areaMatch = workingQuery.match(AREA_PATTERN);
+  if (areaMatch && areaMatch[2]?.trim()) {
+    const potentialTarget = (areaMatch[1] || '').trim();
+    const potentialArea = areaMatch[2].trim();
+
+    if (!NEARBY_INTENT_PATTERN.test(potentialArea)) {
+      areaName = potentialArea;
+      workingQuery = potentialTarget;
+    }
+  }
+
+  // 4. Extract Landmark Anchor if query has format: [target] near [landmark]
   const anchorMatch = workingQuery.match(LANDMARK_ANCHOR_PATTERN);
-  if (anchorMatch && anchorMatch[1].trim() && anchorMatch[2].trim()) {
+  if (anchorMatch && anchorMatch[1]?.trim() && anchorMatch[2]?.trim()) {
     const potentialTarget = anchorMatch[1].trim();
     const potentialLandmark = anchorMatch[2].trim();
 
@@ -156,6 +174,7 @@ export function parseSearchQuery(rawQuery: string): ParsedPlaceSearchQuery {
     cleanedKeyword,
     categorySlug,
     landmarkAnchor,
+    areaName,
     extractedRadiusMeters,
     isNearbyIntent,
   };

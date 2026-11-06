@@ -110,6 +110,13 @@ export interface IPlaceRepository {
   ): Promise<{ lat: number; lng: number; displayName: string } | null>;
 
   /**
+   * Resolves an administrative area name or alias to its area record in travel_areas.
+   */
+  findAreaByName(
+    name: string,
+  ): Promise<{ id: number; name: string } | null>;
+
+  /**
    * Finds nearby places within a specific radius from given GPS coordinates.
    */
   findNearby(dto: NearbyPlacesDto): Promise<PlaceRow[]>;
@@ -147,6 +154,7 @@ export interface IPlaceRepository {
     limit: number,
     areaId?: number,
     minSimilarity?: number,
+    categorySlugs?: string[],
   ): Promise<PlaceRow[]>;
 
   /**

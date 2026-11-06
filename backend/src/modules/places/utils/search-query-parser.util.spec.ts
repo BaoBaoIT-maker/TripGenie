@@ -41,4 +41,31 @@ describe('search-query-parser.util', () => {
     expect(res.cleanedKeyword).toBe('Bà Nà Hills');
     expect(res.isNearbyIntent).toBe(false);
   });
+
+  it('parses pure category query without extra keywords ("quán cafe", "cafe")', () => {
+    const res1 = parseSearchQuery('quán cafe');
+    expect(res1.categorySlug).toBe('ca-phe');
+    expect(res1.cleanedKeyword).toBe('');
+
+    const res2 = parseSearchQuery('cafe');
+    expect(res2.categorySlug).toBe('ca-phe');
+    expect(res2.cleanedKeyword).toBe('');
+  });
+
+  it('parses category + administrative area ("quán cafe ở Đà Nẵng", "khách sạn tại Hải Châu")', () => {
+    const res1 = parseSearchQuery('quán cafe ở Đà Nẵng');
+    expect(res1.categorySlug).toBe('ca-phe');
+    expect(res1.areaName).toBe('Đà Nẵng');
+    expect(res1.cleanedKeyword).toBe('');
+
+    const res2 = parseSearchQuery('khách sạn view biển ở Đà Nẵng');
+    expect(res2.categorySlug).toBe('khach-san');
+    expect(res2.areaName).toBe('Đà Nẵng');
+    expect(res2.cleanedKeyword).toBe('view biển');
+
+    const res3 = parseSearchQuery('hotels in Da Nang');
+    expect(res3.categorySlug).toBe('khach-san');
+    expect(res3.areaName).toBe('Da Nang');
+    expect(res3.cleanedKeyword).toBe('');
+  });
 });

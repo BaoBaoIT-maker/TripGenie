@@ -275,6 +275,38 @@ export class PlacesRepository implements IPlaceRepository {
     return null;
   }
 
+  async findAreaByName(
+    name: string,
+  ): Promise<{ id: number; name: string } | null> {
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+    const raw = `%${trimmed.replace(/[\\%_]/g, '\\$&')}%`;
+    const norm = `%${trimmed
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/gi, 'd')
+      .toLowerCase()}%`;
+
+    const areaSql = `
+      SELECT id, COALESCE(name_vi, name) as name
+      FROM travel_areas
+      WHERE is_active = true
+        AND (name_vi ILIKE $1 OR name ILIKE $1 OR slug ILIKE $2)
+      ORDER BY
+        CASE
+          WHEN name_vi ILIKE $1 OR name ILIKE $1 THEN 0
+          ELSE 1
+        END,
+        id ASC
+      LIMIT 1;
+    `;
+    const rows = await this.prisma.$queryRawUnsafe<any[]>(areaSql, raw, norm);
+    if (rows && rows.length > 0) {
+      return { id: Number(rows[0].id), name: rows[0].name };
+    }
+    return null;
+  }
+
   async findNearby(dto: NearbyPlacesDto): Promise<PlaceRow[]> {
     const { lat, lng, radiusMeters = 3000, categorySlug, limit = 10 } = dto;
     const args: unknown[] = [lng, lat, radiusMeters];
@@ -402,14 +434,24 @@ export class PlacesRepository implements IPlaceRepository {
     limit: number = 10,
     areaId?: number,
     minSimilarity: number = 0.3,
+    categorySlugs?: string[],
   ): Promise<PlaceRow[]> {
     const vectorString = `[${vector.join(',')}]`;
-    const areaCondition =
-      areaId !== undefined
-        ? 'AND (p.area_id = $4 OR a.parent_id = $4 OR pa.parent_id = $4)'
-        : '';
     const args: unknown[] = [vectorString, minSimilarity, limit];
-    if (areaId !== undefined) args.push(areaId);
+
+    let areaCondition = '';
+    if (areaId !== undefined) {
+      const areaParamIdx = args.length + 1;
+      areaCondition = `AND (p.area_id = $${areaParamIdx} OR a.parent_id = $${areaParamIdx} OR pa.parent_id = $${areaParamIdx})`;
+      args.push(areaId);
+    }
+
+    let catCondition = '';
+    if (categorySlugs && categorySlugs.length > 0) {
+      const catParamIdx = args.length + 1;
+      catCondition = `AND c.slug = ANY($${catParamIdx})`;
+      args.push(categorySlugs);
+    }
 
     const sql = `
       SELECT
@@ -420,6 +462,7 @@ export class PlacesRepository implements IPlaceRepository {
       JOIN places p ON pe.place_id = p.id${PLACE_JOINS}
       WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
         ${areaCondition}
+        ${catCondition}
         AND (1 - (pe.embedding <=> $1::vector)) >= $2
       ORDER BY pe.embedding <=> $1::vector ASC
       LIMIT $3;

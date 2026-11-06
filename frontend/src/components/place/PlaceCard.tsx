@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, memo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { MapPin, Sparkles, Heart, Camera, UploadCloud, Navigation } from "lucide-react";
@@ -26,7 +26,7 @@ interface PlaceCardProps {
   collectionName?: string;
 }
 
-export function PlaceCard({
+export const PlaceCard = memo(function PlaceCard({
   place,
   className,
   onContributePhoto,
@@ -327,4 +327,4 @@ export function PlaceCard({
       />
     </div>
   );
-}
+});

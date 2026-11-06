@@ -56,6 +56,123 @@ const AI_SUGGESTIONS = [
   "Quán ăn gần Chùa Cầu Hội An",
 ];
 
+
+interface ExploreSearchBarProps {
+  keyword: string;
+  onSearch: (query: string) => void;
+  onClear: () => void;
+}
+
+function ExploreSearchBar({ keyword, onSearch, onClear }: ExploreSearchBarProps) {
+  const [inputValue, setInputValue] = useState(keyword);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Synchronize input value if parent keyword changes externally
+  useEffect(() => {
+    setInputValue(keyword);
+  }, [keyword]);
+
+  // Close search suggestions when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsSearchFocused(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const handleExecute = (q: string) => {
+    setIsSearchFocused(false);
+    onSearch(q);
+  };
+
+  return (
+    <div ref={searchContainerRef} className="relative flex-1">
+      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
+      <Input
+        value={inputValue}
+        onFocus={() => setIsSearchFocused(true)}
+        onChange={(e) => setInputValue(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            handleExecute(inputValue);
+          }
+        }}
+        placeholder="Tìm điểm đến, món ngon, quán cafe..."
+        className="h-11 pl-10 pr-20 text-sm rounded-xl bg-slate-50 border-slate-200/80 focus:bg-white focus:border-[#0194F3] font-medium"
+      />
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+        {inputValue && (
+          <button
+            type="button"
+            onClick={() => {
+              setInputValue("");
+              onClear();
+            }}
+            className="p-1 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
+            title="Xóa tìm kiếm"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={() => handleExecute(inputValue)}
+          className="px-2.5 py-1 rounded-lg bg-[#0194F3] hover:bg-sky-600 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer"
+          title="Thực hiện tìm kiếm"
+        >
+          Tìm
+        </button>
+      </div>
+
+      {/* Search Suggestions Dropdown (appears only when input is focused) */}
+      {isSearchFocused && (
+        <div className="absolute top-full left-0 right-0 mt-2 z-30 bg-white rounded-2xl border border-slate-200 shadow-xl p-3 space-y-2 animate-in fade-in-50 zoom-in-95 duration-150">
+          <div className="flex items-center justify-between px-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <Compass className="size-3.5 text-[#0194F3]" />
+              <span>Gợi ý tìm kiếm phổ biến</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsSearchFocused(false)}
+              className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+            >
+              Đóng
+            </button>
+          </div>
+          <div className="space-y-1">
+            {AI_SUGGESTIONS.map((sug, idx) => (
+              <button
+                key={idx}
+                type="button"
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  setInputValue(sug);
+                  handleExecute(sug);
+                }}
+                className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-sky-50 hover:text-[#0194F3] transition-colors flex items-center gap-2 cursor-pointer"
+              >
+                <Search className="size-3.5 text-slate-400 shrink-0" />
+                <span className="truncate">{sug}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ExploreContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -82,7 +199,6 @@ function ExploreContent() {
   const [contributePlace, setContributePlace] = useState<Place | null>(null);
 
   // Filters
-  const [searchInput, setSearchInput] = useState<string>(parsedQuery.keyword || "");
   const [keyword, setKeyword] = useState<string>(parsedQuery.keyword || "");
   const [selectedAreaId, setSelectedAreaId] = useState<number | "all">(parsedQuery.areaId || "all");
   const [selectedSuperCategoryId, setSelectedSuperCategoryId] = useState<string>(parsedQuery.category || "all");
@@ -97,24 +213,6 @@ function ExploreContent() {
   const [selectedBudgetLevels, setSelectedBudgetLevels] = useState<string[]>([]);
   const [openNow, setOpenNow] = useState<boolean>(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const searchContainerRef = useRef<HTMLDivElement>(null);
-
-  // Close search suggestions when clicking outside
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (
-        searchContainerRef.current &&
-        !searchContainerRef.current.contains(event.target as Node)
-      ) {
-        setIsSearchFocused(false);
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
-  }, []);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -169,7 +267,6 @@ function ExploreContent() {
     const nextKeyword = parsedQuery.keyword || "";
     if (keyword !== nextKeyword) {
       setKeyword(nextKeyword);
-      setSearchInput(nextKeyword);
       filterChanged = true;
     }
 
@@ -508,7 +605,6 @@ function ExploreContent() {
   // Bilingual spatial intent & search execution handler
   const handleExecuteSearch = useCallback(
     (rawQuery: string) => {
-      setIsSearchFocused(false);
       const parsed = parseSearchIntent(rawQuery);
 
       if (parsed.extractedRadiusKm) {
@@ -519,7 +615,6 @@ function ExploreContent() {
         setUseGpsSearch(true);
         setPinNearbyCenter(null);
         requestLocation();
-        setSearchInput(parsed.cleanedKeyword);
         setKeyword(parsed.cleanedKeyword);
         setPage(1);
         toast.info(
@@ -531,13 +626,11 @@ function ExploreContent() {
         const targetSearch = parsed.cleanedKeyword
           ? `${parsed.cleanedKeyword} gần ${parsed.anchorLandmark}`
           : parsed.anchorLandmark;
-        setSearchInput(targetSearch);
         setKeyword(targetSearch);
         setPage(1);
         toast.info(`Đang tìm kiếm "${targetSearch}"`);
       } else {
         const finalKeyword = parsed.cleanedKeyword || rawQuery.trim();
-        setSearchInput(finalKeyword);
         setKeyword(finalKeyword);
         setPage(1);
       }
@@ -547,7 +640,6 @@ function ExploreContent() {
 
   // Reset all filters
   const resetFilters = () => {
-    setSearchInput("");
     setKeyword("");
     setGeocodedLocation(null);
     setPinNearbyCenter(null);
@@ -570,7 +662,6 @@ function ExploreContent() {
     setPinNearbyCenter(null);
     setRouteToPinRequest(null);
     const coordsStr = `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
-    setSearchInput(coordsStr);
     setKeyword(coordsStr);
     setPage(1);
   }, [setPage]);
@@ -580,7 +671,6 @@ function ExploreContent() {
     setPinNearbyCenter(null);
     setRouteToPinRequest(null);
     const coordsStr = `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
-    setSearchInput(coordsStr);
     setKeyword(coordsStr);
     setPage(1);
   }, [setPage]);
@@ -601,7 +691,6 @@ function ExploreContent() {
     setGeocodedLocation(null);
     setPinNearbyCenter(null);
     setRouteToPinRequest(null);
-    setSearchInput("");
     setKeyword("");
     setPage(1);
   }, [setPage]);
@@ -748,83 +837,12 @@ function ExploreContent() {
         )}
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          {/* Keyword Input with Autocomplete Popover */}
-          <div ref={searchContainerRef} className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
-            <Input
-              value={searchInput}
-              onFocus={() => setIsSearchFocused(true)}
-              onChange={(e) => setSearchInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  handleExecuteSearch(searchInput);
-                }
-              }}
-              placeholder="Tìm điểm đến, món ngon, quán cafe..."
-              className="h-11 pl-10 pr-20 text-sm rounded-xl bg-slate-50 border-slate-200/80 focus:bg-white focus:border-[#0194F3] font-medium"
-            />
-            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              {searchInput && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchInput("");
-                    setKeyword("");
-                    if (pinNearbyCenter) setPinNearbyCenter(null);
-                    setPage(1);
-                  }}
-                  className="p-1 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
-                  title="Xóa tìm kiếm"
-                >
-                  <X className="size-3.5" />
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => handleExecuteSearch(searchInput)}
-                className="px-2.5 py-1 rounded-lg bg-[#0194F3] hover:bg-sky-600 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer"
-                title="Thực hiện tìm kiếm"
-              >
-                Tìm
-              </button>
-            </div>
-
-            {/* Search Suggestions Dropdown (appears only when input is focused) */}
-            {isSearchFocused && (
-              <div className="absolute top-full left-0 right-0 mt-2 z-30 bg-white rounded-2xl border border-slate-200 shadow-xl p-3 space-y-2 animate-in fade-in-50 zoom-in-95 duration-150">
-                <div className="flex items-center justify-between px-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                  <span className="flex items-center gap-1.5">
-                    <Compass className="size-3.5 text-[#0194F3]" />
-                    <span>Gợi ý tìm kiếm phổ biến</span>
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsSearchFocused(false)}
-                    className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
-                  >
-                    Đóng
-                  </button>
-                </div>
-                <div className="space-y-1">
-                  {AI_SUGGESTIONS.map((sug, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        handleExecuteSearch(sug);
-                      }}
-                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-sky-50 hover:text-[#0194F3] transition-colors flex items-center gap-2 cursor-pointer"
-                    >
-                      <Search className="size-3.5 text-slate-400 shrink-0" />
-                      <span className="truncate">{sug}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          {/* Keyword Input with Autocomplete Popover (Isolated Component to prevent page-level lag) */}
+          <ExploreSearchBar
+            keyword={keyword}
+            onSearch={handleExecuteSearch}
+            onClear={handleClearPin}
+          />
 
           {/* Province / City Select Dropdown */}
           <div className="w-full sm:w-56 shrink-0">

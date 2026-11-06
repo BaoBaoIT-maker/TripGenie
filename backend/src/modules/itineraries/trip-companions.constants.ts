@@ -1,0 +1,7 @@
+export const TRIP_COMPANIONS_CONSTANTS = {
+  INVITATION_TTL_DAYS: 7,
+  INVITE_CODE_BYTES: 6,
+  MAX_INVITE_CODE_RETRIES: 5,
+  EVENT_KEY_INVITE_PREFIX: 'trip-invite',
+  EVENT_KEY_RESULT_PREFIX: 'trip-invite-result',
+} as const;

@@ -368,6 +368,7 @@ function ExploreContent() {
   // Selection & Interactivity for Split Map
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(initialSelectedId || null);
   const selectedPlaceIdRef = useRef(selectedPlaceId);
+  const listContainerRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     selectedPlaceIdRef.current = selectedPlaceId;
   }, [selectedPlaceId]);
@@ -923,14 +924,14 @@ function ExploreContent() {
     openNow;
 
   return (
-    <div className="max-w-[1536px] mx-auto w-full px-4 py-8 sm:px-6 lg:px-8 xl:px-10 space-y-7">
-      {/* Header Banner */}
-      <div className="pb-2 border-b border-slate-200/80">
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+    <div className="max-w-[1600px] mx-auto w-full px-4 py-4 sm:px-6 lg:px-6 xl:px-8 space-y-4 lg:space-y-2.5 lg:h-[calc(100vh-4.25rem)] lg:flex lg:flex-col lg:overflow-hidden">
+      {/* Header Banner: Hidden on desktop to maximize map vertical height */}
+      <div className="shrink-0 pb-1.5 border-b border-slate-200/80 hidden sm:block lg:hidden">
+        <div className="space-y-0.5">
+          <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
             Khám phá địa điểm
           </h1>
-          <p className="text-xs sm:text-sm text-slate-500 font-medium">
+          <p className="text-xs text-slate-500 font-medium">
             {selectedAreaObj
               ? `Khám phá các điểm đến hấp dẫn tại ${selectedAreaObj.nameVi || selectedAreaObj.name} được xác thực bởi cộng đồng.`
               : "Hơn 3.100 điểm đến trên toàn quốc được xác thực bởi cộng đồng."}
@@ -939,7 +940,7 @@ function ExploreContent() {
       </div>
 
       {/* Main Unified Search Toolbar */}
-      <div className="relative rounded-2xl border border-slate-200/80 bg-white p-2 sm:p-2.5 shadow-sm space-y-2">
+      <div className="shrink-0 relative rounded-2xl border border-slate-200/80 bg-white p-2 sm:p-2.5 shadow-sm space-y-2">
         {/* Active Spatial Search & Instant Radius Selector Bar */}
         {(useGpsSearch || pinNearbyCenter || geocodedLocation) && (
           <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl bg-sky-50/90 border border-sky-200 text-xs text-slate-800 transition-all animate-in fade-in-50">
@@ -1010,10 +1011,10 @@ function ExploreContent() {
           </div>
         )}
 
-        {/* Search & Location Filter Bar: 2 tiers on mobile, 1 tier on desktop */}
+        {/* Search & Location Filter Bar: 2 tiers on mobile, 1 compact inline tier on desktop */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          {/* Tier 1 on mobile: Full-width keyword input with autocomplete */}
-          <div className="flex-1">
+          {/* Keyword input with autocomplete */}
+          <div className="flex-1 min-w-[200px] lg:max-w-xs xl:max-w-sm">
             <ExploreSearchBar
               keyword={keyword}
               onSearch={handleExecuteSearch}
@@ -1021,10 +1022,10 @@ function ExploreContent() {
             />
           </div>
 
-          {/* Tier 2 on mobile: Location controls (Province dropdown + GPS nearby button) */}
+          {/* Location controls (Province dropdown + GPS nearby button) */}
           <div className="flex items-center gap-2 sm:shrink-0">
             {/* Province / City Select Dropdown */}
-            <div className="flex-1 sm:w-56 sm:flex-none">
+            <div className="flex-1 sm:w-48 sm:flex-none">
               <Select
                 value={selectedAreaId === "all" ? "all" : String(selectedAreaId)}
                 onValueChange={(val) => {
@@ -1033,7 +1034,7 @@ function ExploreContent() {
                   setPage(1);
                 }}
               >
-                <SelectTrigger className="h-11 px-3 rounded-xl bg-slate-50 border-slate-200/80 text-xs sm:text-sm font-semibold text-slate-800">
+                <SelectTrigger className="h-10 sm:h-11 px-3 rounded-xl bg-slate-50 border-slate-200/80 text-xs sm:text-sm font-semibold text-slate-800">
                   <div className="flex items-center gap-2 truncate">
                     <MapPin className="size-4 text-[#0194F3] shrink-0" />
                     <SelectValue placeholder="Chọn Tỉnh / Thành">
@@ -1059,25 +1060,106 @@ function ExploreContent() {
               type="button"
               onClick={handleToggleGps}
               className={cn(
-                "h-11 px-3 sm:px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all shrink-0 cursor-pointer",
+                "h-10 sm:h-11 px-3 sm:px-3.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 border transition-all shrink-0 cursor-pointer",
                 useGpsSearch
                   ? "bg-[#0194F3] text-white border-[#0194F3] shadow-xs"
                   : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80"
               )}
             >
               {locating ? (
-                <Loader2 className="size-4 animate-spin" />
+                <Loader2 className="size-3.5 animate-spin" />
               ) : (
-                <LocateFixed className="size-4" />
+                <LocateFixed className="size-3.5" />
               )}
               <span>{useGpsSearch ? "Đang tìm quanh đây" : "Tìm quanh đây"}</span>
             </button>
+          </div>
+
+          {/* Desktop-only Inline Controls: Divider + Bộ lọc + Đang mở cửa + Sắp xếp */}
+          <div className="hidden lg:flex items-center gap-2 ml-auto shrink-0">
+            <div className="h-6 w-px bg-slate-200 mx-0.5" />
+
+            {/* Button mở Filter Sheet Modal */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsFilterSheetOpen(true)}
+              className={cn(
+                "h-10 rounded-xl font-semibold text-xs gap-1.5 transition-all cursor-pointer border shadow-2xs",
+                activeFilterCount > 0
+                  ? "bg-secondary border-primary text-primary hover:bg-secondary/80"
+                  : "bg-card border-border text-foreground hover:bg-muted"
+              )}
+            >
+              <SlidersHorizontal className="size-3.5" />
+              <span>Bộ lọc</span>
+              {activeFilterCount > 0 && (
+                <span className="size-4.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+                  {activeFilterCount}
+                </span>
+              )}
+            </Button>
+
+            {/* Quick Toggle: Đang mở cửa */}
+            <button
+              type="button"
+              onClick={() => {
+                setOpenNow(!openNow);
+                setPage(1);
+              }}
+              className={cn(
+                "h-10 px-3 rounded-xl text-xs font-semibold border transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs",
+                openNow
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-300 font-bold"
+                  : "bg-card border-border text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <Clock className="size-3.5 text-emerald-600" />
+              <span>Đang mở cửa</span>
+            </button>
+
+            {/* Reset Filters button if any filters active */}
+            {isFiltering && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className="h-10 px-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors flex items-center gap-1 cursor-pointer"
+                title="Đặt lại tất cả bộ lọc"
+              >
+                <RotateCcw className="size-3" />
+                <span>Đặt lại</span>
+              </button>
+            )}
+
+            {/* Sắp xếp theo */}
+            <div className="flex items-center gap-1.5 ml-1">
+              <span className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">Sắp xếp:</span>
+              <Select
+                value={selectedSort}
+                onValueChange={(val) => {
+                  setSelectedSort(val as ExploreSort);
+                  setPage(1);
+                }}
+              >
+                <SelectTrigger className="h-10 w-36 rounded-xl text-xs font-semibold bg-card border-border shadow-2xs text-foreground">
+                  <SelectValue placeholder="Sắp xếp" />
+                </SelectTrigger>
+                <SelectContent align="end">
+                  <SelectItem value="rating">Đánh giá cao nhất</SelectItem>
+                  <SelectItem value="popular">Phổ biến nhất</SelectItem>
+                  <SelectItem value="distance">Gần tôi nhất</SelectItem>
+                  <SelectItem value="price_asc">Giá: Thấp đến Cao</SelectItem>
+                  <SelectItem value="price_desc">Giá: Cao đến Thấp</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Super Categories Bar - Modern Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+      <div className="shrink-0 flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
         {SUPER_CATEGORIES.map((cat) => {
           const isSelected = selectedSuperCategoryId === cat.id;
           return (
@@ -1108,8 +1190,8 @@ function ExploreContent() {
         })}
       </div>
 
-      {/* Sub-Toolbar: Quick Toggle, Sort, and Advanced Filter Sheet Trigger */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-1 pb-2 border-b border-slate-200/70 text-xs">
+      {/* Sub-Toolbar: Mobile only (hidden on desktop because controls are inline in search row) */}
+      <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 pt-1 pb-2 border-b border-slate-200/70 text-xs lg:hidden">
         <div className="flex flex-wrap items-center gap-2">
           {/* Button mở Filter Sheet Modal */}
           <Button
@@ -1221,7 +1303,7 @@ function ExploreContent() {
 
       {/* Place Results Display */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-20 space-y-3">
+        <div className="flex-1 flex flex-col items-center justify-center py-20 space-y-3">
           <Loader2 className="size-7 animate-spin text-muted-foreground" />
           <p className="text-xs text-muted-foreground font-medium">
             Đang tải dữ liệu địa điểm...
@@ -1229,10 +1311,16 @@ function ExploreContent() {
         </div>
       ) : (
         /* ================= UNIFIED SPLIT-VIEW (AIRBNB STYLE) ================= */
-        <div className="relative">
-          <div className="lg:grid lg:grid-cols-[minmax(0,48%)_minmax(0,52%)] lg:gap-6 items-start">
+        <div className="relative lg:flex-1 lg:min-h-0">
+          <div className="h-full lg:grid lg:grid-cols-[minmax(0,48%)_minmax(0,52%)] lg:gap-5 items-stretch">
             {/* Left Column: Places List or Geocoded Pin or Empty */}
-            <div className={cn("flex flex-col gap-4", showMobileMap ? "hidden lg:flex" : "flex")}>
+            <div
+              ref={listContainerRef}
+              className={cn(
+                "flex flex-col gap-4 lg:h-full lg:overflow-y-auto lg:pr-3 scrollbar-thin",
+                showMobileMap ? "hidden lg:flex" : "flex"
+              )}
+            >
               {/* Fallback Banner if applicable */}
               {isFallbackResult && places.length > 0 && (
                 <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs">
@@ -1300,7 +1388,10 @@ function ExploreContent() {
                         disabled={page <= 1}
                         onClick={() => {
                           setPage((p) => Math.max(1, p - 1));
-                          window.scrollTo({ top: 250, behavior: "smooth" });
+                          listContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+                          if (typeof window !== "undefined" && window.innerWidth < 1024) {
+                            window.scrollTo({ top: 250, behavior: "smooth" });
+                          }
                         }}
                         className="flex items-center gap-1 rounded-xl border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       >
@@ -1315,7 +1406,10 @@ function ExploreContent() {
                         disabled={page >= totalPages}
                         onClick={() => {
                           setPage((p) => Math.min(totalPages, p + 1));
-                          window.scrollTo({ top: 250, behavior: "smooth" });
+                          listContainerRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+                          if (typeof window !== "undefined" && window.innerWidth < 1024) {
+                            window.scrollTo({ top: 250, behavior: "smooth" });
+                          }
                         }}
                         className="flex items-center gap-1 rounded-xl border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       >
@@ -1324,6 +1418,13 @@ function ExploreContent() {
                       </button>
                     </div>
                   )}
+
+                  {/* Desktop List Bottom Mini-Notice */}
+                  <div className="hidden lg:block pt-6 pb-4 border-t border-slate-200/70 text-center">
+                    <p className="text-[11px] text-slate-400">
+                      © {new Date().getFullYear()} TripGenie · Nền tảng khám phá du lịch thông minh Việt Nam
+                    </p>
+                  </div>
                 </>
               ) : (
                 <EmptyState
@@ -1370,11 +1471,11 @@ function ExploreContent() {
               )}
             </div>
 
-            {/* Right Column: Sticky Map (VietMap) - ALWAYS MOUNTED AND ACTIVE! */}
+            {/* Right Column: Map (VietMap) - Fully Stretched in Split View */}
             <div
               className={cn(
-                "h-[calc(100vh-140px)] min-h-[500px] rounded-2xl overflow-hidden shadow-xs border",
-                showMobileMap ? "block" : "hidden lg:block lg:sticky lg:top-24"
+                "h-[calc(100vh-140px)] min-h-[500px] lg:h-full lg:min-h-0 rounded-2xl overflow-hidden shadow-xs border relative",
+                showMobileMap ? "block" : "hidden lg:block"
               )}
             >
               <VietMapLoader

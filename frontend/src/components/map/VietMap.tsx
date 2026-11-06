@@ -1348,6 +1348,7 @@ export default function VietMap({
           map.flyTo({
             center: [targetPlace.longitude, targetPlace.latitude],
             zoom: 16,
+            offset: [0, 95],
             duration: 350,
             essential: true,
           });

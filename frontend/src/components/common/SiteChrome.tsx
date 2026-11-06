@@ -23,6 +23,7 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
     AUTH_EXACT_ROUTES.has(pathname) || pathname.startsWith(AUTH_PREFIX);
   const isItineraryCopilotPage = ITINERARY_DETAIL_PATTERN.test(pathname);
   const isLandingPage = pathname === '/';
+  const isExplorePage = pathname === '/explore';
 
   if (isAuthPage) {
     return (
@@ -50,7 +51,13 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
       </div>
       <main className="flex-1 w-full">{children}</main>
       <div className="print:hidden">
-        <Footer />
+        {isExplorePage ? (
+          <div className="lg:hidden">
+            <Footer />
+          </div>
+        ) : (
+          <Footer />
+        )}
         {!isItineraryCopilotPage && <AdvisorWidget />}
       </div>
     </>

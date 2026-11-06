@@ -666,7 +666,7 @@ function ExploreContent() {
       {/* Main Unified Search Toolbar */}
       <div className="relative rounded-2xl border border-slate-200/80 bg-white p-2 sm:p-2.5 shadow-sm space-y-2">
         {/* Active Spatial Search & Instant Radius Selector Bar */}
-        {(useGpsSearch || pinNearbyCenter) && (
+        {(useGpsSearch || pinNearbyCenter || geocodedLocation) && (
           <div className="flex flex-wrap items-center justify-between gap-3 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-xl bg-sky-50/90 border border-sky-200 text-xs text-slate-800 transition-all animate-in fade-in-50">
             <div className="flex items-center gap-2 min-w-0">
               <div className="size-7 rounded-lg bg-[#0194F3]/10 flex items-center justify-center text-[#0194F3] shrink-0">
@@ -679,6 +679,8 @@ function ExploreContent() {
                 <div className="text-xs font-semibold text-slate-900 truncate">
                   {pinNearbyCenter ? (
                     <span>Tâm điểm: <strong className="text-[#0194F3]">{pinNearbyCenter.label}</strong></span>
+                  ) : geocodedLocation ? (
+                    <span>Mốc địa lý: <strong className="text-[#0194F3]">{geocodedLocation.displayName}</strong></span>
                   ) : userLocation ? (
                     <span>Vị trí GPS của bạn (Cách bạn tối đa <strong className="text-[#0194F3]">{radiusKm}km</strong>)</span>
                   ) : (
@@ -721,6 +723,7 @@ function ExploreContent() {
                 onClick={() => {
                   if (pinNearbyCenter) setPinNearbyCenter(null);
                   if (useGpsSearch) setUseGpsSearch(false);
+                  if (geocodedLocation) setGeocodedLocation(null);
                   setPage(1);
                 }}
                 className="ml-2 text-xs font-bold text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
@@ -1015,8 +1018,8 @@ function ExploreContent() {
       ) : viewMode === "grid" ? (
         /* ================= MODE 1: FULL GRID ================= */
         <div className="space-y-4">
-          {/* Pinned Geocoded Location Banner if query was an address or coordinate */}
-          {geocodedLocation && (
+          {/* Pinned Geocoded Location Banner only when 0 places matched (address or coordinate lookup) */}
+          {geocodedLocation && places.length === 0 && (
             <div className="rounded-2xl border-2 border-rose-500/30 bg-rose-50/80 dark:bg-rose-950/20 p-4 sm:p-5 space-y-3.5 shadow-xs">
               <div className="flex items-start gap-3">
                 <div className="size-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-md">
@@ -1211,8 +1214,8 @@ function ExploreContent() {
         <div className="lg:grid lg:grid-cols-[minmax(0,48%)_minmax(0,52%)] lg:gap-6 items-start">
           {/* Left Column: Places List or Geocoded Pin or Empty */}
           <div className="flex flex-col gap-4">
-            {/* Pinned Geocoded Location Banner if query was an address or coordinate */}
-            {geocodedLocation && (
+            {/* Pinned Geocoded Location Banner only when 0 places matched (address or coordinate lookup) */}
+            {geocodedLocation && places.length === 0 && (
               <div className="rounded-2xl border-2 border-rose-500/30 bg-rose-50/80 dark:bg-rose-950/20 p-4 sm:p-5 space-y-3.5 shadow-xs">
                 <div className="flex items-start gap-3">
                   <div className="size-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-md">

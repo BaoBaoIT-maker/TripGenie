@@ -65,4 +65,19 @@ describe("parseSearchIntent", () => {
     expect(res.anchorLandmark).toBeUndefined();
     expect(res.extractedRadiusKm).toBeUndefined();
   });
+
+  it("extracts administrative area intent in Vietnamese", () => {
+    const res = parseSearchIntent("quán cafe ở Đà Nẵng");
+    expect(res.cleanedKeyword).toBe("quán cafe");
+    expect(res.areaName).toBe("Đà Nẵng");
+    expect(res.isNearbyIntent).toBe(false);
+
+    const res2 = parseSearchIntent("khách sạn tại Hà Nội");
+    expect(res2.cleanedKeyword).toBe("khách sạn");
+    expect(res2.areaName).toBe("Hà Nội");
+
+    const resPure = parseSearchIntent("ở Đà Nẵng");
+    expect(resPure.cleanedKeyword).toBe("");
+    expect(resPure.areaName).toBe("Đà Nẵng");
+  });
 });

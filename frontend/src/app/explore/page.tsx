@@ -12,7 +12,7 @@ import {
   MapPin,
   ChevronLeft,
   ChevronRight,
-  LayoutGrid,
+  List,
   Map as MapIcon,
   LocateFixed,
   Clock,
@@ -182,10 +182,8 @@ function ExploreContent() {
   const initialLat = searchParams.get("lat") ? Number(searchParams.get("lat")) : null;
   const initialLng = searchParams.get("lng") ? Number(searchParams.get("lng")) : null;
 
-  // View Mode: Airbnb-style Grid vs Split Map
-  const [userViewMode, setUserViewMode] = useState<"grid" | "split" | null>(null);
-  const viewMode = userViewMode ?? (parsedQuery.view === "split" || Boolean(initialSelectedId) ? "split" : "grid");
-  const setViewMode = (mode: "grid" | "split") => setUserViewMode(mode);
+  // Mobile map view toggle (Airbnb-style floating toggle for mobile devices)
+  const [showMobileMap, setShowMobileMap] = useState(false);
 
   // Selection & Interactivity for Split Map
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(initialSelectedId || null);
@@ -255,7 +253,6 @@ function ExploreContent() {
     setPrevSelectedParam(initialSelectedId);
     if (initialSelectedId) {
       setSelectedPlaceId(initialSelectedId);
-      setUserViewMode("split");
     }
   }
 
@@ -293,10 +290,6 @@ function ExploreContent() {
       filterChanged = true;
     }
 
-    if (parsedQuery.view && userViewMode !== parsedQuery.view) {
-      setUserViewMode(parsedQuery.view);
-    }
-
     if (filterChanged) {
       setPage(1);
     }
@@ -331,28 +324,24 @@ function ExploreContent() {
 
   // Auto scroll to selected card in split view list
   useEffect(() => {
-    if (!selectedPlaceId || viewMode !== "split") return;
+    if (!selectedPlaceId) return;
     const cardEl = document.getElementById(`place-card-${selectedPlaceId}`);
     if (cardEl) {
       cardEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
-  }, [selectedPlaceId, viewMode]);
+  }, [selectedPlaceId]);
 
-  // Card click behavior: If map is open (split view), 1st click highlights on map, 2nd click enters details
+  // Card click behavior: 1st click highlights on map, 2nd click enters details (direct on mobile list)
   const handlePlaceCardClick = (place: Place, e?: React.MouseEvent) => {
-    if (viewMode === "split") {
-      if (selectedPlaceId === place.id) {
-        // Đã hiển thị/chọn trên bản đồ -> click lần nữa thì mở trang chi tiết
-        router.push(`/places/${place.slug}`);
-      } else {
-        // Lần đầu click -> hiển thị trên bản đồ trước, ngăn chặn chuyển trang
-        e?.preventDefault();
-        e?.stopPropagation();
-        setSelectedPlaceId(place.id);
-      }
-    } else {
-      // Khi không bật bản đồ -> click thẳng vào chi tiết
+    const isMobileList = typeof window !== "undefined" && window.innerWidth < 1024 && !showMobileMap;
+    if (isMobileList || selectedPlaceId === place.id) {
+      // Đã chọn trên bản đồ hoặc đang duyệt danh sách mobile -> mở trang chi tiết
       router.push(`/places/${place.slug}`);
+    } else {
+      // Lần đầu click trên desktop -> hiển thị trên bản đồ trước, ngăn chặn chuyển trang
+      e?.preventDefault();
+      e?.stopPropagation();
+      setSelectedPlaceId(place.id);
     }
   };
 
@@ -611,6 +600,41 @@ function ExploreContent() {
         setRadiusKm(parsed.extractedRadiusKm);
       }
 
+      // Synchronize administrative area if recognized in query
+      if (parsed.areaName) {
+        const areaNorm = parsed.areaName
+          .toLowerCase()
+          .normalize("NFD")
+          .replace(/[\u0300-\u036f]/g, "")
+          .replace(/đ/gi, "d")
+          .trim();
+        const matched =
+          provinceAreas.find((a) => {
+            const nameNorm = (a.nameVi || a.name)
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .replace(/đ/gi, "d");
+            const slugNorm = a.slug.replace(/-/g, " ");
+            return nameNorm.includes(areaNorm) || areaNorm.includes(nameNorm) || slugNorm.includes(areaNorm);
+          }) ||
+          travelAreas.find((a) => {
+            const nameNorm = (a.nameVi || a.name)
+              .toLowerCase()
+              .normalize("NFD")
+              .replace(/[\u0300-\u036f]/g, "")
+              .replace(/đ/gi, "d");
+            const slugNorm = a.slug.replace(/-/g, " ");
+            return nameNorm.includes(areaNorm) || areaNorm.includes(nameNorm) || slugNorm.includes(areaNorm);
+          });
+
+        if (matched) {
+          setSelectedAreaId(matched.id);
+          setUseGpsSearch(false);
+          setPinNearbyCenter(null);
+        }
+      }
+
       if (parsed.isNearbyIntent) {
         setUseGpsSearch(true);
         setPinNearbyCenter(null);
@@ -630,12 +654,12 @@ function ExploreContent() {
         setPage(1);
         toast.info(`Đang tìm kiếm "${targetSearch}"`);
       } else {
-        const finalKeyword = parsed.cleanedKeyword || rawQuery.trim();
+        const finalKeyword = parsed.cleanedKeyword || (parsed.areaName ? "" : rawQuery.trim());
         setKeyword(finalKeyword);
         setPage(1);
       }
     },
-    [requestLocation]
+    [requestLocation, provinceAreas, travelAreas]
   );
 
   // Reset all filters
@@ -720,8 +744,8 @@ function ExploreContent() {
 
   return (
     <div className="max-w-[1536px] mx-auto w-full px-4 py-8 sm:px-6 lg:px-8 xl:px-10 space-y-7">
-      {/* Header Banner & Mode Toggle */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/80">
+      {/* Header Banner */}
+      <div className="pb-2 border-b border-slate-200/80">
         <div className="space-y-1">
           <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
             Khám phá địa điểm
@@ -731,36 +755,6 @@ function ExploreContent() {
               ? `Khám phá các điểm đến hấp dẫn tại ${selectedAreaObj.nameVi || selectedAreaObj.name} được xác thực bởi cộng đồng.`
               : "Hơn 3.100 điểm đến trên toàn quốc được xác thực bởi cộng đồng."}
           </p>
-        </div>
-
-        {/* View Toggle (Grid vs Split Map) */}
-        <div className="flex items-center rounded-xl border border-slate-200 p-1 bg-slate-100/80 shadow-2xs self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={() => setViewMode("grid")}
-            className={cn(
-              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer",
-              viewMode === "grid"
-                ? "bg-white text-slate-900 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            )}
-          >
-            <LayoutGrid className="size-3.5" />
-            <span className="hidden md:inline">Lưới danh sách</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode("split")}
-            className={cn(
-              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer",
-              viewMode === "split"
-                ? "bg-white text-slate-900 shadow-xs"
-                : "text-slate-600 hover:text-slate-900"
-            )}
-          >
-            <MapIcon className="size-3.5" />
-            <span className="hidden md:inline">Bản đồ Split-View</span>
-          </button>
         </div>
       </div>
 
@@ -857,7 +851,11 @@ function ExploreContent() {
               <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200/80 text-xs sm:text-sm font-semibold text-slate-800">
                 <div className="flex items-center gap-2 truncate">
                   <MapPin className="size-4 text-[#0194F3] shrink-0" />
-                  <SelectValue placeholder="Chọn Tỉnh / Thành" />
+                  <SelectValue placeholder="Chọn Tỉnh / Thành">
+                    {selectedAreaId === "all"
+                      ? "Toàn quốc (Tất cả)"
+                      : selectedProvinceName || "Chọn Tỉnh / Thành"}
+                  </SelectValue>
                 </div>
               </SelectTrigger>
               <SelectContent className="max-h-80">
@@ -1043,303 +1041,197 @@ function ExploreContent() {
             Đang tải dữ liệu địa điểm...
           </p>
         </div>
-      ) : viewMode === "grid" ? (
-        /* ================= MODE 1: FULL GRID ================= */
-        <div className="space-y-4">
-          {/* Fallback Banner if applicable */}
-          {isFallbackResult && places.length > 0 && (
-            <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs">
-              <Sparkles className="size-4 shrink-0 text-amber-600" />
-              <span>
-                Không tìm thấy địa điểm chính xác cho <strong>&quot;{keyword}&quot;</strong>. Hệ thống AI gợi ý các địa điểm ngữ nghĩa tương tự:
-              </span>
-            </div>
-          )}
-
-          {places.length > 0 ? (
-            <>
-              {/* Top Bar above Grid: Count & Right-aligned Page Size Dropdown */}
-              <div className="flex items-center justify-between pb-1">
-                <span className="text-xs text-muted-foreground font-medium">
-                  Tìm thấy <strong className="text-foreground font-semibold">{totalCount.toLocaleString("vi-VN")}</strong> địa điểm
-                </span>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-medium text-muted-foreground">Hiển thị:</span>
-                  <Select
-                    value={String(pageSize)}
-                    onValueChange={(val) => {
-                      setPageSize(val === "all" ? "all" : Number(val));
-                      setPage(1);
-                    }}
-                  >
-                    <SelectTrigger className="h-8.5 w-32 rounded-xl text-xs font-semibold bg-card border-border/80 shadow-2xs">
-                      <SelectValue placeholder="Số lượng" />
-                    </SelectTrigger>
-                    <SelectContent align="end">
-                      <SelectItem value="12">12 / trang</SelectItem>
-                      <SelectItem value="24">24 / trang</SelectItem>
-                      <SelectItem value="48">48 / trang</SelectItem>
-                      <SelectItem value="all">Tất cả</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {places.map((place) => (
-                  <PlaceCard
-                    key={place.id}
-                    place={place}
-                    onCardClick={(e, p) => handlePlaceCardClick(p, e)}
-                    onContributePhoto={(p) => setContributePlace(p)}
-                    userLocation={userLocation}
-                  />
-                ))}
-              </div>
-
-              {/* Pagination Controls */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-3 pt-6 border-t border-border">
-                  <button
-                    type="button"
-                    disabled={page <= 1}
-                    onClick={() => {
-                      setPage((p) => Math.max(1, p - 1));
-                      window.scrollTo({ top: 250, behavior: "smooth" });
-                    }}
-                    className="flex items-center gap-1 rounded-xl border border-border px-3.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <ChevronLeft className="size-4" />
-                    <span>Trang trước</span>
-                  </button>
-
-                  <span className="text-xs font-medium text-foreground px-2">
-                    Trang {page} / {totalPages}
+      ) : (
+        /* ================= UNIFIED SPLIT-VIEW (AIRBNB STYLE) ================= */
+        <div className="relative">
+          <div className="lg:grid lg:grid-cols-[minmax(0,48%)_minmax(0,52%)] lg:gap-6 items-start">
+            {/* Left Column: Places List or Geocoded Pin or Empty */}
+            <div className={cn("flex flex-col gap-4", showMobileMap ? "hidden lg:flex" : "flex")}>
+              {/* Fallback Banner if applicable */}
+              {isFallbackResult && places.length > 0 && (
+                <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs">
+                  <Sparkles className="size-4 shrink-0 text-amber-600" />
+                  <span>
+                    Không tìm thấy địa điểm chính xác cho <strong>&quot;{keyword}&quot;</strong>. Gợi ý các địa điểm tương tự:
                   </span>
-
-                  <button
-                    type="button"
-                    disabled={page >= totalPages}
-                    onClick={() => {
-                      setPage((p) => Math.min(totalPages, p + 1));
-                      window.scrollTo({ top: 250, behavior: "smooth" });
-                    }}
-                    className="flex items-center gap-1 rounded-xl border border-border px-3.5 py-2 text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                  >
-                    <span>Trang sau</span>
-                    <ChevronRight className="size-4" />
-                  </button>
                 </div>
               )}
-            </>
-          ) : (
-              <EmptyState
-                title={
-                  pinNearbyCenter
-                    ? `Không có địa điểm nào quanh "${pinNearbyCenter.label}" trong bán kính ${radiusKm}km`
-                    : geocodedLocation
-                      ? `Không có địa điểm nào quanh "${geocodedLocation.displayName}" trong bán kính ${radiusKm}km`
-                      : useGpsSearch
-                        ? `Không có địa điểm nào trong bán kính ${radiusKm}km quanh vị trí của bạn`
-                        : "Không tìm thấy địa điểm phù hợp"
-                }
-                description={
-                  pinNearbyCenter || geocodedLocation
-                    ? `Khu vực này hiện chưa có dữ liệu địa điểm trong bán kính ${radiusKm}km. Bạn hãy thử tăng bán kính lên (10km - 20km) hoặc xóa từ khóa tìm kiếm để khám phá thêm địa điểm.`
-                    : useGpsSearch
-                      ? `Hiện dữ liệu chưa có điểm đến nào nằm trong bán kính ${radiusKm}km quanh tọa độ của bạn. Bạn hãy thử tăng bán kính lên (10km - 20km) hoặc tắt "Tìm quanh đây" để khám phá hơn 3.100 địa điểm khác trên toàn quốc.`
-                      : keyword
-                        ? `Không tìm thấy địa điểm nào khớp với "${keyword}". Hãy thử tìm kiếm với từ khóa khác hoặc điều chỉnh bộ lọc.`
-                        : "Hãy thử bỏ bớt một số tiện ích hoặc chọn 'Tất cả' để xem nhiều gợi ý hơn."
-                }
-                actionLabel={
-                  pinNearbyCenter || geocodedLocation
-                    ? radiusKm < 20
-                      ? "Tăng bán kính lên 10km"
-                      : "Bỏ ghim vị trí"
-                    : useGpsSearch
-                      ? "Tắt tìm quanh đây (Xem toàn quốc)"
-                      : "Xóa bộ lọc tìm kiếm"
-                }
-                onAction={
-                  pinNearbyCenter || geocodedLocation
-                    ? radiusKm < 20
-                      ? () => {
-                          setRadiusKm(10);
-                          setPage(1);
-                        }
-                      : handleClearPin
-                    : useGpsSearch
-                      ? () => setUseGpsSearch(false)
-                      : resetFilters
-                }
-              />
-          )}
-        </div>
-      ) : (
-        /* ================= MODE 2: AIRBNB SPLIT-VIEW ================= */
-        /* In Split View: ALWAYS KEEP 2 COLUMNS WITH MAP MOUNTED! */
-        <div className="lg:grid lg:grid-cols-[minmax(0,48%)_minmax(0,52%)] lg:gap-6 items-start">
-          {/* Left Column: Places List or Geocoded Pin or Empty */}
-          <div className="flex flex-col gap-4">
-            {/* Fallback Banner if applicable */}
-            {isFallbackResult && places.length > 0 && (
-              <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs">
-                <Sparkles className="size-4 shrink-0 text-amber-600" />
-                <span>
-                  Không tìm thấy địa điểm chính xác cho <strong>&quot;{keyword}&quot;</strong>. Gợi ý các địa điểm tương tự:
-                </span>
-              </div>
-            )}
 
-            {places.length > 0 ? (
-              <>
-                {/* Top Bar above Split View Cards: Count & Right-aligned Page Size Dropdown */}
-                <div className="flex items-center justify-between pb-1">
-                  <span className="text-xs text-muted-foreground font-medium">
-                    <strong className="text-foreground font-semibold">{totalCount.toLocaleString("vi-VN")}</strong> địa điểm
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] font-medium text-muted-foreground">Hiển thị:</span>
-                    <Select
-                      value={String(pageSize)}
-                      onValueChange={(val) => {
-                        setPageSize(val === "all" ? "all" : Number(val));
-                        setPage(1);
-                      }}
-                    >
-                      <SelectTrigger className="h-8.5 w-32 rounded-xl text-xs font-semibold bg-card border-border/80 shadow-2xs">
-                        <SelectValue placeholder="Số lượng" />
-                      </SelectTrigger>
-                      <SelectContent align="end">
-                        <SelectItem value="12">12 / trang</SelectItem>
-                        <SelectItem value="24">24 / trang</SelectItem>
-                        <SelectItem value="48">48 / trang</SelectItem>
-                        <SelectItem value="all">Tất cả</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {places.map((place) => (
-                    <div
-                      key={place.id}
-                      id={`place-card-${place.id}`}
-                      onMouseEnter={() => setHoveredPlaceId(place.id)}
-                      onMouseLeave={() => setHoveredPlaceId(null)}
-                      className="transition-all rounded-2xl"
-                    >
-                      <PlaceCard
-                        place={place}
-                        isSelected={selectedPlaceId === place.id}
-                        onCardClick={(e, p) => handlePlaceCardClick(p, e)}
-                        onContributePhoto={(p) => setContributePlace(p)}
-                        userLocation={userLocation}
-                      />
-                    </div>
-                  ))}
-                </div>
-
-                {/* Pagination Controls in Split View */}
-                {totalPages > 1 && (
-                  <div className="flex items-center justify-between pt-4 border-t border-border">
-                    <button
-                      type="button"
-                      disabled={page <= 1}
-                      onClick={() => {
-                        setPage((p) => Math.max(1, p - 1));
-                        window.scrollTo({ top: 250, behavior: "smooth" });
-                      }}
-                      className="flex items-center gap-1 rounded-xl border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <ChevronLeft className="size-3.5" />
-                      <span>Trang trước</span>
-                    </button>
-                    <span className="text-xs font-medium text-foreground">
-                      Trang {page} / {totalPages}
+              {places.length > 0 ? (
+                <>
+                  {/* Top Bar above Split View Cards: Count & Right-aligned Page Size Dropdown */}
+                  <div className="flex items-center justify-between pb-1">
+                    <span className="text-xs text-muted-foreground font-medium">
+                      Tìm thấy <strong className="text-foreground font-semibold">{totalCount.toLocaleString("vi-VN")}</strong> địa điểm
                     </span>
-                    <button
-                      type="button"
-                      disabled={page >= totalPages}
-                      onClick={() => {
-                        setPage((p) => Math.min(totalPages, p + 1));
-                        window.scrollTo({ top: 250, behavior: "smooth" });
-                      }}
-                      className="flex items-center gap-1 rounded-xl border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      <span>Trang sau</span>
-                      <ChevronRight className="size-3.5" />
-                    </button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <EmptyState
-                title={
-                  pinNearbyCenter
-                    ? `Không có địa điểm nào quanh "${pinNearbyCenter.label}" trong bán kính ${radiusKm}km`
-                    : geocodedLocation
-                      ? `Không có địa điểm nào quanh "${geocodedLocation.displayName}" trong bán kính ${radiusKm}km`
-                      : useGpsSearch
-                        ? `Không có địa điểm nào trong bán kính ${radiusKm}km quanh vị trí của bạn`
-                        : "Không tìm thấy địa điểm phù hợp"
-                }
-                description={
-                  pinNearbyCenter || geocodedLocation
-                    ? `Khu vực này hiện chưa có dữ liệu địa điểm trong bán kính ${radiusKm}km. Bạn hãy thử tăng bán kính lên (10km - 20km) hoặc xóa từ khóa tìm kiếm để khám phá thêm địa điểm.`
-                    : useGpsSearch
-                      ? `Hiện dữ liệu chưa có điểm đến nào nằm trong bán kính ${radiusKm}km quanh tọa độ của bạn. Bạn hãy thử tăng bán kính lên (10km - 20km) hoặc tắt "Tìm quanh đây" để khám phá hơn 3.100 địa điểm khác trên toàn quốc.`
-                      : keyword
-                        ? `Không tìm thấy địa điểm nào khớp với "${keyword}". Hãy thử tìm kiếm với từ khóa khác hoặc điều chỉnh bộ lọc.`
-                        : "Hãy thử bỏ bớt một số tiện ích hoặc chọn 'Tất cả' để xem nhiều gợi ý hơn."
-                }
-                actionLabel={
-                  pinNearbyCenter || geocodedLocation
-                    ? radiusKm < 20
-                      ? "Tăng bán kính lên 10km"
-                      : "Bỏ ghim vị trí"
-                    : useGpsSearch
-                      ? "Tắt tìm quanh đây (Xem toàn quốc)"
-                      : "Xóa bộ lọc tìm kiếm"
-                }
-                onAction={
-                  pinNearbyCenter || geocodedLocation
-                    ? radiusKm < 20
-                      ? () => {
-                          setRadiusKm(10);
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-medium text-muted-foreground">Hiển thị:</span>
+                      <Select
+                        value={String(pageSize)}
+                        onValueChange={(val) => {
+                          setPageSize(val === "all" ? "all" : Number(val));
                           setPage(1);
-                        }
-                      : handleClearPin
-                    : useGpsSearch
-                      ? () => setUseGpsSearch(false)
-                      : resetFilters
-                }
+                        }}
+                      >
+                        <SelectTrigger className="h-8.5 w-32 rounded-xl text-xs font-semibold bg-card border-border/80 shadow-2xs">
+                          <SelectValue placeholder="Số lượng" />
+                        </SelectTrigger>
+                        <SelectContent align="end">
+                          <SelectItem value="12">12 / trang</SelectItem>
+                          <SelectItem value="24">24 / trang</SelectItem>
+                          <SelectItem value="48">48 / trang</SelectItem>
+                          <SelectItem value="all">Tất cả</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {places.map((place) => (
+                      <div
+                        key={place.id}
+                        id={`place-card-${place.id}`}
+                        onMouseEnter={() => setHoveredPlaceId(place.id)}
+                        onMouseLeave={() => setHoveredPlaceId(null)}
+                        className="transition-all rounded-2xl"
+                      >
+                        <PlaceCard
+                          place={place}
+                          isSelected={selectedPlaceId === place.id}
+                          onCardClick={(e, p) => handlePlaceCardClick(p, e)}
+                          onContributePhoto={(p) => setContributePlace(p)}
+                          userLocation={userLocation}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Pagination Controls in Split View */}
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between pt-4 border-t border-border">
+                      <button
+                        type="button"
+                        disabled={page <= 1}
+                        onClick={() => {
+                          setPage((p) => Math.max(1, p - 1));
+                          window.scrollTo({ top: 250, behavior: "smooth" });
+                        }}
+                        className="flex items-center gap-1 rounded-xl border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <ChevronLeft className="size-3.5" />
+                        <span>Trang trước</span>
+                      </button>
+                      <span className="text-xs font-medium text-foreground">
+                        Trang {page} / {totalPages}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={page >= totalPages}
+                        onClick={() => {
+                          setPage((p) => Math.min(totalPages, p + 1));
+                          window.scrollTo({ top: 250, behavior: "smooth" });
+                        }}
+                        className="flex items-center gap-1 rounded-xl border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                      >
+                        <span>Trang sau</span>
+                        <ChevronRight className="size-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <EmptyState
+                  title={
+                    pinNearbyCenter
+                      ? `Không có địa điểm nào quanh "${pinNearbyCenter.label}" trong bán kính ${radiusKm}km`
+                      : geocodedLocation
+                        ? `Không có địa điểm nào quanh "${geocodedLocation.displayName}" trong bán kính ${radiusKm}km`
+                        : useGpsSearch
+                          ? `Không có địa điểm nào trong bán kính ${radiusKm}km quanh vị trí của bạn`
+                          : "Không tìm thấy địa điểm phù hợp"
+                  }
+                  description={
+                    pinNearbyCenter || geocodedLocation
+                      ? `Khu vực này hiện chưa có dữ liệu địa điểm trong bán kính ${radiusKm}km. Bạn hãy thử tăng bán kính lên (10km - 20km) hoặc xóa từ khóa tìm kiếm để khám phá thêm địa điểm.`
+                      : useGpsSearch
+                        ? `Hiện dữ liệu chưa có điểm đến nào nằm trong bán kính ${radiusKm}km quanh tọa độ của bạn. Bạn hãy thử tăng bán kính lên (10km - 20km) hoặc tắt "Tìm quanh đây" để khám phá hơn 3.100 địa điểm khác trên toàn quốc.`
+                        : keyword
+                          ? `Không tìm thấy địa điểm nào khớp với "${keyword}". Hãy thử tìm kiếm với từ khóa khác hoặc điều chỉnh bộ lọc.`
+                          : "Hãy thử bỏ bớt một số tiện ích hoặc chọn 'Tất cả' để xem nhiều gợi ý hơn."
+                  }
+                  actionLabel={
+                    pinNearbyCenter || geocodedLocation
+                      ? radiusKm < 20
+                        ? "Tăng bán kính lên 10km"
+                        : "Bỏ ghim vị trí"
+                      : useGpsSearch
+                        ? "Tắt tìm quanh đây (Xem toàn quốc)"
+                        : "Xóa bộ lọc tìm kiếm"
+                  }
+                  onAction={
+                    pinNearbyCenter || geocodedLocation
+                      ? radiusKm < 20
+                        ? () => {
+                            setRadiusKm(10);
+                            setPage(1);
+                          }
+                        : handleClearPin
+                      : useGpsSearch
+                        ? () => setUseGpsSearch(false)
+                        : resetFilters
+                  }
+                />
+              )}
+            </div>
+
+            {/* Right Column: Sticky Map (VietMap) - ALWAYS MOUNTED AND ACTIVE! */}
+            <div
+              className={cn(
+                "h-[calc(100vh-140px)] min-h-[500px] rounded-2xl overflow-hidden shadow-xs border",
+                showMobileMap ? "block" : "hidden lg:block lg:sticky lg:top-24"
+              )}
+            >
+              <VietMapLoader
+                places={discoveryPlaces}
+                center={mapCenter}
+                radiusKm={radiusKm}
+                selectedPlaceId={selectedPlaceId}
+                hoveredPlaceId={hoveredPlaceId}
+                onSelectPlace={handleSelectPlace}
+                onViewportChange={() => {}}
+                onRequestCurrentLocation={handleRequestCurrentLocation}
+                locating={locating}
+                selectedProvinceName={selectedProvinceName}
+                userLocation={userLocation || null}
+                geocodedPin={activeGeocodedPin}
+                onMapClickDropPin={handleMapClickDropPin}
+                routeToPinRequest={routeToPinRequest}
+                onPinDragEnd={handlePinDragEnd}
+                onSearchThisArea={handleSearchThisArea}
+                travelAreas={travelAreas}
               />
-            )}
+            </div>
           </div>
 
-          {/* Right Column: Sticky Map (VietMap) - ALWAYS MOUNTED AND ACTIVE! */}
-          <div className="hidden lg:block lg:sticky lg:top-24 h-[calc(100vh-140px)] min-h-[500px] rounded-2xl overflow-hidden shadow-xs border">
-            <VietMapLoader
-              places={discoveryPlaces}
-              center={mapCenter}
-              radiusKm={radiusKm}
-              selectedPlaceId={selectedPlaceId}
-              hoveredPlaceId={hoveredPlaceId}
-              onSelectPlace={handleSelectPlace}
-              onViewportChange={() => {}}
-              onRequestCurrentLocation={handleRequestCurrentLocation}
-              locating={locating}
-              selectedProvinceName={selectedProvinceName}
-              userLocation={userLocation || null}
-              geocodedPin={activeGeocodedPin}
-              onMapClickDropPin={handleMapClickDropPin}
-              routeToPinRequest={routeToPinRequest}
-              onPinDragEnd={handlePinDragEnd}
-              onSearchThisArea={handleSearchThisArea}
-              travelAreas={travelAreas}
-            />
+          {/* Mobile Floating View Switcher (Airbnb style) */}
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 lg:hidden">
+            <button
+              type="button"
+              onClick={() => setShowMobileMap((prev) => !prev)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-900 text-white font-semibold text-xs shadow-lg hover:bg-slate-800 active:scale-95 transition-all cursor-pointer"
+            >
+              {showMobileMap ? (
+                <>
+                  <List className="size-4 text-white" />
+                  <span>Xem danh sách</span>
+                </>
+              ) : (
+                <>
+                  <MapIcon className="size-4 text-white" />
+                  <span>Xem bản đồ</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
       )}

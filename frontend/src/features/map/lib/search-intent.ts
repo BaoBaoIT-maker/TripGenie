@@ -6,6 +6,7 @@ export interface ParsedSearchIntent {
   isNearbyIntent: boolean;
   extractedRadiusKm?: RadiusKm;
   anchorLandmark?: string;
+  areaName?: string;
 }
 
 /**
@@ -31,6 +32,9 @@ const NEARBY_INTENT_PATTERN =
 const LANDMARK_ANCHOR_PATTERN =
   /^(.*?)\s+(?:gần|quanh|sát|cạnh|kế\s+bên|near|around|close\s+to|by|next\s+to)\s+([^,]+)$/i;
 
+// Administrative area pattern ("quán cafe ở Đà Nẵng", "khách sạn tại Hà Nội")
+const AREA_PATTERN = /^(?:(.*?)\s+)?(?:ở|tại|in|at)\s+([^,]+)$/i;
+
 /**
  * Parses user search query for spatial intent, distance/radius, and anchor landmark.
  * Pure function: Fast, zero-dependency, 0ms execution time, completely testable.
@@ -40,6 +44,7 @@ export function parseSearchIntent(rawQuery: string): ParsedSearchIntent {
   let extractedRadiusKm: RadiusKm | undefined = undefined;
   let isNearbyIntent = false;
   let anchorLandmark: string | undefined = undefined;
+  let areaName: string | undefined = undefined;
 
   // 1. Extract Distance / Radius if present
   const distMatch = workingQuery.match(DISTANCE_PATTERN);
@@ -82,6 +87,16 @@ export function parseSearchIntent(rawQuery: string): ParsedSearchIntent {
     }
   }
 
+  // 4. Extract Administrative Area if query matches: [target] ở/tại [area]
+  const areaMatch = workingQuery.match(AREA_PATTERN);
+  if (areaMatch && areaMatch[2]?.trim()) {
+    const potentialArea = areaMatch[2].trim();
+    if (!NEARBY_INTENT_PATTERN.test(potentialArea)) {
+      areaName = potentialArea;
+      workingQuery = (areaMatch[1] || "").trim();
+    }
+  }
+
   // Normalize spaces
   const cleanedKeyword = workingQuery.replace(/\s+/g, " ").trim();
 
@@ -91,5 +106,6 @@ export function parseSearchIntent(rawQuery: string): ParsedSearchIntent {
     isNearbyIntent,
     extractedRadiusKm,
     anchorLandmark,
+    areaName,
   };
 }

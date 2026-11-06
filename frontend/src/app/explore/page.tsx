@@ -84,7 +84,6 @@ function ExploreContent() {
   const [keyword, setKeyword] = useState<string>(parsedQuery.keyword || "");
   const [selectedAreaId, setSelectedAreaId] = useState<number | "all">(parsedQuery.areaId || "all");
   const [selectedSuperCategoryId, setSelectedSuperCategoryId] = useState<string>(parsedQuery.category || "all");
-  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
   const [selectedAudience, setSelectedAudience] = useState<SuitableAudience | "all">(parsedQuery.suitableFor || "all");
   const [selectedSort, setSelectedSort] = useState<ExploreSort>(parsedQuery.sort || "rating");
 
@@ -120,10 +119,9 @@ function ExploreContent() {
     if (minRating !== null) count++;
     if (selectedBudgetLevels.length > 0) count += selectedBudgetLevels.length;
     if (selectedAudience !== "all") count++;
-    if (selectedAmenities.length > 0) count += selectedAmenities.length;
     if (useGpsSearch && radiusKm !== 5) count++;
     return count;
-  }, [minRating, selectedBudgetLevels, selectedAudience, selectedAmenities, useGpsSearch, radiusKm]);
+  }, [minRating, selectedBudgetLevels, selectedAudience, useGpsSearch, radiusKm]);
 
   // Pagination & Data
   const [page, setPage] = useState(1);
@@ -323,7 +321,6 @@ function ExploreContent() {
         keyword: keyword.trim() || undefined,
         areaId,
         categorySlugs,
-        amenities: selectedAmenities.length > 0 ? selectedAmenities : undefined,
         minRating: minRating || undefined,
         budgetLevels: selectedBudgetLevels.length > 0 ? selectedBudgetLevels : undefined,
         openNow: openNow ? true : undefined,
@@ -388,7 +385,6 @@ function ExploreContent() {
     keyword,
     selectedAreaId,
     activeSuperCategory.slugs,
-    selectedAmenities,
     selectedAudience,
     selectedSort,
     minRating,
@@ -483,21 +479,10 @@ function ExploreContent() {
   const handleSelectSuperCategory = (catId: string) => {
     startTransition(() => {
       setSelectedSuperCategoryId(catId);
-      setSelectedAmenities([]);
       setPage(1);
     });
   };
 
-  // Toggle Amenity Chip
-  const handleToggleAmenity = (amenityId: string) => {
-    setSelectedAmenities((prev) => {
-      if (prev.includes(amenityId)) {
-        return prev.filter((id) => id !== amenityId);
-      }
-      return [...prev, amenityId];
-    });
-    setPage(1);
-  };
 
   // GPS Toggle Handler
   const handleToggleGps = () => {
@@ -520,7 +505,6 @@ function ExploreContent() {
     setIsFallbackResult(false);
     setSelectedAreaId("all");
     setSelectedSuperCategoryId("all");
-    setSelectedAmenities([]);
     setSelectedAudience("all");
     setUseGpsSearch(false);
     setRadiusKm(5);
@@ -584,7 +568,6 @@ function ExploreContent() {
     geocodedLocation !== null ||
     selectedAreaId !== "all" ||
     selectedSuperCategoryId !== "all" ||
-    selectedAmenities.length > 0 ||
     selectedAudience !== "all" ||
     useGpsSearch ||
     minRating !== null ||
@@ -643,7 +626,7 @@ function ExploreContent() {
         {pinNearbyCenter && (
           <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-sky-50 border border-sky-200 text-xs text-[#0194F3] font-medium">
             <div className="flex items-center gap-2 truncate">
-              <LocateFixed className="size-4 shrink-0 animate-pulse" />
+              <LocateFixed className="size-4 shrink-0 " />
               <span className="truncate">
                 Đang quét quanh: <strong>{pinNearbyCenter.label}</strong> (Bán kính {radiusKm}km)
               </span>
@@ -695,7 +678,7 @@ function ExploreContent() {
               <div className="absolute top-full left-0 right-0 mt-2 z-30 bg-white rounded-2xl border border-slate-200 shadow-xl p-3 space-y-2 animate-in fade-in-50 zoom-in-95 duration-150">
                 <div className="flex items-center justify-between px-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   <span className="flex items-center gap-1.5">
-                    <Sparkles className="size-3 text-[#0194F3]" />
+                    <Compass className="size-3.5 text-[#0194F3]" />
                     <span>Gợi ý tìm kiếm phổ biến</span>
                   </span>
                   <button
@@ -909,9 +892,6 @@ function ExploreContent() {
           setSelectedAudience(val);
           setPage(1);
         }}
-        amenities={activeSuperCategory.amenities}
-        selectedAmenities={selectedAmenities}
-        onAmenityToggle={handleToggleAmenity}
         useGpsSearch={useGpsSearch}
         radiusKm={radiusKm}
         onRadiusKmChange={(val) => {

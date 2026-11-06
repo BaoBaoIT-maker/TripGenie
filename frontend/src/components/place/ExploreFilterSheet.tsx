@@ -16,7 +16,6 @@ import {
   Users,
   LocateFixed,
   RotateCcw,
-  Sparkles,
 } from "lucide-react";
 import { SuitableAudience } from "@/types/place";
 import { RadiusKm } from "@/features/map/types";
@@ -55,9 +54,6 @@ interface ExploreFilterSheetProps {
   onBudgetLevelToggle: (id: string) => void;
   selectedAudience: SuitableAudience | "all";
   onAudienceChange: (val: SuitableAudience | "all") => void;
-  amenities?: Array<{ id: string; label: string }>;
-  selectedAmenities: string[];
-  onAmenityToggle: (id: string) => void;
   useGpsSearch: boolean;
   radiusKm: RadiusKm;
   onRadiusKmChange: (val: RadiusKm) => void;
@@ -74,9 +70,6 @@ export function ExploreFilterSheet({
   onBudgetLevelToggle,
   selectedAudience,
   onAudienceChange,
-  amenities,
-  selectedAmenities,
-  onAmenityToggle,
   useGpsSearch,
   radiusKm,
   onRadiusKmChange,
@@ -196,38 +189,7 @@ export function ExploreFilterSheet({
             </div>
           </div>
 
-          {/* Section 4: Amenities (Contextual) */}
-          {amenities && amenities.length > 0 && (
-            <div className="space-y-2.5 pt-4 border-t border-slate-100">
-              <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-600">
-                <Sparkles className="size-4 text-purple-600" />
-                <span>Tiện ích theo danh mục</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {amenities.map((amenity) => {
-                  const isChecked = selectedAmenities.includes(amenity.id);
-                  return (
-                    <button
-                      key={amenity.id}
-                      type="button"
-                      onClick={() => onAmenityToggle(amenity.id)}
-                      className={cn(
-                        "py-1.5 px-3 rounded-lg text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5",
-                        isChecked
-                          ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
-                          : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
-                      )}
-                    >
-                      {isChecked && <span className="text-[10px] font-bold">✓</span>}
-                      <span>{amenity.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Section 5: GPS Radius (if GPS search active) */}
+          {/* Section 4: GPS Radius (if GPS search active) */}
           {useGpsSearch && (
             <div className="space-y-2.5 pt-4 border-t border-slate-100">
               <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#0194F3]">

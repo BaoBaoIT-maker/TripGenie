@@ -45,15 +45,9 @@ export function Footer() {
         <div className="pt-6 border-t border-slate-200/80 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p>© 2026 TripGenie Platform. Thiết kế tinh gọn, chuẩn trải nghiệm du lịch hiện đại.</p>
           <div className="flex items-center gap-6 font-medium">
-            <Link href="#" className="hover:text-slate-800 transition-colors">
-              Điều khoản
-            </Link>
-            <Link href="#" className="hover:text-slate-800 transition-colors">
-              Bảo mật
-            </Link>
-            <Link href="#" className="hover:text-slate-800 transition-colors">
-              Hỗ trợ
-            </Link>
+            <span className="text-slate-400 font-medium">
+              Phiên bản 2.0 • Đồng hành du lịch Việt Nam
+            </span>
           </div>
         </div>
       </div>

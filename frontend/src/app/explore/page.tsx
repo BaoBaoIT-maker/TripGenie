@@ -82,6 +82,7 @@ function ExploreContent() {
   const [contributePlace, setContributePlace] = useState<Place | null>(null);
 
   // Filters
+  const [searchInput, setSearchInput] = useState<string>(parsedQuery.keyword || "");
   const [keyword, setKeyword] = useState<string>(parsedQuery.keyword || "");
   const [selectedAreaId, setSelectedAreaId] = useState<number | "all">(parsedQuery.areaId || "all");
   const [selectedSuperCategoryId, setSelectedSuperCategoryId] = useState<string>(parsedQuery.category || "all");
@@ -168,6 +169,7 @@ function ExploreContent() {
     const nextKeyword = parsedQuery.keyword || "";
     if (keyword !== nextKeyword) {
       setKeyword(nextKeyword);
+      setSearchInput(nextKeyword);
       filterChanged = true;
     }
 
@@ -517,6 +519,7 @@ function ExploreContent() {
         setUseGpsSearch(true);
         setPinNearbyCenter(null);
         requestLocation();
+        setSearchInput(parsed.cleanedKeyword);
         setKeyword(parsed.cleanedKeyword);
         setPage(1);
         toast.info(
@@ -528,11 +531,14 @@ function ExploreContent() {
         const targetSearch = parsed.cleanedKeyword
           ? `${parsed.cleanedKeyword} gần ${parsed.anchorLandmark}`
           : parsed.anchorLandmark;
+        setSearchInput(targetSearch);
         setKeyword(targetSearch);
         setPage(1);
         toast.info(`Đang tìm kiếm "${targetSearch}"`);
       } else {
-        setKeyword(parsed.cleanedKeyword || rawQuery.trim());
+        const finalKeyword = parsed.cleanedKeyword || rawQuery.trim();
+        setSearchInput(finalKeyword);
+        setKeyword(finalKeyword);
         setPage(1);
       }
     },
@@ -541,6 +547,7 @@ function ExploreContent() {
 
   // Reset all filters
   const resetFilters = () => {
+    setSearchInput("");
     setKeyword("");
     setGeocodedLocation(null);
     setPinNearbyCenter(null);
@@ -562,7 +569,9 @@ function ExploreContent() {
   const handleMapClickDropPin = useCallback((coords: { lat: number; lng: number }) => {
     setPinNearbyCenter(null);
     setRouteToPinRequest(null);
-    setKeyword(`${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`);
+    const coordsStr = `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
+    setSearchInput(coordsStr);
+    setKeyword(coordsStr);
     setPage(1);
   }, [setPage]);
 
@@ -570,7 +579,9 @@ function ExploreContent() {
   const handlePinDragEnd = useCallback((coords: { lat: number; lng: number }) => {
     setPinNearbyCenter(null);
     setRouteToPinRequest(null);
-    setKeyword(`${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`);
+    const coordsStr = `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
+    setSearchInput(coordsStr);
+    setKeyword(coordsStr);
     setPage(1);
   }, [setPage]);
 
@@ -590,6 +601,7 @@ function ExploreContent() {
     setGeocodedLocation(null);
     setPinNearbyCenter(null);
     setRouteToPinRequest(null);
+    setSearchInput("");
     setKeyword("");
     setPage(1);
   }, [setPage]);
@@ -740,28 +752,26 @@ function ExploreContent() {
           <div ref={searchContainerRef} className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
             <Input
-              value={keyword}
+              value={searchInput}
               onFocus={() => setIsSearchFocused(true)}
-              onChange={(e) => {
-                setKeyword(e.target.value);
-                if (pinNearbyCenter) setPinNearbyCenter(null);
-                setPage(1);
-              }}
+              onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   e.preventDefault();
-                  handleExecuteSearch(keyword);
+                  handleExecuteSearch(searchInput);
                 }
               }}
               placeholder="Tìm điểm đến, món ngon, quán cafe..."
               className="h-11 pl-10 pr-20 text-sm rounded-xl bg-slate-50 border-slate-200/80 focus:bg-white focus:border-[#0194F3] font-medium"
             />
             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-              {keyword && (
+              {searchInput && (
                 <button
                   type="button"
                   onClick={() => {
+                    setSearchInput("");
                     setKeyword("");
+                    if (pinNearbyCenter) setPinNearbyCenter(null);
                     setPage(1);
                   }}
                   className="p-1 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
@@ -772,7 +782,7 @@ function ExploreContent() {
               )}
               <button
                 type="button"
-                onClick={() => handleExecuteSearch(keyword)}
+                onClick={() => handleExecuteSearch(searchInput)}
                 className="px-2.5 py-1 rounded-lg bg-[#0194F3] hover:bg-sky-600 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer"
                 title="Thực hiện tìm kiếm"
               >

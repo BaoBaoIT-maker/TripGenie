@@ -50,6 +50,7 @@ describe('PlacesService', () => {
   beforeEach(async () => {
     const mockRepo: Partial<jest.Mocked<IPlaceRepository>> = {
       searchPlaces: jest.fn(),
+      findLandmarkCoords: jest.fn(),
       findNearby: jest.fn(),
       findById: jest.fn(),
       findCategories: jest.fn(),
@@ -122,6 +123,58 @@ describe('PlacesService', () => {
       expect(result.items[0].distanceMeters).toBe(350);
       expect(result.meta.totalItems).toBe(1);
       expect(result.meta.totalPages).toBe(1);
+    });
+
+    it('should perform 2-stage spatial search when query contains landmark anchor', async () => {
+      (repository.findLandmarkCoords as jest.Mock).mockResolvedValue({
+        lat: 16.0592,
+        lng: 108.2483,
+        displayName: 'Bãi biển Mỹ Khê',
+      });
+      repository.searchPlaces.mockResolvedValue({
+        items: [mockRawPlaceRow],
+        total: 1,
+      });
+
+      const result = await service.searchPlaces({
+        keyword: 'khách sạn view biển gần Mỹ Khê',
+      });
+
+      expect(repository.findLandmarkCoords).toHaveBeenCalledWith('Mỹ Khê');
+      expect(repository.searchPlaces).toHaveBeenCalledWith(
+        expect.objectContaining({
+          lat: 16.0592,
+          lng: 108.2483,
+          categorySlugs: ['khach-san'],
+          keyword: 'view biển',
+          sortBy: PlaceSortBy.DISTANCE,
+        }),
+      );
+      expect(result.geocoded).toEqual({
+        lat: 16.0592,
+        lng: 108.2483,
+        displayName: 'Bãi biển Mỹ Khê',
+      });
+      expect(result.items).toHaveLength(1);
+    });
+
+    it('should enforce strict spatial guard and not fallback to semantic search when GPS coordinates return 0 places', async () => {
+      repository.searchPlaces.mockResolvedValue({
+        items: [],
+        total: 0,
+      });
+
+      const result = await service.searchPlaces({
+        keyword: 'quán cafe quanh đây',
+        lat: 10.776,
+        lng: 106.700,
+        radiusMeters: 5000,
+      });
+
+      expect(repository.searchPlaces).toHaveBeenCalledTimes(1);
+      expect(repository.searchSemantic).not.toHaveBeenCalled();
+      expect(result.items).toHaveLength(0);
+      expect(result.meta.totalItems).toBe(0);
     });
 
     it('should filter out closed places when openNow is true', async () => {

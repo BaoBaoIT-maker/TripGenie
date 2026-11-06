@@ -214,6 +214,67 @@ export class PlacesRepository implements IPlaceRepository {
     };
   }
 
+  async findLandmarkCoords(
+    name: string,
+  ): Promise<{ lat: number; lng: number; displayName: string } | null> {
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+    const raw = `%${trimmed.replace(/[\\%_]/g, '\\$&')}%`;
+    const norm = `%${trimmed
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/gi, 'd')
+      .toLowerCase()}%`;
+
+    // 1. Look up in places table (Attractions, Beaches, Bridges, Famous POIs)
+    const placeSql = `
+      SELECT name,
+             ST_Y(location::geometry) as lat,
+             ST_X(location::geometry) as lng
+      FROM places
+      WHERE deleted_at IS NULL
+        AND status = 'ACTIVE'
+        AND location IS NOT NULL
+        AND (name ILIKE $1 OR name_normalized ILIKE $2)
+      ORDER BY
+        CASE
+          WHEN name ILIKE $1 THEN 0
+          ELSE 1
+        END,
+        rating_avg DESC
+      LIMIT 1;
+    `;
+    const placeRes = await this.prisma.$queryRawUnsafe<any[]>(placeSql, raw, norm);
+    if (placeRes && placeRes.length > 0 && placeRes[0].lat && placeRes[0].lng) {
+      return {
+        lat: Number(placeRes[0].lat),
+        lng: Number(placeRes[0].lng),
+        displayName: placeRes[0].name,
+      };
+    }
+
+    // 2. Look up in travel_areas table (Districts, Wards, Zones)
+    const areaSql = `
+      SELECT name_vi, name,
+             (bbox_min_lat + bbox_max_lat) / 2 as lat,
+             (bbox_min_lng + bbox_max_lng) / 2 as lng
+      FROM travel_areas
+      WHERE bbox_min_lat IS NOT NULL
+        AND (name_vi ILIKE $1 OR name ILIKE $1)
+      LIMIT 1;
+    `;
+    const areaRes = await this.prisma.$queryRawUnsafe<any[]>(areaSql, raw);
+    if (areaRes && areaRes.length > 0 && areaRes[0].lat && areaRes[0].lng) {
+      return {
+        lat: Number(areaRes[0].lat),
+        lng: Number(areaRes[0].lng),
+        displayName: areaRes[0].name_vi || areaRes[0].name,
+      };
+    }
+
+    return null;
+  }
+
   async findNearby(dto: NearbyPlacesDto): Promise<PlaceRow[]> {
     const { lat, lng, radiusMeters = 3000, categorySlug, limit = 10 } = dto;
     const args: unknown[] = [lng, lat, radiusMeters];

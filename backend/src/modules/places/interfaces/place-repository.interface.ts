@@ -103,6 +103,13 @@ export interface IPlaceRepository {
   searchPlaces(filters: SearchPlacesDto): Promise<PlaceSearchResult>;
 
   /**
+   * Resolves a landmark name to its geographic coordinates from places or travel areas.
+   */
+  findLandmarkCoords(
+    name: string,
+  ): Promise<{ lat: number; lng: number; displayName: string } | null>;
+
+  /**
    * Finds nearby places within a specific radius from given GPS coordinates.
    */
   findNearby(dto: NearbyPlacesDto): Promise<PlaceRow[]>;

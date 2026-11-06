@@ -297,6 +297,11 @@ function ExploreContent() {
 
   // Fetch places using unified search (with automatic NLP fallback in backend)
   const fetchPlaces = useCallback(async () => {
+    // Hold off firing premature nationwide request while browser is actively acquiring GPS fix
+    if (useGpsSearch && !userLocation && locating) {
+      return;
+    }
+
     setLoading(true);
     const limit = pageSize === "all" ? 100 : pageSize;
 
@@ -393,6 +398,7 @@ function ExploreContent() {
     openNow,
     useGpsSearch,
     userLocation,
+    locating,
     pinNearbyCenter,
     radiusKm,
     page,

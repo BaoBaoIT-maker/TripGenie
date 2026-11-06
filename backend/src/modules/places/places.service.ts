@@ -17,6 +17,8 @@ import {
 } from './dto/place-response.dto';
 import { BudgetLevel } from '@prisma/client';
 import { detectSearchIntent } from '../../common/utils/string.util';
+import { PlaceSortBy } from '../../common/enums/places.enum';
+import { parseSearchQuery } from './utils/search-query-parser.util';
 import { checkIsOpenNow } from '../../common/utils/opening-hours.util';
 
 /** Max rows scanned when filtering by openNow in memory (see ponytail note in searchPlaces). */
@@ -45,31 +47,83 @@ export class PlacesService {
    * Frontend adds a "Tìm quanh đây" button for user-initiated nearby search.
    */
   async searchPlaces(dto: SearchPlacesDto): Promise<PaginatedPlacesResponseDto> {
-    const keyword = dto.keyword?.trim() ?? '';
-    const intent = keyword ? detectSearchIntent(keyword) : 'keyword';
+    const rawKeyword = dto.keyword?.trim() ?? '';
     const page = dto.page || 1;
     const limit = dto.limit || 20;
 
-    // ── Tier 1: Coordinates → PIN only ───────────────────────────────────────
-    if (intent === 'coordinates') {
-      const [latStr, lngStr] = keyword.split(/[,\s]+/);
-      const lat = parseFloat(latStr);
-      const lng = parseFloat(lngStr);
-      const displayName = await this.nominatim.reverseGeocode(lat, lng);
-      return {
-        items: [],
-        meta: { totalItems: 0, page: 1, limit, totalPages: 0 },
-        geocoded: { lat, lng, displayName: displayName ?? keyword },
-      };
+    // ── Tier 1: Coordinates intent → PIN only ──────────────────────────────────
+    if (rawKeyword) {
+      const intent = detectSearchIntent(rawKeyword);
+      if (intent === 'coordinates') {
+        const [latStr, lngStr] = rawKeyword.split(/[\s,]+/);
+        const lat = parseFloat(latStr);
+        const lng = parseFloat(lngStr);
+        const displayName = await this.nominatim.reverseGeocode(lat, lng);
+        return {
+          items: [],
+          meta: { totalItems: 0, page: 1, limit, totalPages: 0 },
+          geocoded: { lat, lng, displayName: displayName ?? rawKeyword },
+        };
+      }
     }
 
-    // ── Tier 2 & 3: DB keyword search first ──────────────────────────────────
-    // ponytail: opening_hours is free-form text/JSON, so openNow is evaluated in memory over at most
-    // OPEN_NOW_SCAN_LIMIT rows, then paginated here. Ceiling: rows beyond the limit are never considered.
-    // Upgrade: normalize opening_hours into a table and filter in SQL.
+    // ── Tier 2: 2-Stage Spatial Search if Landmark Anchor is present ("X gần Y") ──
+    const parsed = rawKeyword ? parseSearchQuery(rawKeyword) : null;
+
+    if (parsed?.landmarkAnchor) {
+      // Resolve Landmark to coordinates (DB first, fallback to Nominatim)
+      let landmark = await this.placeRepo.findLandmarkCoords(parsed.landmarkAnchor);
+      if (!landmark) {
+        landmark = await this.nominatim.geocode(parsed.landmarkAnchor);
+      }
+
+      if (landmark) {
+        const effectiveRadius = parsed.extractedRadiusMeters || dto.radiusMeters || 3000;
+        const effectiveCategorySlugs = parsed.categorySlug
+          ? [parsed.categorySlug]
+          : dto.categorySlugs;
+        const effectiveKeyword = parsed.cleanedKeyword || undefined;
+
+        const spatialDto: SearchPlacesDto = {
+          ...dto,
+          lat: landmark.lat,
+          lng: landmark.lng,
+          radiusMeters: effectiveRadius,
+          categorySlugs: effectiveCategorySlugs,
+          keyword: effectiveKeyword,
+          sortBy: PlaceSortBy.DISTANCE,
+          page,
+          limit,
+        };
+
+        const { items: rawItems, total: dbTotal } = await this.placeRepo.searchPlaces(spatialDto);
+        const items = rawItems.map((row) => this.mapToPlaceItemDto(row));
+        return {
+          items,
+          meta: { totalItems: dbTotal, page, limit, totalPages: Math.ceil(dbTotal / limit) || 1 },
+          geocoded: landmark,
+        };
+      }
+    }
+
+    // ── Tier 3: Standard Multi-Criteria Search ─────────────────────────────────
+    const effectiveCategorySlugs =
+      parsed?.categorySlug && (!dto.categorySlugs || dto.categorySlugs.length === 0)
+        ? [parsed.categorySlug]
+        : dto.categorySlugs;
+    const effectiveKeyword = parsed ? (parsed.cleanedKeyword || rawKeyword || undefined) : (rawKeyword || undefined);
+
+    const searchFilters: SearchPlacesDto = {
+      ...dto,
+      categorySlugs: effectiveCategorySlugs,
+      keyword: effectiveKeyword,
+      page,
+      limit,
+    };
+
     const openNowOnly = dto.openNow === true;
     const { items: rawItems, total: dbTotal } = await this.placeRepo.searchPlaces(
-      openNowOnly ? { ...dto, page: 1, limit: OPEN_NOW_SCAN_LIMIT } : dto,
+      openNowOnly ? { ...searchFilters, page: 1, limit: OPEN_NOW_SCAN_LIMIT } : searchFilters,
     );
 
     let items: PlaceItemDto[] = rawItems.map((row) => this.mapToPlaceItemDto(row));
@@ -88,10 +142,18 @@ export class PlacesService {
       };
     }
 
-    // ── Nothing in DB ────────────────────────────────────────────────────────
-    if (intent === 'address' && keyword) {
-      // Address → PIN only, matches Google Maps behavior
-      const geocoded = await this.nominatim.geocode(keyword);
+    // ── Strict Spatial Guard: If GPS coordinates were passed, DO NOT fallback to nationwide search! ──
+    const isExplicitSpatial = dto.lat !== undefined && dto.lng !== undefined;
+    if (isExplicitSpatial) {
+      return {
+        items: [],
+        meta: { totalItems: 0, page: 1, limit, totalPages: 0 },
+      };
+    }
+
+    // ── Address Geocoding Fallback ─────────────────────────────────────────────
+    if (rawKeyword && detectSearchIntent(rawKeyword) === 'address') {
+      const geocoded = await this.nominatim.geocode(rawKeyword);
       if (geocoded) {
         return {
           items: [],
@@ -99,14 +161,14 @@ export class PlacesService {
           geocoded,
         };
       }
-      // Geocode failed → fall through to NLP
     }
 
-    // ── Tier 3: NLP semantic fallback ────────────────────────────────────────
-    if (keyword) {
-      this.logger.log(`Keyword "${keyword}" not found in DB — falling back to semantic search`);
+    // ── Tier 4: NLP Semantic Search Fallback (for non-spatial keyword queries) ──
+    const fallbackQuery = effectiveKeyword || rawKeyword;
+    if (fallbackQuery) {
+      this.logger.log(`Keyword "${fallbackQuery}" not found in DB — falling back to semantic search`);
       const semantic = await this.searchSemantic({
-        query: keyword,
+        query: fallbackQuery,
         areaId: dto.areaId,
         limit,
         minSimilarity: 0.25,

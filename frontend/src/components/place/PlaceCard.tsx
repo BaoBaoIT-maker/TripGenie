@@ -123,10 +123,10 @@ export function PlaceCard({
     <div
       onClick={handleCardInteraction}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-2xl border bg-card transition-[border-color,box-shadow] duration-200 hover:border-primary/40 hover:shadow-md cursor-pointer",
+        "group relative flex flex-col overflow-hidden rounded-2xl border bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl cursor-pointer",
         isSelected
-          ? "border-primary ring-2 ring-primary ring-offset-2 ring-offset-background shadow-lg"
-          : "border-border/80",
+          ? "border-[#0194F3] ring-2 ring-[#0194F3] ring-offset-2 ring-offset-background shadow-lg"
+          : "border-slate-200/80 hover:border-slate-300 shadow-2xs",
         className
       )}
     >
@@ -150,7 +150,7 @@ export function PlaceCard({
                   place.coverImage.includes("wikipedia.org")
                 }
                 sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                className="object-cover transition-transform duration-200 [@media(hover:hover)_and_(pointer:fine)]:group-hover:scale-[1.025] motion-reduce:transform-none"
+                className="object-cover transition-transform duration-500 ease-out [@media(hover:hover)_and_(pointer:fine)]:group-hover:scale-105 motion-reduce:transform-none"
                 onError={() => setImgError(true)}
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
@@ -193,13 +193,13 @@ export function PlaceCard({
           <div className="flex flex-wrap items-center gap-1.5 pointer-events-auto">
             <Badge
               variant="secondary"
-              className="bg-background/90 text-foreground backdrop-blur-md text-[11px] font-semibold py-0.5 px-2.5 shadow-xs"
+              className="bg-black/50 text-white border border-white/20 backdrop-blur-md text-[11px] font-bold py-0.5 px-2.5 shadow-xs"
             >
               {place.categoryLabel}
             </Badge>
 
             {place.matchScore && (
-              <Badge className="bg-primary/95 text-primary-foreground backdrop-blur-md text-[11px] font-bold py-0.5 px-2 shadow-xs gap-1">
+              <Badge className="bg-[#0194F3] text-white backdrop-blur-md text-[11px] font-bold py-0.5 px-2 shadow-xs gap-1">
                 <Sparkles className="size-3" />
                 <span>{place.matchScore}% Phù hợp</span>
               </Badge>
@@ -269,7 +269,7 @@ export function PlaceCard({
       <div className="flex flex-1 flex-col p-4 sm:p-5 justify-between space-y-3">
         <div className="space-y-1.5">
           <Link href={`/places/${place.slug}`} onClick={handleCardInteraction}>
-            <h3 className="text-base sm:text-lg font-bold tracking-tight text-foreground transition-colors group-hover:text-primary line-clamp-1">
+            <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 transition-colors group-hover:text-[#0194F3] line-clamp-1">
               {place.name}
             </h3>
           </Link>
@@ -312,7 +312,7 @@ export function PlaceCard({
           <Link
             href={`/places/${place.slug}`}
             onClick={handleCardInteraction}
-            className="font-semibold text-primary hover:underline text-xs"
+            className="font-bold text-[#0194F3] hover:underline text-xs"
           >
             Chi tiết <span className="inline-block transition-transform duration-200 group-hover:translate-x-[3px] motion-reduce:transform-none" aria-hidden="true">→</span>
           </Link>

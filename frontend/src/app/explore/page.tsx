@@ -5,9 +5,9 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Search,
-  Users,
   Sparkles,
   RotateCcw,
+  SlidersHorizontal,
   Loader2,
   MapPin,
   ChevronLeft,
@@ -16,8 +16,6 @@ import {
   Map as MapIcon,
   LocateFixed,
   Clock,
-  Star,
-  DollarSign,
   Compass,
   Navigation,
   X,
@@ -31,6 +29,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PlaceCard } from "@/components/place/PlaceCard";
+import { ExploreFilterSheet } from "@/components/place/ExploreFilterSheet";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/common/EmptyState";
 import { VietMapLoader } from "@/components/map/VietMapLoader";
 import { PhotoContributeModal } from "@/components/place/PhotoContributeModal";
@@ -45,30 +46,6 @@ import { SUPER_CATEGORIES, type SuperCategory } from "@/config/categories";
 import { DEFAULT_MAP_CENTER } from "@/features/map/map-config";
 import { useGeolocation } from "@/features/map/hooks/use-geolocation";
 import { parseExploreQuery, type ExploreSort } from "@/features/map/lib/explore-query";
-
-const AUDIENCES: { id: SuitableAudience | "all"; label: string }[] = [
-  { id: "all", label: "Tất cả đối tượng" },
-  { id: "couple", label: "Cặp đôi" },
-  { id: "family", label: "Gia đình" },
-  { id: "friends", label: "Nhóm bạn" },
-  { id: "solo", label: "Đi một mình" },
-];
-
-const RATING_FILTER_OPTIONS: { val: number | null; label: string }[] = [
-  { val: null, label: "Tất cả sao" },
-  { val: 3, label: "3.0★+" },
-  { val: 4, label: "4.0★+" },
-  { val: 4.5, label: "4.5★+" },
-];
-
-const BUDGET_LEVEL_OPTIONS: { id: string; label: string; desc: string }[] = [
-  { id: "LOW", label: "Dưới 100k", desc: "Tiết kiệm (< 100.000đ)" },
-  { id: "MEDIUM", label: "100k - 300k", desc: "Phổ thông (100.000đ - 300.000đ)" },
-  { id: "HIGH", label: "300k - 1 triệu", desc: "Cao cấp (300.000đ - 1.000.000đ)" },
-  { id: "LUXURY", label: "Trên 1 triệu", desc: "Sang trọng (> 1.000.000đ)" },
-];
-
-const RADIUS_OPTIONS: RadiusKm[] = [1, 3, 5, 10, 20];
 
 const AI_SUGGESTIONS = [
   "Quán cafe yên tĩnh làm việc gần biển Mỹ Khê",
@@ -118,6 +95,35 @@ function ExploreContent() {
   const [minRating, setMinRating] = useState<number | null>(null);
   const [selectedBudgetLevels, setSelectedBudgetLevels] = useState<string[]>([]);
   const [openNow, setOpenNow] = useState<boolean>(false);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+
+  // Close search suggestions when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (
+        searchContainerRef.current &&
+        !searchContainerRef.current.contains(event.target as Node)
+      ) {
+        setIsSearchFocused(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (minRating !== null) count++;
+    if (selectedBudgetLevels.length > 0) count += selectedBudgetLevels.length;
+    if (selectedAudience !== "all") count++;
+    if (selectedAmenities.length > 0) count += selectedAmenities.length;
+    if (useGpsSearch && radiusKm !== 5) count++;
+    return count;
+  }, [minRating, selectedBudgetLevels, selectedAudience, selectedAmenities, useGpsSearch, radiusKm]);
 
   // Pagination & Data
   const [page, setPage] = useState(1);
@@ -587,138 +593,59 @@ function ExploreContent() {
 
   return (
     <div className="max-w-[1536px] mx-auto w-full px-4 py-8 sm:px-6 lg:px-8 xl:px-10 space-y-7">
-      {/* Header Banner, View Toggle & AI Search Toggle */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-border/60">
+      {/* Header Banner & Mode Toggle */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-slate-200/80">
         <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-heading text-foreground">
-              Khám phá địa điểm
-            </h1>
-          </div>
-          <p className="text-xs sm:text-sm text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+            Khám phá địa điểm
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 font-medium">
             {selectedAreaObj
               ? `Khám phá các điểm đến hấp dẫn tại ${selectedAreaObj.nameVi || selectedAreaObj.name} được xác thực bởi cộng đồng.`
               : "Hơn 3.100 điểm đến trên toàn quốc được xác thực bởi cộng đồng."}
           </p>
         </div>
 
-        {/* View Toggle (Airbnb Style) & AI Toggle */}
-        <div className="flex items-center gap-2.5 self-start sm:self-auto flex-wrap">
-          {/* View Toggle */}
-          <div className="flex items-center rounded-xl border border-border/80 p-0.5 bg-muted/30 shadow-2xs">
-            <button
-              type="button"
-              onClick={() => setViewMode("grid")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                viewMode === "grid"
-                  ? "bg-foreground text-background shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <LayoutGrid className="size-3.5" />
-              <span className="hidden md:inline">Lưới danh sách</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode("split")}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                viewMode === "split"
-                  ? "bg-foreground text-background shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <MapIcon className="size-3.5" />
-              <span className="hidden md:inline">Bản đồ Split-View</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Minimalist Text Tabs */}
-      <div className="space-y-4">
-        {/* Super Categories Bar */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-border">
-          {SUPER_CATEGORIES.map((cat) => {
-            const isSelected = selectedSuperCategoryId === cat.id;
-
-            return (
-              <button
-                key={cat.id}
-                type="button"
-                onClick={() => handleSelectSuperCategory(cat.id)}
-                className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-medium transition-colors ${
-                  isSelected
-                    ? "bg-foreground text-background font-semibold shadow-xs"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
-                }`}
-              >
-                <span>{cat.label}</span>
-                <span
-                  className={`text-[11px] rounded-full px-1.5 py-0.2 ${
-                    isSelected
-                      ? "bg-background/20 text-background font-bold"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {cat.count.toLocaleString("vi-VN")}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Contextual Text Amenity Chips */}
-        {activeSuperCategory.amenities && activeSuperCategory.amenities.length > 0 && (
-          <div className="flex items-center gap-2 overflow-x-auto pt-1 pb-1 text-xs">
-            <span className="text-[11px] font-semibold text-muted-foreground shrink-0 mr-1 uppercase tracking-wider">
-              Tiện ích:
-            </span>
-            <div className="flex items-center gap-1.5 flex-nowrap">
-              {activeSuperCategory.amenities.map((amenity) => {
-                const isChecked = selectedAmenities.includes(amenity.id);
-                return (
-                  <button
-                    key={amenity.id}
-                    type="button"
-                    onClick={() => handleToggleAmenity(amenity.id)}
-                    className={`inline-flex shrink-0 items-center gap-1 rounded-md px-2.5 py-1 text-xs transition-colors border ${
-                      isChecked
-                        ? "bg-foreground text-background border-foreground font-semibold"
-                        : "bg-background border-border/80 text-muted-foreground hover:text-foreground hover:border-foreground/30"
-                    }`}
-                  >
-                    {isChecked && <span className="text-[10px]">✓</span>}
-                    <span>{amenity.label}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {selectedAmenities.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedAmenities([]);
-                  setPage(1);
-                }}
-                className="text-[11px] text-muted-foreground hover:text-foreground underline shrink-0 ml-2"
-              >
-                Xóa lọc tiện ích
-              </button>
+        {/* View Toggle (Grid vs Split Map) */}
+        <div className="flex items-center rounded-xl border border-slate-200 p-1 bg-slate-100/80 shadow-2xs self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setViewMode("grid")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer",
+              viewMode === "grid"
+                ? "bg-white text-slate-900 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
             )}
-          </div>
-        )}
+          >
+            <LayoutGrid className="size-3.5" />
+            <span className="hidden md:inline">Lưới danh sách</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("split")}
+            className={cn(
+              "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer",
+              viewMode === "split"
+                ? "bg-white text-slate-900 shadow-xs"
+                : "text-slate-600 hover:text-slate-900"
+            )}
+          >
+            <MapIcon className="size-3.5" />
+            <span className="hidden md:inline">Bản đồ Split-View</span>
+          </button>
+        </div>
       </div>
 
-      {/* Main Filter / Search Toolbar */}
-      <div className="rounded-2xl border border-border/80 bg-card p-4 sm:p-5 space-y-3.5 shadow-2xs">
-        {/* Active Pinned Center indicator if user clicked 'Tìm quanh đây' on a geocoded pin */}
+      {/* Main Unified Search Toolbar */}
+      <div className="relative rounded-2xl border border-slate-200/80 bg-white p-2 sm:p-2.5 shadow-sm space-y-2">
+        {/* Pinned Center Indicator (if user clicked 'Tìm quanh đây' on map pin) */}
         {pinNearbyCenter && (
-          <div className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-primary/10 border border-primary/25 text-xs text-primary font-medium">
+          <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-sky-50 border border-sky-200 text-xs text-[#0194F3] font-medium">
             <div className="flex items-center gap-2 truncate">
-              <LocateFixed className="size-4 shrink-0 text-primary animate-pulse" />
+              <LocateFixed className="size-4 shrink-0 animate-pulse" />
               <span className="truncate">
-                Đang khám phá quanh: <strong>{pinNearbyCenter.label}</strong> (Bán kính {radiusKm}km)
+                Đang quét quanh: <strong>{pinNearbyCenter.label}</strong> (Bán kính {radiusKm}km)
               </span>
             </div>
             <button
@@ -734,244 +661,267 @@ function ExploreContent() {
           </div>
         )}
 
-        {/* Row 1: Search Keyword, Province/City Select (34 Provinces Only), GPS Nearby Button */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          {/* Keyword Input */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          {/* Keyword Input with Autocomplete Popover */}
+          <div ref={searchContainerRef} className="relative flex-1">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
             <Input
               value={keyword}
+              onFocus={() => setIsSearchFocused(true)}
               onChange={(e) => {
                 setKeyword(e.target.value);
                 if (pinNearbyCenter) setPinNearbyCenter(null);
                 setPage(1);
               }}
-              placeholder="Tìm địa điểm, quán ăn, hoặc không gian bạn thích..."
-              className="h-11 pl-10 text-sm rounded-xl bg-muted/30"
+              placeholder="Tìm điểm đến, món ngon, quán cafe..."
+              className="h-11 pl-10 pr-9 text-sm rounded-xl bg-slate-50 border-slate-200/80 focus:bg-white focus:border-[#0194F3] font-medium"
             />
-          </div>
-
-              {/* Province / City Dropdown (Strictly 34 Provinces & Municipalities) */}
-              <div className="w-full sm:w-60 shrink-0">
-                <Select
-                  value={selectedAreaId === "all" ? "all" : String(selectedAreaId)}
-                  onValueChange={(val) => {
-                    setSelectedAreaId(val === "all" ? "all" : Number(val));
-                    setUseGpsSearch(false);
-                    setPage(1);
-                  }}
-                >
-                  <SelectTrigger className="h-11 rounded-xl bg-muted/30 border-border text-xs sm:text-sm font-medium">
-                    <div className="flex items-center gap-2 truncate">
-                      <MapPin className="size-4 text-primary shrink-0" />
-                      <SelectValue placeholder="Chọn Tỉnh / Thành" />
-                    </div>
-                  </SelectTrigger>
-                  <SelectContent className="max-h-80">
-                    <SelectItem value="all">Tất cả khu vực (Toàn quốc)</SelectItem>
-                    {provinceAreas.map((area) => (
-                      <SelectItem key={area.id} value={String(area.id)}>
-                        {area.nameVi || area.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* GPS Button: Tìm quanh đây */}
-              <button
-                type="button"
-                onClick={handleToggleGps}
-                className={`h-11 px-4 rounded-xl text-xs font-semibold flex items-center justify-center gap-2 border transition-all shrink-0 ${
-                  useGpsSearch
-                    ? "bg-primary text-primary-foreground border-primary shadow-xs"
-                    : "bg-muted/40 hover:bg-muted/80 text-foreground border-border"
-                }`}
-              >
-                {locating ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <LocateFixed className="size-4" />
-                )}
-                <span>{useGpsSearch ? "Đang tìm quanh đây" : "Tìm quanh đây"}</span>
-              </button>
-            </div>
-
-            {/* Quick Search Suggestions */}
-            <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-              <span className="text-[11px] font-semibold text-muted-foreground mr-1">Gợi ý tìm kiếm:</span>
-              {AI_SUGGESTIONS.map((sug, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => {
-                    setKeyword(sug);
-                    setPage(1);
-                  }}
-                  className="rounded-lg bg-muted/40 hover:bg-muted border border-border/70 px-2.5 py-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                >
-                  {sug}
-                </button>
-              ))}
-            </div>
-
-            {/* Row 2: Secondary Filter Criteria (Radius, Rating, Price, Open Now) */}
-            <div className="flex flex-wrap items-center gap-2.5 pt-2 border-t border-border/40 text-xs">
-              {/* If GPS is active: Radius selector */}
-              {useGpsSearch && (
-                <div className="flex items-center gap-1.5 bg-primary/10 border border-primary/25 rounded-lg px-2.5 py-1 text-primary font-medium">
-                  <span className="text-[11px] font-semibold">Bán kính:</span>
-                  <div className="flex items-center gap-1">
-                    {RADIUS_OPTIONS.map((r) => (
-                      <button
-                        key={r}
-                        type="button"
-                        onClick={() => {
-                          setRadiusKm(r);
-                          setPage(1);
-                        }}
-                        className={`px-1.5 py-0.5 rounded text-[11px] font-bold transition-colors ${
-                          radiusKm === r
-                            ? "bg-primary text-primary-foreground shadow-2xs"
-                            : "hover:bg-primary/20"
-                        }`}
-                      >
-                        {r}km
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Rating Filter Pills */}
-              <div className="flex items-center gap-1">
-                <span className="text-[11px] font-semibold text-muted-foreground mr-1 flex items-center gap-0.5">
-                  <Star className="size-3 text-amber-500 fill-amber-500" />
-                  <span>Đánh giá:</span>
-                </span>
-                {RATING_FILTER_OPTIONS.map((opt) => (
-                  <button
-                    key={String(opt.val)}
-                    type="button"
-                    onClick={() => {
-                      setMinRating(opt.val);
-                      setPage(1);
-                    }}
-                    className={`rounded-lg px-2 py-1 text-[11px] font-medium transition-colors ${
-                      minRating === opt.val
-                        ? "bg-foreground text-background font-semibold"
-                        : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Budget Level Filter Pills */}
-              <div className="flex items-center gap-1">
-                <span className="text-[11px] font-semibold text-muted-foreground mr-1 flex items-center gap-0.5">
-                  <DollarSign className="size-3" />
-                  <span>Mức giá:</span>
-                </span>
-                {BUDGET_LEVEL_OPTIONS.map((opt) => {
-                  const isSelected = selectedBudgetLevels.includes(opt.id);
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedBudgetLevels((prev) =>
-                          prev.includes(opt.id)
-                            ? prev.filter((x) => x !== opt.id)
-                            : [...prev, opt.id]
-                        );
-                        setPage(1);
-                      }}
-                      title={opt.desc}
-                      className={`rounded-lg px-2 py-1 text-[11px] font-medium transition-colors ${
-                        isSelected
-                          ? "bg-foreground text-background font-semibold"
-                          : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Open Now Toggle */}
+            {keyword && (
               <button
                 type="button"
                 onClick={() => {
-                  setOpenNow(!openNow);
+                  setKeyword("");
                   setPage(1);
                 }}
-                className={`flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-medium border transition-colors ${
-                  openNow
-                    ? "bg-emerald-600 text-white border-emerald-600 font-semibold shadow-2xs"
-                    : "bg-muted/40 hover:bg-muted text-muted-foreground border-border/70"
-                }`}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
+                title="Xóa tìm kiếm"
               >
-                <Clock className="size-3" />
-                <span>Đang mở cửa</span>
+                <X className="size-3.5" />
               </button>
-            </div>
+            )}
 
-            {/* Row 3: Audience Filter Pills */}
-            <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/30 text-xs">
-              <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1 mr-1">
-                <Users className="size-3.5" />
-                <span>Phù hợp:</span>
-              </span>
-              <div className="flex flex-wrap items-center gap-1">
-                {AUDIENCES.map((aud) => (
+            {/* Search Suggestions Dropdown (appears only when input is focused) */}
+            {isSearchFocused && (
+              <div className="absolute top-full left-0 right-0 mt-2 z-30 bg-white rounded-2xl border border-slate-200 shadow-xl p-3 space-y-2 animate-in fade-in-50 zoom-in-95 duration-150">
+                <div className="flex items-center justify-between px-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="size-3 text-[#0194F3]" />
+                    <span>Gợi ý tìm kiếm phổ biến</span>
+                  </span>
                   <button
-                    key={aud.id}
                     type="button"
-                    onClick={() => {
-                      setSelectedAudience(aud.id);
-                      setPage(1);
-                    }}
-                    className={`rounded-lg px-2.5 py-1 text-xs transition-colors ${
-                      selectedAudience === aud.id
-                        ? "bg-foreground text-background font-semibold"
-                        : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground"
-                    }`}
+                    onClick={() => setIsSearchFocused(false)}
+                    className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
                   >
-                    {aud.label}
+                    Đóng
                   </button>
-                ))}
+                </div>
+                <div className="space-y-1">
+                  {AI_SUGGESTIONS.map((sug, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setKeyword(sug);
+                        setPage(1);
+                        setIsSearchFocused(false);
+                      }}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 hover:bg-sky-50 hover:text-[#0194F3] transition-colors flex items-center gap-2 cursor-pointer"
+                    >
+                      <Search className="size-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate">{sug}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+          </div>
 
-        {/* Reset Filter Button if active */}
-        {isFiltering && (
-          <div className="flex items-center justify-between pt-2 text-xs text-muted-foreground border-t border-border/50">
-            <span>
-              {selectedAudience !== "all" ? (
-                <>
-                  Tìm thấy <strong className="text-foreground font-semibold">{places.length}</strong> địa điểm phù hợp trên trang này (lọc theo đối tượng)
-                </>
-              ) : (
-                <>
-                  Tìm thấy <strong className="text-foreground font-semibold">{totalCount}</strong> địa điểm phù hợp
-                </>
+          {/* Province / City Select Dropdown */}
+          <div className="w-full sm:w-56 shrink-0">
+            <Select
+              value={selectedAreaId === "all" ? "all" : String(selectedAreaId)}
+              onValueChange={(val) => {
+                setSelectedAreaId(val === "all" ? "all" : Number(val));
+                setUseGpsSearch(false);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger className="h-11 rounded-xl bg-slate-50 border-slate-200/80 text-xs sm:text-sm font-semibold text-slate-800">
+                <div className="flex items-center gap-2 truncate">
+                  <MapPin className="size-4 text-[#0194F3] shrink-0" />
+                  <SelectValue placeholder="Chọn Tỉnh / Thành" />
+                </div>
+              </SelectTrigger>
+              <SelectContent className="max-h-80">
+                <SelectItem value="all">Toàn quốc (Tất cả)</SelectItem>
+                {provinceAreas.map((area) => (
+                  <SelectItem key={area.id} value={String(area.id)}>
+                    {area.nameVi || area.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* GPS Button: Tìm quanh đây */}
+          <button
+            type="button"
+            onClick={handleToggleGps}
+            className={cn(
+              "h-11 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all shrink-0 cursor-pointer",
+              useGpsSearch
+                ? "bg-[#0194F3] text-white border-[#0194F3] shadow-xs"
+                : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200/80"
+            )}
+          >
+            {locating ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <LocateFixed className="size-4" />
+            )}
+            <span>{useGpsSearch ? "Đang tìm quanh đây" : "Tìm quanh đây"}</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Super Categories Bar - Modern Pills */}
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        {SUPER_CATEGORIES.map((cat) => {
+          const isSelected = selectedSuperCategoryId === cat.id;
+          return (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => handleSelectSuperCategory(cat.id)}
+              className={cn(
+                "inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-bold transition-all cursor-pointer shadow-2xs",
+                isSelected
+                  ? "bg-[#0194F3] text-white shadow-md shadow-blue-500/25"
+                  : "bg-white border border-slate-200/80 text-slate-700 hover:bg-slate-50 hover:text-slate-900"
               )}
-            </span>
+            >
+              <span>{cat.label}</span>
+              <span
+                className={cn(
+                  "text-[10px] rounded-full px-1.5 py-0.2 font-extrabold",
+                  isSelected
+                    ? "bg-white/20 text-white"
+                    : "bg-slate-100 text-slate-500"
+                )}
+              >
+                {cat.count.toLocaleString("vi-VN")}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Sub-Toolbar: Quick Toggle, Sort, and Advanced Filter Sheet Trigger */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-1 pb-2 border-b border-slate-200/70 text-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Button mở Filter Sheet Modal */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => setIsFilterSheetOpen(true)}
+            className={cn(
+              "h-9 rounded-xl font-bold text-xs gap-2 transition-all cursor-pointer border shadow-2xs",
+              activeFilterCount > 0
+                ? "bg-sky-50 border-[#0194F3] text-[#0194F3] hover:bg-sky-100"
+                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+            )}
+          >
+            <SlidersHorizontal className="size-3.5" />
+            <span>Bộ lọc</span>
+            {activeFilterCount > 0 && (
+              <span className="size-5 rounded-full bg-[#0194F3] text-white text-[10px] font-black flex items-center justify-center ml-0.5">
+                {activeFilterCount}
+              </span>
+            )}
+          </Button>
+
+          {/* Quick Toggle: Đang mở cửa */}
+          <button
+            type="button"
+            onClick={() => {
+              setOpenNow(!openNow);
+              setPage(1);
+            }}
+            className={cn(
+              "h-9 px-3 rounded-xl text-xs font-bold border transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs",
+              openNow
+                ? "bg-emerald-50 text-emerald-700 border-emerald-300 font-bold"
+                : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+            )}
+          >
+            <Clock className="size-3.5 text-emerald-600" />
+            <span>Đang mở cửa</span>
+          </button>
+
+          {/* Reset Filters button if any filters active */}
+          {isFiltering && (
             <button
               type="button"
               onClick={resetFilters}
-              className="flex items-center gap-1 font-semibold text-destructive hover:underline"
+              className="h-9 px-2.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors flex items-center gap-1 cursor-pointer"
             >
               <RotateCcw className="size-3" />
-              <span>Xóa bộ lọc</span>
+              <span>Đặt lại tất cả</span>
             </button>
-          </div>
-        )}
+          )}
+        </div>
+
+        {/* Right: Sắp xếp theo */}
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-bold text-slate-500">Sắp xếp:</span>
+          <Select
+            value={selectedSort}
+            onValueChange={(val) => {
+              setSelectedSort(val as ExploreSort);
+              setPage(1);
+            }}
+          >
+            <SelectTrigger className="h-9 w-40 rounded-xl text-xs font-bold bg-white border-slate-200 shadow-2xs">
+              <SelectValue placeholder="Sắp xếp" />
+            </SelectTrigger>
+            <SelectContent align="end">
+              <SelectItem value="rating">Đánh giá cao nhất</SelectItem>
+              <SelectItem value="popular">Phổ biến nhất</SelectItem>
+              <SelectItem value="distance">Gần tôi nhất</SelectItem>
+              <SelectItem value="price_asc">Giá: Thấp đến Cao</SelectItem>
+              <SelectItem value="price_desc">Giá: Cao đến Thấp</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
+      {/* Advanced Filter Modal/Sheet */}
+      <ExploreFilterSheet
+        open={isFilterSheetOpen}
+        onOpenChange={setIsFilterSheetOpen}
+        minRating={minRating}
+        onMinRatingChange={(val) => {
+          setMinRating(val);
+          setPage(1);
+        }}
+        selectedBudgetLevels={selectedBudgetLevels}
+        onBudgetLevelToggle={(id) => {
+          setSelectedBudgetLevels((prev) =>
+            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+          );
+          setPage(1);
+        }}
+        selectedAudience={selectedAudience}
+        onAudienceChange={(val) => {
+          setSelectedAudience(val);
+          setPage(1);
+        }}
+        amenities={activeSuperCategory.amenities}
+        selectedAmenities={selectedAmenities}
+        onAmenityToggle={handleToggleAmenity}
+        useGpsSearch={useGpsSearch}
+        radiusKm={radiusKm}
+        onRadiusKmChange={(val) => {
+          setRadiusKm(val);
+          setPage(1);
+        }}
+        onReset={resetFilters}
+        activeFilterCount={activeFilterCount}
+      />
+
       {/* Place Results Display */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-20 space-y-3">

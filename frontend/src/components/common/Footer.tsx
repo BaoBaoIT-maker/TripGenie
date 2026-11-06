@@ -1,89 +1,59 @@
 import Link from "next/link";
-import { MapPin, Heart } from "lucide-react";
+import Image from "next/image";
 
 export function Footer() {
   return (
-    <footer className="border-t border-border bg-card/50 text-foreground py-12 mt-auto mb-16 md:mb-0">
-      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10">
-          {/* Brand Col */}
-          <div className="space-y-3">
-            <Link href="/" className="flex items-center gap-2 font-bold tracking-tight">
-              <div className="flex size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <MapPin className="size-4" />
+    <footer className="bg-slate-50 border-t border-slate-200/80 py-12 px-4 sm:px-6 lg:px-8 mt-auto">
+      <div className="max-w-7xl mx-auto space-y-8">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="flex items-center gap-3 group">
+              <Image
+                src="/images/logo_transparent.png"
+                alt="TripGenie Logo"
+                width={48}
+                height={48}
+                className="h-11 sm:h-12 w-auto object-contain transition-transform group-hover:scale-105"
+              />
+              <div>
+                <span className="text-xl font-black tracking-tight text-slate-900">
+                  TripGenie
+                </span>
+                <p className="text-[10px] uppercase font-bold tracking-wider text-slate-500 -mt-0.5">
+                  Nền Tảng Du Lịch Thông Minh
+                </p>
               </div>
-              <span className="text-lg font-bold">TripGenie</span>
             </Link>
-            <p className="text-xs text-muted-foreground leading-relaxed max-w-sm">
-              Hệ thống khám phá địa điểm du lịch và hỗ trợ lập kế hoạch trải nghiệm cá nhân hóa với bản đồ tương tác và AI.
-            </p>
           </div>
 
-          {/* Col 1 */}
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground mb-3">
+          <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-8 text-sm font-bold text-slate-600">
+            <Link href="/explore" className="hover:text-[#0194F3] transition-colors">
               Khám phá
-            </h4>
-            <ul className="space-y-2 text-xs text-muted-foreground">
-              <li>
-                <Link href="/explore" className="hover:text-foreground transition-colors">
-                  Tất cả địa điểm
-                </Link>
-              </li>
-              <li>
-                <Link href="/explore?category=ca-phe" className="hover:text-foreground transition-colors">
-                  Quán Cafe & Trà
-                </Link>
-              </li>
-              <li>
-                <Link href="/explore?category=am-thuc" className="hover:text-foreground transition-colors">
-                  Ẩm thực & Nhà hàng
-                </Link>
-              </li>
-              <li>
-                <Link href="/explore?category=tham-quan" className="hover:text-foreground transition-colors">
-                  Thiên nhiên & Check-in
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Col 2 */}
-          <div>
-            <h4 className="text-xs font-semibold uppercase tracking-wider text-foreground mb-3">
-              Công cụ
-            </h4>
-            <ul className="space-y-2 text-xs text-muted-foreground">
-              <li>
-                <Link href="/planner/new" className="hover:text-foreground transition-colors">
-                  Lập kế hoạch cá nhân
-                </Link>
-              </li>
-              <li>
-                <Link href="/planner" className="hover:text-foreground transition-colors">
-                  Lịch trình đã lưu
-                </Link>
-              </li>
-              <li>
-                <Link href="/community" className="hover:text-foreground transition-colors">
-                  Cộng đồng chia sẻ
-                </Link>
-              </li>
-              <li>
-                <Link href="/collections" className="hover:text-foreground transition-colors">
-                  Bộ sưu tập yêu thích
-                </Link>
-              </li>
-            </ul>
+            </Link>
+            <Link href="/planner" className="hover:text-[#0194F3] transition-colors">
+              Lịch trình
+            </Link>
+            <Link href="/community" className="hover:text-[#0194F3] transition-colors">
+              Cộng đồng
+            </Link>
+            <Link href="/collections" className="hover:text-[#0194F3] transition-colors">
+              Bộ sưu tập
+            </Link>
           </div>
         </div>
 
-        <div className="border-t border-border/60 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
-          <p>© 2026 TripGenie. All rights reserved.</p>
-          <div className="flex items-center gap-1">
-            <span>Xây dựng với</span>
-            <Heart className="size-3.5 fill-red-500 text-red-500 inline" />
-            <span>cho trải nghiệm du lịch Việt Nam</span>
+        <div className="pt-6 border-t border-slate-200/80 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p>© 2026 TripGenie Platform. Thiết kế tinh gọn, chuẩn trải nghiệm du lịch hiện đại.</p>
+          <div className="flex items-center gap-6 font-medium">
+            <Link href="#" className="hover:text-slate-800 transition-colors">
+              Điều khoản
+            </Link>
+            <Link href="#" className="hover:text-slate-800 transition-colors">
+              Bảo mật
+            </Link>
+            <Link href="#" className="hover:text-slate-800 transition-colors">
+              Hỗ trợ
+            </Link>
           </div>
         </div>
       </div>

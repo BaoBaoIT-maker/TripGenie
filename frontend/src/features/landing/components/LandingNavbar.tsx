@@ -8,6 +8,7 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { MobileNavSheet } from "@/components/common/MobileNavSheet";
 import { DEFAULT_AVATAR } from "@/config/avatars";
 
 const NAV_LINKS = [
@@ -65,11 +66,11 @@ export function LandingNavbar() {
       </div>
 
       {/* Action area: User controls when logged in, Auth buttons when logged out */}
-      <div className="flex items-center justify-end gap-3">
+      <div className="flex items-center justify-end gap-2 sm:gap-3">
         {user ? (
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Nút Bộ sưu tập */}
-            <Link href="/collections">
+          <div className="flex items-center gap-1.5 sm:gap-2.5">
+            {/* Nút Bộ sưu tập - Hiện trên tablet+ */}
+            <Link href="/collections" className="hidden sm:inline-flex">
               <Button
                 variant="ghost"
                 size="icon"
@@ -89,9 +90,9 @@ export function LandingNavbar() {
             <Link
               href="/profile"
               title={`Hồ sơ: ${user.fullName || "Người dùng"}`}
-              className="outline-none group ml-1"
+              className="outline-none group ml-0.5 sm:ml-1"
             >
-              <Avatar className="size-9.5 border-2 border-white/60 transition-all group-hover:border-white group-hover:scale-105 cursor-pointer shadow-md">
+              <Avatar className="size-9 sm:size-9.5 border-2 border-white/60 transition-all group-hover:border-white group-hover:scale-105 cursor-pointer shadow-md">
                 <AvatarImage
                   src={user.avatarUrl || DEFAULT_AVATAR}
                   alt={user.fullName || "Avatar"}
@@ -101,9 +102,12 @@ export function LandingNavbar() {
                 </AvatarFallback>
               </Avatar>
             </Link>
+
+            {/* Mobile Navigation Drawer Trigger */}
+            <MobileNavSheet triggerVariant="transparent" />
           </div>
         ) : (
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <Link
               href="/login"
               className="hidden sm:inline-flex px-4 py-2 text-sm font-bold text-white hover:text-[#38BDF8] transition-colors cursor-pointer drop-shadow-xs"
@@ -112,10 +116,13 @@ export function LandingNavbar() {
             </Link>
             <Link
               href="/register"
-              className="px-5 py-2.5 rounded-xl text-sm font-bold bg-[#0194F3] hover:bg-[#0073D1] text-white transition-all shadow-lg shadow-blue-500/30 cursor-pointer"
+              className="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-[#0194F3] hover:bg-[#0073D1] text-white transition-all shadow-lg shadow-blue-500/30 cursor-pointer"
             >
               Bắt đầu miễn phí
             </Link>
+
+            {/* Mobile Navigation Drawer Trigger */}
+            <MobileNavSheet triggerVariant="transparent" />
           </div>
         )}
       </div>

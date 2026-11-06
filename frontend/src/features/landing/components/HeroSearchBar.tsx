@@ -90,8 +90,8 @@ export function HeroSearchBar({ onDestinationChange }: HeroSearchBarProps) {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Tìm kiếm điểm đến, món ngon đặc sản, quán cafe..."
-          className="flex-1 bg-transparent py-2.5 sm:py-3 text-sm sm:text-base font-semibold text-slate-900 placeholder:text-slate-500/90 focus:outline-hidden"
+          placeholder="Tìm điểm đến, món ngon, quán cafe..."
+          className="flex-1 min-w-0 bg-transparent py-2 sm:py-3 text-sm sm:text-base font-semibold text-slate-900 placeholder:text-slate-500/90 focus:outline-hidden"
           aria-label="Tìm kiếm điểm đến du lịch"
         />
 
@@ -100,27 +100,27 @@ export function HeroSearchBar({ onDestinationChange }: HeroSearchBarProps) {
           <button
             type="button"
             onClick={() => setQuery("")}
-            className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 transition-colors cursor-pointer"
+            className="p-1 sm:p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 transition-colors cursor-pointer shrink-0"
             aria-label="Xóa tìm kiếm"
           >
             <X className="size-4" />
           </button>
         )}
 
-        {/* Primary Search Submit Button */}
+        {/* Primary Search Submit Button - Responsive Icon on Mobile, Expanded on Tablet+ */}
         <button
           type="submit"
-          className="h-10 sm:h-11 px-5 sm:px-6 rounded-full bg-[#0194F3] hover:bg-[#0073D1] text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-500/25 hover:shadow-blue-500/40 shrink-0 cursor-pointer"
+          className="size-10 sm:h-11 sm:w-auto sm:px-6 rounded-full bg-[#0194F3] hover:bg-[#0073D1] text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-500/25 hover:shadow-blue-500/40 shrink-0 cursor-pointer"
           title="Khám phá ngay"
         >
-          <Search className="size-4" />
-          <span>Khám phá</span>
+          <Search className="size-4.5 sm:size-4" />
+          <span className="hidden sm:inline">Khám phá</span>
         </button>
       </form>
 
-      {/* Suggestion Pills: Translucent, Clean, Directly Actionable */}
-      <div className="flex flex-wrap items-center justify-center gap-2 px-2 text-xs">
-        <span className="text-white/80 font-bold text-[11px] uppercase tracking-wider drop-shadow-xs">
+      {/* Suggestion Pills: Translucent, Clean, Responsive Touch Scroll on Mobile */}
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-2 px-2 sm:mx-0 sm:px-0 sm:flex-wrap sm:justify-center text-xs">
+        <span className="text-white/80 font-bold text-[11px] uppercase tracking-wider drop-shadow-xs shrink-0">
           Gợi ý hot:
         </span>
         {POPULAR_SUGGESTIONS.map((s) => (
@@ -128,7 +128,7 @@ export function HeroSearchBar({ onDestinationChange }: HeroSearchBarProps) {
             key={s.label}
             type="button"
             onClick={() => handleSuggestionClick(s)}
-            className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/15 hover:bg-white/30 backdrop-blur-md border border-white/25 hover:border-white/50 text-white text-xs font-semibold transition-all hover:scale-105 cursor-pointer shadow-2xs drop-shadow-xs"
+            className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/15 hover:bg-white/30 backdrop-blur-md border border-white/25 hover:border-white/50 text-white text-xs font-semibold transition-all hover:scale-105 cursor-pointer shadow-2xs drop-shadow-xs shrink-0 whitespace-nowrap"
           >
             <span>{s.label}</span>
           </button>

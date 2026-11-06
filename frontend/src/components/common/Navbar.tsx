@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { MobileNavSheet } from "@/components/common/MobileNavSheet";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { cn } from "@/lib/utils";
@@ -77,11 +78,11 @@ export function Navbar() {
         </nav>
 
         {/* Cột 3: User controls / Auth actions căn sát lề phải */}
-        <div className="flex items-center justify-end gap-2.5 sm:gap-3">
+        <div className="flex items-center justify-end gap-2 sm:gap-3">
           {user ? (
-            <div className="flex items-center gap-2 sm:gap-2.5">
-              {/* Nút Bộ sưu tập */}
-              <Link href="/collections">
+            <div className="flex items-center gap-1.5 sm:gap-2.5">
+              {/* Nút Bộ sưu tập - Hiện từ tablet trở lên */}
+              <Link href="/collections" className="hidden sm:inline-flex">
                 <Button
                   variant="ghost"
                   size="icon"
@@ -99,9 +100,9 @@ export function Navbar() {
               <Link
                 href="/profile"
                 title={`Hồ sơ: ${user?.fullName || "Người dùng"}`}
-                className="outline-none group ml-1"
+                className="outline-none group ml-0.5 sm:ml-1"
               >
-                <Avatar className="size-9.5 border-2 border-slate-200 transition-all group-hover:border-[#0194F3] group-hover:scale-105 cursor-pointer shadow-xs">
+                <Avatar className="size-9 sm:size-9.5 border-2 border-slate-200 transition-all group-hover:border-[#0194F3] group-hover:scale-105 cursor-pointer shadow-xs">
                   <AvatarImage
                     src={user?.avatarUrl || DEFAULT_AVATAR}
                     alt={user?.fullName || "Avatar"}
@@ -111,6 +112,9 @@ export function Navbar() {
                   </AvatarFallback>
                 </Avatar>
               </Link>
+
+              {/* Mobile Navigation Drawer Trigger */}
+              <MobileNavSheet triggerVariant="light" />
             </div>
           ) : (
             <div className="flex items-center gap-2 sm:gap-3">
@@ -122,10 +126,13 @@ export function Navbar() {
               </Link>
               <Link
                 href="/register"
-                className="px-5 py-2.5 rounded-xl text-sm font-bold bg-[#0194F3] hover:bg-[#0073D1] text-white transition-all shadow-md shadow-blue-500/20 cursor-pointer"
+                className="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-[#0194F3] hover:bg-[#0073D1] text-white transition-all shadow-md shadow-blue-500/20 cursor-pointer"
               >
                 Bắt đầu miễn phí
               </Link>
+
+              {/* Mobile Navigation Drawer Trigger */}
+              <MobileNavSheet triggerVariant="light" />
             </div>
           )}
         </div>

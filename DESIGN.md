@@ -1,9 +1,9 @@
 # TripGenie — Design System & Visual Direction (DESIGN.md)
 
-> **Identity**: Nền tảng Lập kế hoạch Du lịch Thông minh & Cộng tác Thời gian thực.  
-> **Aesthetic Philosophy**: **Modern Travel Editorial** — Tinh tế, thoáng đãng, mang hơi thở tạp chí du lịch cao cấp; tôn vinh văn hóa và ẩm thực bản địa.  
-> **Source of Truth for Visuals**: Được đồng bộ trực tiếp với `frontend/src/app/globals.css` và `frontend/src/app/layout.tsx`.  
-> **Governing Filter**: Kết hợp cùng `.agents/skills/antislop-ui/SKILL.md` để loại bỏ 100% "AI Slop".
+> **Identity**: Nền tảng Lập kế hoạch Du lịch Thông minh Việt Nam & Cộng tác Thời gian thực.  
+> **Aesthetic Philosophy**: **Modern Travel Tech & Clean Editorial** — Diện mạo du lịch hiện đại, dứt khoát, thoáng đãng, mang hơi thở công nghệ cao kết hợp tinh hoa trải nghiệm bản địa (lấy cảm hứng từ Traveloka, Airbnb, Google Arts & Culture, Canva).  
+> **Source of Truth for Visuals**: Đồng bộ 100% với phong cách **Trang Chủ** (`frontend/src/app/page.tsx`), `frontend/src/app/globals.css` và `frontend/src/app/layout.tsx`.  
+> **Governing Filter**: Kết hợp cùng `.agents/skills/antislop-ui/SKILL.md` để loại bỏ hoàn toàn "AI Slop".
 
 ---
 
@@ -11,114 +11,113 @@
 
 | Tham số | Giá trị | Ý nghĩa thực tế |
 |---|---|---|
-| **ENERGY** | `2` (Balanced) | Giao diện tươi sáng, khơi gợi cảm hứng xê dịch nhưng giữ được sự trang nhã; không màu mè khoa trương, không dùng màu neon. |
-| **RHYTHM** | `2` (Harmonic) | Nhịp điệu bố cục đa dạng: Hero trực quan $\to$ Bảng tra cứu & Bộ lọc $\to$ Thẻ địa điểm $\to$ Timeline lộ trình ngày $\to$ Bản đồ VietMap tương tác. |
-| **MOTION** | `1` (Subtle) | Chuyển động nhẹ nhàng (150ms–200ms, easing `cubic-bezier(0.22, 1, 0.36, 1)`) cho micro-interactions (Drawer, Popup, Step change, Hover ảnh scale 1.025, mũi tên shift 3px). Tuyệt đối **không có endless animation loops** (trừ live indicator của hệ thống). Tôn trọng `prefers-reduced-motion`. |
+| **ENERGY** | `2` (Balanced) | Giao diện tươi sáng, tràn đầy năng lượng khám phá với sắc xanh **Electric Travel Sky Blue (`#0194F3`)**; tinh tế, sắc sảo, không dùng màu neon chói mắt. |
+| **RHYTHM** | `2` (Harmonic) | Nhịp điệu bố cục đa dạng như trang chủ: Hero trực quan sắc nét $\to$ Horizontal Destination Track $\to$ Story Feature Blocks (Canva-style) $\to$ Asymmetric Mosaic Grid (Google Arts & Culture) $\to$ Collaborative Planning Mockup $\to$ Bản đồ tương tác. |
+| **MOTION** | `1` (Subtle) | Chuyển động vi mô mượt mà (150ms–250ms, easing `cubic-bezier(0.22, 1, 0.36, 1)`): Zoom ảnh nhẹ 1.025–1.05 khi hover, trượt thanh cuộn điểm đến, popover nổi nhẹ. **Tuyệt đối không có chuyển động lặp vô tận (endless animation loops)**. Tôn trọng `prefers-reduced-motion`. |
 
 ---
 
-## 2. Brand Identity & Personality
+## 2. Brand Identity & Visual Language (Phong cách Trang Chủ)
 
-- **Tính cách thương hiệu**: Thấu hiểu, phóng khoáng, tin cậy, giàu chất bản địa.
+- **Tính cách thương hiệu**: Thông minh, dứt khoát, phóng khoáng, tin cậy, giàu chất bản địa.
 - **Trải nghiệm cốt lõi**:
-  - Không khiến người dùng bị ngợp thông tin: ưu tiên hình ảnh chất lượng cao và khoảng trắng thở (`whitespace as structure`).
-  - Mọi thao tác đều mang tính trực quan và chạm tới cảm xúc (như xem một cuốn tạp chí du lịch sống động).
+  - **Không rườm rà**: Loại bỏ phong cách phông chữ có chân (Serif/Playfair Display) cổ điển cũ; toàn bộ tiêu đề chuyển sang sans-serif đậm nét, dứt khoát, hiện đại.
+  - **Khoảng thở làm khung kết cấu (`whitespace as structure`)**: Sử dụng nền trắng sạch (`bg-white`) xen kẽ các dải Slate cao cấp (`bg-slate-50`, `bg-[#F0F7FF]`, `bg-[#F8FAFC]`) tạo chiều sâu phân tầng rõ rệt.
+  - **Hình ảnh chân thực**: Tôn vinh hình ảnh phong cảnh, ẩm thực và văn hóa thực tế với tỷ lệ chuẩn và hiệu ứng scrim chuyển màu tinh tế.
 - **Nguyên tắc "The Litmus Test"**:
-  > Nếu gỡ bỏ logo TripGenie, giao diện vẫn phải toát lên rõ nét phong cách du lịch Việt Nam hiện đại, không bị nhầm lẫn với bất kỳ dashboard SaaS quản lý công việc chung chung nào.
+  > Giao diện TripGenie toát lên phong cách nền tảng du lịch thế hệ mới — chuẩn mực, sắc sảo, trực quan và tiện dụng, không bị nhầm lẫn với các dashboard quản lý khô khan.
 
 ---
 
-## 3. Color System (OKLCH Semantic Tokens)
+## 3. Typography System (Đồng bộ 100% với Trang Chủ)
 
-Hệ thống màu được chuẩn hóa theo chuẩn OKLCH trong `globals.css` đảm bảo độ tương phản hoàn hảo (WCAG 2.2 AA $\ge 4.5:1$):
-
-```mermaid
-flowchart LR
-    Teal["Ocean Discovery Teal<br/>Primary (oklch 0.48 0.14 185)"] --- Coral["Sunset Adventure Coral<br/>Accent (oklch 0.95 0.035 55)"]
-    Coral --- Neutral["Crisp White & Slate<br/>Surfaces & Backgrounds"]
-```
-
-### 3.1 Light Mode (Chủ đạo)
-- **`--primary`**: `oklch(0.48 0.14 185)` (Ocean Discovery Teal — Xanh ngọc biển sâu). Đại diện cho khám phá, đại dương và sự tin cậy. Dùng cho: Primary CTA, Active Tabs, Map Pins chính, Highlight icons.
-- **`--primary-foreground`**: `oklch(0.99 0 0)` (Trắng tinh khiết).
-- **`--secondary`**: `oklch(0.95 0.025 185)` (Soft Mist Teal — Xanh sương mai). Dùng cho: Nền badge, Chips chọn nhanh, nút phụ.
-- **`--secondary-foreground`**: `oklch(0.35 0.10 185)`.
-- **`--accent`**: `oklch(0.95 0.035 55)` / Coral (Sunset Adventure Coral — Cam san hô hoàng hôn). **Màu nhấn duy nhất** cho các khoảnh khắc đặc biệt: Tag ẩm thực đặc sắc, Deal hot, Nút Cố vấn AI nổi bật.
-- **`--background`**: `oklch(0.99 0.005 240)` (Nền trắng ánh lam nhẹ, thoáng đãng).
-- **`--card`**: `oklch(1 0 0)` (Trắng đặc, làm nổi bật hình ảnh địa điểm).
-- **`--muted`**: `oklch(0.96 0.008 240)` & `--muted-foreground`: `oklch(0.48 0.025 240)`.
-- **`--border`**: `oklch(0.91 0.01 240)` (Viền xám mảnh tinh tế).
-
-### 3.2 Dark Mode (Hỗ trợ ban đêm)
-- **`--background`**: `oklch(0.14 0.02 240)` (Midnight Navy — Xanh đen màn đêm dịu mắt, không dùng màu đen tuyền `#000000`).
-- **`--card`**: `oklch(0.18 0.025 240)`.
-- **`--primary`**: `oklch(0.68 0.13 185)` (Luminous Teal — Xanh ngọc phát sáng nhẹ, tương phản cao trên nền tối).
-
----
-
-## 4. Typography Pairing (Hệ Thống Phông Chữ)
-
-Được cấu hình qua `next/font/google` trong `RootLayout`:
+Toàn bộ hệ thống giao diện chuẩn hóa sử dụng **Inter** cho cả Tiêu đề và Nội dung, tối ưu hoàn hảo cho tiếng Việt có dấu:
 
 | Vai trò | Phông chữ | Class Tailwind | Ứng dụng thực tế |
 |---|---|---|---|
-| **Heading (Tiêu đề)** | **Playfair Display** | `font-heading font-serif` | Tiêu đề trang, tên địa phương (Đà Nẵng, Phú Quốc), tiêu đề chuyến đi. Tạo cảm giác tạp chí du lịch cao cấp (*Editorial*). |
-| **Body (Nội dung)** | **Geist Sans** | `font-sans` | Đoạn văn mô tả, thông số lịch trình, giờ mở cửa, giá vé, ghi chú. Tối ưu độ sắc nét và dễ đọc. |
-| **Monospace (Số liệu kỹ thuật)** | **Geist Mono** | `font-mono` | Tọa độ GPS, mã chuyến đi, mã đặt vé tàu xe máy bay. |
+| **Headings (Tiêu đề)** | **Inter** | `font-sans font-black tracking-tight` hoặc `font-extrabold tracking-tight` | Tiêu đề Hero, Tiêu đề Section, Tên vùng đất, Tiêu đề bài viết. Nét chữ đậm đà, hiện đại, uy lực và dễ đọc. |
+| **Body (Nội dung)** | **Inter** | `font-sans font-medium text-slate-600` | Đoạn văn mô tả, thông số lịch trình, giờ mở cửa, ghi chú. |
+| **Eyebrow / Badges** | **Inter** | `text-xs font-bold uppercase tracking-wider` | Nhãn phân loại trên đầu section (`#0194F3`), thẻ danh mục. |
+| **Monospace (Kỹ thuật)** | **Geist Mono** | `font-mono` | Tọa độ GPS, mã chuyến đi, mã đặt chỗ, số liệu chi phí. |
 
-### Thang đo tỷ lệ (Scale):
-- `text-2xl sm:text-3xl lg:text-4xl font-bold font-heading`: Tiêu đề Hero và Tiêu đề trang.
-- `text-lg sm:text-xl font-semibold`: Tên thẻ địa điểm (`PlaceCard`), tên ngày trong lịch trình.
-- `text-sm leading-relaxed text-muted-foreground`: Nội dung mô tả địa điểm.
-- `text-xs font-medium`: Nhãn phụ, giờ giấc di chuyển, badge danh mục.
+### Thang đo tỷ lệ (Type Scale) chuẩn Trang Chủ:
+- `text-4xl sm:text-6xl md:text-7xl font-black tracking-tight leading-[1.12]`: Tiêu đề Hero chính.
+- `text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight`: Tiêu đề Section (`h2`).
+- `text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight leading-tight`: Tiêu đề khối tính năng (`h3`).
+- `text-base sm:text-lg font-bold text-slate-900 leading-snug`: Tên thẻ địa điểm (`PlaceCard`), tên bài viết cộng đồng (`PostCard`).
+- `text-sm sm:text-base text-slate-600 font-medium leading-relaxed`: Văn bản nội dung và mô tả.
+- `text-xs font-bold uppercase tracking-wider`: Nhãn danh mục, tag trạng thái.
 
 ---
 
-## 5. Shape, Spacing & Elevation (Hình khối & Phân cấp)
+## 4. Color System (Bảng Màu Nhận Diện)
 
-### 5.1 Border Radius Scale (Bo góc có chủ đích)
-- **Cards & Modals**: `rounded-2xl` (16px) — Bo tròn vừa vặn, hiện đại, thân thiện.
-- **Buttons & Input fields**: `rounded-xl` (12px) — Cân bằng giữa cảm giác bấm và tính công thái học.
-- **Badges & Avatars**: `rounded-full` (Dành riêng cho ảnh đại diện, chip trạng thái nhỏ).
-- ❌ **Cấm kỵ**: Không bo tròn mọi thứ thành hình con nhộng (pill shape) bừa bãi.
+```mermaid
+flowchart LR
+    SkyBlue["Electric Travel Sky Blue<br/>Primary Accent (#0194F3)"] --- Slate["Deep Slate Text<br/>(#0F172A / slate-900)"]
+    Slate --- Surfaces["Clean White & Slate Mist<br/>(white / slate-50 / #F0F7FF)"]
+```
+
+### 4.1 Bảng màu chủ đạo (Light Theme - Chuẩn Trang Chủ)
+- **Primary Brand Color**: `#0194F3` (Electric Travel Sky Blue)  
+  Màu xanh công nghệ du lịch đặc trưng của TripGenie. Dùng cho: Nút bấm chính (Primary CTA), đường dẫn nổi bật, icon chỉ hướng, tỷ lệ phần trăm tiến độ, thanh gạch chân chủ đề, viền focus.
+- **Surface & Backgrounds**:
+  - `bg-white`: Nền thẻ, nền trang chính sạch sẽ.
+  - `bg-slate-50` / `bg-[#F0F7FF]` / `bg-[#F8FAFC]`: Nền section chuyển đổi mềm mại, không gây chói mắt.
+- **Typography & Text Contrast**:
+  - `text-slate-950` / `text-slate-900` (`#0F172A`): Tiêu đề chính, tương phản tối đa, sắc nét.
+  - `text-slate-700` / `text-slate-600`: Nội dung mô tả, dễ đọc, không gây mỏi mắt.
+  - `text-slate-400` / `text-muted-foreground`: Ghi chú phụ, thời gian đăng, placeholder.
+- **Borders & Dividers**:
+  - `border-slate-200/80` hoặc `border-slate-300`: Đường phân cách mảnh, tinh tế, giữ sự liền mạch.
+- **Accent & Highlights**:
+  - **Sunset Gold / Amber** (`#F59E0B`, `text-amber-500`): Dành riêng cho sao đánh giá (Rating stars), thời tiết nắng ấm, badge deal nổi bật.
+  - **Soft Blue Badge**: `bg-blue-50 text-[#0194F3] border border-blue-200/80` cho các nhãn danh mục con nhộng.
+
+---
+
+## 5. Shape, Spacing & Elevation (Hình Khối & Chiều Sâu)
+
+### 5.1 Bo góc (Border Radius Scale)
+- **Thanh tìm kiếm & Badges**: `rounded-full` — Thân thiện, mượt mà, tạo cảm giác mời gọi tương tác.
+- **Cards thông thường & Modals**: `rounded-2xl` (16px) — Bo tròn vừa vặn, chuẩn mực hiện đại.
+- **Khối tính năng lớn & Story Blocks**: `rounded-3xl` (24px) — Tạo khung chứa vững chãi, ôm trọn nội dung.
+- **Buttons & Input fields**: `rounded-xl` (12px) hoặc `rounded-full` tùy theo cấp bậc thị giác.
 
 ### 5.2 Shadows & Elevation (Độ nổi)
-- Thẻ thông thường: `border border-border/80 shadow-xs`.
-- Thẻ khi hover: Ảnh scale nhẹ 1.025 (`transition-transform duration-200 ease-out`), mũi tên dịch 3px (`hover:translate-x-0.75`), viền `hover:border-primary/40 hover:shadow-md`. Thẻ giữ nguyên vị trí, không nảy toàn bộ card (`hover:-translate-y-1` đã bỏ).
-- Modals, Popups, Floating Action Buttons: `shadow-xl border border-border/80 backdrop-blur-md`.
-- ❌ **Cấm kỵ**: Không dùng shadow quá to, quá mềm khiến trang web bay bổng thiếu điểm tựa.
+- **Thẻ thông thường khi đứng yên**: `border border-slate-200/80 shadow-xs` hoặc `shadow-sm`.
+- **Thẻ khi hover**: 
+  - Ảnh zoom nhẹ 1.025–1.05 (`transition-transform duration-500 ease-out`).
+  - Viền chuyển sang xanh nhẹ hoặc xám đậm hơn: `hover:border-slate-300` / `hover:border-[#0194F3]/40`.
+  - Độ bóng nâng lên: `hover:shadow-xl` hoặc `hover:shadow-2xl`. Thẻ giữ nguyên trục toạ độ, không rung lắc.
+- **Floating Modals & Dropdowns**: `shadow-2xl border border-slate-200/90 backdrop-blur-md bg-white/95`.
 
 ---
 
-## 6. Component Rules (Quy chuẩn Thành phần chuẩn Frontend Senior)
+## 6. Component Rules (Quy Chuẩn Thành Phần Giao Diện)
 
-### 6.1 Place Cards (`PlaceCard`)
-- **Tỷ lệ ảnh**: Aspect ratio `16:9` hoặc `4:3`, sử dụng `next/image` với `object-cover`.
-- **Bookmark (Trái tim)**: Nằm ở góc trên bên phải ảnh, kích thước tối thiểu 36x36px (touch target thuận tiện), chuyển màu đỏ rực khi lưu (`fill-red-500 text-red-500`).
-- **Rating**: Hiển thị sao vàng rõ nét kèm số lượng đánh giá thật dạng `4.8 (124 đánh giá)`.
+### 6.1 Section Headers
+- Cấu trúc 3 tầng chuẩn trang chủ:
+  1. **Eyebrow**: `text-xs font-bold uppercase tracking-wider text-[#0194F3]`.
+  2. **Title (`h2`)**: `text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight`.
+  3. **Description**: `text-slate-600 text-sm sm:text-base max-w-2xl leading-relaxed`.
 
 ### 6.2 Buttons & Interactions
-- Chiều cao chuẩn: `h-10 sm:h-11 px-4 sm:px-5`.
-- Trạng thái hover/active rõ ràng: `hover:opacity-95 active:scale-[0.98]`.
-- Bắt buộc có viền Focus cho bàn phím: `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2`.
-- **Functional Completeness**: Nút bấm nào xuất hiện trên màn hình thì **bắt buộc phải có chức năng thật**, không để nút trang trí giả.
+- Primary Button: `bg-[#0194F3] hover:bg-[#0082d6] text-white font-bold rounded-xl shadow-xs transition-all active:scale-[0.98]`.
+- Secondary / Outline Button: `border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-semibold rounded-xl shadow-xs`.
+- Đảm bảo **Functional Completeness (C-2)**: Mọi nút bấm hiển thị đều phải gắn liền với hành vi thật hoặc mở modal tương ứng.
 
 ### 6.3 Empty, Loading & Error States (Quy tắc 4 Trạng thái)
-- **Loading State**: Sử dụng Skeleton UI khớp 100% với layout của component thực tế, cấm chỉ quăng 1 cái spinner trơ trọi giữa trang.
-- **Empty State**: Bắt buộc giải thích lý do vì sao rỗng và cung cấp đúng **1 nút hành động** để khắc phục (Ví dụ: *"Bạn chưa có địa điểm nào trong bộ sưu tập. Hãy khám phá và lưu những điểm đến thú vị ngay!"* kèm nút `[Khám phá ngay]`).
-- **Error State**: Nêu rõ lỗi kết nối và cung cấp nút `[Thử lại]`.
-
-### 6.4 Mobile First & Safe Areas
-- Header & Bottom Navigation: Đảm bảo vùng an toàn (Safe Area) cho điện thoại có tai thỏ / thanh điều hướng ảo (`pb-16 md:pb-0`).
-- Nút bấm và vùng chạm cảm ứng (Touch Target): Tối thiểu **44×44px** trên thiết bị di động.
+- **Loading State**: Sử dụng Skeleton UI tương đồng hình học với component thực tế, không dùng spinner trơ trọi.
+- **Empty State**: Nêu rõ lý do trống và cung cấp đúng **1 nút hành động tích cực** để lấp đầy dữ liệu.
+- **Error State**: Nêu rõ thông điệp và có nút `[Thử lại]`.
 
 ---
 
-## 7. Anti-Slop Safeguards (Bộ lọc cấm kỵ)
+## 7. Anti-Slop Safeguards (Bộ Lọc Chống Slop)
 
-Bắt buộc tuân thủ bộ kiểm tra nghiệm thu trong quá trình code:
-1. ❌ **Không dùng gradient AI cliché**: Tuyệt đối không dùng gradient xanh-tím-hồng rập khuôn hoặc quả cầu phát sáng mờ ảo.
-2. ❌ **Không nhồi nhét Emoji vào Text**: Không chèn 🚀, 🔥, ✨, ✅ vào tiêu đề hay nút bấm giao diện. Hãy dùng Icon SVG từ Lucide có ngữ nghĩa phù hợp.
-3. ❌ **Không số liệu ảo (No fake stats/reviews)**: Không bịa đặt số lượng đánh giá hay trích dẫn khách hàng giả.
-4. ❌ **Không lạm dụng Glassmorphism**: Tối đa 1–2 thành phần nổi (như Floating Bar) được dùng `backdrop-blur`. Các thẻ nội dung phải giữ màu nền đặc.
-5. ❌ **Không có chuyển động lặp vô tận (No endless animation loops)**: Mọi animation phải phục vụ mục đích UX (dẫn dắt sự chú ý của người dùng), không chạy loop làm phân tâm.
+1. ❌ **Không dùng gradient AI tím-xanh rập khuôn**: Chỉ dùng các dải chuyển màu xanh nhạt hoặc slate sang trọng (`from-[#F0F7FF] via-[#F8FAFC] to-[#F1F5F9]`).
+2. ❌ **Không emoji trang trí trong nút/tiêu đề**: Dùng icon SVG dứt khoát từ Lucide.
+3. ❌ **Không số liệu ảo (No fake stats/metrics)**: Mọi con số bài đăng, lượt nhân bản, đánh giá đều lấy từ cơ sở dữ liệu thật.
+4. ❌ **Không endless pulse loops**: Không nhấp nháy đèn trạng thái vô tận gây phân tâm.
+5. ❌ **Không bento grid hỗn loạn vô nghĩa**: Bố cục phải bám sát câu chuyện nội dung thực tế của du lịch.

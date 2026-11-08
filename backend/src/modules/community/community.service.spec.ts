@@ -1,10 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { ReportStatus, ReportType, UserRole } from '@prisma/client';
 import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
 import { CommunityService } from './community.service';
 import { CommunitySortMode } from './community.constants';
@@ -12,6 +13,11 @@ import { CommunitySortMode } from './community.constants';
 describe('CommunityService', () => {
   let service: CommunityService;
   let mockRepo: {
+    findActiveGroups: jest.Mock;
+    findGroupByIdOrSlug: jest.Mock;
+    findDefaultGroup: jest.Mock;
+    createCommunityGroup: jest.Mock;
+    getSidebarDiscovery: jest.Mock;
     findFeedPosts: jest.Mock;
     findPostById: jest.Mock;
     findItineraryOwner: jest.Mock;
@@ -19,6 +25,7 @@ describe('CommunityService', () => {
     updatePost: jest.Mock;
     softDeletePost: jest.Mock;
     togglePostLike: jest.Mock;
+    reportPost: jest.Mock;
     findPostComments: jest.Mock;
     findCommentById: jest.Mock;
     getCommentContext: jest.Mock;
@@ -33,6 +40,16 @@ describe('CommunityService', () => {
 
   beforeEach(async () => {
     mockRepo = {
+      findActiveGroups: jest.fn(),
+      findGroupByIdOrSlug: jest.fn(),
+      findDefaultGroup: jest.fn().mockResolvedValue({
+        id: 'default-group-id',
+        name: 'Cộng đồng chung TripGenie',
+        slug: 'cong-dong-chung',
+        isDefault: true,
+      }),
+      createCommunityGroup: jest.fn(),
+      getSidebarDiscovery: jest.fn(),
       findFeedPosts: jest.fn(),
       findPostById: jest.fn(),
       findItineraryOwner: jest.fn(),
@@ -40,6 +57,7 @@ describe('CommunityService', () => {
       updatePost: jest.fn(),
       softDeletePost: jest.fn(),
       togglePostLike: jest.fn(),
+      reportPost: jest.fn(),
       findPostComments: jest.fn(),
       findCommentById: jest.fn(),
       getCommentContext: jest.fn(),
@@ -103,9 +121,10 @@ describe('CommunityService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should normalize tags with hash prefix and cap at max limit', async () => {
+    it('should normalize tags with hash prefix and assign default group when groupId omitted', async () => {
       mockRepo.createPost.mockResolvedValue({
         id: 'post-1',
+        groupId: 'default-group-id',
         title: 'Check-in',
         tags: ['#dalat', '#travel'],
       });
@@ -117,9 +136,160 @@ describe('CommunityService', () => {
 
       expect(mockRepo.createPost).toHaveBeenCalledWith(
         expect.objectContaining({
+          groupId: 'default-group-id',
           tags: ['#dalat', '#travel'],
         }),
       );
+    });
+
+    it('should resolve explicit groupId/slug when creating a post in a topic group', async () => {
+      mockRepo.findGroupByIdOrSlug.mockResolvedValue({
+        id: 'group-san-may',
+        slug: 'san-may-nui-rung',
+        name: 'Săn Mây & Núi Rừng',
+        isDefault: false,
+      });
+      mockRepo.createPost.mockResolvedValue({
+        id: 'post-2',
+        groupId: 'group-san-may',
+        title: 'Săn mây Cầu Đất',
+        tags: [],
+      });
+
+      await service.createPost('user-1', {
+        title: 'Săn mây Cầu Đất',
+        groupId: 'san-may-nui-rung',
+      });
+
+      expect(mockRepo.findGroupByIdOrSlug).toHaveBeenCalledWith('san-may-nui-rung');
+      expect(mockRepo.createPost).toHaveBeenCalledWith(
+        expect.objectContaining({
+          groupId: 'group-san-may',
+        }),
+      );
+    });
+  });
+
+  describe('createGroup', () => {
+    it('should forbid non-admin users from creating community groups', async () => {
+      await expect(
+        service.createGroup('user-1', UserRole.USER, {
+          name: 'Nhóm Tự Phát',
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('should allow ADMIN to create a group with auto-generated slug', async () => {
+      mockRepo.findGroupByIdOrSlug.mockResolvedValue(null);
+      mockRepo.createCommunityGroup.mockResolvedValue({
+        id: 'g-new',
+        name: 'Phượt Tây Bắc Mùa Lúa Chín',
+        slug: 'phuot-tay-bac-mua-lua-chin',
+        isDefault: false,
+        sortOrder: 5,
+        postCount: 0,
+      });
+
+      const res = await service.createGroup('admin-1', UserRole.ADMIN, {
+        name: 'Phượt Tây Bắc Mùa Lúa Chín',
+        subtitle: 'Mù Cang Chải, Hoàng Su Phì',
+        sortOrder: 5,
+      });
+
+      expect(mockRepo.createCommunityGroup).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'Phượt Tây Bắc Mùa Lúa Chín',
+          slug: 'phuot-tay-bac-mua-lua-chin',
+          createdBy: 'admin-1',
+        }),
+      );
+      expect(res.slug).toBe('phuot-tay-bac-mua-lua-chin');
+    });
+
+    it('should throw ConflictException if slug already exists', async () => {
+      mockRepo.findGroupByIdOrSlug.mockResolvedValue({
+        id: 'g-1',
+        slug: 'san-may-nui-rung',
+      });
+
+      await expect(
+        service.createGroup('admin-1', UserRole.ADMIN, {
+          name: 'Săn Mây & Núi Rừng',
+        }),
+      ).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('reportPost', () => {
+    it('should throw NotFoundException if post does not exist', async () => {
+      mockRepo.findPostById.mockResolvedValue(null);
+
+      await expect(
+        service.reportPost('user-1', 'missing-post', {
+          reportType: ReportType.SPAM,
+        }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should forbid users from reporting their own post', async () => {
+      mockRepo.findPostById.mockResolvedValue({
+        id: 'post-1',
+        userId: 'user-1',
+      });
+
+      await expect(
+        service.reportPost('user-1', 'post-1', {
+          reportType: ReportType.SPAM,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should create content report for another user post', async () => {
+      mockRepo.findPostById.mockResolvedValue({
+        id: 'post-1',
+        userId: 'author-2',
+      });
+      mockRepo.reportPost.mockResolvedValue({
+        id: 'rep-1',
+        postId: 'post-1',
+        reportType: ReportType.FALSE_INFO,
+        status: ReportStatus.PENDING,
+        alreadyReported: false,
+      });
+
+      const res = await service.reportPost('user-1', 'post-1', {
+        reportType: ReportType.FALSE_INFO,
+        description: '  Giá vé sai thực tế  ',
+      });
+
+      expect(mockRepo.reportPost).toHaveBeenCalledWith({
+        postId: 'post-1',
+        reportedBy: 'user-1',
+        reportType: ReportType.FALSE_INFO,
+        description: 'Giá vé sai thực tế',
+      });
+      expect(res.alreadyReported).toBe(false);
+    });
+  });
+
+  describe('getSidebarDiscovery', () => {
+    it('should cache anonymous sidebar discovery and invalidate on post creation', async () => {
+      const sampleSidebar = {
+        groups: [],
+        topClonedPosts: [],
+        checkinHighlights: [],
+        topCreators: [],
+      };
+      mockRepo.getSidebarDiscovery.mockResolvedValue(sampleSidebar);
+
+      await service.getSidebarDiscovery();
+      await service.getSidebarDiscovery();
+
+      expect(mockRepo.getSidebarDiscovery).toHaveBeenCalledTimes(1);
+
+      service.invalidateSidebarCache();
+      await service.getSidebarDiscovery();
+      expect(mockRepo.getSidebarDiscovery).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -389,17 +559,18 @@ describe('CommunityService', () => {
   });
 
   describe('getFeed', () => {
-    it('should pass normalized sort mode and pagination limit to repository', async () => {
+    it('should pass normalized sort mode, groupId, and pagination limit to repository', async () => {
       mockRepo.findFeedPosts.mockResolvedValue({ items: [], nextCursor: null });
 
       await service.getFeed(
-        { sort: CommunitySortMode.TRENDING, limit: 10 },
+        { sort: CommunitySortMode.TRENDING, limit: 10, groupId: 'san-may-nui-rung' },
         'viewer-1',
       );
 
       expect(mockRepo.findFeedPosts).toHaveBeenCalledWith(
         expect.objectContaining({
           sort: CommunitySortMode.TRENDING,
+          groupId: 'san-may-nui-rung',
           limit: 10,
           viewerId: 'viewer-1',
         }),

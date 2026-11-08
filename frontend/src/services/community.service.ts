@@ -2,9 +2,13 @@ import { apiClient } from "@/lib/api-client";
 import type {
   CommunityCommentItem,
   CommunityFeedResponse,
+  CommunityGroupSummary,
   CommunityPostItem,
   CommunitySortMode,
+  CreateCommunityGroupPayload,
   CreateCommunityPostPayload,
+  ReportCommunityPostPayload,
+  SidebarDiscoveryResponse,
   UpdateCommunityPostPayload,
   CreatorProfileData,
   UploadedMediaItem,
@@ -15,8 +19,18 @@ export const COMMUNITY_UI_CONSTANTS = {
   MAX_TITLE_LENGTH: 255,
   MAX_CAPTION_LENGTH: 5000,
   MAX_COMMENT_LENGTH: 1500,
+  MAX_REPORT_DESCRIPTION_LENGTH: 1000,
   DEFAULT_FEED_PAGE_SIZE: 10,
   SEARCH_DEBOUNCE_MS: 300,
+  STORY_DURATION_MS: 5000,
+  POST_HIGHLIGHT_DURATION_MS: 3200,
+  STORY_CAROUSEL_SCROLL_STEP_PX: 260,
+  DEFAULT_GROUP_SLUG: "cong-dong-chung",
+  DEFAULT_GROUP_DISPLAY_NAME: "Cộng đồng chung TripGenie",
+  VIDEO_THUMBNAIL_FRAGMENT: "#t=0.1",
+  VERIFIED_LOCAL_BADGE_PREFIX: "Thổ địa",
+  ITINERARY_SHARE_BADGE_PREFIX: "Chia sẻ lộ trình",
+  DEFAULT_MEMBER_BADGE: "Thành viên TripGenie",
   ACCEPTED_MEDIA_MIMES:
     "image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime",
   POPULAR_TAGS: [
@@ -30,7 +44,55 @@ export const COMMUNITY_UI_CONSTANTS = {
 } as const;
 
 export function isVideoUrl(url: string): boolean {
-  return /\.(mp4|webm|mov)(\?.*)?$/i.test(url);
+  return /\.(mp4|webm|mov)(?:[?#].*)?$/i.test(url);
+}
+
+// ponytail: W3C Media Fragments (#t=0.1) instructs the browser decoder to paint the first non-black frame without server-side FFmpeg thumbnail extraction; upgrade to CDN poster URLs if switching IMediaStorageProvider to Cloudflare Stream / S3.
+export function getVideoThumbnailSrc(url: string): string {
+  if (!url || url.includes("#t=")) return url;
+  return `${url}${COMMUNITY_UI_CONSTANTS.VIDEO_THUMBNAIL_FRAGMENT}`;
+}
+
+export interface PostAuthorSubtitleInfo {
+  handle: string;
+  groupBadge: { name: string; slug: string; isDefault: boolean } | null;
+  contextLabel: string;
+}
+
+function deriveHandleFromFullName(fullName: string): string {
+  const normalized = fullName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "d")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+  return normalized ? `@${normalized}` : "@member";
+}
+
+export function resolvePostAuthorSubtitle(
+  post: Pick<CommunityPostItem, "author" | "group" | "itinerary">
+): PostAuthorSubtitleInfo {
+  const handle = post.author.username
+    ? `@${post.author.username}`
+    : deriveHandleFromFullName(post.author.fullName);
+
+  const groupBadge = post.group
+    ? {
+        name: post.group.name,
+        slug: post.group.slug,
+        isDefault: Boolean(post.group.isDefault),
+      }
+    : null;
+
+  const contextLabel =
+    groupBadge?.name || COMMUNITY_UI_CONSTANTS.DEFAULT_GROUP_DISPLAY_NAME;
+
+  return {
+    handle,
+    groupBadge,
+    contextLabel,
+  };
 }
 
 export function formatRelativeTime(isoDate: string): string {
@@ -47,11 +109,32 @@ export function formatRelativeTime(isoDate: string): string {
   return date.toLocaleDateString("vi-VN");
 }
 
+export function formatTripDuration(
+  startDate?: string | null,
+  endDate?: string | null,
+  compact = false
+): string | null {
+  if (!startDate || !endDate) return null;
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  const diffDays = Math.max(
+    1,
+    Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
+  );
+  const nights = Math.max(0, diffDays - 1);
+  if (compact) {
+    return nights > 0 ? `${diffDays}N${nights}Đ` : `${diffDays} Ngày`;
+  }
+  return nights > 0 ? `${diffDays} Ngày ${nights} Đêm` : `${diffDays} Ngày`;
+}
+
 export interface CommunityFeedQuery {
   cursor?: string;
   limit?: number;
   sort?: CommunitySortMode;
   areaId?: number;
+  groupId?: string;
   authorId?: string;
   tag?: string;
   search?: string;
@@ -72,12 +155,30 @@ export const communityService = {
     );
   },
 
+  getGroups: async (): Promise<{ groups: CommunityGroupSummary[] }> =>
+    apiClient<{ groups: CommunityGroupSummary[] }>("/community/groups"),
+
+  createGroup: async (
+    payload: CreateCommunityGroupPayload
+  ): Promise<{ message: string; group: CommunityGroupSummary }> =>
+    apiClient<{ message: string; group: CommunityGroupSummary }>(
+      "/community/groups",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    ),
+
+  getSidebarDiscovery: async (): Promise<SidebarDiscoveryResponse> =>
+    apiClient<SidebarDiscoveryResponse>("/community/sidebar-discovery"),
+
   getFeed: async (query: CommunityFeedQuery = {}): Promise<CommunityFeedResponse> => {
     const params = new URLSearchParams();
     if (query.cursor) params.set("cursor", query.cursor);
     if (query.limit) params.set("limit", String(query.limit));
     if (query.sort) params.set("sort", query.sort);
     if (query.areaId) params.set("areaId", String(query.areaId));
+    if (query.groupId) params.set("groupId", query.groupId);
     if (query.authorId) params.set("authorId", query.authorId);
     if (query.tag) params.set("tag", query.tag);
     if (query.search) params.set("search", query.search);
@@ -118,6 +219,21 @@ export const communityService = {
       `/community/posts/${postId}/like`,
       { method: "POST" }
     ),
+
+  reportPost: async (
+    postId: string,
+    payload: ReportCommunityPostPayload
+  ): Promise<{
+    message: string;
+    report: { id: string; status: string; alreadyReported: boolean };
+  }> =>
+    apiClient<{
+      message: string;
+      report: { id: string; status: string; alreadyReported: boolean };
+    }>(`/community/posts/${postId}/report`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
 
   getComments: async (
     postId: string

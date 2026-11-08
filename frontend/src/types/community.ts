@@ -7,6 +7,7 @@ export interface CommunityAuthorSummary {
   avatarUrl: string | null;
   bio: string | null;
   isVerified: boolean;
+  isVerifiedCreator?: boolean;
 }
 
 export interface CommunityLinkedItinerarySummary {
@@ -24,9 +25,24 @@ export interface CommunityLinkedItinerarySummary {
   coverPhoto: string | null;
 }
 
+export interface CommunityGroupSummary {
+  id: string;
+  slug: string;
+  name: string;
+  subtitle: string | null;
+  description?: string | null;
+  iconUrl?: string | null;
+  coverUrl?: string | null;
+  coverImageUrl?: string | null;
+  isDefault: boolean;
+  postCount: number;
+  sortOrder: number;
+}
+
 export interface CommunityPostItem {
   id: string;
   userId: string;
+  groupId?: string | null;
   itineraryId: string | null;
   title: string;
   caption: string | null;
@@ -36,11 +52,60 @@ export interface CommunityPostItem {
   commentCount: number;
   cloneCount: number;
   isLiked: boolean;
+  isBookmarked?: boolean;
   editedAt: string | null;
   createdAt: string;
   updatedAt: string;
   author: CommunityAuthorSummary;
+  group?: CommunityGroupSummary | null;
   itinerary: CommunityLinkedItinerarySummary | null;
+}
+
+export interface TopCreatorSummary {
+  id?: string;
+  username?: string | null;
+  fullName?: string;
+  avatarUrl?: string | null;
+  bio?: string | null;
+  isVerified?: boolean;
+  isVerifiedCreator?: boolean;
+  author?: CommunityAuthorSummary;
+  postCount: number;
+  publicItineraryCount: number;
+  totalLikesReceived?: number;
+  totalClonesReceived: number;
+}
+
+export interface SidebarDiscoveryResponse {
+  message?: string;
+  groups: CommunityGroupSummary[];
+  topClonedPosts: CommunityPostItem[];
+  checkinHighlights: CommunityPostItem[];
+  topCreators: TopCreatorSummary[];
+}
+
+export type CommunityReportType =
+  | "SPAM"
+  | "INAPPROPRIATE"
+  | "FALSE_INFO"
+  | "COPYRIGHT"
+  | "OTHER";
+
+export interface ReportCommunityPostPayload {
+  reportType: CommunityReportType;
+  description?: string;
+}
+
+export interface CreateCommunityGroupPayload {
+  name: string;
+  slug?: string;
+  subtitle?: string;
+  description?: string;
+  iconUrl?: string;
+  coverUrl?: string;
+  coverImageUrl?: string;
+  isDefault?: boolean;
+  sortOrder?: number;
 }
 
 export interface CommunityCommentItem {
@@ -91,12 +156,14 @@ export interface CreateCommunityPostPayload {
   mediaUrls?: string[];
   tags?: string[];
   itineraryId?: string;
+  groupId?: string;
 }
 
 export interface UpdateCommunityPostPayload {
   title: string;
   caption?: string;
   tags?: string[];
+  groupId?: string;
 }
 
 /**

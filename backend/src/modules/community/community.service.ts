@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ForbiddenException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
@@ -14,17 +15,22 @@ import {
 } from './community.constants';
 import {
   CreateCommunityCommentDto,
+  CreateCommunityGroupDto,
   CreateCommunityPostDto,
   QueryCommunityFeedDto,
+  ReportCommunityPostDto,
   UpdateCommunityPostDto,
 } from './dto/community.dto';
 import {
   CommentContextResult,
   CommunityCommentView,
+  CommunityGroupSummary,
   CommunityPostView,
   CreatorProfileData,
   FeedPageResult,
   ICommunityRepository,
+  PostReportResult,
+  SidebarDiscoveryData,
 } from './interfaces/community-repository.interface';
 import {
   IMediaStorageProvider,
@@ -34,12 +40,22 @@ import {
 
 @Injectable()
 export class CommunityService {
+  // ponytail: single-node in-memory TTL cache for anonymous sidebar discovery; upgrade to Redis key if scaled horizontally past 3 API replicas.
+  private sidebarCache: {
+    expiresAt: number;
+    data: SidebarDiscoveryData;
+  } | null = null;
+
   constructor(
     @Inject(INJECT_TOKENS.COMMUNITY_REPOSITORY)
     private readonly communityRepository: ICommunityRepository,
     @Inject(INJECT_TOKENS.MEDIA_STORAGE_PROVIDER)
     private readonly mediaStorageProvider: IMediaStorageProvider,
   ) {}
+
+  invalidateSidebarCache(): void {
+    this.sidebarCache = null;
+  }
 
   private normalizeTags(tags?: string[]): string[] {
     return Array.from(
@@ -50,6 +66,18 @@ export class CommunityService {
           .map((t) => (t.startsWith('#') ? t : `#${t}`)),
       ),
     ).slice(0, COMMUNITY_CONSTANTS.MAX_TAGS_COUNT);
+  }
+
+  private slugifyGroupName(input: string): string {
+    return input
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd')
+      .replace(/Đ/g, 'd')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, COMMUNITY_CONSTANTS.MAX_GROUP_SLUG_LENGTH);
   }
 
   private assertCanModifyPost(
@@ -76,11 +104,77 @@ export class CommunityService {
     };
   }
 
+  async getGroups(): Promise<CommunityGroupSummary[]> {
+    return this.communityRepository.findActiveGroups();
+  }
+
+  async createGroup(
+    userId: string,
+    userRole: UserRole | undefined,
+    dto: CreateCommunityGroupDto,
+  ): Promise<CommunityGroupSummary> {
+    if (userRole !== UserRole.ADMIN) {
+      throw new ForbiddenException(
+        'Chỉ quản trị viên mới có quyền tạo nhóm cộng đồng',
+      );
+    }
+
+    const trimmedName = (dto.name || '').trim();
+    if (!trimmedName) {
+      throw new BadRequestException('Tên nhóm cộng đồng không được để trống');
+    }
+
+    const slug = this.slugifyGroupName(dto.slug?.trim() || trimmedName);
+    if (!slug) {
+      throw new BadRequestException('Định danh (slug) nhóm cộng đồng không hợp lệ');
+    }
+
+    const existing = await this.communityRepository.findGroupByIdOrSlug(slug);
+    if (existing) {
+      throw new ConflictException(`Nhóm cộng đồng với slug "${slug}" đã tồn tại`);
+    }
+
+    for (const url of [dto.iconUrl, dto.coverUrl]) {
+      if (url && !SAFE_MEDIA_URL_REGEX.test(url.trim())) {
+        throw new BadRequestException(`Đường dẫn hình ảnh nhóm không hợp lệ: "${url}"`);
+      }
+    }
+
+    const created = await this.communityRepository.createCommunityGroup({
+      name: trimmedName,
+      slug,
+      subtitle: dto.subtitle?.trim() || null,
+      description: dto.description?.trim() || null,
+      iconUrl: dto.iconUrl?.trim() || null,
+      coverUrl: dto.coverUrl?.trim() || null,
+      sortOrder: dto.sortOrder ?? 0,
+      createdBy: userId,
+    });
+
+    this.invalidateSidebarCache();
+    return created;
+  }
+
+  async getSidebarDiscovery(viewerId?: string): Promise<SidebarDiscoveryData> {
+    if (!viewerId && this.sidebarCache && Date.now() < this.sidebarCache.expiresAt) {
+      return this.sidebarCache.data;
+    }
+
+    const data = await this.communityRepository.getSidebarDiscovery(viewerId);
+    if (!viewerId) {
+      this.sidebarCache = {
+        expiresAt: Date.now() + COMMUNITY_CONSTANTS.SIDEBAR_CACHE_TTL_MS,
+        data,
+      };
+    }
+
+    return data;
+  }
+
   async getFeed(
     query: QueryCommunityFeedDto,
     viewerId?: string,
   ): Promise<FeedPageResult> {
-    // Defense in depth: DTO already validates HTTP input, but internal callers bypass it.
     const limit = Math.min(
       Math.max(1, query.limit ?? COMMUNITY_CONSTANTS.DEFAULT_FEED_LIMIT),
       COMMUNITY_CONSTANTS.MAX_FEED_LIMIT,
@@ -91,6 +185,7 @@ export class CommunityService {
       cursor: query.cursor,
       limit,
       sort,
+      groupId: query.groupId?.trim() || undefined,
       areaId: query.areaId,
       authorId: query.authorId,
       tag: query.tag?.trim() || undefined,
@@ -105,6 +200,21 @@ export class CommunityService {
       throw new NotFoundException('Không tìm thấy bài viết hoặc bài viết đã bị xóa');
     }
     return post;
+  }
+
+  private async resolveTargetGroupId(groupIdOrSlug?: string): Promise<string | null> {
+    if (groupIdOrSlug && groupIdOrSlug.trim()) {
+      const group = await this.communityRepository.findGroupByIdOrSlug(
+        groupIdOrSlug.trim(),
+      );
+      if (!group) {
+        throw new NotFoundException('Không tìm thấy nhóm cộng đồng đã chọn');
+      }
+      return group.id;
+    }
+
+    const defaultGroup = await this.communityRepository.findDefaultGroup();
+    return defaultGroup?.id ?? null;
   }
 
   async createPost(
@@ -142,14 +252,20 @@ export class CommunityService {
       }
     }
 
-    return this.communityRepository.createPost({
+    const resolvedGroupId = await this.resolveTargetGroupId(dto.groupId);
+
+    const created = await this.communityRepository.createPost({
       userId,
+      groupId: resolvedGroupId,
       title: trimmedTitle,
       caption: dto.caption?.trim() || null,
       mediaUrls: sanitizedMediaUrls,
       tags: normalizedTags,
       itineraryId: dto.itineraryId ?? null,
     });
+
+    this.invalidateSidebarCache();
+    return created;
   }
 
   async updatePost(
@@ -172,15 +288,24 @@ export class CommunityService {
 
     const normalizedTags = this.normalizeTags(dto.tags);
 
-    return this.communityRepository.updatePost(
+    let resolvedGroupId: string | null | undefined = undefined;
+    if (dto.groupId !== undefined) {
+      resolvedGroupId = await this.resolveTargetGroupId(dto.groupId);
+    }
+
+    const updated = await this.communityRepository.updatePost(
       postId,
       {
         title: trimmedTitle,
         caption: dto.caption?.trim() || null,
         tags: normalizedTags,
+        ...(resolvedGroupId !== undefined ? { groupId: resolvedGroupId } : {}),
       },
       userId,
     );
+
+    this.invalidateSidebarCache();
+    return updated;
   }
 
   async deletePost(
@@ -196,6 +321,7 @@ export class CommunityService {
     this.assertCanModifyPost(post, userId, userRole, 'xóa bài viết');
 
     await this.communityRepository.softDeletePost(postId);
+    this.invalidateSidebarCache();
     return { success: true, id: postId };
   }
 
@@ -209,10 +335,33 @@ export class CommunityService {
     }
 
     const result = await this.communityRepository.togglePostLike(postId, userId);
+    this.invalidateSidebarCache();
     return {
       postId,
       ...result,
     };
+  }
+
+  async reportPost(
+    userId: string,
+    postId: string,
+    dto: ReportCommunityPostDto,
+  ): Promise<PostReportResult> {
+    const post = await this.communityRepository.findPostById(postId, userId);
+    if (!post) {
+      throw new NotFoundException('Không tìm thấy bài viết để báo cáo');
+    }
+
+    if (post.userId === userId) {
+      throw new BadRequestException('Bạn không thể tự báo cáo bài viết của chính mình');
+    }
+
+    return this.communityRepository.reportPost({
+      postId,
+      reportedBy: userId,
+      reportType: dto.reportType,
+      description: dto.description?.trim() || null,
+    });
   }
 
   async getPostComments(postId: string): Promise<CommunityCommentView[]> {

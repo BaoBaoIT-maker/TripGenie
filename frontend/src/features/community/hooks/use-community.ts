@@ -17,7 +17,10 @@ import type {
   CommunityCommentItem,
   CommunityFeedResponse,
   CommunityPostItem,
+  CreateCommunityGroupPayload,
   CreateCommunityPostPayload,
+  ReportCommunityPostPayload,
+  SidebarDiscoveryResponse,
   UpdateCommunityPostPayload,
   CreatorProfileData,
 } from "@/types/community";
@@ -25,6 +28,8 @@ import { useAuth } from "@/features/auth/hooks/use-auth";
 
 export const COMMUNITY_QUERY_KEYS = {
   all: ["community"] as const,
+  sidebarDiscovery: ["community", "sidebar-discovery"] as const,
+  groups: ["community", "groups"] as const,
   feed: (filters: Omit<CommunityFeedQuery, "cursor">) =>
     ["community", "feed", filters] as const,
   post: (postId: string) => ["community", "post", postId] as const,
@@ -52,9 +57,41 @@ function updatePostInFeedPages(
   };
 }
 
-export function useCommunityFeed(
-  filters: Omit<CommunityFeedQuery, "cursor"> = {}
+export function useCommunitySidebarDiscovery(
+  initialData?: SidebarDiscoveryResponse | null
 ) {
+  return useQuery({
+    queryKey: COMMUNITY_QUERY_KEYS.sidebarDiscovery,
+    queryFn: () => communityService.getSidebarDiscovery(),
+    initialData: initialData ?? undefined,
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useCommunityGroups(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: COMMUNITY_QUERY_KEYS.groups,
+    queryFn: async () => {
+      const res = await communityService.getGroups();
+      return res.groups;
+    },
+    staleTime: 60 * 1000,
+    enabled: options?.enabled ?? true,
+  });
+}
+
+export function useCommunityFeed(
+  filters: Omit<CommunityFeedQuery, "cursor"> = {},
+  initialFirstPage?: CommunityFeedResponse | null
+) {
+  const isDefaultUnfilteredFeed =
+    (!filters.sort || filters.sort === "LATEST") &&
+    !filters.groupId &&
+    !filters.tag &&
+    !filters.search &&
+    !filters.areaId &&
+    !filters.authorId;
+
   return useInfiniteQuery({
     queryKey: COMMUNITY_QUERY_KEYS.feed(filters),
     queryFn: ({ pageParam }) =>
@@ -64,6 +101,13 @@ export function useCommunityFeed(
       }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    initialData:
+      isDefaultUnfilteredFeed && initialFirstPage
+        ? {
+            pages: [initialFirstPage],
+            pageParams: [undefined],
+          }
+        : undefined,
   });
 }
 
@@ -179,6 +223,42 @@ export function useDeleteCommunityPost() {
   });
 }
 
+export function useCreateCommunityGroup() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (payload: CreateCommunityGroupPayload) =>
+      communityService.createGroup(payload),
+    onSuccess: (res) => {
+      toast.success(res.message || "Đã tạo nhóm cộng đồng mới!");
+      queryClient.invalidateQueries({ queryKey: COMMUNITY_QUERY_KEYS.all });
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Không thể tạo nhóm cộng đồng");
+    },
+  });
+}
+
+export function useReportCommunityPost() {
+  return useMutation({
+    mutationFn: ({
+      postId,
+      payload,
+    }: {
+      postId: string;
+      payload: ReportCommunityPostPayload;
+    }) => communityService.reportPost(postId, payload),
+    onSuccess: (res) => {
+      toast.success(
+        res.message || "Đã gửi báo cáo bài viết để Ban quản trị xem xét"
+      );
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Không thể gửi báo cáo bài viết");
+    },
+  });
+}
+
 /**
  * Optimistic UI Toggle Like (0ms latency with snapshot rollback on error)
  */
@@ -200,6 +280,11 @@ export function useTogglePostLike() {
         queryKey: ["community", "creator"],
       });
 
+      const previousSidebar =
+        queryClient.getQueryData<SidebarDiscoveryResponse>(
+          COMMUNITY_QUERY_KEYS.sidebarDiscovery
+        );
+
       // Optimistically update all feed caches
       queryClient.setQueriesData<InfiniteData<CommunityFeedResponse>>(
         { queryKey: ["community", "feed"] },
@@ -217,6 +302,28 @@ export function useTogglePostLike() {
             };
           })
       );
+
+      // Optimistically update sidebar discovery check-in highlights & top cloned posts
+      if (previousSidebar) {
+        const updatePostItem = (post: CommunityPostItem) => {
+          if (post.id !== postId) return post;
+          const nextLiked = !post.isLiked;
+          return {
+            ...post,
+            isLiked: nextLiked,
+            likeCount: Math.max(0, post.likeCount + (nextLiked ? 1 : -1)),
+          };
+        };
+        queryClient.setQueryData<SidebarDiscoveryResponse>(
+          COMMUNITY_QUERY_KEYS.sidebarDiscovery,
+          {
+            ...previousSidebar,
+            topClonedPosts: previousSidebar.topClonedPosts.map(updatePostItem),
+            checkinHighlights:
+              previousSidebar.checkinHighlights.map(updatePostItem),
+          }
+        );
+      }
 
       // Optimistically update creator profile caches
       queryClient.setQueriesData<CreatorProfileData>(
@@ -248,7 +355,7 @@ export function useTogglePostLike() {
         }
       );
 
-      return { previousFeeds, previousProfiles };
+      return { previousFeeds, previousProfiles, previousSidebar };
     },
     onError: (err: Error, _postId, context) => {
       if (context?.previousFeeds) {
@@ -260,6 +367,12 @@ export function useTogglePostLike() {
         context.previousProfiles.forEach(([queryKey, data]) => {
           queryClient.setQueryData(queryKey, data);
         });
+      }
+      if (context?.previousSidebar) {
+        queryClient.setQueryData(
+          COMMUNITY_QUERY_KEYS.sidebarDiscovery,
+          context.previousSidebar
+        );
       }
       toast.error(err.message || "Vui lòng đăng nhập để thả tim bài viết");
     },
@@ -315,7 +428,7 @@ export function useCreatePostComment() {
           fullName: user?.fullName || "Bạn",
           avatarUrl: user?.avatarUrl || null,
           bio: null,
-          isVerified: Boolean(user?.isVerified),
+          isVerified: Boolean(user?.role === "ADMIN"),
         },
       };
 

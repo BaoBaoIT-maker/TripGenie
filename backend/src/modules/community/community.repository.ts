@@ -1,5 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, NotificationType } from '@prisma/client';
+import {
+  Prisma,
+  NotificationType,
+  PostModerationStatus,
+  ReportStatus,
+  ReportTargetType,
+} from '@prisma/client';
 import { PrismaService } from '@/database/prisma.service';
 import { writeNotification } from '../notifications/notification-writer';
 import {
@@ -11,21 +17,30 @@ import {
   CommentAccessView,
   CommentContextResult,
   CommunityCommentView,
+  CommunityGroupSummary,
   CommunityLinkedItinerarySummary,
   CommunityPostView,
   CreateCommentData,
+  CreateCommunityGroupData,
   CreatePostData,
+  CreatePostReportData,
   CreatorProfileData,
   FeedPageResult,
   FindFeedParams,
   ICommunityRepository,
   MatchedCreatorSummary,
+  PostReportResult,
+  SidebarDiscoveryData,
+  TopCreatorSummary,
 } from './interfaces/community-repository.interface';
 import {
   AUTHOR_SELECT,
+  GROUP_MINI_SELECT,
+  GROUP_SUMMARY_SELECT,
   ITINERARY_SUMMARY_SELECT,
   mapAuthorSummary,
   mapCommentView,
+  mapGroupSummary,
   mapItinerarySummary,
   mapPostView,
 } from './mappers/community.mapper';
@@ -37,6 +52,7 @@ export class CommunityRepository implements ICommunityRepository {
   private buildPostInclude(viewerId?: string) {
     return {
       user: { select: AUTHOR_SELECT },
+      group: { select: GROUP_MINI_SELECT },
       itinerary: { select: ITINERARY_SUMMARY_SELECT },
       likes: viewerId
         ? {
@@ -48,6 +64,209 @@ export class CommunityRepository implements ICommunityRepository {
     } satisfies Prisma.CommunityPostInclude;
   }
 
+  private async syncGroupPostCounts(tx: Prisma.TransactionClient): Promise<void> {
+    await tx.$executeRaw`
+      UPDATE community_groups cg
+      SET post_count = CASE
+        WHEN cg.is_default = true THEN (
+          SELECT COUNT(*)::int FROM community_posts cp
+          WHERE cp.deleted_at IS NULL AND cp.moderation_status = 'APPROVED'
+        )
+        ELSE (
+          SELECT COUNT(*)::int FROM community_posts cp
+          WHERE cp.group_id = cg.id AND cp.deleted_at IS NULL AND cp.moderation_status = 'APPROVED'
+        )
+      END;
+    `;
+  }
+
+  async findActiveGroups(): Promise<CommunityGroupSummary[]> {
+    const rows = await this.prisma.communityGroup.findMany({
+      where: {
+        isActive: true,
+        deletedAt: null,
+      },
+      select: GROUP_SUMMARY_SELECT,
+      orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+    });
+
+    return rows.map((r) => mapGroupSummary(r));
+  }
+
+  async findGroupByIdOrSlug(
+    identifier: string,
+  ): Promise<CommunityGroupSummary | null> {
+    const clean = identifier.trim();
+    if (!clean) return null;
+    const isUuid = UUID_REGEX.test(clean);
+
+    const row = await this.prisma.communityGroup.findFirst({
+      where: {
+        ...(isUuid ? { id: clean } : { slug: clean }),
+        isActive: true,
+        deletedAt: null,
+      },
+      select: GROUP_SUMMARY_SELECT,
+    });
+
+    return row ? mapGroupSummary(row) : null;
+  }
+
+  async findDefaultGroup(): Promise<CommunityGroupSummary | null> {
+    const row = await this.prisma.communityGroup.findFirst({
+      where: {
+        isDefault: true,
+        isActive: true,
+        deletedAt: null,
+      },
+      select: GROUP_SUMMARY_SELECT,
+      orderBy: { sortOrder: 'asc' },
+    });
+
+    return row ? mapGroupSummary(row) : null;
+  }
+
+  async createCommunityGroup(
+    data: CreateCommunityGroupData,
+  ): Promise<CommunityGroupSummary> {
+    const created = await this.prisma.communityGroup.create({
+      data: {
+        name: data.name,
+        slug: data.slug,
+        subtitle: data.subtitle ?? null,
+        description: data.description ?? null,
+        iconUrl: data.iconUrl ?? null,
+        coverUrl: data.coverUrl ?? null,
+        isDefault: Boolean(data.isDefault),
+        sortOrder: data.sortOrder ?? 0,
+        createdBy: data.createdBy,
+      },
+      select: GROUP_SUMMARY_SELECT,
+    });
+
+    return mapGroupSummary(created);
+  }
+
+  private async findTopCreatorsForSidebar(): Promise<TopCreatorSummary[]> {
+    const grouped = await this.prisma.communityPost.groupBy({
+      by: ['userId'],
+      where: {
+        deletedAt: null,
+        moderationStatus: PostModerationStatus.APPROVED,
+      },
+      _count: { _all: true },
+      _sum: {
+        likeCount: true,
+        cloneCount: true,
+      },
+    });
+
+    if (grouped.length === 0) return [];
+
+    const ranked = grouped
+      .map((g) => {
+        const postCount = g._count._all ?? 0;
+        const totalLikesReceived = g._sum.likeCount ?? 0;
+        const totalClonesReceived = g._sum.cloneCount ?? 0;
+        const score = totalClonesReceived * 3 + totalLikesReceived + postCount * 5;
+        return {
+          userId: g.userId,
+          postCount,
+          totalLikesReceived,
+          totalClonesReceived,
+          score,
+        };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, COMMUNITY_CONSTANTS.TOP_CREATORS_SIDEBAR_LIMIT);
+
+    const userIds = ranked.map((r) => r.userId);
+    const [users, publicItinerariesByCreator] = await Promise.all([
+      this.prisma.user.findMany({
+        where: {
+          id: { in: userIds },
+          deletedAt: null,
+          isActive: true,
+        },
+        select: AUTHOR_SELECT,
+      }),
+      this.prisma.itinerary.groupBy({
+        by: ['creatorId'],
+        where: {
+          creatorId: { in: userIds },
+          isPublic: true,
+          deletedAt: null,
+        },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const userMap = new Map(users.map((u) => [u.id, u]));
+    const itinCountMap = new Map(
+      publicItinerariesByCreator.map((it) => [it.creatorId, it._count._all ?? 0]),
+    );
+
+    const results: TopCreatorSummary[] = [];
+    for (const item of ranked) {
+      const u = userMap.get(item.userId);
+      if (!u) continue;
+      const authorSummary = mapAuthorSummary(u, {
+        postCount: item.postCount,
+        totalLikesReceived: item.totalLikesReceived,
+        totalClonesReceived: item.totalClonesReceived,
+      });
+      results.push({
+        ...authorSummary,
+        author: authorSummary,
+        postCount: item.postCount,
+        publicItineraryCount: itinCountMap.get(item.userId) ?? 0,
+        totalLikesReceived: item.totalLikesReceived,
+        totalClonesReceived: item.totalClonesReceived,
+      });
+    }
+
+    return results;
+  }
+
+  async getSidebarDiscovery(viewerId?: string): Promise<SidebarDiscoveryData> {
+    const [groups, topClonedRows, checkinHighlightRows, topCreators] =
+      await Promise.all([
+        this.findActiveGroups(),
+        this.prisma.communityPost.findMany({
+          where: {
+            deletedAt: null,
+            moderationStatus: PostModerationStatus.APPROVED,
+            itineraryId: { not: null },
+          },
+          orderBy: [
+            { cloneCount: 'desc' },
+            { likeCount: 'desc' },
+            { createdAt: 'desc' },
+          ],
+          take: COMMUNITY_CONSTANTS.TOP_CLONED_SIDEBAR_LIMIT,
+          include: this.buildPostInclude(viewerId),
+        }),
+        this.prisma.communityPost.findMany({
+          where: {
+            deletedAt: null,
+            moderationStatus: PostModerationStatus.APPROVED,
+            NOT: { mediaUrls: { equals: [] } },
+          },
+          orderBy: [{ createdAt: 'desc' }, { likeCount: 'desc' }],
+          take: COMMUNITY_CONSTANTS.CHECKIN_HIGHLIGHTS_LIMIT,
+          include: this.buildPostInclude(viewerId),
+        }),
+        this.findTopCreatorsForSidebar(),
+      ]);
+
+    return {
+      groups,
+      topClonedPosts: topClonedRows.map((r) => mapPostView(r)),
+      checkinHighlights: checkinHighlightRows.map((r) => mapPostView(r)),
+      topCreators,
+    };
+  }
+
   // ponytail: unnest(p.tags) scan runs O(N_tags) with ILIKE. Upgrade to a GIN index on tags or dedicated community_tags table if feed volume > 100k posts.
   private async findMatchingTagsCaseInsensitive(term: string): Promise<string[]> {
     const clean = term.replace(/^#/, '').trim();
@@ -57,6 +276,7 @@ export class CommunityRepository implements ICommunityRepository {
       SELECT DISTINCT unnest(tags) AS tag
       FROM community_posts
       WHERE deleted_at IS NULL
+        AND moderation_status = 'APPROVED'
         AND EXISTS (
           SELECT 1
           FROM unnest(tags) t
@@ -89,7 +309,10 @@ export class CommunityRepository implements ICommunityRepository {
         _count: {
           select: {
             posts: {
-              where: { deletedAt: null },
+              where: {
+                deletedAt: null,
+                moderationStatus: PostModerationStatus.APPROVED,
+              },
             },
           },
         },
@@ -152,7 +375,15 @@ export class CommunityRepository implements ICommunityRepository {
   ): Promise<{ where: Prisma.CommunityPostWhereInput; matchedCreators?: MatchedCreatorSummary[] }> {
     const where: Prisma.CommunityPostWhereInput = {
       deletedAt: null,
+      moderationStatus: PostModerationStatus.APPROVED,
     };
+
+    if (params.groupId) {
+      const group = await this.findGroupByIdOrSlug(params.groupId);
+      if (group && !group.isDefault) {
+        where.groupId = group.id;
+      }
+    }
 
     if (params.authorId) {
       where.userId = params.authorId;
@@ -239,7 +470,7 @@ export class CommunityRepository implements ICommunityRepository {
   }
 
   async createPost(data: CreatePostData): Promise<CommunityPostView> {
-    const created = await this.prisma.$transaction(async (tx) => {
+    const createdId = await this.prisma.$transaction(async (tx) => {
       if (data.itineraryId) {
         await tx.itinerary.update({
           where: { id: data.itineraryId },
@@ -247,38 +478,59 @@ export class CommunityRepository implements ICommunityRepository {
         });
       }
 
-      return tx.communityPost.create({
+      const post = await tx.communityPost.create({
         data: {
           userId: data.userId,
+          groupId: data.groupId ?? null,
           title: data.title,
           caption: data.caption ?? null,
           mediaUrls: data.mediaUrls,
           tags: data.tags,
           itineraryId: data.itineraryId ?? null,
+          moderationStatus: PostModerationStatus.APPROVED,
         },
-        include: this.buildPostInclude(data.userId),
+        select: { id: true },
       });
+
+      await this.syncGroupPostCounts(tx);
+
+      return post.id;
     });
 
-    return mapPostView(created);
+    const view = await this.findPostById(createdId, data.userId);
+    return view!;
   }
 
   async updatePost(
     postId: string,
-    data: { title: string; caption?: string | null; tags: string[] },
+    data: {
+      title: string;
+      caption?: string | null;
+      tags: string[];
+      groupId?: string | null;
+    },
     viewerId?: string,
   ): Promise<CommunityPostView> {
-    const updated = await this.prisma.communityPost.update({
-      where: { id: postId },
-      data: {
-        title: data.title,
-        caption: data.caption ?? null,
-        tags: data.tags,
-        editedAt: new Date(),
-      },
-      include: this.buildPostInclude(viewerId),
+    await this.prisma.$transaction(async (tx) => {
+      await tx.communityPost.update({
+        where: { id: postId },
+        data: {
+          title: data.title,
+          caption: data.caption ?? null,
+          tags: data.tags,
+          ...(data.groupId !== undefined ? { groupId: data.groupId } : {}),
+          editedAt: new Date(),
+        },
+        select: { id: true },
+      });
+
+      if (data.groupId !== undefined) {
+        await this.syncGroupPostCounts(tx);
+      }
     });
-    return mapPostView(updated);
+
+    const view = await this.findPostById(postId, viewerId);
+    return view!;
   }
 
   async softDeletePost(postId: string): Promise<void> {
@@ -310,6 +562,8 @@ export class CommunityRepository implements ICommunityRepository {
           });
         }
       }
+
+      await this.syncGroupPostCounts(tx);
     });
   }
 
@@ -392,6 +646,56 @@ export class CommunityRepository implements ICommunityRepository {
     });
   }
 
+  async reportPost(data: CreatePostReportData): Promise<PostReportResult> {
+    const existing = await this.prisma.contentReport.findFirst({
+      where: {
+        targetType: ReportTargetType.POST,
+        targetId: data.postId,
+        reportedBy: data.reportedBy,
+        status: { in: [ReportStatus.PENDING, ReportStatus.REVIEWING] },
+      },
+      select: {
+        id: true,
+        reportType: true,
+        status: true,
+      },
+    });
+
+    if (existing) {
+      return {
+        id: existing.id,
+        postId: data.postId,
+        reportType: existing.reportType,
+        status: existing.status,
+        alreadyReported: true,
+      };
+    }
+
+    const created = await this.prisma.contentReport.create({
+      data: {
+        reportedBy: data.reportedBy,
+        targetType: ReportTargetType.POST,
+        targetId: data.postId,
+        reportType: data.reportType,
+        description: data.description ?? null,
+        status: ReportStatus.PENDING,
+      },
+      select: {
+        id: true,
+        reportType: true,
+        status: true,
+      },
+    });
+
+    return {
+      id: created.id,
+      postId: data.postId,
+      reportType: created.reportType,
+      status: created.status,
+      alreadyReported: false,
+    };
+  }
+
   async findPostComments(
     postId: string,
     limit: number = COMMUNITY_CONSTANTS.DEFAULT_COMMENTS_LIMIT,
@@ -453,7 +757,7 @@ export class CommunityRepository implements ICommunityRepository {
     let parent: CommunityCommentView | null = null;
     if (comment.parentId) {
       const parentRow = await this.prisma.postComment.findFirst({
-        where: { id: comment.parentId, postId, deletedAt: null },
+        where: { id: commentId === comment.parentId ? undefined : comment.parentId, postId, deletedAt: null },
         include: {
           user: { select: AUTHOR_SELECT },
         },
@@ -523,10 +827,6 @@ export class CommunityRepository implements ICommunityRepository {
         },
       });
 
-      // Notifications:
-      // 1. Reply: notify target author with COMMENT_REPLIED (if not self).
-      //    If post owner is someone else (not actor, not target author), notify post owner with POST_COMMENTED.
-      // 2. Root comment: notify post owner with POST_COMMENTED (if not self).
       if (targetAuthorId) {
         if (targetAuthorId !== data.userId) {
           await writeNotification(tx, {
@@ -644,7 +944,11 @@ export class CommunityRepository implements ICommunityRepository {
     if (!user) return null;
 
     const aggregateStats = await this.prisma.communityPost.aggregate({
-      where: { userId: user.id, deletedAt: null },
+      where: {
+        userId: user.id,
+        deletedAt: null,
+        moderationStatus: PostModerationStatus.APPROVED,
+      },
       _count: { _all: true },
       _sum: {
         likeCount: true,
@@ -653,7 +957,11 @@ export class CommunityRepository implements ICommunityRepository {
     });
 
     const postRows = await this.prisma.communityPost.findMany({
-      where: { userId: user.id, deletedAt: null },
+      where: {
+        userId: user.id,
+        deletedAt: null,
+        moderationStatus: PostModerationStatus.APPROVED,
+      },
       include: this.buildPostInclude(viewerId),
       orderBy: { createdAt: 'desc' },
       take: COMMUNITY_CONSTANTS.MAX_FEED_LIMIT,
@@ -670,17 +978,19 @@ export class CommunityRepository implements ICommunityRepository {
       take: COMMUNITY_CONSTANTS.MAX_FEED_LIMIT,
     });
 
+    const stats = {
+      postCount: aggregateStats._count._all ?? 0,
+      totalLikesReceived: aggregateStats._sum.likeCount ?? 0,
+      totalClonesReceived: aggregateStats._sum.cloneCount ?? 0,
+      publicItineraryCount: itineraryRows.length,
+    };
+
     return {
       user: {
-        ...mapAuthorSummary(user),
+        ...mapAuthorSummary(user, stats),
         createdAt: user.createdAt,
       },
-      stats: {
-        postCount: aggregateStats._count._all ?? 0,
-        totalLikesReceived: aggregateStats._sum.likeCount ?? 0,
-        totalClonesReceived: aggregateStats._sum.cloneCount ?? 0,
-        publicItineraryCount: itineraryRows.length,
-      },
+      stats,
       posts: postRows.map((p) => mapPostView(p)),
       publicItineraries: itineraryRows
         .map((it) => mapItinerarySummary(it))

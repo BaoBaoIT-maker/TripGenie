@@ -23,8 +23,10 @@ import { COMMUNITY_CONSTANTS } from './community.constants';
 import { CommunityService } from './community.service';
 import {
   CreateCommunityCommentDto,
+  CreateCommunityGroupDto,
   CreateCommunityPostDto,
   QueryCommunityFeedDto,
+  ReportCommunityPostDto,
   UpdateCommunityPostDto,
 } from './dto/community.dto';
 import { RawUploadFile } from './interfaces/media-storage.interface';
@@ -47,6 +49,43 @@ export class CommunityController {
     const result = await this.communityService.uploadMedia(files);
     return {
       message: 'Tải lên tệp đa phương tiện thành công',
+      ...result,
+    };
+  }
+
+  @Get('groups')
+  async getGroups() {
+    const groups = await this.communityService.getGroups();
+    return {
+      message: 'Lấy danh sách nhóm cộng đồng thành công',
+      groups,
+    };
+  }
+
+  @Post('groups')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  async createGroup(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: CreateCommunityGroupDto,
+  ) {
+    const group = await this.communityService.createGroup(
+      user.id,
+      user.role,
+      dto,
+    );
+    return {
+      message: 'Tạo nhóm cộng đồng thành công',
+      group,
+    };
+  }
+
+  @Get('sidebar-discovery')
+  @UseGuards(OptionalJwtAuthGuard)
+  async getSidebarDiscovery(@CurrentUser('id') viewerId?: string) {
+    const result = await this.communityService.getSidebarDiscovery(viewerId);
+    return {
+      message: 'Lấy dữ liệu khám phá cộng đồng thành công',
       ...result,
     };
   }
@@ -136,6 +175,23 @@ export class CommunityController {
     return {
       message: result.isLiked ? 'Đã thích bài viết' : 'Đã bỏ thích bài viết',
       ...result,
+    };
+  }
+
+  @Post('posts/:id/report')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async reportPost(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ReportCommunityPostDto,
+  ) {
+    const report = await this.communityService.reportPost(user.id, id, dto);
+    return {
+      message: report.alreadyReported
+        ? 'Bạn đã gửi báo cáo cho bài viết này trước đó'
+        : 'Đã gửi báo cáo bài viết cho quản trị viên xem xét',
+      report,
     };
   }
 

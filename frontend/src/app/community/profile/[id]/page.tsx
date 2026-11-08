@@ -131,10 +131,10 @@ export default function CreatorProfilePage({ params }: CreatorProfilePageProps) 
                 <h1 className="text-2xl sm:text-3xl font-bold font-heading text-foreground">
                   {creator.fullName}
                 </h1>
-                {creator.isVerified && (
+                {(creator.isVerifiedCreator ?? creator.isVerified) && (
                   <CheckCircle2
-                    className="size-5 text-primary shrink-0"
-                    aria-label="Tài khoản xác thực"
+                    className="size-5 text-[#0194F3] shrink-0"
+                    aria-label="Thổ địa xác thực"
                   />
                 )}
               </div>

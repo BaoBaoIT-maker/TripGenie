@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import {
   X,
   Upload,
@@ -10,10 +10,11 @@ import {
   Image as ImageIcon,
   Trash2,
   Hash,
+  Users,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
+  useCommunityGroups,
   useCreateCommunityPost,
   useUploadCommunityMedia,
 } from "@/features/community/hooks/use-community";
@@ -23,13 +24,19 @@ import {
   POPULAR_COMMUNITY_TAGS,
   normalizeKeyword,
 } from "@/features/community/config/community-suggestions";
-import type { UploadedMediaItem } from "@/types/community";
+import { CommunityModalPortal } from "./CommunityModalPortal";
+import type {
+  CommunityGroupSummary,
+  UploadedMediaItem,
+} from "@/types/community";
 
 interface CreatePostModalProps {
   open: boolean;
   onClose: () => void;
   initialFiles?: File[];
   focusItinerary?: boolean;
+  defaultGroupId?: string;
+  groups?: CommunityGroupSummary[];
 }
 
 export function CreatePostModal({
@@ -37,6 +44,8 @@ export function CreatePostModal({
   onClose,
   initialFiles,
   focusItinerary,
+  defaultGroupId,
+  groups: providedGroups,
 }: CreatePostModalProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const itinerarySelectRef = useRef<HTMLSelectElement | null>(null);
@@ -49,39 +58,74 @@ export function CreatePostModal({
   const tagDropdownRef = useRef<HTMLDivElement | null>(null);
   const tagInputRef = useRef<HTMLInputElement | null>(null);
   const [selectedItineraryId, setSelectedItineraryId] = useState<string>("");
+  const [selectedGroupId, setSelectedGroupId] = useState<string>(
+    defaultGroupId || COMMUNITY_UI_CONSTANTS.DEFAULT_GROUP_SLUG
+  );
   const [uploadedItems, setUploadedItems] = useState<UploadedMediaItem[]>([]);
 
-  // Calculate tag suggestions based on active token after comma
-  const tagTokens = tagsInput.split(',');
-  const currentTagToken = tagTokens[tagTokens.length - 1]?.trim() || '';
-  const rawTagKeyword = currentTagToken.replace(/^#/, '');
-  const normalizedTagKeyword = normalizeKeyword(rawTagKeyword);
-  const existingTagsNormalized = new Set(
-    tagTokens.slice(0, -1).map((t) => normalizeKeyword(t.trim().replace(/^#/, '')))
-  );
-  const suggestedTags = normalizedTagKeyword.length > 0
-    ? POPULAR_COMMUNITY_TAGS.filter((tag) => {
-        const tagNorm = normalizeKeyword(tag.replace(/^#/, ''));
-        return !existingTagsNormalized.has(tagNorm) && tagNorm.includes(normalizedTagKeyword);
-      }).slice(0, 6)
-    : [];
+  useEffect(() => {
+    if (open) {
+      setSelectedGroupId(
+        defaultGroupId || COMMUNITY_UI_CONSTANTS.DEFAULT_GROUP_SLUG
+      );
+    }
+  }, [open, defaultGroupId]);
+
+  // Memoize tag suggestions so typing in title/caption never triggers regex normalization
+  const suggestedTags = useMemo(() => {
+    const tagTokens = tagsInput.split(",");
+    const currentTagToken = tagTokens[tagTokens.length - 1]?.trim() || "";
+    const rawTagKeyword = currentTagToken.replace(/^#/, "");
+    const normalizedTagKeyword = normalizeKeyword(rawTagKeyword);
+    if (normalizedTagKeyword.length === 0) return [];
+
+    const existingTagsNormalized = new Set(
+      tagTokens
+        .slice(0, -1)
+        .map((t) => normalizeKeyword(t.trim().replace(/^#/, "")))
+    );
+
+    return POPULAR_COMMUNITY_TAGS.filter((tag) => {
+      const tagNorm = normalizeKeyword(tag.replace(/^#/, ""));
+      return (
+        !existingTagsNormalized.has(tagNorm) &&
+        tagNorm.includes(normalizedTagKeyword)
+      );
+    }).slice(0, 6);
+  }, [tagsInput]);
 
   const handleSelectTag = (tag: string) => {
-    const parts = tagsInput.split(',');
-    parts[parts.length - 1] = (parts.length > 1 ? ' ' : '') + tag;
-    const newText = parts.map((p) => p.trim()).filter(Boolean).join(', ') + ', ';
+    const parts = tagsInput.split(",");
+    parts[parts.length - 1] = (parts.length > 1 ? " " : "") + tag;
+    const newText =
+      parts
+        .map((p) => p.trim())
+        .filter(Boolean)
+        .join(", ") + ", ";
     setTagsInput(newText);
     setIsTagDropdownOpen(false);
     tagInputRef.current?.focus();
   };
 
   const uploadMediaMutation = useUploadCommunityMedia();
+  const uploadMutateAsyncRef = useRef(uploadMediaMutation.mutateAsync);
+  uploadMutateAsyncRef.current = uploadMediaMutation.mutateAsync;
+
   const createPostMutation = useCreateCommunityPost();
 
-  const { data: myItineraries = [], isLoading: isLoadingItineraries } =
-    useItinerariesListQuery();
+  const hasProvidedGroups = Boolean(
+    providedGroups && providedGroups.length > 0
+  );
+  const { data: fetchedGroups = [] } = useCommunityGroups({
+    enabled: open && !hasProvidedGroups,
+  });
+  const communityGroups = hasProvidedGroups ? providedGroups! : fetchedGroups;
 
-  const handleClose = () => {
+  const { data: myItineraries = [], isLoading: isLoadingItineraries } =
+    useItinerariesListQuery("OWNED", { enabled: open });
+
+  const handleClose = useCallback(() => {
+    if (createPostMutation.isPending || uploadMediaMutation.isPending) return;
     setTitle("");
     setCaption("");
     setTagsInput("");
@@ -90,9 +134,10 @@ export function CreatePostModal({
     setUploadedItems([]);
     hasProcessedInitialFilesRef.current = false;
     onClose();
-  };
+  }, [createPostMutation.isPending, uploadMediaMutation.isPending, onClose]);
 
   useEffect(() => {
+    if (!open || !isTagDropdownOpen) return;
     const handleClickOutside = (event: MouseEvent) => {
       if (
         tagDropdownRef.current &&
@@ -103,34 +148,11 @@ export function CreatePostModal({
         setIsTagDropdownOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, []);
-
-  // WCAG 2.2 AA & frontend.md §4: Handle Escape key & lock background scroll when modal is open
-  useEffect(() => {
-    if (!open) {
-      hasProcessedInitialFilesRef.current = false;
-      return;
-    }
-
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        handleClose();
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.body.style.overflow = prevOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
+  }, [open, isTagDropdownOpen]);
 
   // Auto-upload initialFiles if triggered directly from quick-action buttons
   useEffect(() => {
@@ -150,8 +172,8 @@ export function CreatePostModal({
       const filesToUpload = initialFiles.slice(0, remainingSlots);
 
       if (filesToUpload.length > 0) {
-        uploadMediaMutation
-          .mutateAsync(filesToUpload)
+        uploadMutateAsyncRef
+          .current(filesToUpload)
           .then((res) => {
             setUploadedItems((prev) =>
               [...prev, ...(res.items || [])].slice(
@@ -165,7 +187,7 @@ export function CreatePostModal({
           });
       }
     }
-  }, [open, initialFiles, uploadedItems.length, uploadMediaMutation]);
+  }, [open, initialFiles, uploadedItems.length]);
 
   // Auto-focus and scroll to itinerary selector if triggered via 'Đính kèm lịch trình'
   useEffect(() => {
@@ -179,7 +201,7 @@ export function CreatePostModal({
           block: "center",
         });
       }
-    }, 150);
+    }, 120);
 
     return () => clearTimeout(timer);
   }, [open, focusItinerary]);
@@ -229,6 +251,7 @@ export function CreatePostModal({
       mediaUrls: uploadedItems.map((item) => item.url),
       tags: parsedTags,
       itineraryId: selectedItineraryId || undefined,
+      groupId: selectedGroupId || undefined,
     });
 
     setTitle("");
@@ -240,277 +263,332 @@ export function CreatePostModal({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="create-post-modal-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
-      onClick={handleClose}
+    <CommunityModalPortal
+      open={open}
+      onClose={handleClose}
+      ariaLabelledBy="create-post-modal-title"
+      maxWidthClass="max-w-[600px]"
     >
-      <div
-        className="w-full max-w-2xl rounded-2xl border border-border bg-card text-foreground shadow-xl overflow-hidden flex flex-col max-h-[90vh]"
-        onClick={(e) => e.stopPropagation()}
+      {/* Modal Header */}
+      <div className="px-5 py-4 border-b border-[#F1F5F9] bg-[#F8FAFC] flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="size-9 rounded-[10px] bg-[#0194F3] text-white flex items-center justify-center text-sm shadow-[0_2px_6px_rgba(1,148,243,0.25)]">
+            <i className="fa-solid fa-pen-to-square" aria-hidden="true" />
+          </div>
+          <div>
+            <h2
+              id="create-post-modal-title"
+              className="text-[15px] font-black text-[#0F172A] tracking-[-0.01em]"
+            >
+              Tạo bài chia sẻ mới
+            </h2>
+            <p className="text-[11px] text-[#64748B]">
+              Chia sẻ ảnh, video và lộ trình thực tế cùng cộng đồng TripGenie
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={handleClose}
+          disabled={
+            createPostMutation.isPending || uploadMediaMutation.isPending
+          }
+          className="size-8 rounded-full bg-white border border-[#E2E8F0] hover:bg-[#F1F5F9] inline-flex items-center justify-center text-[#64748B] hover:text-[#0F172A] transition-colors cursor-pointer disabled:opacity-50"
+          aria-label="Đóng hộp thoại tạo bài viết"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+
+      {/* Form Body */}
+      <form
+        onSubmit={handleSubmit}
+        className="p-5 space-y-4 overflow-y-auto flex-1 custom-scroll"
       >
-        {/* Modal Header */}
-        <div className="relative flex items-center justify-center px-6 py-5 border-b border-border">
-          <h2
-            id="create-post-modal-title"
-            className="text-2xl font-bold text-foreground tracking-tight text-center"
+        {/* Community Group Selection */}
+        <div className="space-y-1.5">
+          <label
+            htmlFor="post-group-select"
+            className="flex items-center gap-1.5 text-[12px] font-extrabold text-[#0F172A]"
           >
-            Tạo bài viết
-          </h2>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="absolute right-4 top-1/2 -translate-y-1/2 min-h-[40px] min-w-[40px] inline-flex items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            aria-label="Đóng hộp thoại tạo bài viết"
+            <Users className="size-3.5 text-[#0194F3]" />
+            <span>Nhóm cộng đồng đăng bài</span>
+          </label>
+          <select
+            id="post-group-select"
+            value={selectedGroupId}
+            onChange={(e) => setSelectedGroupId(e.target.value)}
+            className="w-full h-10 px-3.5 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] text-[13px] font-semibold text-[#0F172A] focus:outline-none focus:border-[#0194F3] focus:bg-white transition-colors"
           >
-            <X className="size-4" />
-          </button>
+            {communityGroups.length > 0 ? (
+              communityGroups.map((grp) => (
+                <option key={grp.id} value={grp.slug}>
+                  {grp.name} {grp.isDefault ? "(Mặc định - Tất cả)" : ""}
+                </option>
+              ))
+            ) : (
+              <option value={COMMUNITY_UI_CONSTANTS.DEFAULT_GROUP_SLUG}>
+                Cộng đồng chung TripGenie (Mặc định)
+              </option>
+            )}
+          </select>
         </div>
 
-        {/* Form Body */}
-        <form
-          onSubmit={handleSubmit}
-          className="p-6 sm:p-7 space-y-5 overflow-y-auto flex-1"
-        >
-          <div className="space-y-1.5">
+        {/* Title */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
             <label
               htmlFor="post-title-input"
-              className="block text-sm font-semibold text-foreground"
+              className="block text-[12px] font-extrabold text-[#0F172A]"
             >
-              Tiêu đề bài viết <span className="text-destructive">*</span>
+              Tiêu đề bài viết <span className="text-rose-500">*</span>
             </label>
-            <input
-              id="post-title-input"
-              type="text"
-              required
-              maxLength={COMMUNITY_UI_CONSTANTS.MAX_TITLE_LENGTH}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Ví dụ: Đà Lạt 3N2Đ săn mây Cầu Đất & lẩu gà lá é chiều mưa"
-              className="w-full h-12 px-4 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 transition-shadow"
-            />
+            <span className="text-[11px] text-[#94A3B8]">
+              {title.length}/{COMMUNITY_UI_CONSTANTS.MAX_TITLE_LENGTH}
+            </span>
           </div>
+          <input
+            id="post-title-input"
+            type="text"
+            required
+            maxLength={COMMUNITY_UI_CONSTANTS.MAX_TITLE_LENGTH}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Ví dụ: Đà Lạt 3N2Đ săn mây Cầu Đất & lẩu gà lá é chiều mưa"
+            className="w-full h-10 px-3.5 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] text-[13px] text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#0194F3] focus:bg-white transition-colors"
+          />
+        </div>
 
-          <div className="space-y-1.5">
+        {/* Caption */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
             <label
               htmlFor="post-caption-input"
-              className="block text-sm font-semibold text-foreground"
+              className="block text-[12px] font-extrabold text-[#0F172A]"
             >
               Nội dung chia sẻ kinh nghiệm
             </label>
-            <textarea
-              id="post-caption-input"
-              rows={4}
-              maxLength={COMMUNITY_UI_CONSTANTS.MAX_CAPTION_LENGTH}
-              value={caption}
-              onChange={(e) => setCaption(e.target.value)}
-              placeholder="Chia sẻ cảm nhận thực tế, thời điểm đẹp nhất trong ngày, chi phí ăn uống hoặc lưu ý di chuyển..."
-              className="w-full p-4 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 leading-relaxed transition-shadow resize-y"
-            />
+            <span className="text-[11px] text-[#94A3B8]">
+              {caption.length}/{COMMUNITY_UI_CONSTANTS.MAX_CAPTION_LENGTH}
+            </span>
+          </div>
+          <textarea
+            id="post-caption-input"
+            rows={4}
+            maxLength={COMMUNITY_UI_CONSTANTS.MAX_CAPTION_LENGTH}
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            placeholder="Chia sẻ cảm nhận thực tế, thời điểm đẹp nhất trong ngày, chi phí ăn uống hoặc lưu ý di chuyển..."
+            className="w-full p-3.5 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] text-[13px] text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#0194F3] focus:bg-white leading-relaxed transition-colors resize-y"
+          />
+        </div>
+
+        {/* Local Media Upload Zone */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="block text-[12px] font-extrabold text-[#0F172A]">
+              Ảnh / Video ngắn từ thiết bị ({uploadedItems.length}/
+              {COMMUNITY_UI_CONSTANTS.MAX_MEDIA_FILES})
+            </label>
+            <span className="text-[11px] text-[#64748B]">
+              JPG, PNG, WebP, MP4, MOV (tối đa 50MB/tệp)
+            </span>
           </div>
 
-          {/* Local Media Upload Zone */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="block text-sm font-semibold text-foreground">
-                Ảnh / Video ngắn từ thiết bị ({uploadedItems.length}/
-                {COMMUNITY_UI_CONSTANTS.MAX_MEDIA_FILES})
-              </label>
-              <span className="text-xs text-muted-foreground">
-                Hỗ trợ JPG, PNG, WebP, MP4, MOV (tối đa 50MB/tệp)
-              </span>
-            </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept={COMMUNITY_UI_CONSTANTS.ACCEPTED_MEDIA_MIMES}
+            onChange={handleFileChange}
+            className="hidden"
+          />
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              accept={COMMUNITY_UI_CONSTANTS.ACCEPTED_MEDIA_MIMES}
-              onChange={handleFileChange}
-              className="hidden"
-            />
-
-            <button
-              type="button"
-              disabled={
-                uploadMediaMutation.isPending ||
-                uploadedItems.length >= COMMUNITY_UI_CONSTANTS.MAX_MEDIA_FILES
-              }
-              onClick={() => fileInputRef.current?.click()}
-              aria-label="Chọn ảnh hoặc video từ thiết bị"
-              className="w-full py-4 px-4 rounded-2xl border-2 border-dashed border-border hover:border-primary/60 bg-muted/20 hover:bg-muted/40 transition-all flex items-center justify-center gap-3 cursor-pointer disabled:opacity-50 min-h-[60px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              {uploadMediaMutation.isPending ? (
-                <>
-                  <Loader2 className="size-5 animate-spin text-primary" />
-                  <span className="text-sm font-medium text-foreground">
-                    Đang tải tệp lên máy chủ...
-                  </span>
-                </>
-              ) : (
-                <div className="flex items-center gap-3 text-primary">
-                  <Upload className="size-5" />
-                  <ImageIcon className="size-5" />
-                  <Film className="size-5" />
-                </div>
-              )}
-            </button>
-
-            {/* Uploaded Media Previews */}
-            {uploadedItems.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
-                {uploadedItems.map((item) => (
-                  <div
-                    key={item.url}
-                    className="relative group rounded-xl overflow-hidden border border-border bg-muted aspect-video"
-                  >
-                    {item.mediaType === "VIDEO" ? (
-                      <video
-                        src={item.url}
-                        className="w-full h-full object-cover"
-                        muted
-                        playsInline
-                      />
-                    ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={item.url}
-                        alt="Tệp đa phương tiện đã tải lên"
-                        className="w-full h-full object-cover"
-                      />
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveMedia(item.url)}
-                      className="absolute top-1.5 right-1.5 min-h-[36px] min-w-[36px] inline-flex items-center justify-center rounded-lg bg-black/70 text-white hover:bg-destructive transition-colors cursor-pointer"
-                      aria-label="Gỡ tệp đa phương tiện này"
-                    >
-                      <Trash2 className="size-3.5" />
-                    </button>
-                    <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-md bg-black/65 text-white text-xs font-medium">
-                      {item.mediaType === "VIDEO" ? "Video" : "Ảnh"}
-                    </span>
-                  </div>
-                ))}
+          <button
+            type="button"
+            disabled={
+              uploadMediaMutation.isPending ||
+              uploadedItems.length >= COMMUNITY_UI_CONSTANTS.MAX_MEDIA_FILES
+            }
+            onClick={() => fileInputRef.current?.click()}
+            aria-label="Chọn ảnh hoặc video từ thiết bị"
+            className="w-full py-3.5 px-4 rounded-[16px] border-2 border-dashed border-[#CBD5E1] hover:border-[#0194F3] bg-[#F8FAFC] hover:bg-[#F0F7FF]/50 transition-colors flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 min-h-[54px]"
+          >
+            {uploadMediaMutation.isPending ? (
+              <>
+                <Loader2 className="size-4 animate-spin text-[#0194F3]" />
+                <span className="text-[12px] font-bold text-[#0F172A]">
+                  Đang tải tệp lên máy chủ...
+                </span>
+              </>
+            ) : (
+              <div className="flex items-center gap-2 text-[#0194F3] text-[12px] font-bold">
+                <Upload className="size-4" />
+                <ImageIcon className="size-4" />
+                <Film className="size-4" />
+                <span>Nhấn để chọn ảnh hoặc video từ thiết bị</span>
               </div>
             )}
-          </div>
+          </button>
 
-          {/* Attach Owned Itinerary */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <label
-                htmlFor="post-itinerary-select"
-                className="flex items-center gap-1.5 text-sm font-semibold text-foreground"
-              >
-                <CalendarDays className="size-4 text-primary" />
-                <span>Đính kèm lịch trình của bạn (Tùy chọn)</span>
-              </label>
-              <select
-                ref={itinerarySelectRef}
-                id="post-itinerary-select"
-                value={selectedItineraryId}
-                onChange={(e) => setSelectedItineraryId(e.target.value)}
-                disabled={isLoadingItineraries}
-                className={cn(
-                  "w-full h-12 px-3.5 rounded-xl border border-border bg-background text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all",
-                  focusItinerary && "ring-2 ring-primary border-primary shadow-xs"
-                )}
-              >
-                <option value="">-- Không đính kèm lịch trình --</option>
-                {myItineraries.map((itin) => (
-                  <option key={itin.id} value={itin.id}>
-                    {itin.title} ({itin.destination || `${itin.totalDays} ngày`})
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="space-y-1.5">
-              <label
-                htmlFor="post-tags-input"
-                className="block text-sm font-semibold text-foreground"
-              >
-                Thẻ chủ đề (Hashtags)
-              </label>
-              <div className="relative">
-                <input
-                  ref={tagInputRef}
-                  id="post-tags-input"
-                  type="text"
-                  value={tagsInput}
-                  onFocus={() => {
-                    if (suggestedTags.length > 0) setIsTagDropdownOpen(true);
-                  }}
-                  onChange={(e) => {
-                    setTagsInput(e.target.value);
-                    setIsTagDropdownOpen(true);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
-                      setIsTagDropdownOpen(false);
-                    }
-                  }}
-                  placeholder="#DaLat, #SanMay, #AmThuc"
-                  autoComplete="off"
-                  className="w-full h-12 px-4 rounded-xl border border-border bg-background text-sm text-foreground placeholder:text-muted-foreground placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-primary/40"
-                />
-                {isTagDropdownOpen && suggestedTags.length > 0 && (
-                  <div
-                    ref={tagDropdownRef}
-                    className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-xl border border-border bg-card shadow-lg p-2 space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-150"
+          {/* Uploaded Media Previews */}
+          {uploadedItems.length > 0 && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1">
+              {uploadedItems.map((item) => (
+                <div
+                  key={item.url}
+                  className="relative group rounded-[12px] overflow-hidden border border-[#E2E8F0] bg-[#F1F5F9] aspect-video"
+                >
+                  {item.mediaType === "VIDEO" ? (
+                    <video
+                      src={item.url}
+                      className="w-full h-full object-cover"
+                      muted
+                      playsInline
+                    />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.url}
+                      alt="Tệp đa phương tiện đã tải lên"
+                      loading="lazy"
+                      decoding="async"
+                      className="w-full h-full object-cover"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveMedia(item.url)}
+                    className="absolute top-1.5 right-1.5 size-7 inline-flex items-center justify-center rounded-lg bg-black/70 text-white hover:bg-rose-600 transition-colors cursor-pointer"
+                    aria-label="Gỡ tệp đa phương tiện này"
                   >
-                    <div className="px-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                      Gợi ý thẻ chủ đề phổ biến
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
-                      {suggestedTags.map((tag) => (
-                        <button
-                          key={tag}
-                          type="button"
-                          onClick={() => handleSelectTag(tag)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-muted/80 hover:bg-primary hover:text-primary-foreground text-foreground transition-all cursor-pointer"
-                        >
-                          <Hash className="size-3 text-primary group-hover:text-primary-foreground" />
-                          <span>{tag}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
+                    <Trash2 className="size-3.5" />
+                  </button>
+                  <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-md bg-black/65 text-white text-[10px] font-bold">
+                    {item.mediaType === "VIDEO" ? "Video" : "Ảnh"}
+                  </span>
+                </div>
+              ))}
             </div>
+          )}
+        </div>
+
+        {/* Attach Owned Itinerary & Hashtags */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <label
+              htmlFor="post-itinerary-select"
+              className="flex items-center gap-1.5 text-[12px] font-extrabold text-[#0F172A]"
+            >
+              <CalendarDays className="size-3.5 text-[#0194F3]" />
+              <span>Đính kèm lịch trình (Tùy chọn)</span>
+            </label>
+            <select
+              ref={itinerarySelectRef}
+              id="post-itinerary-select"
+              value={selectedItineraryId}
+              onChange={(e) => setSelectedItineraryId(e.target.value)}
+              disabled={isLoadingItineraries}
+              className={cn(
+                "w-full h-10 px-3 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] text-[12px] font-semibold text-[#0F172A] focus:outline-none focus:border-[#0194F3] focus:bg-white transition-colors",
+                focusItinerary &&
+                  "border-[#0194F3] bg-[#F0F7FF]/40 ring-2 ring-[#0194F3]/20"
+              )}
+            >
+              <option value="">-- Không đính kèm lịch trình --</option>
+              {myItineraries.map((itin) => (
+                <option key={itin.id} value={itin.id}>
+                  {itin.title} ({itin.destination || `${itin.totalDays} ngày`})
+                </option>
+              ))}
+            </select>
           </div>
 
-          {/* Footer Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-border">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleClose}
-              className="h-11 px-5 rounded-xl text-sm font-medium cursor-pointer"
+          <div className="space-y-1.5">
+            <label
+              htmlFor="post-tags-input"
+              className="block text-[12px] font-extrabold text-[#0F172A]"
             >
-              Hủy
-            </Button>
-            <Button
-              type="submit"
-              disabled={
-                !title.trim() ||
-                createPostMutation.isPending ||
-                uploadMediaMutation.isPending
-              }
-              className="h-11 px-6 rounded-xl text-sm font-semibold gap-2 cursor-pointer shadow-xs"
-            >
-              {createPostMutation.isPending && (
-                <Loader2 className="size-4 animate-spin" />
+              Thẻ chủ đề (Hashtags)
+            </label>
+            <div className="relative">
+              <input
+                ref={tagInputRef}
+                id="post-tags-input"
+                type="text"
+                value={tagsInput}
+                onFocus={() => {
+                  if (suggestedTags.length > 0) setIsTagDropdownOpen(true);
+                }}
+                onChange={(e) => {
+                  setTagsInput(e.target.value);
+                  setIsTagDropdownOpen(true);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") {
+                    e.stopPropagation();
+                    setIsTagDropdownOpen(false);
+                  }
+                }}
+                placeholder="#DaLat, #SanMay, #AmThuc"
+                autoComplete="off"
+                className="w-full h-10 px-3.5 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] text-[12px] text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#0194F3] focus:bg-white transition-colors"
+              />
+              {isTagDropdownOpen && suggestedTags.length > 0 && (
+                <div
+                  ref={tagDropdownRef}
+                  className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-[12px] border border-[#E2E8F0] bg-white shadow-xl p-2 space-y-1.5"
+                >
+                  <div className="px-1 text-[10px] font-bold text-[#64748B] uppercase tracking-wider">
+                    Gợi ý thẻ chủ đề phổ biến
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto custom-scroll">
+                    {suggestedTags.map((tag) => (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => handleSelectTag(tag)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-[#F1F5F9] hover:bg-[#0194F3] hover:text-white text-[#1E293B] transition-colors cursor-pointer"
+                      >
+                        <Hash className="size-3" />
+                        <span>{tag}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
-              <span>Đăng lên Cộng đồng</span>
-            </Button>
+            </div>
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+
+        {/* Footer Actions */}
+        <div className="flex items-center justify-end gap-2.5 pt-3.5 border-t border-[#F1F5F9]">
+          <button
+            type="button"
+            onClick={handleClose}
+            disabled={
+              createPostMutation.isPending || uploadMediaMutation.isPending
+            }
+            className="h-9 px-4 rounded-[10px] border border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-[12px] font-bold text-[#334155] transition-colors cursor-pointer disabled:opacity-50"
+          >
+            Hủy
+          </button>
+          <button
+            type="submit"
+            disabled={
+              !title.trim() ||
+              createPostMutation.isPending ||
+              uploadMediaMutation.isPending
+            }
+            className="h-9 px-5 rounded-[10px] bg-[#0194F3] hover:bg-[#007FE3] text-white text-[12px] font-extrabold inline-flex items-center gap-1.5 shadow-[0_2px_6px_rgba(1,148,243,0.25)] transition-colors cursor-pointer disabled:opacity-50"
+          >
+            {createPostMutation.isPending && (
+              <Loader2 className="size-3.5 animate-spin" />
+            )}
+            <span>Đăng lên Cộng đồng</span>
+          </button>
+        </div>
+      </form>
+    </CommunityModalPortal>
   );
 }

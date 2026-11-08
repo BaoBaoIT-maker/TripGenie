@@ -12,6 +12,7 @@ import {
   IsNotEmpty,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ReportType } from '@prisma/client';
 import { COMMUNITY_CONSTANTS, CommunitySortMode } from '../community.constants';
 
 export class QueryCommunityFeedDto {
@@ -29,6 +30,11 @@ export class QueryCommunityFeedDto {
   @IsOptional()
   @IsEnum(CommunitySortMode)
   sort?: CommunitySortMode = CommunitySortMode.LATEST;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(COMMUNITY_CONSTANTS.MAX_GROUP_SLUG_LENGTH)
+  groupId?: string;
 
   @IsOptional()
   @Type(() => Number)
@@ -76,6 +82,11 @@ export class CreateCommunityPostDto {
   @IsOptional()
   @IsUUID()
   itineraryId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(COMMUNITY_CONSTANTS.MAX_GROUP_SLUG_LENGTH)
+  groupId?: string;
 }
 
 export class UpdateCommunityPostDto {
@@ -94,6 +105,11 @@ export class UpdateCommunityPostDto {
   @IsString({ each: true })
   @ArrayMaxSize(COMMUNITY_CONSTANTS.MAX_TAGS_COUNT)
   tags?: string[];
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(COMMUNITY_CONSTANTS.MAX_GROUP_SLUG_LENGTH)
+  groupId?: string;
 }
 
 export class CreateCommunityCommentDto {
@@ -110,4 +126,49 @@ export class CreateCommunityCommentDto {
   @IsString()
   @MaxLength(COMMUNITY_CONSTANTS.MAX_REPLY_TO_NAME_LENGTH)
   replyToName?: string;
+}
+
+export class ReportCommunityPostDto {
+  @IsEnum(ReportType, { message: 'Loại báo cáo không hợp lệ' })
+  reportType!: ReportType;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(COMMUNITY_CONSTANTS.MAX_REPORT_DESCRIPTION_LENGTH)
+  description?: string;
+}
+
+export class CreateCommunityGroupDto {
+  @IsString()
+  @IsNotEmpty({ message: 'Tên nhóm cộng đồng không được để trống' })
+  @MaxLength(COMMUNITY_CONSTANTS.MAX_GROUP_NAME_LENGTH)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(COMMUNITY_CONSTANTS.MAX_GROUP_SLUG_LENGTH)
+  slug?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(COMMUNITY_CONSTANTS.MAX_GROUP_SUBTITLE_LENGTH)
+  subtitle?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(COMMUNITY_CONSTANTS.MAX_GROUP_DESCRIPTION_LENGTH)
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  iconUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  coverUrl?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  sortOrder?: number;
 }

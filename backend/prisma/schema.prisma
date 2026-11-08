@@ -187,6 +187,15 @@ enum ReportTargetType {
   @@map("report_target_type_enum")
 }
 
+enum PostModerationStatus {
+  PENDING
+  APPROVED
+  FLAGGED
+  REJECTED
+
+  @@map("post_moderation_status_enum")
+}
+
 // =============================================================================
 // MODELS
 // =============================================================================
@@ -202,7 +211,8 @@ model User {
   phoneNumber  String?   @map("phone_number") @db.VarChar(20)
   role         UserRole  @default(USER)
   isActive     Boolean   @default(true) @map("is_active")
-  isVerified   Boolean   @default(false) @map("is_verified")
+  isVerified        Boolean   @default(false) @map("is_verified")
+  isVerifiedCreator Boolean   @default(false) @map("is_verified_creator")
   authVersion  Int       @default(0) @map("auth_version")
   verifiedAt   DateTime? @map("verified_at") @db.Timestamptz
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
@@ -219,6 +229,7 @@ model User {
   proposals       GroupPlaceProposal[]
   votes           GroupPlaceVote[]
   chatSessions    AiChatSession[]
+  createdCommunityGroups CommunityGroup[] @relation("AdminCreatedCommunityGroups")
   posts           CommunityPost[]
   postLikes       PostLike[]
   postComments    PostComment[]
@@ -673,31 +684,64 @@ model AiChatMessage {
   @@map("ai_chat_messages")
 }
 
-model CommunityPost {
-  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  userId       String    @map("user_id") @db.Uuid
-  itineraryId  String?   @map("itinerary_id") @db.Uuid
-  title        String    @db.VarChar(255)
-  caption      String?
-  mediaUrls    String[]  @default([]) @map("media_urls")
-  tags         String[]  @default([])
-  likeCount    Int       @default(0) @map("like_count")
-  commentCount Int       @default(0) @map("comment_count")
-  cloneCount   Int       @default(0) @map("clone_count")
-  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
-  editedAt     DateTime? @map("edited_at") @db.Timestamptz
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+model CommunityGroup {
+  id          String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name        String    @db.VarChar(120)
+  slug        String    @unique @db.VarChar(120)
+  subtitle    String?   @db.VarChar(255)
+  description String?
+  iconUrl     String?   @map("icon_url")
+  coverUrl    String?   @map("cover_url")
+  isDefault   Boolean   @default(false) @map("is_default")
+  isActive    Boolean   @default(true) @map("is_active")
+  sortOrder   Int       @default(0) @map("sort_order")
+  postCount   Int       @default(0) @map("post_count")
+  createdBy   String?   @map("created_by") @db.Uuid
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  itinerary Itinerary?    @relation(fields: [itineraryId], references: [id], onDelete: SetNull)
-  likes     PostLike[]
-  comments  PostComment[]
+  creator User?           @relation("AdminCreatedCommunityGroups", fields: [createdBy], references: [id], onDelete: SetNull)
+  posts   CommunityPost[]
+
+  @@index([isActive, sortOrder])
+  @@index([isDefault])
+  @@map("community_groups")
+}
+
+model CommunityPost {
+  id               String               @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  userId           String               @map("user_id") @db.Uuid
+  groupId          String?              @map("group_id") @db.Uuid
+  itineraryId      String?              @map("itinerary_id") @db.Uuid
+  title            String               @db.VarChar(255)
+  caption          String?
+  mediaUrls        String[]             @default([]) @map("media_urls")
+  tags             String[]             @default([])
+  likeCount        Int                  @default(0) @map("like_count")
+  commentCount     Int                  @default(0) @map("comment_count")
+  cloneCount       Int                  @default(0) @map("clone_count")
+  moderationStatus PostModerationStatus @default(APPROVED) @map("moderation_status")
+  moderationNote   String?              @map("moderation_note")
+  moderatedAt      DateTime?            @map("moderated_at") @db.Timestamptz
+  deletedAt        DateTime?            @map("deleted_at") @db.Timestamptz
+  editedAt         DateTime?            @map("edited_at") @db.Timestamptz
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  user          User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group         CommunityGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  itinerary     Itinerary?      @relation(fields: [itineraryId], references: [id], onDelete: SetNull)
+  likes         PostLike[]
+  comments      PostComment[]
   notifications Notification[]
 
   @@index([userId])
+  @@index([groupId, deletedAt, createdAt(sort: Desc)])
   @@index([itineraryId])
   @@index([createdAt])
+  @@index([moderationStatus, deletedAt, createdAt(sort: Desc)])
+  @@index([deletedAt, cloneCount(sort: Desc), likeCount(sort: Desc)])
   @@map("community_posts")
 }
 
@@ -752,7 +796,7 @@ model ContentReport {
   reviewer User? @relation("AdminReviewedReports", fields: [reviewedBy], references: [id])
 
   @@index([status])
-  @@index([targetType, targetId])
+  @@index([targetType, targetId, reportedBy])
   @@map("content_reports")
 }
 

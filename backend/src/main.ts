@@ -9,6 +9,7 @@ import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/exceptions/all-exceptions.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { COMMUNITY_CONSTANTS } from './modules/community/community.constants';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -35,8 +36,14 @@ async function bootstrap() {
   // Global Prefix
   app.setGlobalPrefix('api/v1');
 
-  // Serve local community media uploads (supports HTTP Range requests for HTML5 video seeking)
-  app.use('/api/v1/uploads', expressStatic(join(process.cwd(), 'uploads')));
+  // ponytail: express.static HTTP 206 Range streaming + immutable browser cache covers single-node deployments up to ~50 concurrent video streams; upgrade by swapping IMediaStorageProvider to S3+CloudFront / Cloudflare Stream when scaling horizontally.
+  app.use(
+    '/api/v1/uploads',
+    expressStatic(join(process.cwd(), COMMUNITY_CONSTANTS.UPLOAD_ROOT_DIR), {
+      maxAge: COMMUNITY_CONSTANTS.STATIC_UPLOAD_CACHE_MAX_AGE,
+      immutable: true,
+    }),
+  );
 
   // CORS Configuration (credentials: true for HttpOnly cookies, supports loopback equivalence)
   const frontendUrl = configService.getOrThrow<string>('FRONTEND_BASE_URL');

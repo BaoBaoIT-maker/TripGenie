@@ -1,4 +1,6 @@
 require('dotenv').config({ path: 'backend/.env' });
+const fs = require('fs');
+const path = require('path');
 const { Pool } = require('pg');
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
@@ -6,7 +8,17 @@ async function seedCommunity() {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    console.log('Seeding travel creators and community posts...');
+    console.log('Seeding travel creators, community groups, and community posts...');
+
+    // 0. Ensure community_groups & moderation schema migration is applied
+    const migrationPath = path.resolve(
+      __dirname,
+      '../migrations/20261108152000_community_groups_moderation_and_verified_creator/migration.sql'
+    );
+    if (fs.existsSync(migrationPath)) {
+      const migrationSql = fs.readFileSync(migrationPath, 'utf8');
+      await client.query(migrationSql);
+    }
 
     // 1. Update creators profile (avatar & username)
     await client.query(`
@@ -179,6 +191,207 @@ async function seedCommunity() {
         }
       }
     }
+
+    // 4. Mark Admin & Top Travel Creators as verified creators (Tích xanh Thổ địa)
+    await client.query(`
+      UPDATE users
+      SET is_verified_creator = true
+      WHERE role = 'ADMIN'
+         OR email IN (
+           'thutrang.travel@gmail.com',
+           'hoanglong.danang@gmail.com',
+           'quynhanh.foodie@gmail.com'
+         );
+    `);
+
+    const adminRes = await client.query(`
+      SELECT id FROM users WHERE role = 'ADMIN' AND deleted_at IS NULL LIMIT 1;
+    `);
+    const adminId = adminRes.rows[0]?.id ?? null;
+
+    // 5. Seed Default General Group & Admin-curated Community Topic Groups
+    const groupsData = [
+      {
+        name: 'Cộng đồng chung TripGenie',
+        slug: 'cong-dong-chung',
+        subtitle: 'Sảnh chung • Mọi hành trình & chia sẻ',
+        description:
+          'Không gian chung dành cho tất cả thành viên TripGenie chia sẻ kinh nghiệm, lịch trình và hỏi đáp du lịch.',
+        iconUrl:
+          'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=160&auto=format&fit=crop&q=80',
+        coverUrl:
+          'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=1200&auto=format&fit=crop&q=80',
+        isDefault: true,
+        sortOrder: 0,
+      },
+      {
+        name: 'Săn Mây & Núi Rừng',
+        slug: 'san-may-nui-rung',
+        subtitle: 'Đà Lạt, Sa Pa, Tà Xùa, Hà Giang',
+        description:
+          'Hội đam mê săn mây đón bình minh, chinh phục đèo cao và những quán cafe thung lũng sương mù.',
+        iconUrl:
+          'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=160&auto=format&fit=crop&q=80',
+        coverUrl:
+          'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80',
+        isDefault: false,
+        sortOrder: 1,
+      },
+      {
+        name: 'Food Tour Địa Phương',
+        slug: 'food-tour-dia-phuong',
+        subtitle: 'Hải Phòng, Huế, Hội An, Sài Gòn',
+        description:
+          'Review quán ngon bản địa, đặc sản ngõ ngách và bản đồ ẩm thực chuẩn vị thổ địa.',
+        iconUrl:
+          'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=160&auto=format&fit=crop&q=80',
+        coverUrl:
+          'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=1200&auto=format&fit=crop&q=80',
+        isDefault: false,
+        sortOrder: 2,
+      },
+      {
+        name: 'Biển Đảo & Resort',
+        slug: 'bien-dao-resort',
+        subtitle: 'Phú Quốc, Nha Trang, Đà Nẵng, Quy Nhơn',
+        description:
+          'Chia sẻ kinh nghiệm nghỉ dưỡng resort, lặn ngắm san hô và khám phá các hòn đảo đẹp nhất Việt Nam.',
+        iconUrl:
+          'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=160&auto=format&fit=crop&q=80',
+        coverUrl:
+          'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&auto=format&fit=crop&q=80',
+        isDefault: false,
+        sortOrder: 3,
+      },
+      {
+        name: 'Cắm Trại & Chữa Lành',
+        slug: 'cam-trai-chua-lanh',
+        subtitle: 'Hồ Trị An, Măng Đen, Bảo Lộc',
+        description:
+          'Cộng đồng yêu thích glamping, cắm trại ven hồ, trekking nhẹ nhàng và du lịch chữa lành cuối tuần.',
+        iconUrl:
+          'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=160&auto=format&fit=crop&q=80',
+        coverUrl:
+          'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=1200&auto=format&fit=crop&q=80',
+        isDefault: false,
+        sortOrder: 4,
+      },
+    ];
+
+    const groupMap = {};
+    for (const g of groupsData) {
+      const res = await client.query(
+        `
+        INSERT INTO community_groups (
+          name, slug, subtitle, description, icon_url, cover_url, is_default, is_active, sort_order, created_by, updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8, $9, NOW())
+        ON CONFLICT (slug) DO UPDATE SET
+          name = EXCLUDED.name,
+          subtitle = EXCLUDED.subtitle,
+          description = EXCLUDED.description,
+          icon_url = EXCLUDED.icon_url,
+          cover_url = EXCLUDED.cover_url,
+          is_default = EXCLUDED.is_default,
+          sort_order = EXCLUDED.sort_order,
+          updated_at = NOW()
+        RETURNING id, slug;
+        `,
+        [
+          g.name,
+          g.slug,
+          g.subtitle,
+          g.description,
+          g.iconUrl,
+          g.coverUrl,
+          g.isDefault,
+          g.sortOrder,
+          adminId,
+        ]
+      );
+      groupMap[res.rows[0].slug] = res.rows[0].id;
+    }
+
+    // 6. Link existing unassigned posts to their matching CommunityGroup
+    await client.query(
+      `
+      UPDATE community_posts
+      SET group_id = $1
+      WHERE group_id IS NULL
+        AND deleted_at IS NULL
+        AND (
+          title ILIKE '%săn mây%' OR title ILIKE '%đà lạt%' OR title ILIKE '%sa pa%' OR title ILIKE '%tà xùa%'
+          OR tags && ARRAY['#dalat', '#sanmay', '#sapa', '#taxua', '#DaLat', '#SanMay']::text[]
+        );
+      `,
+      [groupMap['san-may-nui-rung']]
+    );
+
+    await client.query(
+      `
+      UPDATE community_posts
+      SET group_id = $1
+      WHERE group_id IS NULL
+        AND deleted_at IS NULL
+        AND (
+          title ILIKE '%ẩm thực%' OR title ILIKE '%food%' OR title ILIKE '%ăn gì%'
+          OR tags && ARRAY['#amthuc', '#foodie', '#foodtour', '#FoodTour', '#hoian']::text[]
+        );
+      `,
+      [groupMap['food-tour-dia-phuong']]
+    );
+
+    await client.query(
+      `
+      UPDATE community_posts
+      SET group_id = $1
+      WHERE group_id IS NULL
+        AND deleted_at IS NULL
+        AND (
+          title ILIKE '%phú quốc%' OR title ILIKE '%biển%' OR title ILIKE '%đà nẵng%' OR title ILIKE '%nha trang%'
+          OR tags && ARRAY['#phuquoc', '#biendao', '#danang', '#PhuQuoc', '#DaNang']::text[]
+        );
+      `,
+      [groupMap['bien-dao-resort']]
+    );
+
+    await client.query(
+      `
+      UPDATE community_posts
+      SET group_id = $1
+      WHERE group_id IS NULL
+        AND deleted_at IS NULL
+        AND (
+          title ILIKE '%cắm trại%' OR title ILIKE '%camping%' OR title ILIKE '%chữa lành%'
+          OR tags && ARRAY['#camping', '#camtrai', '#chualanh']::text[]
+        );
+      `,
+      [groupMap['cam-trai-chua-lanh']]
+    );
+
+    await client.query(
+      `
+      UPDATE community_posts
+      SET group_id = $1
+      WHERE group_id IS NULL AND deleted_at IS NULL;
+      `,
+      [groupMap['cong-dong-chung']]
+    );
+
+    // 7. Synchronize post_count for all community_groups
+    await client.query(`
+      UPDATE community_groups cg
+      SET post_count = CASE
+        WHEN cg.is_default = true THEN (
+          SELECT COUNT(*)::int FROM community_posts cp
+          WHERE cp.deleted_at IS NULL AND cp.moderation_status = 'APPROVED'
+        )
+        ELSE (
+          SELECT COUNT(*)::int FROM community_posts cp
+          WHERE cp.group_id = cg.id AND cp.deleted_at IS NULL AND cp.moderation_status = 'APPROVED'
+        )
+      END;
+    `);
 
     await client.query('COMMIT');
     console.log('Seeding completed successfully!');

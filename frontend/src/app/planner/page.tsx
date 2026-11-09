@@ -189,7 +189,7 @@ export default function PlannerListPage() {
               }}
               className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 activeScope === 'OWNED'
-                  ? 'bg-teal-600 text-white shadow-xs'
+                  ? 'bg-[#0068B8] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200'
               }`}
             >
@@ -210,7 +210,7 @@ export default function PlannerListPage() {
               }}
               className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                 activeScope === 'JOINED'
-                  ? 'bg-teal-600 text-white shadow-xs'
+                  ? 'bg-[#0068B8] text-white shadow-xs'
                   : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200'
               }`}
             >
@@ -227,11 +227,11 @@ export default function PlannerListPage() {
             <div>
               <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
                 <span>{activeScope === 'OWNED' ? 'Chuyến đi bạn đã tạo' : 'Chuyến đi cùng bạn bè'}</span>
-                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-teal-100 text-teal-800">
+                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-sky-100 text-sky-900">
                   {itineraries.length}
                 </span>
                 {isSelectMode && (
-                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-teal-600 text-white animate-in fade-in">
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#0068B8] text-white animate-in fade-in">
                     Đã chọn {selectedIds.length}/{itineraries.length}
                   </span>
                 )}
@@ -255,7 +255,7 @@ export default function PlannerListPage() {
                         onClick={handleSelectAll}
                         className="inline-flex items-center gap-1.5 px-3 py-2 border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-2xs"
                       >
-                        <CheckCheck className="size-3.5 text-teal-600" />
+                        <CheckCheck className="size-3.5 text-[#0194F3]" />
                         <span>
                           {selectedIds.length === itineraries.length ? "Bỏ chọn tất cả" : `Chọn tất cả (${itineraries.length})`}
                         </span>
@@ -276,7 +276,7 @@ export default function PlannerListPage() {
                       onClick={toggleSelectMode}
                       className="inline-flex items-center gap-1.5 px-3.5 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-2xs cursor-pointer"
                     >
-                      <CheckSquare className="size-4 text-teal-600" />
+                      <CheckSquare className="size-4 text-[#0194F3]" />
                       <span>Chọn nhiều</span>
                     </button>
                   )}
@@ -286,7 +286,7 @@ export default function PlannerListPage() {
               <button
                 type="button"
                 onClick={() => handleOpenWizard()}
-                className="inline-flex items-center gap-2 px-4 py-2.5 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
+                className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#0068B8] hover:bg-[#00569C] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer"
               >
                 <Plus className="size-4" />
                 <span>Tạo chuyến đi mới</span>
@@ -318,7 +318,7 @@ export default function PlannerListPage() {
           {/* Empty State */}
           {!isLoading && itineraries.length === 0 && (
             <div className="rounded-3xl border-2 border-dashed border-slate-200 bg-white p-12 text-center space-y-4 max-w-2xl mx-auto my-6">
-              <div className="size-16 rounded-full bg-teal-50 text-teal-600 mx-auto flex items-center justify-center">
+              <div className="size-16 rounded-full bg-sky-50 text-[#0194F3] mx-auto flex items-center justify-center">
                 <Compass className="size-8" />
               </div>
               <div className="space-y-1">
@@ -339,7 +339,7 @@ export default function PlannerListPage() {
                 <button
                   type="button"
                   onClick={() => handleOpenWizard()}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-teal-600 hover:bg-teal-700 text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs cursor-pointer"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-[#0068B8] hover:bg-[#00569C] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs cursor-pointer"
                 >
                   <Sparkles className="size-4" />
                   <span>{user ? "Bắt đầu tạo lịch trình với AI" : "Đăng nhập & Tạo lịch trình"}</span>
@@ -380,8 +380,8 @@ export default function PlannerListPage() {
                     }}
                     className={`group cursor-pointer bg-white rounded-2xl border overflow-hidden transition-all flex flex-col duration-200 relative ${
                       isSelected
-                        ? 'border-teal-500 ring-2 ring-teal-500 bg-teal-50/15 shadow-md'
-                        : 'border-slate-200/90 hover:border-teal-500 hover:shadow-md'
+                        ? 'border-[#0194F3] ring-2 ring-[#0194F3] bg-sky-50/15 shadow-md'
+                        : 'border-slate-200/90 hover:border-[#0194F3] hover:shadow-md'
                     }`}
                   >
                     {/* Card Cover Image */}
@@ -401,7 +401,7 @@ export default function PlannerListPage() {
                             aria-label={isSelected ? "Bỏ chọn" : "Chọn lịch trình"}
                             className={`size-7 rounded-lg backdrop-blur flex items-center justify-center transition-all shadow-xs cursor-pointer ${
                               isSelected
-                                ? 'bg-teal-600 text-white shadow-teal-500/30 ring-2 ring-white'
+                                ? 'bg-[#0068B8] text-white shadow-blue-500/30 ring-2 ring-white'
                                 : 'bg-white/90 text-slate-700 hover:bg-white'
                             }`}
                           >
@@ -442,7 +442,7 @@ export default function PlannerListPage() {
 
                       {itin.destination && (
                         <span className="absolute bottom-2.5 left-3 text-white text-xs font-semibold drop-shadow-sm flex items-center gap-1">
-                          <MapPin className="size-3 text-teal-300" />
+                          <MapPin className="size-3 text-sky-300" />
                           <span>{itin.destination}</span>
                         </span>
                       )}
@@ -451,7 +451,7 @@ export default function PlannerListPage() {
                     {/* Card Body */}
                     <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
                       <div>
-                        <h3 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-teal-700 transition-colors line-clamp-2 leading-snug">
+                        <h3 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-[#0068B8] transition-colors line-clamp-2 leading-snug">
                           {itin.title}
                         </h3>
                         {dateText && (
@@ -472,7 +472,7 @@ export default function PlannerListPage() {
                             {budgetText}
                           </strong>
                         </div>
-                        <span className="font-semibold text-teal-700 group-hover:translate-x-0.5 transition-transform inline-flex items-center gap-0.5">
+                        <span className="font-semibold text-[#0068B8] group-hover:translate-x-0.5 transition-transform inline-flex items-center gap-0.5">
                           <span>Chi tiết</span>
                           <ArrowRight className="size-3" />
                         </span>
@@ -485,12 +485,12 @@ export default function PlannerListPage() {
               {/* Quick Launch Card */}
               <div
                 onClick={() => handleOpenWizard()}
-                className="cursor-pointer border-2 border-dashed border-slate-200 hover:border-teal-400 rounded-2xl p-6 flex flex-col items-center justify-center text-center space-y-3 bg-slate-50/50 hover:bg-teal-50/30 transition-all min-h-[300px] group"
+                className="cursor-pointer border-2 border-dashed border-slate-200 hover:border-sky-400 rounded-2xl p-6 flex flex-col items-center justify-center text-center space-y-3 bg-slate-50/50 hover:bg-sky-50/30 transition-all min-h-[300px] group"
               >
-                <div className="size-12 rounded-full bg-teal-100 text-teal-700 font-bold flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
+                <div className="size-12 rounded-full bg-sky-100 text-[#0068B8] font-bold flex items-center justify-center text-xl group-hover:scale-110 transition-transform">
                   +
                 </div>
-                <div className="text-sm font-bold text-slate-800 group-hover:text-teal-700">
+                <div className="text-sm font-bold text-slate-800 group-hover:text-[#0068B8]">
                   Lên kế hoạch mới
                 </div>
                 <p className="text-xs text-slate-500 max-w-[200px] leading-relaxed">
@@ -506,7 +506,7 @@ export default function PlannerListPage() {
       {isSelectMode && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 bg-slate-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl border border-slate-700/80 flex items-center gap-4 animate-in slide-in-from-bottom-5 duration-200">
           <div className="flex items-center gap-2 text-xs sm:text-sm font-semibold">
-            <span className="size-6 rounded-full bg-teal-500 text-white font-bold flex items-center justify-center text-xs">
+            <span className="size-6 rounded-full bg-sky-500 text-white font-bold flex items-center justify-center text-xs">
               {selectedIds.length}
             </span>
             <span>Đã chọn {selectedIds.length} lịch trình</span>
@@ -559,7 +559,7 @@ export default function PlannerListPage() {
                 Bạn có chắc chắn muốn xóa <strong className="text-slate-900 font-semibold">{selectedIds.length} lịch trình</strong> đã chọn? Hành động này sẽ gỡ bỏ chúng khỏi danh sách của bạn.
               </p>
               <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed flex items-start gap-1.5">
-                <Info className="size-4 text-teal-600 shrink-0 mt-0.5" aria-hidden="true" />
+                <Info className="size-4 text-[#0194F3] shrink-0 mt-0.5" aria-hidden="true" />
                 <span><strong>Bảo vệ bản sao (Clone-safe):</strong> Nếu bất kỳ lịch trình nào trong số này đã được người khác sao chép (clone) về chuyến đi của họ, thì bản sao của họ <strong>hoàn toàn an toàn và không bị ảnh hưởng</strong>.</span>
               </p>
             </div>
@@ -618,7 +618,7 @@ export default function PlannerListPage() {
                 Bạn có chắc chắn muốn xóa chuyến đi <strong className="text-slate-900 font-semibold">&quot;{deletingItin.title}&quot;</strong>?
               </p>
               <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed flex items-start gap-1.5">
-                <Info className="size-4 text-teal-600 shrink-0 mt-0.5" aria-hidden="true" />
+                <Info className="size-4 text-[#0194F3] shrink-0 mt-0.5" aria-hidden="true" />
                 <span><strong>Lưu ý:</strong> Chuyến đi sẽ được gỡ khỏi danh sách của bạn. Nếu có người khác đã sao chép (clone) lịch trình này về tài khoản của họ thì bản sao của họ <strong>hoàn toàn không bị mất</strong>.</span>
               </p>
             </div>

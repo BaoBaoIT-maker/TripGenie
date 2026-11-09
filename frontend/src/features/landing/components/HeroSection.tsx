@@ -8,7 +8,7 @@ import { LANDING_CONFIG } from "../config/landing.config";
 
 export function HeroSection() {
   const [currentLocationTitle, setCurrentLocationTitle] = useState<string>(
-    "Bán đảo Sơn Trà & Biển Mỹ Khê, Đà Nẵng"
+    LANDING_CONFIG.hero.defaultLocationTitle
   );
 
   return (
@@ -20,7 +20,7 @@ export function HeroSection() {
       <LandingNavbar />
 
       {/* Hero Content */}
-      <div className="relative z-20 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 sm:py-14 text-center space-y-6 my-auto">
+      <div className="relative z-10 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 sm:py-14 text-center space-y-6 my-auto">
         {/* Tag badge */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-bold tracking-wide shadow-sm">
           {LANDING_CONFIG.hero.badgeText}
@@ -44,7 +44,7 @@ export function HeroSection() {
       </div>
 
       {/* Location Pill Footer */}
-      <div className="relative z-20 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-5 flex items-center justify-between text-xs text-slate-800">
+      <div className="relative z-10 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-5 flex items-center justify-between text-xs text-slate-800">
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/95 border border-slate-200 shadow-sm">
           <svg
             className="size-3.5 text-[#0194F3]"

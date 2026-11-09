@@ -294,7 +294,7 @@ export default function CoverPhotoModal({
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
           <div className="flex items-center gap-2.5">
-            <div className="size-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center border border-teal-100/80">
+            <div className="size-9 rounded-xl bg-sky-50 text-[#0194F3] flex items-center justify-center border border-sky-200/80">
               <Camera className="size-5" />
             </div>
             <div>
@@ -343,11 +343,11 @@ export default function CoverPhotoModal({
               onClick={() => setActiveTab('presets')}
               className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                 activeTab === 'presets'
-                  ? 'bg-white text-teal-700 font-bold shadow-xs'
+                  ? 'bg-white text-[#0068B8] font-bold shadow-xs'
                   : 'hover:text-slate-900'
               }`}
             >
-              <Sparkles className="size-3.5 text-teal-600" />
+              <Sparkles className="size-3.5 text-[#0194F3]" />
               <span>Gợi ý điểm đến</span>
             </button>
             <button
@@ -355,11 +355,11 @@ export default function CoverPhotoModal({
               onClick={() => setActiveTab('upload')}
               className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                 activeTab === 'upload'
-                  ? 'bg-white text-teal-700 font-bold shadow-xs'
+                  ? 'bg-white text-[#0068B8] font-bold shadow-xs'
                   : 'hover:text-slate-900'
               }`}
             >
-              <Upload className="size-3.5 text-teal-600" />
+              <Upload className="size-3.5 text-[#0194F3]" />
               <span>Tải từ thiết bị</span>
             </button>
             <button
@@ -367,11 +367,11 @@ export default function CoverPhotoModal({
               onClick={() => setActiveTab('url')}
               className={`flex-1 py-2 px-3 rounded-lg flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                 activeTab === 'url'
-                  ? 'bg-white text-teal-700 font-bold shadow-xs'
+                  ? 'bg-white text-[#0068B8] font-bold shadow-xs'
                   : 'hover:text-slate-900'
               }`}
             >
-              <Link2 className="size-3.5 text-teal-600" />
+              <Link2 className="size-3.5 text-[#0194F3]" />
               <span>Dán liên kết (URL)</span>
             </button>
           </div>
@@ -391,8 +391,8 @@ export default function CoverPhotoModal({
                     onClick={() => handleSelectPreset(preset.url)}
                     className={`group relative rounded-xl overflow-hidden border-2 text-left transition-all cursor-pointer aspect-video bg-slate-100 ${
                       isChosen
-                        ? 'border-teal-600 ring-2 ring-teal-500/30'
-                        : 'border-slate-200 hover:border-teal-400'
+                        ? 'border-[#0068B8] ring-2 ring-[#0194F3]/30'
+                        : 'border-slate-200 hover:border-sky-400'
                     }`}
                   >
                     <img
@@ -402,7 +402,7 @@ export default function CoverPhotoModal({
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
                     {isChosen && (
-                      <div className="absolute top-2 right-2 size-5 rounded-full bg-teal-600 text-white flex items-center justify-center shadow">
+                      <div className="absolute top-2 right-2 size-5 rounded-full bg-[#0068B8] text-white flex items-center justify-center shadow">
                         <Check className="size-3 stroke-[3]" />
                       </div>
                     )}
@@ -427,7 +427,7 @@ export default function CoverPhotoModal({
                 className="hidden"
                 id="cover-file-input"
               />
-              <div className="size-14 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center mb-3">
+              <div className="size-14 rounded-2xl bg-sky-50 text-[#0194F3] flex items-center justify-center mb-3">
                 {isUploading ? (
                   <Loader2 className="size-7 animate-spin" />
                 ) : (
@@ -444,7 +444,7 @@ export default function CoverPhotoModal({
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isUploading}
-                className="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+                className="px-4 py-2 bg-[#0068B8] hover:bg-[#00569C] text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
               >
                 <Camera className="size-3.5" />
                 <span>Chọn ảnh từ thiết bị</span>
@@ -465,7 +465,7 @@ export default function CoverPhotoModal({
                     value={customUrlInput}
                     onChange={(e) => setCustomUrlInput(e.target.value)}
                     placeholder="https://images.unsplash.com/..."
-                    className="flex-1 px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-teal-500 text-slate-900"
+                    className="flex-1 px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#0194F3] text-slate-900"
                   />
                   <button
                     type="button"
@@ -497,7 +497,7 @@ export default function CoverPhotoModal({
             type="button"
             onClick={handleSave}
             disabled={isSaving}
-            className="px-5 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+            className="px-5 py-2 rounded-xl bg-[#0068B8] hover:bg-[#00569C] text-white text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
           >
             {isSaving ? (
               <>

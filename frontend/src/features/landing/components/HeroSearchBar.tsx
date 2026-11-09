@@ -16,6 +16,11 @@ interface SuggestionItem {
 
 const POPULAR_SUGGESTIONS: SuggestionItem[] = [
   {
+    label: "Hạ Long",
+    query: "Hạ Long",
+    locationTitle: "Vịnh Hạ Long, Quảng Ninh",
+  },
+  {
     label: "Đà Nẵng",
     query: "Đà Nẵng",
     locationTitle: "Bán đảo Sơn Trà & Biển Mỹ Khê, Đà Nẵng",

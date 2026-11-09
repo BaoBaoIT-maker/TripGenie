@@ -211,7 +211,7 @@ function AvatarPickerContent({
                   : 'TG'}
               </AvatarFallback>
             </Avatar>
-            <div className="absolute -bottom-1 -right-1 size-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md">
+            <div className="absolute -bottom-1 -right-1 z-20 size-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md">
               <Check className="size-3.5 stroke-[3]" />
             </div>
           </div>
@@ -264,7 +264,7 @@ function AvatarPickerContent({
             )}
 
             {selectedUrl === customAvatarUrl && customAvatarUrl && (
-              <div className="absolute -top-1 -right-1 size-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xs">
+              <div className="absolute -top-1 -right-1 z-20 size-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xs">
                 <Check className="size-3 stroke-[3]" />
               </div>
             )}
@@ -296,7 +296,7 @@ function AvatarPickerContent({
                   className="object-cover"
                 />
                 {isSelected && (
-                  <div className="absolute inset-0 bg-primary/10 flex items-center justify-center">
+                  <div className="absolute inset-0 z-20 bg-primary/10 flex items-center justify-center">
                     <div className="size-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xs">
                       <Check className="size-3.5 stroke-[3]" />
                     </div>

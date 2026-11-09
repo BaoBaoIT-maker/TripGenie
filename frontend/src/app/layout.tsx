@@ -26,6 +26,9 @@ const playfair = Playfair_Display({
 export const metadata: Metadata = {
   title: "TripGenie - Khám phá và lập kế hoạch du lịch cá nhân hóa",
   description: "Hệ thống khám phá địa điểm du lịch và hỗ trợ lập kế hoạch trải nghiệm cá nhân hóa",
+  icons: {
+    icon: { url: "/images/logo_transparent.png", type: "image/png" },
+  },
 };
 
 export default function RootLayout({

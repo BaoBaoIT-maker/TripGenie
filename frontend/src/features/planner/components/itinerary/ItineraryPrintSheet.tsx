@@ -42,7 +42,7 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
     >
       {/* 1A. OFFICIAL TOUR SHEET MASTHEAD */}
       <header className="border-b-2 border-slate-900 pb-4">
-        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold uppercase tracking-wider text-teal-800">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold uppercase tracking-wider text-sky-900">
           <span>TRIPGENIE.VN — PHIẾU HÀNH TRÌNH &amp; HƯỚNG DẪN ĐOÀN</span>
           <span className="font-mono text-slate-600 font-semibold">
             MÃ HÀNH TRÌNH: #{docCode}
@@ -99,7 +99,7 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
       >
         <div className="flex items-center justify-between border-b border-slate-200 pb-1.5 mb-2.5">
           <h2 className="text-xs font-extrabold uppercase tracking-wide text-slate-950 flex items-center gap-1.5">
-            <UserCheck className="size-3.5 text-teal-700 shrink-0" aria-hidden="true" />
+            <UserCheck className="size-3.5 text-[#0068B8] shrink-0" aria-hidden="true" />
             <span>THÔNG TIN ĐIỀU HÀNH ĐOÀN &amp; ĐIỂM TẬP TRUNG</span>
           </h2>
           <span className="text-[10px] font-medium text-slate-500">
@@ -268,7 +268,7 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
                       {/* Column 2: Place Name, Category, Full Address, Notes & Next Leg */}
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="font-mono text-[11px] font-bold text-teal-800">
+                          <span className="font-mono text-[11px] font-bold text-sky-900">
                             {day.dayNumber}.{actIdx + 1}
                           </span>
                           <h3 className="text-sm font-bold text-slate-950">
@@ -364,7 +364,7 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
               </strong>
             </div>
             <div className="p-2.5 bg-slate-50 col-span-2 sm:col-span-1">
-              <span className="text-[10px] font-bold uppercase text-teal-800 block">
+              <span className="text-[10px] font-bold uppercase text-sky-900 block">
                 TỔNG DỰ KIẾN
               </span>
               <strong className="font-mono text-sm font-extrabold text-slate-950 tabular-nums">

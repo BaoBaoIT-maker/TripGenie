@@ -13,13 +13,13 @@ import {
   Users,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 import {
   useCommunityGroups,
   useCreateCommunityPost,
-  useUploadCommunityMedia,
 } from "@/features/community/hooks/use-community";
 import { useItinerariesListQuery } from "@/features/planner/hooks/use-itinerary-planner";
-import { COMMUNITY_UI_CONSTANTS } from "@/services/community.service";
+import { communityService, COMMUNITY_UI_CONSTANTS } from "@/services/community.service";
 import {
   POPULAR_COMMUNITY_TAGS,
   normalizeKeyword,
@@ -107,9 +107,72 @@ export function CreatePostModal({
     tagInputRef.current?.focus();
   };
 
-  const uploadMediaMutation = useUploadCommunityMedia();
-  const uploadMutateAsyncRef = useRef(uploadMediaMutation.mutateAsync);
-  uploadMutateAsyncRef.current = uploadMediaMutation.mutateAsync;
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadingFileName, setUploadingFileName] = useState("");
+  const uploadAbortRef = useRef<AbortController | null>(null);
+
+  const cancelUpload = useCallback((showToast = false) => {
+    if (uploadAbortRef.current) {
+      uploadAbortRef.current.abort();
+      uploadAbortRef.current = null;
+    }
+    setIsUploading(false);
+    setUploadProgress(0);
+    setUploadingFileName("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    if (showToast) {
+      toast.info("Đã hủy tải tệp lên");
+    }
+  }, []);
+
+  const uploadFiles = useCallback(async (files: File[]) => {
+    if (files.length === 0) return;
+    const controller = new AbortController();
+    uploadAbortRef.current = controller;
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadingFileName(
+      files.length === 1 ? files[0].name : `${files.length} tệp`
+    );
+
+    try {
+      const res = await communityService.uploadMedia(
+        files,
+        (percent) => setUploadProgress(percent),
+        controller.signal
+      );
+      const rawRes = res as unknown as Record<string, unknown>;
+      const newItems: UploadedMediaItem[] =
+        (Array.isArray(res?.items) ? res.items : null) ||
+        (Array.isArray((rawRes?.data as Record<string, unknown>)?.items)
+          ? ((rawRes.data as Record<string, unknown>).items as UploadedMediaItem[])
+          : null) ||
+        [];
+
+      setUploadedItems((prev) =>
+        [...prev, ...newItems].slice(
+          0,
+          COMMUNITY_UI_CONSTANTS.MAX_MEDIA_FILES
+        )
+      );
+    } catch (err: unknown) {
+      if ((err as Error)?.name === "AbortError") {
+        return;
+      }
+      toast.error((err as Error)?.message || "Tải lên ảnh/video thất bại");
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+      setUploadingFileName("");
+      uploadAbortRef.current = null;
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  }, []);
 
   const createPostMutation = useCreateCommunityPost();
 
@@ -125,7 +188,10 @@ export function CreatePostModal({
     useItinerariesListQuery("OWNED", { enabled: open });
 
   const handleClose = useCallback(() => {
-    if (createPostMutation.isPending || uploadMediaMutation.isPending) return;
+    if (createPostMutation.isPending) return;
+    if (isUploading) {
+      cancelUpload();
+    }
     setTitle("");
     setCaption("");
     setTagsInput("");
@@ -134,7 +200,7 @@ export function CreatePostModal({
     setUploadedItems([]);
     hasProcessedInitialFilesRef.current = false;
     onClose();
-  }, [createPostMutation.isPending, uploadMediaMutation.isPending, onClose]);
+  }, [createPostMutation.isPending, isUploading, cancelUpload, onClose]);
 
   useEffect(() => {
     if (!open || !isTagDropdownOpen) return;
@@ -172,22 +238,10 @@ export function CreatePostModal({
       const filesToUpload = initialFiles.slice(0, remainingSlots);
 
       if (filesToUpload.length > 0) {
-        uploadMutateAsyncRef
-          .current(filesToUpload)
-          .then((res) => {
-            setUploadedItems((prev) =>
-              [...prev, ...(res.items || [])].slice(
-                0,
-                COMMUNITY_UI_CONSTANTS.MAX_MEDIA_FILES
-              )
-            );
-          })
-          .catch((err) => {
-            console.error("Lỗi khi tải tệp khởi tạo:", err);
-          });
+        uploadFiles(filesToUpload);
       }
     }
-  }, [open, initialFiles, uploadedItems.length]);
+  }, [open, initialFiles, uploadedItems.length, uploadFiles]);
 
   // Auto-focus and scroll to itinerary selector if triggered via 'Đính kèm lịch trình'
   useEffect(() => {
@@ -208,28 +262,17 @@ export function CreatePostModal({
 
   if (!open) return null;
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
     if (!fileList || fileList.length === 0) return;
 
     const remainingSlots =
       COMMUNITY_UI_CONSTANTS.MAX_MEDIA_FILES - uploadedItems.length;
     const files = Array.from(fileList).slice(0, remainingSlots);
+    e.target.value = "";
     if (files.length === 0) return;
 
-    try {
-      const res = await uploadMediaMutation.mutateAsync(files);
-      setUploadedItems((prev) =>
-        [...prev, ...(res.items || [])].slice(
-          0,
-          COMMUNITY_UI_CONSTANTS.MAX_MEDIA_FILES
-        )
-      );
-    } finally {
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-    }
+    uploadFiles(files);
   };
 
   const handleRemoveMedia = (url: string) => {
@@ -266,6 +309,7 @@ export function CreatePostModal({
     <CommunityModalPortal
       open={open}
       onClose={handleClose}
+      disableClose={createPostMutation.isPending}
       ariaLabelledBy="create-post-modal-title"
       maxWidthClass="max-w-[600px]"
     >
@@ -290,9 +334,7 @@ export function CreatePostModal({
         <button
           type="button"
           onClick={handleClose}
-          disabled={
-            createPostMutation.isPending || uploadMediaMutation.isPending
-          }
+          disabled={createPostMutation.isPending}
           className="size-8 rounded-full bg-white border border-[#E2E8F0] hover:bg-[#F1F5F9] inline-flex items-center justify-center text-[#64748B] hover:text-[#0F172A] transition-colors cursor-pointer disabled:opacity-50"
           aria-label="Đóng hộp thoại tạo bài viết"
         >
@@ -404,32 +446,67 @@ export function CreatePostModal({
             className="hidden"
           />
 
-          <button
-            type="button"
-            disabled={
-              uploadMediaMutation.isPending ||
-              uploadedItems.length >= COMMUNITY_UI_CONSTANTS.MAX_MEDIA_FILES
-            }
-            onClick={() => fileInputRef.current?.click()}
-            aria-label="Chọn ảnh hoặc video từ thiết bị"
-            className="w-full py-3.5 px-4 rounded-[16px] border-2 border-dashed border-[#CBD5E1] hover:border-[#0194F3] bg-[#F8FAFC] hover:bg-[#F0F7FF]/50 transition-colors flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 min-h-[54px]"
-          >
-            {uploadMediaMutation.isPending ? (
-              <>
-                <Loader2 className="size-4 animate-spin text-[#0194F3]" />
-                <span className="text-[12px] font-bold text-[#0F172A]">
-                  Đang tải tệp lên máy chủ...
+          {/* Upload Button or Progress Bar */}
+          {isUploading ? (
+            <div className="w-full p-4 rounded-[16px] border border-[#BAE6FD] bg-[#F0F9FF] space-y-2.5">
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 min-w-0 pr-2">
+                  <Loader2 className="size-4 animate-spin text-[#0194F3] shrink-0" />
+                  <span className="font-bold text-[#0F172A] truncate">
+                    Đang tải {uploadingFileName || "tệp"} lên máy chủ...
+                  </span>
+                </div>
+                <div className="flex items-center gap-2.5 shrink-0">
+                  <span className="font-extrabold text-[#0194F3] text-sm tabular-nums">
+                    {uploadProgress}%
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => cancelUpload(true)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-xs font-bold transition-colors cursor-pointer shadow-xs"
+                    title="Hủy tải lên"
+                  >
+                    <X className="size-3.5 stroke-[2.5]" />
+                    <span>Hủy tải</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Progress Bar Track */}
+              <div className="w-full h-2 rounded-full bg-[#E0F2FE] overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-[#0194F3] to-[#0068B8] rounded-full transition-all duration-150 ease-out"
+                  style={{ width: `${Math.max(4, uploadProgress)}%` }}
+                />
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-[#64748B]">
+                <span>Bạn có thể nhấn Hủy bất cứ lúc nào</span>
+                <span>
+                  {uploadProgress === 100
+                    ? "Đang hoàn tất xử lý..."
+                    : `${uploadProgress}% hoàn tất`}
                 </span>
-              </>
-            ) : (
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              disabled={
+                uploadedItems.length >= COMMUNITY_UI_CONSTANTS.MAX_MEDIA_FILES
+              }
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Chọn ảnh hoặc video từ thiết bị"
+              className="w-full py-3.5 px-4 rounded-[16px] border-2 border-dashed border-[#CBD5E1] hover:border-[#0194F3] bg-[#F8FAFC] hover:bg-[#F0F7FF]/50 transition-colors flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 min-h-[54px]"
+            >
               <div className="flex items-center gap-2 text-[#0194F3] text-[12px] font-bold">
                 <Upload className="size-4" />
                 <ImageIcon className="size-4" />
                 <Film className="size-4" />
                 <span>Nhấn để chọn ảnh hoặc video từ thiết bị</span>
               </div>
-            )}
-          </button>
+            </button>
+          )}
 
           {/* Uploaded Media Previews */}
           {uploadedItems.length > 0 && (
@@ -566,9 +643,7 @@ export function CreatePostModal({
           <button
             type="button"
             onClick={handleClose}
-            disabled={
-              createPostMutation.isPending || uploadMediaMutation.isPending
-            }
+            disabled={createPostMutation.isPending}
             className="h-9 px-4 rounded-[10px] border border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-[12px] font-bold text-[#334155] transition-colors cursor-pointer disabled:opacity-50"
           >
             Hủy
@@ -578,7 +653,7 @@ export function CreatePostModal({
             disabled={
               !title.trim() ||
               createPostMutation.isPending ||
-              uploadMediaMutation.isPending
+              isUploading
             }
             className="h-9 px-5 rounded-[10px] bg-[#0194F3] hover:bg-[#007FE3] text-white text-[12px] font-extrabold inline-flex items-center gap-1.5 shadow-[0_2px_6px_rgba(1,148,243,0.25)] transition-colors cursor-pointer disabled:opacity-50"
           >

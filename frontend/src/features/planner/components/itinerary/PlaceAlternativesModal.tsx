@@ -63,7 +63,7 @@ export default function PlaceAlternativesModal({
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
           <div className="flex items-center gap-2.5">
-            <div className="size-9 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center shadow-xs">
+            <div className="size-9 rounded-xl bg-sky-100 text-[#0068B8] flex items-center justify-center shadow-xs">
               <Sparkles className="size-4" />
             </div>
             <div>
@@ -89,7 +89,7 @@ export default function PlaceAlternativesModal({
         <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-white text-xs">
           {isLoading && (
             <div className="py-12 flex flex-col items-center justify-center gap-2.5 text-slate-500">
-              <Loader2 className="size-6 text-teal-600 animate-spin" />
+              <Loader2 className="size-6 text-[#0194F3] animate-spin" />
               <p className="text-xs font-medium">Đang tìm các địa điểm tương đương trong khu vực...</p>
             </div>
           )}
@@ -116,7 +116,7 @@ export default function PlaceAlternativesModal({
             alternatives?.map((alt) => (
               <div
                 key={alt.id}
-                className="group p-3 rounded-xl border border-slate-200 hover:border-teal-500 hover:shadow-xs transition-all flex items-center gap-3 bg-white"
+                className="group p-3 rounded-xl border border-slate-200 hover:border-[#0194F3] hover:shadow-xs transition-all flex items-center gap-3 bg-white"
               >
                 {/* Thumbnail */}
                 <div className="relative size-16 sm:size-18 rounded-lg overflow-hidden bg-slate-100 shrink-0">
@@ -138,7 +138,7 @@ export default function PlaceAlternativesModal({
                 {/* Info */}
                 <div className="flex-1 min-w-0 space-y-1">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="px-1.5 py-0.5 rounded-sm bg-teal-50 text-teal-700 font-bold text-[10px]">
+                    <span className="px-1.5 py-0.5 rounded-sm bg-sky-50 text-[#0068B8] font-bold text-[10px]">
                       {alt.categoryName}
                     </span>
                     <span className="inline-flex items-center gap-0.5 text-amber-500 font-bold text-[11px]">
@@ -148,7 +148,7 @@ export default function PlaceAlternativesModal({
                     <span className="text-[10px] text-slate-400">({alt.reviewCount})</span>
                   </div>
 
-                  <h4 className="text-xs font-bold text-slate-900 truncate group-hover:text-teal-700 transition-colors">
+                  <h4 className="text-xs font-bold text-slate-900 truncate group-hover:text-[#0068B8] transition-colors">
                     {alt.name}
                   </h4>
 
@@ -163,7 +163,7 @@ export default function PlaceAlternativesModal({
                   type="button"
                   disabled={swappingId !== null}
                   onClick={() => handleSelect(alt)}
-                  className="px-3 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-700 disabled:opacity-50 text-white font-bold text-xs transition-colors shrink-0 shadow-xs cursor-pointer inline-flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-lg bg-[#0068B8] hover:bg-[#00569C] disabled:opacity-50 text-white font-bold text-xs transition-colors shrink-0 shadow-xs cursor-pointer inline-flex items-center gap-1"
                 >
                   {swappingId === alt.id ? (
                     <Loader2 className="size-3 animate-spin" />
@@ -188,9 +188,9 @@ export default function PlaceAlternativesModal({
               onClose();
               onAskCopilot(activity.placeName);
             }}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-teal-50 border border-slate-200 hover:border-teal-400 text-teal-700 text-xs font-bold transition-all shadow-2xs cursor-pointer"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-400 text-[#0068B8] text-xs font-bold transition-all shadow-2xs cursor-pointer"
           >
-            <MessageSquare className="size-3.5 text-teal-600" />
+            <MessageSquare className="size-3.5 text-[#0194F3]" />
             <span>Nhờ Genie Copilot tìm theo yêu cầu...</span>
           </button>
         </div>

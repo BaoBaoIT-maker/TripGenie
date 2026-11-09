@@ -24,8 +24,14 @@ export const LANDING_CONFIG = {
     headlineLine2: "theo cách của riêng bạn",
     subtitle:
       "Tự động sắp xếp lịch trình chi tiết từng giờ, tính toán chi phí minh bạch và đồng bộ thời gian thực cùng hội bạn thân mà không cần ghi chép thủ công.",
+    defaultLocationTitle: "Vịnh Hạ Long, Quảng Ninh",
   },
   destinations: [
+    {
+      value: "ha-long",
+      label: "Hạ Long — Kỳ quan di sản",
+      locationName: "Vịnh Hạ Long, Quảng Ninh",
+    },
     {
       value: "da-nang",
       label: "Đà Nẵng — Hội An",

@@ -1160,7 +1160,7 @@ export default function VietMap({
           type: "Feature",
           properties: {
             dayNumber: seg.dayNumber,
-            color: seg.color || "#0D9488",
+            color: seg.color || "#0068B8",
           },
           geometry: {
             type: "LineString",
@@ -1173,7 +1173,7 @@ export default function VietMap({
           type: "Feature",
           properties: {
             dayNumber: 1,
-            color: "#0D9488",
+            color: "#0068B8",
           },
           geometry: {
             type: "LineString",
@@ -1214,7 +1214,7 @@ export default function VietMap({
           source: SOURCE_ID,
           layout: { "line-join": "round", "line-cap": "round" },
           paint: {
-            "line-color": ["coalesce", ["get", "color"], "#0D9488"],
+            "line-color": ["coalesce", ["get", "color"], "#0068B8"],
             "line-width": 4.5,
             "line-opacity": 0.95,
           },

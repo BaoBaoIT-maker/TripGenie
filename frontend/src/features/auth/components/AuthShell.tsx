@@ -69,7 +69,7 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
               <div className="size-9 rounded-full border-2 border-white bg-amber-500 flex items-center justify-center text-xs font-bold text-white">
                 AN
               </div>
-              <div className="size-9 rounded-full border-2 border-white bg-teal-500 flex items-center justify-center text-xs font-bold text-white">
+              <div className="size-9 rounded-full border-2 border-white bg-sky-500 flex items-center justify-center text-xs font-bold text-white">
                 TP
               </div>
               <div className="size-9 rounded-full border-2 border-white bg-indigo-500 flex items-center justify-center text-xs font-bold text-white">

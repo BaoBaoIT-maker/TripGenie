@@ -42,14 +42,14 @@ interface DirectModeTheme {
 
 const DIRECT_MODE_THEMES: Record<Exclude<TransitMode, 'PERSONAL_MOTORBIKE'>, DirectModeTheme> = {
   FLIGHT: {
-    icon: <Plane className="size-3.5 text-teal-600 dark:text-teal-400 shrink-0" aria-hidden="true" />,
+    icon: <Plane className="size-3.5 text-[#0194F3] dark:text-sky-400 shrink-0" aria-hidden="true" />,
     title: 'LỘ TRÌNH HÀNG KHÔNG & XE TRUNG CHUYỂN SÂN BAY:',
     noteLabel: 'Gợi ý trung chuyển',
     containerClass:
-      'border-teal-200 bg-teal-50/50 dark:border-teal-900/50 dark:bg-teal-950/20',
-    headerClass: 'text-teal-900 dark:text-teal-200',
-    badgeClass: 'bg-teal-600 text-white',
-    noteBoxClass: 'border-teal-200/80 dark:border-teal-800/50',
+      'border-sky-200 bg-sky-50/50 dark:border-sky-200/50 dark:bg-sky-950/40',
+    headerClass: 'text-sky-950 dark:text-sky-900',
+    badgeClass: 'bg-[#0068B8] text-white',
+    noteBoxClass: 'border-sky-200/80 dark:border-sky-200/50',
     buildFallbackSteps: ({ transit, cleanOrigin, cleanDest, durMinutes, priceOneWay }) => {
       const transferKm =
         transit.destHub?.distanceKm || TRANSIT_UI_CONFIG.DEFAULT_AIRPORT_TRANSFER_KM;

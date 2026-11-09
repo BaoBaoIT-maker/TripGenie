@@ -451,7 +451,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
             ───────────────────────────────────────────────────────────── */}
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-3.5">
-                <div className="size-11 rounded-2xl bg-teal-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                <div className="size-11 rounded-2xl bg-[#0068B8] text-white flex items-center justify-center shadow-xs shrink-0">
                   <Sparkles className="size-6" />
                 </div>
                 <div>
@@ -482,15 +482,15 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
               <div
                 onClick={() => goToStep(1)}
                 className={`flex items-center gap-2 cursor-pointer ${
-                  step === 1 ? 'text-teal-700 font-bold' : 'text-slate-400'
+                  step === 1 ? 'text-[#0068B8] font-bold' : 'text-slate-400'
                 }`}
               >
                 <span
                   className={`size-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                     step === 1
-                      ? 'bg-teal-600 text-white shadow-xs'
+                      ? 'bg-[#0068B8] text-white shadow-xs'
                       : step > 1
-                      ? 'bg-teal-100 text-teal-700'
+                      ? 'bg-sky-100 text-[#0068B8]'
                       : 'bg-slate-100 text-slate-500'
                   }`}
                 >
@@ -501,7 +501,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
 
               <div
                 className={`flex-1 h-0.5 mx-3 sm:mx-6 transition-colors ${
-                  step >= 2 ? 'bg-teal-600' : 'bg-slate-200'
+                  step >= 2 ? 'bg-[#0068B8]' : 'bg-slate-200'
                 }`}
               />
 
@@ -510,18 +510,18 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                 onClick={() => goToStep(2)}
                 className={`flex items-center gap-2 cursor-pointer ${
                   step === 2
-                    ? 'text-teal-700 font-bold'
+                    ? 'text-[#0068B8] font-bold'
                     : step > 2
-                    ? 'text-teal-600'
+                    ? 'text-[#0194F3]'
                     : 'text-slate-400'
                 }`}
               >
                 <span
                   className={`size-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                     step === 2
-                      ? 'bg-teal-600 text-white shadow-xs'
+                      ? 'bg-[#0068B8] text-white shadow-xs'
                       : step > 2
-                      ? 'bg-teal-100 text-teal-700'
+                      ? 'bg-sky-100 text-[#0068B8]'
                       : 'bg-slate-100 text-slate-500'
                   }`}
                 >
@@ -532,7 +532,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
 
               <div
                 className={`flex-1 h-0.5 mx-3 sm:mx-6 transition-colors ${
-                  step === 3 ? 'bg-teal-600' : 'bg-slate-200'
+                  step === 3 ? 'bg-[#0068B8]' : 'bg-slate-200'
                 }`}
               />
 
@@ -540,13 +540,13 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
               <div
                 onClick={() => goToStep(3)}
                 className={`flex items-center gap-2 cursor-pointer ${
-                  step === 3 ? 'text-teal-700 font-bold' : 'text-slate-400'
+                  step === 3 ? 'text-[#0068B8] font-bold' : 'text-slate-400'
                 }`}
               >
                 <span
                   className={`size-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
                     step === 3
-                      ? 'bg-teal-600 text-white shadow-xs'
+                      ? 'bg-[#0068B8] text-white shadow-xs'
                       : 'bg-slate-100 text-slate-500'
                   }`}
                 >
@@ -573,8 +573,8 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     ĐIỂM KHỞI HÀNH
                   </label>
-                  <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/20 transition-all">
-                    <MapPin className="size-4 text-teal-600 shrink-0 mr-3" />
+                  <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-[#0194F3] focus-within:ring-2 focus-within:ring-[#0194F3]/20 transition-all">
+                    <MapPin className="size-4 text-[#0194F3] shrink-0 mr-3" />
                     <input
                       type="text"
                       value={originCity}
@@ -589,9 +589,9 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                     <button
                       type="button"
                       onClick={handleDetectGPS}
-                      className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-teal-50 border border-teal-200 px-3.5 py-1 text-xs font-bold text-teal-700 hover:bg-teal-100 transition-colors cursor-pointer shrink-0"
+                      className="ml-2 inline-flex items-center gap-1.5 rounded-full bg-sky-50 border border-sky-200 px-3.5 py-1 text-xs font-bold text-[#0068B8] hover:bg-sky-100 transition-colors cursor-pointer shrink-0"
                     >
-                      <Navigation className="size-3.5 text-teal-600" aria-hidden="true" />
+                      <Navigation className="size-3.5 text-[#0194F3]" aria-hidden="true" />
                       <span>Dùng vị trí hiện tại</span>
                     </button>
                   </div>
@@ -601,7 +601,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                     <div className="absolute top-full left-0 right-0 mt-1.5 z-50 bg-white rounded-2xl border border-slate-200 shadow-xl max-h-56 overflow-y-auto divide-y divide-slate-100 animate-in fade-in duration-150">
                       {isLoadingAreas ? (
                         <div className="p-4 flex items-center justify-center gap-2 text-xs text-slate-500">
-                          <Loader2 className="size-4 animate-spin text-teal-600 shrink-0" />
+                          <Loader2 className="size-4 animate-spin text-[#0194F3] shrink-0" />
                           <span>Đang tải danh sách điểm đến từ CSDL...</span>
                         </div>
                       ) : filteredOrigins.length > 0 ? (
@@ -612,15 +612,15 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                               setOriginCity(loc.name);
                               setShowOriginDropdown(false);
                             }}
-                            className="px-4 py-2.5 hover:bg-teal-50/70 cursor-pointer flex items-center justify-between text-xs sm:text-sm transition-colors group"
+                            className="px-4 py-2.5 hover:bg-sky-50/70 cursor-pointer flex items-center justify-between text-xs sm:text-sm transition-colors group"
                           >
                             <div className="flex items-center gap-2">
-                              <MapPin className="size-3.5 text-slate-400 group-hover:text-teal-600 shrink-0" />
-                              <span className="font-semibold text-slate-800 group-hover:text-teal-900">
+                              <MapPin className="size-3.5 text-slate-400 group-hover:text-[#0194F3] shrink-0" />
+                              <span className="font-semibold text-slate-800 group-hover:text-sky-950">
                                 {loc.name}
                               </span>
                             </div>
-                            <span className="text-[11px] text-slate-400 bg-slate-100 group-hover:bg-teal-100/80 group-hover:text-teal-800 px-2 py-0.5 rounded-full font-medium transition-colors">
+                            <span className="text-[11px] text-slate-400 bg-slate-100 group-hover:bg-sky-100/80 group-hover:text-sky-900 px-2 py-0.5 rounded-full font-medium transition-colors">
                               {loc.badge}
                             </span>
                           </div>
@@ -637,8 +637,8 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     BẠN MUỐN ĐI ĐÂU?
                   </label>
-                  <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-teal-500 focus-within:ring-2 focus-within:ring-teal-500/20 transition-all">
-                    <Compass className="size-4 text-teal-600 shrink-0 mr-3" />
+                  <div className="flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-3 focus-within:border-[#0194F3] focus-within:ring-2 focus-within:ring-[#0194F3]/20 transition-all">
+                    <Compass className="size-4 text-[#0194F3] shrink-0 mr-3" />
                     <input
                       type="text"
                       value={destinationCity}
@@ -657,7 +657,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                     <div className="absolute top-full left-0 right-0 mt-1.5 z-50 bg-white rounded-2xl border border-slate-200 shadow-xl max-h-56 overflow-y-auto divide-y divide-slate-100 animate-in fade-in duration-150">
                       {isLoadingAreas ? (
                         <div className="p-4 flex items-center justify-center gap-2 text-xs text-slate-500">
-                          <Loader2 className="size-4 animate-spin text-teal-600 shrink-0" />
+                          <Loader2 className="size-4 animate-spin text-[#0194F3] shrink-0" />
                           <span>Đang tải danh sách điểm đến từ CSDL...</span>
                         </div>
                       ) : filteredDests.length > 0 ? (
@@ -668,15 +668,15 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                               setDestinationCity(loc.name);
                               setShowDestDropdown(false);
                             }}
-                            className="px-4 py-2.5 hover:bg-teal-50/70 cursor-pointer flex items-center justify-between text-xs sm:text-sm transition-colors group"
+                            className="px-4 py-2.5 hover:bg-sky-50/70 cursor-pointer flex items-center justify-between text-xs sm:text-sm transition-colors group"
                           >
                             <div className="flex items-center gap-2">
-                              <Compass className="size-3.5 text-slate-400 group-hover:text-teal-600 shrink-0" />
-                              <span className="font-semibold text-slate-800 group-hover:text-teal-900">
+                              <Compass className="size-3.5 text-slate-400 group-hover:text-[#0194F3] shrink-0" />
+                              <span className="font-semibold text-slate-800 group-hover:text-sky-950">
                                 {loc.name}
                               </span>
                             </div>
-                            <span className="text-[11px] text-slate-400 bg-slate-100 group-hover:bg-teal-100/80 group-hover:text-teal-800 px-2 py-0.5 rounded-full font-medium transition-colors">
+                            <span className="text-[11px] text-slate-400 bg-slate-100 group-hover:bg-sky-100/80 group-hover:text-sky-900 px-2 py-0.5 rounded-full font-medium transition-colors">
                               {loc.badge}
                             </span>
                           </div>
@@ -703,7 +703,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                         }}
                         className={`relative h-28 sm:h-32 rounded-2xl overflow-hidden cursor-pointer group transition-all ${
                           isSelected
-                            ? 'ring-3 ring-teal-600 border-2 border-teal-600 shadow-md scale-[1.02]'
+                            ? 'ring-3 ring-[#0194F3] border-2 border-[#0068B8] shadow-md scale-[1.02]'
                             : 'border border-slate-200 hover:border-slate-400 hover:shadow-xs'
                         }`}
                       >
@@ -715,7 +715,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-900/35 to-transparent" />
 
                         {isSelected && (
-                          <div className="absolute top-2.5 right-2.5 size-5 rounded-full bg-teal-600 text-white flex items-center justify-center text-[10px] shadow-sm">
+                          <div className="absolute top-2.5 right-2.5 size-5 rounded-full bg-[#0068B8] text-white flex items-center justify-center text-[10px] shadow-sm">
                             <Check className="size-3 stroke-[3]" />
                           </div>
                         )}
@@ -740,7 +740,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                   </label>
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <Calendar className="size-5 text-teal-600 shrink-0" />
+                      <Calendar className="size-5 text-[#0194F3] shrink-0" />
                       <div className="flex items-center gap-2">
                         <input
                           type="date"
@@ -757,7 +757,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                         />
                       </div>
                     </div>
-                    <span className="self-start sm:self-auto inline-flex items-center gap-1.5 rounded-full bg-teal-50 border border-teal-200 px-3.5 py-1 text-xs font-bold text-teal-700 shrink-0">
+                    <span className="self-start sm:self-auto inline-flex items-center gap-1.5 rounded-full bg-sky-50 border border-sky-200 px-3.5 py-1 text-xs font-bold text-[#0068B8] shrink-0">
                       ⏱️ {totalDays} Ngày {totalNights} Đêm
                     </span>
                   </div>
@@ -768,7 +768,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                   <button
                     type="button"
                     onClick={() => goToStep(2)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs sm:text-sm font-bold px-7 py-3 transition-colors cursor-pointer shadow-xs"
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#0068B8] hover:bg-[#00569C] text-white text-xs sm:text-sm font-bold px-7 py-3 transition-colors cursor-pointer shadow-xs"
                   >
                     Tiếp tục: Phương tiện di chuyển
                     <ChevronRight className="size-4" />
@@ -812,12 +812,12 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                         onClick={() => setTransitMode(v.id)}
                         className={`relative rounded-2xl p-4 cursor-pointer transition-all flex flex-col justify-between min-h-[124px] ${
                           isSelected
-                            ? 'border-2 border-teal-600 bg-white ring-2 ring-teal-600/10 shadow-xs'
+                            ? 'border-2 border-[#0068B8] bg-white ring-2 ring-[#0194F3]/10 shadow-xs'
                             : 'border border-slate-200 hover:border-slate-300 bg-white'
                         }`}
                       >
                         {isSelected && (
-                          <div className="absolute top-2.5 right-2.5 size-5 rounded-full bg-teal-600 text-white flex items-center justify-center text-[10px]">
+                          <div className="absolute top-2.5 right-2.5 size-5 rounded-full bg-[#0068B8] text-white flex items-center justify-center text-[10px]">
                             <Check className="size-3 stroke-[3]" />
                           </div>
                         )}
@@ -833,7 +833,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                           <div className="text-xs sm:text-sm font-bold text-slate-900">
                             {v.title}
                           </div>
-                          <div className="text-[11px] font-semibold text-teal-700 mt-0.5">
+                          <div className="text-[11px] font-semibold text-[#0068B8] mt-0.5">
                             {dynamicDur}
                           </div>
                           <div className="text-[10px] text-slate-400 mt-0.5">
@@ -853,13 +853,13 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
 
                 {/* Dynamic Smart Transit Preview Box / Safety Alert */}
                 {isTransitLoading || !transitPreview ? (
-                  <div className="rounded-2xl border border-teal-200 bg-teal-50/60 p-5 flex items-center gap-3.5 shadow-2xs">
-                    <Loader2 className="size-5 text-teal-600 animate-spin shrink-0" />
+                  <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-5 flex items-center gap-3.5 shadow-2xs">
+                    <Loader2 className="size-5 text-[#0194F3] animate-spin shrink-0" />
                     <div>
-                      <div className="text-xs sm:text-sm font-bold text-teal-950">
+                      <div className="text-xs sm:text-sm font-bold text-sky-900">
                         Đang đồng bộ lộ trình &amp; tính cự ly thực tế từ CSDL...
                       </div>
-                      <div className="text-[11px] text-teal-700/80 mt-0.5">
+                      <div className="text-[11px] text-[#0068B8]/80 mt-0.5">
                         Tuyến đường: {cleanOrigin} ──&gt; {cleanDest}
                       </div>
                     </div>
@@ -887,7 +887,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                           onClick={() => setIntracityMode(opt.id)}
                           className={`rounded-xl px-4 py-3 text-xs sm:text-sm font-semibold text-left transition-all cursor-pointer ${
                             isSelected
-                              ? 'border-2 border-teal-600 bg-teal-50/70 text-teal-800'
+                              ? 'border-2 border-[#0068B8] bg-sky-50/70 text-sky-900'
                               : 'border border-slate-200 hover:border-slate-300 bg-white text-slate-700'
                           }`}
                         >
@@ -911,7 +911,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                   <button
                     type="button"
                     onClick={() => goToStep(3)}
-                    className="inline-flex items-center gap-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs sm:text-sm font-bold px-7 py-3 transition-colors cursor-pointer shadow-xs"
+                    className="inline-flex items-center gap-2 rounded-xl bg-[#0068B8] hover:bg-[#00569C] text-white text-xs sm:text-sm font-bold px-7 py-3 transition-colors cursor-pointer shadow-xs"
                   >
                     Tiếp tục: Gu & Ngân sách
                     <ChevronRight className="size-4" />
@@ -939,12 +939,12 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                           onClick={() => setBudgetLevel(lvl.id)}
                           className={`relative rounded-2xl p-4 cursor-pointer transition-all flex flex-col justify-between min-h-[110px] ${
                             isSelected
-                              ? 'border-2 border-teal-600 bg-teal-50/20 ring-2 ring-teal-600/10 shadow-xs'
+                              ? 'border-2 border-[#0068B8] bg-sky-50/20 ring-2 ring-[#0194F3]/10 shadow-xs'
                               : 'border border-slate-200 hover:border-slate-300 bg-white'
                           }`}
                         >
                           {lvl.isPopular && (
-                            <span className="absolute -top-2.5 right-3 rounded-full bg-teal-700 px-2.5 py-0.5 text-[10px] font-bold text-white shadow-2xs">
+                            <span className="absolute -top-2.5 right-3 rounded-full bg-[#00569C] px-2.5 py-0.5 text-[10px] font-bold text-white shadow-2xs">
                               Được chọn nhiều nhất
                             </span>
                           )}
@@ -952,7 +952,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                             <div className="text-xs sm:text-sm font-bold text-slate-900">
                               {lvl.title}
                             </div>
-                            <div className="text-sm sm:text-base font-extrabold text-teal-700 mt-1">
+                            <div className="text-sm sm:text-base font-extrabold text-[#0068B8] mt-1">
                               {lvl.dailyCost}
                             </div>
                           </div>
@@ -980,7 +980,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                           onClick={() => setPace(p.id)}
                           className={`rounded-xl py-2 px-3 text-xs sm:text-sm font-semibold text-center transition-all cursor-pointer ${
                             isSelected
-                              ? 'bg-white text-teal-800 shadow-xs font-bold'
+                              ? 'bg-white text-sky-900 shadow-xs font-bold'
                               : 'text-slate-600 hover:text-slate-900'
                           }`}
                         >
@@ -1006,7 +1006,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                           onClick={() => toggleStyle(tag)}
                           className={`rounded-full px-4 py-2 text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
                             isSelected
-                              ? 'bg-teal-700 text-white shadow-2xs'
+                              ? 'bg-[#00569C] text-white shadow-2xs'
                               : 'bg-slate-100 text-slate-700 border border-slate-200 hover:bg-slate-200'
                           }`}
                         >
@@ -1027,7 +1027,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                     value={customPrompt}
                     onChange={(e) => setCustomPrompt(e.target.value)}
                     placeholder="Gia đình có trẻ nhỏ, ưu tiên quán ăn hải sản tươi sống và không gian thoáng đãng..."
-                    className="w-full rounded-2xl border border-slate-200 bg-white p-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-teal-500 focus:ring-2 focus:ring-teal-500/20"
+                    className="w-full rounded-2xl border border-slate-200 bg-white p-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-[#0194F3] focus:ring-2 focus:ring-[#0194F3]/20"
                   />
                 </div>
 
@@ -1052,7 +1052,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
                     type="button"
                     onClick={handleSubmit}
                     disabled={generate.isPending || isProcessing}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-teal-600 via-emerald-600 to-indigo-600 hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold text-xs sm:text-sm px-8 py-3.5 shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all cursor-pointer"
+                    className="inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#0068B8] via-[#0194F3] to-blue-600 hover:opacity-95 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold text-xs sm:text-sm px-8 py-3.5 shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all cursor-pointer"
                   >
                     <Sparkles className="size-4" />
                     <span>TẠO LỊCH TRÌNH VỚI AI</span>
@@ -1067,8 +1067,8 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
               SMART PROGRESS / LOADING STATE
           ───────────────────────────────────────────────────────────── */
           <div className="py-12 px-6 text-center space-y-6">
-            <div className="size-16 mx-auto rounded-full bg-teal-50 flex items-center justify-center">
-              <div className="size-8 border-3 border-teal-600 border-t-transparent rounded-full animate-spin" />
+            <div className="size-16 mx-auto rounded-full bg-sky-50 flex items-center justify-center">
+              <div className="size-8 border-3 border-[#0068B8] border-t-transparent rounded-full animate-spin" />
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-bold text-slate-900">
@@ -1080,7 +1080,7 @@ export default function ItineraryWizardModal({ isOpen, onClose, initialDestinati
             </div>
             <div className="w-full max-w-md mx-auto bg-slate-100 h-2 rounded-full overflow-hidden">
               <div
-                className="bg-gradient-to-r from-teal-600 to-emerald-600 h-full transition-all duration-700 rounded-full"
+                className="bg-gradient-to-r from-[#0068B8] to-[#0194F3] h-full transition-all duration-700 rounded-full"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>

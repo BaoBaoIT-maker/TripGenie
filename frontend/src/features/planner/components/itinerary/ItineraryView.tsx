@@ -416,7 +416,7 @@ export default function ItineraryView({ id }: Props) {
 
   const finalMarkerColors = useMemo(() => {
     if (!previewPlace || selectedPlaceId !== previewPlace.id) return markerColors;
-    return { ...markerColors, [previewPlace.id]: '#0D9488' };
+    return { ...markerColors, [previewPlace.id]: '#0068B8' };
   }, [markerColors, previewPlace, selectedPlaceId]);
 
   const mapCenter = useMemo(() => {
@@ -737,7 +737,7 @@ export default function ItineraryView({ id }: Props) {
 
             <div className="absolute bottom-4 left-5 right-5 text-white">
               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="px-2.5 py-0.5 bg-teal-600/95 backdrop-blur text-white text-[11px] font-bold rounded-md shadow-xs">
+                <span className="px-2.5 py-0.5 bg-[#0068B8]/95 backdrop-blur text-white text-[11px] font-bold rounded-md shadow-xs">
                   {totalDays} Ngày {totalNights} Đêm
                 </span>
                 <span className="px-2.5 py-0.5 bg-white/90 backdrop-blur text-slate-900 text-[11px] font-bold rounded-md shadow-xs">
@@ -791,7 +791,7 @@ export default function ItineraryView({ id }: Props) {
                 <button
                   type="button"
                   onClick={() => setIsHeaderInviteOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#0068B8] hover:bg-[#00569C] text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs"
                 >
                   <UserPlus className="size-3.5" />
                   <span>Mời bạn đồng hành</span>
@@ -801,9 +801,9 @@ export default function ItineraryView({ id }: Props) {
                 <button
                   type="button"
                   onClick={() => setIsHeaderCompanionsOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-teal-200 bg-teal-50/70 hover:bg-teal-100/70 text-teal-900 text-xs font-semibold transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-sky-200 bg-sky-50/70 hover:bg-sky-100/70 text-sky-950 text-xs font-semibold transition-colors cursor-pointer"
                 >
-                  <Users className="size-3.5 text-teal-700" />
+                  <Users className="size-3.5 text-[#0068B8]" />
                   <span>Bạn đồng hành</span>
                 </button>
               )}
@@ -812,15 +812,15 @@ export default function ItineraryView({ id }: Props) {
                 onClick={handleShareLink}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
               >
-                <Share2 className="size-3.5 text-teal-600" />
+                <Share2 className="size-3.5 text-[#0194F3]" />
                 <span>Chia sẻ link</span>
               </button>
               <button
                 type="button"
                 onClick={() => setIsPrintModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-teal-200 bg-teal-50/60 hover:bg-teal-100/70 text-teal-900 text-xs font-semibold transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-sky-200 bg-sky-50/60 hover:bg-sky-100/70 text-sky-950 text-xs font-semibold transition-colors cursor-pointer"
               >
-                <Printer className="size-3.5 text-teal-700" />
+                <Printer className="size-3.5 text-[#0068B8]" />
                 <span>Tờ hướng dẫn / Xuất PDF</span>
               </button>
               <button
@@ -830,9 +830,9 @@ export default function ItineraryView({ id }: Props) {
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
               >
                 {cloneMutation.isPending ? (
-                  <Loader2 className="size-3.5 animate-spin text-teal-600" />
+                  <Loader2 className="size-3.5 animate-spin text-[#0194F3]" />
                 ) : (
-                  <Copy className="size-3.5 text-teal-600" />
+                  <Copy className="size-3.5 text-[#0194F3]" />
                 )}
                 <span>{isOwner ? 'Sao chép' : 'Nhân bản về lịch trình của tôi'}</span>
               </button>
@@ -849,7 +849,7 @@ export default function ItineraryView({ id }: Props) {
             </div>
           </div>
           {!isMemberOrOwner && (
-            <div className="px-4 py-3 bg-teal-50/80 border-t border-teal-200/70 flex flex-wrap items-center justify-between gap-2 text-xs text-teal-900">
+            <div className="px-4 py-3 bg-sky-50/80 border-t border-sky-200/70 flex flex-wrap items-center justify-between gap-2 text-xs text-sky-950">
               <span>
                 Bạn đang xem lịch trình chia sẻ công khai ở <strong>chế độ chỉ đọc</strong>. Hãy nhấn <strong>Nhân bản về lịch trình của tôi</strong> để tùy chỉnh lộ trình bằng AI Copilot!
               </span>
@@ -893,7 +893,7 @@ export default function ItineraryView({ id }: Props) {
                 onClick={() => setDayScope('all')}
                 className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all shrink-0 cursor-pointer ${
                   dayScope === 'all'
-                    ? 'bg-teal-600 text-white shadow-xs font-bold'
+                    ? 'bg-[#0068B8] text-white shadow-xs font-bold'
                     : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200'
                 }`}
               >
@@ -1038,7 +1038,7 @@ export default function ItineraryView({ id }: Props) {
           onClick={() => setMobileTab('timeline')}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all ${
             mobileTab === 'timeline'
-              ? 'bg-teal-600 text-white shadow-xs'
+              ? 'bg-[#0068B8] text-white shadow-xs'
               : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
@@ -1050,7 +1050,7 @@ export default function ItineraryView({ id }: Props) {
           onClick={() => setMobileTab('map')}
           className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all ${
             mobileTab === 'map'
-              ? 'bg-teal-600 text-white shadow-xs'
+              ? 'bg-[#0068B8] text-white shadow-xs'
               : 'text-slate-600 hover:bg-slate-100'
           }`}
         >
@@ -1095,7 +1095,7 @@ export default function ItineraryView({ id }: Props) {
                 Bạn có chắc chắn muốn xóa chuyến đi <strong className="text-slate-900 font-semibold">&quot;{data?.title}&quot;</strong>?
               </p>
               <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed flex items-start gap-1.5">
-                <Info className="size-4 text-teal-600 shrink-0 mt-0.5" aria-hidden="true" />
+                <Info className="size-4 text-[#0194F3] shrink-0 mt-0.5" aria-hidden="true" />
                 <span>
                   <strong>Lưu ý:</strong> Chuyến đi sẽ được gỡ khỏi danh sách của bạn. Nếu có người khác đã sao chép (clone) lịch trình này về tài khoản của họ thì bản sao của họ <strong>hoàn toàn không bị mất</strong>.
                 </span>

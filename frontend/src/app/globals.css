@@ -36,7 +36,9 @@
   --color-secondary-foreground: var(--secondary-foreground);
   --color-secondary: var(--secondary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--primary-hover);
   --color-primary: var(--primary);
+  --color-brand-blue: var(--brand-blue);
   --color-popover-foreground: var(--popover-foreground);
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
@@ -51,100 +53,102 @@
 }
 
 :root {
-  /* Travel modern light palette: Clean, airy with Ocean Teal primary & Sunset Coral accent */
-  --background: oklch(0.99 0.005 240);
-  --foreground: oklch(0.18 0.02 240);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.02 240);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.02 240);
+  /* TripGenie Blue Theme (DESIGN.md) */
+  --brand-blue: #0194F3;
+  --primary: #0068B8;
+  --primary-hover: #00569C;
+  --primary-foreground: #FFFFFF;
 
-  /* Primary: Ocean Discovery Teal */
-  --primary: oklch(0.48 0.14 185);
-  --primary-foreground: oklch(0.99 0 0);
+  --background: #F5F9FF;
+  --foreground: #10243A;
 
-  /* Secondary: Soft Mist Teal */
-  --secondary: oklch(0.95 0.025 185);
-  --secondary-foreground: oklch(0.35 0.10 185);
+  --card: #FFFFFF;
+  --card-foreground: #10243A;
 
-  /* Muted surfaces & subtle text */
-  --muted: oklch(0.96 0.008 240);
-  --muted-foreground: oklch(0.48 0.025 240);
+  --popover: #FFFFFF;
+  --popover-foreground: #10243A;
 
-  /* Accent: Sunset Adventure Coral */
-  --accent: oklch(0.95 0.035 55);
-  --accent-foreground: oklch(0.42 0.14 45);
+  --secondary: #E6F2FF;
+  --secondary-foreground: #174A79;
+
+  --accent: #D9EDFF;
+  --accent-foreground: #123E68;
+
+  --muted: #EDF3FA;
+  --muted-foreground: #475569;
+
+  --border: #D5E2F0;
+  --input: #7489A1;
+  --ring: #0068B8;
+
+  --radius: 0.625rem;
 
   /* Status & system */
   --destructive: oklch(0.58 0.22 25);
   --destructive-foreground: oklch(0.99 0 0);
 
-  --border: oklch(0.91 0.01 240);
-  --input: oklch(0.91 0.01 240);
-  --ring: oklch(0.48 0.14 185);
-
-  --radius: 0.625rem;
-
-  --chart-1: oklch(0.48 0.14 185);
-  --chart-2: oklch(0.65 0.18 45);
+  --chart-1: #0068B8;
+  --chart-2: #0194F3;
   --chart-3: oklch(0.60 0.14 140);
   --chart-4: oklch(0.55 0.18 290);
   --chart-5: oklch(0.70 0.12 80);
 
-  --sidebar: oklch(0.99 0.005 240);
-  --sidebar-foreground: oklch(0.18 0.02 240);
-  --sidebar-primary: oklch(0.48 0.14 185);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.95 0.025 185);
-  --sidebar-accent-foreground: oklch(0.35 0.10 185);
-  --sidebar-border: oklch(0.91 0.01 240);
-  --sidebar-ring: oklch(0.48 0.14 185);
+  --sidebar: #F5F9FF;
+  --sidebar-foreground: #10243A;
+  --sidebar-primary: #0068B8;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #E6F2FF;
+  --sidebar-accent-foreground: #174A79;
+  --sidebar-border: #D5E2F0;
+  --sidebar-ring: #0068B8;
 }
 
 .dark {
-  /* Travel modern dark palette: Midnight Navy with luminous accents */
-  --background: oklch(0.14 0.02 240);
-  --foreground: oklch(0.98 0.005 240);
-  --card: oklch(0.18 0.025 240);
-  --card-foreground: oklch(0.98 0.005 240);
-  --popover: oklch(0.18 0.025 240);
-  --popover-foreground: oklch(0.98 0.005 240);
+  /* TripGenie Blue Dark Theme (DESIGN.md) */
+  --brand-blue: #0194F3;
+  --primary: #66BFFF;
+  --primary-hover: #8ACFFF;
+  --primary-foreground: #0B1728;
 
-  /* Primary: Luminous Teal */
-  --primary: oklch(0.68 0.13 185);
-  --primary-foreground: oklch(0.12 0.03 185);
+  --background: #0B1728;
+  --foreground: #EAF4FF;
 
-  /* Secondary */
-  --secondary: oklch(0.24 0.03 185);
-  --secondary-foreground: oklch(0.90 0.04 185);
+  --card: #12243C;
+  --card-foreground: #EAF4FF;
 
-  --muted: oklch(0.22 0.02 240);
-  --muted-foreground: oklch(0.70 0.02 240);
+  --popover: #12243C;
+  --popover-foreground: #EAF4FF;
 
-  --accent: oklch(0.25 0.05 45);
-  --accent-foreground: oklch(0.92 0.06 45);
+  --secondary: #193552;
+  --secondary-foreground: #D6EBFF;
+
+  --accent: #234865;
+  --accent-foreground: #EAF4FF;
+
+  --muted: #172B44;
+  --muted-foreground: #A9BDD5;
+
+  --border: #304962;
+  --input: #6683A3;
+  --ring: #66BFFF;
 
   --destructive: oklch(0.62 0.20 25);
   --destructive-foreground: oklch(0.99 0 0);
 
-  --border: oklch(0.26 0.02 240);
-  --input: oklch(0.26 0.02 240);
-  --ring: oklch(0.68 0.13 185);
-
-  --chart-1: oklch(0.68 0.13 185);
-  --chart-2: oklch(0.72 0.16 45);
+  --chart-1: #66BFFF;
+  --chart-2: #8ACFFF;
   --chart-3: oklch(0.70 0.13 140);
   --chart-4: oklch(0.65 0.16 290);
   --chart-5: oklch(0.78 0.11 80);
 
-  --sidebar: oklch(0.16 0.02 240);
-  --sidebar-foreground: oklch(0.98 0.005 240);
-  --sidebar-primary: oklch(0.68 0.13 185);
-  --sidebar-primary-foreground: oklch(0.12 0.03 185);
-  --sidebar-accent: oklch(0.24 0.03 185);
-  --sidebar-accent-foreground: oklch(0.90 0.04 185);
-  --sidebar-border: oklch(0.26 0.02 240);
-  --sidebar-ring: oklch(0.68 0.13 185);
+  --sidebar: #12243C;
+  --sidebar-foreground: #EAF4FF;
+  --sidebar-primary: #66BFFF;
+  --sidebar-primary-foreground: #0B1728;
+  --sidebar-accent: #193552;
+  --sidebar-accent-foreground: #D6EBFF;
+  --sidebar-border: #304962;
+  --sidebar-ring: #66BFFF;
 }
 
 @layer base {

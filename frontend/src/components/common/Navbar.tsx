@@ -3,10 +3,16 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
-import { Bookmark } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Bookmark, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
 import { MobileNavSheet } from "@/components/common/MobileNavSheet";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
@@ -28,7 +34,8 @@ function getUserInitials(fullName?: string | null): string {
 
 export function Navbar() {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, logout } = useAuth();
   const userInitials = getUserInitials(user?.fullName);
 
   return (
@@ -96,22 +103,45 @@ export function Navbar() {
               {/* Chuông thông báo cộng đồng */}
               <NotificationBell />
 
-              {/* Avatar người dùng dẫn đến Hồ sơ cá nhân */}
-              <Link
-                href="/profile"
-                title={`Hồ sơ: ${user?.fullName || "Người dùng"}`}
-                className="outline-none group ml-0.5 sm:ml-1"
-              >
-                <Avatar className="size-9 sm:size-9.5 border-2 border-slate-200 transition-all group-hover:border-[#0194F3] group-hover:scale-105 cursor-pointer shadow-xs">
-                  <AvatarImage
-                    src={user?.avatarUrl || DEFAULT_AVATAR}
-                    alt={user?.fullName || "Avatar"}
-                  />
-                  <AvatarFallback className="text-xs font-bold bg-slate-100 text-slate-800">
-                    {userInitials}
-                  </AvatarFallback>
-                </Avatar>
-              </Link>
+              {/* Avatar người dùng dạng Dropdown Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  className="outline-none group ml-0.5 sm:ml-1 rounded-full cursor-pointer focus-visible:ring-2 focus-visible:ring-[#0194F3]/40"
+                  aria-label="Tài khoản cá nhân"
+                >
+                  <Avatar className="size-9 sm:size-9.5 border-2 border-slate-200 transition-all group-hover:border-[#0194F3] group-hover:scale-105 shadow-xs">
+                    <AvatarImage
+                      src={user?.avatarUrl || DEFAULT_AVATAR}
+                      alt={user?.fullName || "Avatar"}
+                    />
+                    <AvatarFallback className="text-xs font-bold bg-slate-100 text-slate-800">
+                      {userInitials}
+                    </AvatarFallback>
+                  </Avatar>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="end"
+                  side="bottom"
+                  sideOffset={8}
+                  className="w-44 p-1 shadow-lg border border-slate-200/90 rounded-xl bg-white"
+                >
+                  <DropdownMenuItem
+                    onClick={() => router.push("/profile")}
+                    className="group cursor-pointer rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:!bg-sky-50 hover:!text-[#0194F3] focus:!bg-sky-50 focus:!text-[#0194F3] data-[highlighted]:!bg-sky-50 data-[highlighted]:!text-[#0194F3] transition-colors flex items-center gap-2.5"
+                  >
+                    <User className="size-4 text-slate-500 group-hover:!text-[#0194F3] group-focus:!text-[#0194F3] group-data-[highlighted]:!text-[#0194F3] transition-colors" />
+                    <span>Hồ sơ cá nhân</span>
+                  </DropdownMenuItem>
+
+                  <DropdownMenuItem
+                    onClick={() => logout()}
+                    className="group cursor-pointer rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:!bg-sky-50 hover:!text-[#0194F3] focus:!bg-sky-50 focus:!text-[#0194F3] data-[highlighted]:!bg-sky-50 data-[highlighted]:!text-[#0194F3] transition-colors flex items-center gap-2.5"
+                  >
+                    <LogOut className="size-4 text-slate-500 group-hover:!text-[#0194F3] group-focus:!text-[#0194F3] group-data-[highlighted]:!text-[#0194F3] transition-colors" />
+                    <span>Đăng xuất</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
 
               {/* Mobile Navigation Drawer Trigger */}
               <MobileNavSheet triggerVariant="light" />

@@ -123,7 +123,7 @@ export function TourBriefingPrintModal({
                       onChangeDraftBriefing({ ...draftBriefing, leaderName: e.target.value })
                     }
                     placeholder="VD: Nguyễn Hoàng Minh"
-                    className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-600"
+                    className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0194F3]"
                   />
                 </div>
 
@@ -143,7 +143,7 @@ export function TourBriefingPrintModal({
                       onChangeDraftBriefing({ ...draftBriefing, leaderPhone: e.target.value })
                     }
                     placeholder="VD: 0905 882 419"
-                    className="w-full h-10 px-3 rounded-xl border border-slate-300 font-mono text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-600"
+                    className="w-full h-10 px-3 rounded-xl border border-slate-300 font-mono text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0194F3]"
                   />
                 </div>
 
@@ -166,7 +166,7 @@ export function TourBriefingPrintModal({
                       })
                     }
                     placeholder="VD: 05:30 sáng 15/11 — Sân bay Tân Sơn Nhất (Cổng D2)"
-                    className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-600"
+                    className="w-full h-10 px-3 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0194F3]"
                   />
                 </div>
 
@@ -186,12 +186,12 @@ export function TourBriefingPrintModal({
                       onChangeDraftBriefing({ ...draftBriefing, notes: e.target.value })
                     }
                     placeholder="VD: Mang CCCD bản gốc; có mặt trước 15 phút; chuẩn bị giày thể thao êm chân..."
-                    className="w-full p-3 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-600 resize-none"
+                    className="w-full p-3 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#0194F3] resize-none"
                   />
                 </div>
               </div>
             ) : (
-              <div className="bg-teal-50/80 border border-teal-200 rounded-xl p-3.5 text-xs text-teal-950 space-y-1.5">
+              <div className="bg-sky-50/80 border border-sky-200 rounded-xl p-3.5 text-xs text-sky-900 space-y-1.5">
                 <div className="font-bold">Chế độ xem thành viên đoàn</div>
                 <p className="text-slate-600 leading-relaxed">
                   Tờ hướng dẫn này đã được đồng bộ đầy đủ toàn bộ các ngày trong lịch trình. Bạn có thể bấm nút bên dưới để lưu thành file PDF hoặc in ra giấy A4.
@@ -215,7 +215,7 @@ export function TourBriefingPrintModal({
                       showChecklist: e.target.checked,
                     })
                   }
-                  className="size-4 rounded border-slate-300 text-teal-600 focus:ring-teal-600"
+                  className="size-4 rounded border-slate-300 text-[#0194F3] focus:ring-[#0194F3]"
                 />
                 <span>Hiển thị ô tích (Checklist ☐) trước mỗi mốc giờ</span>
               </label>
@@ -230,7 +230,7 @@ export function TourBriefingPrintModal({
                       showCostTable: e.target.checked,
                     })
                   }
-                  className="size-4 rounded border-slate-300 text-teal-600 focus:ring-teal-600"
+                  className="size-4 rounded border-slate-300 text-[#0194F3] focus:ring-[#0194F3]"
                 />
                 <span>Hiển thị bảng tổng hợp dự toán chi phí cuối trang</span>
               </label>
@@ -245,7 +245,7 @@ export function TourBriefingPrintModal({
                       pageBreakPerDay: e.target.checked,
                     })
                   }
-                  className="size-4 rounded border-slate-300 text-teal-600 focus:ring-teal-600"
+                  className="size-4 rounded border-slate-300 text-[#0194F3] focus:ring-[#0194F3]"
                 />
                 <span>Ngắt sang trang A4 mới cho mỗi ngày (Tách tờ theo ngày)</span>
               </label>
@@ -260,7 +260,7 @@ export function TourBriefingPrintModal({
                       blankHandwritingMode: e.target.checked,
                     })
                   }
-                  className="size-4 rounded border-slate-300 text-teal-600 focus:ring-teal-600"
+                  className="size-4 rounded border-slate-300 text-[#0194F3] focus:ring-[#0194F3]"
                 />
                 <span>Để trống khung thông tin đoàn (In dòng chấm để ghi tay)</span>
               </label>
@@ -268,7 +268,7 @@ export function TourBriefingPrintModal({
 
             {isOwner && (
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-[11px] text-slate-600 flex items-start gap-2">
-                <ShieldCheck className="size-4 text-teal-700 shrink-0 mt-0.5" aria-hidden="true" />
+                <ShieldCheck className="size-4 text-[#0068B8] shrink-0 mt-0.5" aria-hidden="true" />
                 <span>
                   <strong>Bảo mật:</strong> Số điện thoại và ghi chú chỉ hiển thị với bạn và thành viên nhóm chuyến đi. Người xem công khai và người nhân bản lịch trình sẽ không thấy hai thông tin này.
                 </span>
@@ -286,9 +286,9 @@ export function TourBriefingPrintModal({
                 className="w-full h-10 rounded-xl border border-slate-300 bg-white hover:bg-slate-100 text-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
               >
                 {isSaving ? (
-                  <Loader2 className="size-3.5 animate-spin text-teal-600" />
+                  <Loader2 className="size-3.5 animate-spin text-[#0194F3]" />
                 ) : (
-                  <Save className="size-3.5 text-teal-700" />
+                  <Save className="size-3.5 text-[#0068B8]" />
                 )}
                 <span>Lưu thông tin đoàn vào lịch trình</span>
               </button>
@@ -298,7 +298,7 @@ export function TourBriefingPrintModal({
               type="button"
               disabled={isSaving}
               onClick={handleSaveAndPrint}
-              className="w-full h-11 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+              className="w-full h-11 rounded-xl bg-[#0068B8] hover:bg-[#00569C] text-white text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
             >
               <Printer className="size-4" />
               <span>
@@ -316,7 +316,7 @@ export function TourBriefingPrintModal({
             <span className="font-medium">
               Bản xem trước khổ chuẩn A4 (210 × 297 mm) • Tự động gộp đầy đủ {data.days.length} ngày
             </span>
-            <span className="font-mono text-[11px] text-teal-300">
+            <span className="font-mono text-[11px] text-sky-300">
               Hỗ trợ in nhiều trang tự động (Chống cắt đôi địa điểm)
             </span>
           </div>

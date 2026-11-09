@@ -42,7 +42,7 @@ export default function BudgetBreakdownCard({
           </h4>
           <p className="text-[11px] text-slate-500 mt-0.5">Ước lượng minh bạch từ dữ liệu địa điểm thực tế</p>
         </div>
-        <span className="text-sm font-extrabold text-teal-800 bg-teal-50 border border-teal-200/80 px-3 py-1 rounded-full shadow-2xs">
+        <span className="text-sm font-extrabold text-sky-900 bg-sky-50 border border-sky-200/80 px-3 py-1 rounded-full shadow-2xs">
           ~{formatVnd(breakdown.totalEstimated)} / người
         </span>
       </div>
@@ -52,7 +52,7 @@ export default function BudgetBreakdownCard({
         <div className="w-full h-3 rounded-full overflow-hidden flex bg-slate-100 shadow-2xs">
           <div
             style={{ width: `${pTransit}%` }}
-            className="bg-teal-600 transition-all duration-500"
+            className="bg-[#0068B8] transition-all duration-500"
             title={`Vé di chuyển: ${pTransit}%`}
           />
           <div
@@ -80,7 +80,7 @@ export default function BudgetBreakdownCard({
         {/* Legend */}
         <div className="flex items-center justify-between text-[11px] text-slate-500 flex-wrap gap-x-3 gap-y-1 pt-0.5">
           <span className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-teal-600" />
+            <span className="size-2 rounded-full bg-[#0068B8]" />
             Di chuyển ({pTransit}%)
           </span>
           <span className="inline-flex items-center gap-1.5">
@@ -107,7 +107,7 @@ export default function BudgetBreakdownCard({
         <div className="py-2.5 flex items-start justify-between gap-2">
           <div className="space-y-0.5">
             <span className="text-slate-800 font-medium flex items-center gap-2">
-              <span className="size-2 rounded-full bg-teal-600 shrink-0" />
+              <span className="size-2 rounded-full bg-[#0068B8] shrink-0" />
               1. Vé {transitModeName || 'di chuyển'} khứ hồi
             </span>
             <p className="text-[11px] text-slate-500 pl-4">Cước phí vé theo chặng và ngày khởi hành</p>
@@ -172,7 +172,7 @@ export default function BudgetBreakdownCard({
 
       {/* Advisory Note */}
       <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3 text-[11px] text-slate-600 flex items-start gap-2 leading-relaxed">
-        <Info className="size-3.5 text-teal-600 shrink-0 mt-0.5" aria-hidden="true" />
+        <Info className="size-3.5 text-[#0194F3] shrink-0 mt-0.5" aria-hidden="true" />
         <span>
           <strong>Lưu ý:</strong> Ngân sách được tính tự động từ dữ liệu giá cào được của từng địa điểm. Khuyến nghị dự phòng 10-15% cho mua sắm quà lưu niệm hoặc chi tiêu phát sinh theo mùa du lịch.
         </span>

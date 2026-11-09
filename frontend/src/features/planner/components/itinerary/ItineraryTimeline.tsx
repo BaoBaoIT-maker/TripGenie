@@ -117,7 +117,7 @@ function getTransitModeConfig(transit: IntercityTransit) {
       };
     case 'PERSONAL_MOTORBIKE':
       return {
-        icon: <Bike className="size-4 text-teal-600 shrink-0" aria-hidden="true" />,
+        icon: <Bike className="size-4 text-[#0194F3] shrink-0" aria-hidden="true" />,
         title: 'Chặng đi: Phượt xe máy',
         departLabel: `Khởi hành sáng sớm (~${TRANSIT_UI_CONFIG.MOTORBIKE_DEPART_TIME})`,
         arriveLabel: 'Đến nơi dự kiến',
@@ -168,7 +168,7 @@ const TRANSIT_MODE_OPTIONS: Array<{
     mode: 'PERSONAL_MOTORBIKE',
     title: 'Xe máy phượt',
     desc: 'Tự do trải nghiệm cung đường đèo ven biển, tiết kiệm tối đa',
-    icon: (c) => <Bike className={c || 'size-4 text-teal-600'} aria-hidden="true" />,
+    icon: (c) => <Bike className={c || 'size-4 text-[#0194F3]'} aria-hidden="true" />,
   },
 ];
 
@@ -347,16 +347,16 @@ export default function ItineraryTimeline({
                     setIsEditTransitOpen(true);
                   }}
                   disabled={isUpdatingTransitMode}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-teal-200 bg-teal-50 dark:border-teal-800 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 hover:bg-teal-100 dark:hover:bg-teal-900/50 font-semibold transition-colors cursor-pointer text-[11px] shadow-2xs"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-sky-200 bg-sky-50 dark:border-sky-200 dark:bg-sky-950/40 text-[#0068B8] dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/50 font-semibold transition-colors cursor-pointer text-[11px] shadow-2xs"
                 >
                   {isUpdatingTransitMode ? (
                     <>
-                      <Loader2 className="size-3 animate-spin text-teal-600 dark:text-teal-400" aria-hidden="true" />
+                      <Loader2 className="size-3 animate-spin text-[#0194F3] dark:text-sky-400" aria-hidden="true" />
                       <span>Đang đổi...</span>
                     </>
                   ) : (
                     <>
-                      <ArrowLeftRight className="size-3 text-teal-600 dark:text-teal-400" aria-hidden="true" />
+                      <ArrowLeftRight className="size-3 text-[#0194F3] dark:text-sky-400" aria-hidden="true" />
                       <span>Sửa phương tiện</span>
                     </>
                   )}
@@ -444,9 +444,9 @@ export default function ItineraryTimeline({
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label="Đặt vé tàu hỏa qua VeXeRe"
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-teal-50 text-teal-800 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/40 px-3 py-1.5 font-semibold transition-colors cursor-pointer text-xs shadow-2xs"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-sky-50 text-sky-900 dark:bg-sky-950/40 dark:text-sky-300 border border-sky-200 dark:border-sky-200 hover:bg-sky-100 dark:hover:bg-sky-900/50 px-3 py-1.5 font-semibold transition-colors cursor-pointer text-xs shadow-2xs"
                     >
-                      <Ticket className="size-3.5 text-teal-600 dark:text-teal-400" aria-hidden="true" />
+                      <Ticket className="size-3.5 text-[#0194F3] dark:text-sky-400" aria-hidden="true" />
                       <span>Vé tàu VeXeRe</span>
                       <ExternalLink className="size-3 opacity-60" aria-hidden="true" />
                     </a>
@@ -475,9 +475,9 @@ export default function ItineraryTimeline({
                       target="_blank"
                       rel="noopener noreferrer"
                       aria-label="Đặt vé xe khách qua VeXeRe"
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-teal-50 text-teal-800 dark:bg-teal-950/40 dark:text-teal-300 border border-teal-200 dark:border-teal-800 hover:bg-teal-100 dark:hover:bg-teal-900/40 px-3 py-1.5 font-semibold transition-colors cursor-pointer text-xs shadow-2xs"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-sky-50 text-sky-900 dark:bg-sky-950/40 dark:text-sky-300 border border-sky-200 dark:border-sky-200 hover:bg-sky-100 dark:hover:bg-sky-900/50 px-3 py-1.5 font-semibold transition-colors cursor-pointer text-xs shadow-2xs"
                     >
-                      <Bus className="size-3.5 text-teal-600 dark:text-teal-400" aria-hidden="true" />
+                      <Bus className="size-3.5 text-[#0194F3] dark:text-sky-400" aria-hidden="true" />
                       <span>Đặt vé VeXeRe</span>
                       <ExternalLink className="size-3 opacity-60" aria-hidden="true" />
                     </a>
@@ -524,7 +524,7 @@ export default function ItineraryTimeline({
           <div className="bg-card text-card-foreground rounded-2xl border border-border p-5 shadow-2xl max-w-md w-full space-y-4 animate-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2">
-                <div className="size-8 rounded-xl bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300 flex items-center justify-center">
+                <div className="size-8 rounded-xl bg-sky-100 text-[#0068B8] dark:bg-sky-950/40 dark:text-sky-300 flex items-center justify-center">
                   <ArrowLeftRight className="size-4" aria-hidden="true" />
                 </div>
                 <div>
@@ -551,7 +551,7 @@ export default function ItineraryTimeline({
                     onClick={() => setSelectedTransitMode(opt.mode)}
                     className={`w-full p-3 rounded-xl border text-left transition-all flex items-start gap-3 cursor-pointer ${
                       isSelected
-                        ? 'border-teal-500 bg-teal-50/70 dark:bg-teal-950/40 shadow-xs ring-1 ring-teal-500/20'
+                        ? 'border-[#0194F3] bg-sky-50/70 dark:bg-sky-950/40 shadow-xs ring-1 ring-[#0194F3]/20'
                         : 'border-border hover:bg-muted/60'
                     }`}
                   >
@@ -560,11 +560,11 @@ export default function ItineraryTimeline({
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between">
-                        <span className={`text-xs font-bold ${isSelected ? 'text-teal-900 dark:text-teal-200' : 'text-foreground'}`}>
+                        <span className={`text-xs font-bold ${isSelected ? 'text-sky-950 dark:text-sky-900' : 'text-foreground'}`}>
                           {opt.title}
                         </span>
                         {isSelected && (
-                          <span className="size-4 rounded-full bg-teal-600 text-white flex items-center justify-center">
+                          <span className="size-4 rounded-full bg-[#0068B8] text-white flex items-center justify-center">
                             <Check className="size-2.5" />
                           </span>
                         )}
@@ -591,7 +591,7 @@ export default function ItineraryTimeline({
                 type="button"
                 onClick={handleConfirmChangeTransit}
                 disabled={isUpdatingTransitMode || selectedTransitMode === transit?.mode}
-                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#0068B8] hover:bg-[#00569C] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isUpdatingTransitMode ? (
                   <>
@@ -682,7 +682,7 @@ export default function ItineraryTimeline({
                       <div className="flex items-start justify-between gap-2">
                         <div>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[11px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-md border border-teal-200/60">
+                            <span className="text-[11px] font-bold text-[#0068B8] bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200/60">
                               {act.startTime || '08:30'} – {act.endTime || '10:00'} (
                               {act.durationMinutes || 90} phút)
                             </span>
@@ -707,9 +707,9 @@ export default function ItineraryTimeline({
                                   onSwapPlace(act.placeId, act);
                                 }}
                                 title="Đổi điểm tham quan hoặc quán ăn khác"
-                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white hover:bg-teal-50 hover:border-teal-500 hover:text-teal-700 px-2.5 py-1 text-[11px] font-bold text-slate-700 transition-all cursor-pointer shadow-2xs"
+                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white hover:bg-sky-50 hover:border-[#0194F3] hover:text-[#0068B8] px-2.5 py-1 text-[11px] font-bold text-slate-700 transition-all cursor-pointer shadow-2xs"
                               >
-                                <Sparkles className="size-3 text-teal-600" aria-hidden="true" />
+                                <Sparkles className="size-3 text-[#0194F3]" aria-hidden="true" />
                                 <span>Đổi điểm</span>
                               </button>
                             )}
@@ -767,7 +767,7 @@ export default function ItineraryTimeline({
 
                   {/* Discrete Transit Connector between stops */}
                   {!isLast && (
-                    <div className="pl-8 border-l-2 border-dashed border-teal-300 ml-5 py-1">
+                    <div className="pl-8 border-l-2 border-dashed border-sky-300 ml-5 py-1">
                       {renderIntracityTransitConnector(act)}
                     </div>
                   )}
@@ -782,7 +782,7 @@ export default function ItineraryTimeline({
               <button
                 type="button"
                 onClick={() => onAddPlace(day.dayNumber)}
-                className="w-full py-2.5 rounded-xl border border-dashed border-slate-300 hover:border-teal-500 hover:bg-teal-50/40 text-slate-600 hover:text-teal-700 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                className="w-full py-2.5 rounded-xl border border-dashed border-slate-300 hover:border-[#0194F3] hover:bg-sky-50/40 text-slate-600 hover:text-[#0068B8] text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 <Plus className="size-4" />
                 <span>Thêm địa điểm vào Ngày {day.dayNumber}</span>

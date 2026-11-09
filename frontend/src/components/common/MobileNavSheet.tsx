@@ -175,7 +175,7 @@ export function MobileNavSheet({ triggerVariant = "light" }: MobileNavSheetProps
                 <button
                   type="button"
                   onClick={handleLogout}
-                  className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold text-red-600 bg-white border border-red-200 hover:bg-red-50 transition-colors cursor-pointer"
+                  className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-sky-50 hover:text-[#0194F3] hover:border-blue-200 transition-colors cursor-pointer"
                 >
                   <LogOut className="size-3.5" />
                   <span>Đăng xuất</span>

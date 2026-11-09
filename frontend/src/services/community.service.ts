@@ -1,4 +1,4 @@
-import { apiClient } from "@/lib/api-client";
+import { apiClient, API_BASE_URL } from "@/lib/api-client";
 import type {
   CommunityCommentItem,
   CommunityFeedResponse,
@@ -142,17 +142,75 @@ export interface CommunityFeedQuery {
 
 export const communityService = {
   uploadMedia: async (
-    files: File[]
+    files: File[],
+    onProgress?: (percent: number) => void,
+    signal?: AbortSignal
   ): Promise<{ mediaUrls: string[]; items: UploadedMediaItem[] }> => {
-    const formData = new FormData();
-    files.forEach((f) => formData.append("files", f));
-    return apiClient<{ mediaUrls: string[]; items: UploadedMediaItem[] }>(
-      "/community/media/upload",
-      {
-        method: "POST",
-        body: formData,
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const url = `${API_BASE_URL}/community/media/upload`;
+
+      xhr.open("POST", url, true);
+      xhr.withCredentials = true;
+
+      if (signal) {
+        if (signal.aborted) {
+          reject(new DOMException("Đã hủy tải tệp lên", "AbortError"));
+          return;
+        }
+        signal.addEventListener("abort", () => {
+          xhr.abort();
+          reject(new DOMException("Đã hủy tải tệp lên", "AbortError"));
+        });
       }
-    );
+
+      if (xhr.upload) {
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable && onProgress) {
+            const percent = Math.min(
+              100,
+              Math.max(0, Math.round((event.loaded / event.total) * 100))
+            );
+            onProgress(percent);
+          }
+        };
+      }
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            const raw = JSON.parse(xhr.responseText);
+            // Unwrap standard NestJS ApiResponse envelope if present
+            const payload =
+              raw && typeof raw === "object" && "data" in raw && raw.data
+                ? raw.data
+                : raw;
+            resolve(payload);
+          } catch {
+            reject(new Error("Phản hồi từ máy chủ không hợp lệ"));
+          }
+        } else {
+          try {
+            const err = JSON.parse(xhr.responseText);
+            reject(new Error(err.message || "Tải lên tệp thất bại"));
+          } catch {
+            reject(new Error(`Tải lên tệp thất bại (HTTP ${xhr.status})`));
+          }
+        }
+      };
+
+      xhr.onerror = () => {
+        reject(new Error("Lỗi kết nối máy chủ khi tải tệp"));
+      };
+
+      xhr.onabort = () => {
+        reject(new DOMException("Đã hủy tải tệp lên", "AbortError"));
+      };
+
+      const formData = new FormData();
+      files.forEach((f) => formData.append("files", f));
+      xhr.send(formData);
+    });
   },
 
   getGroups: async (): Promise<{ groups: CommunityGroupSummary[] }> =>

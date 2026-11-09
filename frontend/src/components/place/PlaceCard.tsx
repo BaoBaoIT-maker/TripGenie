@@ -3,7 +3,6 @@
 import { useState, useMemo, memo } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { MapPin, Sparkles, Heart, Camera, UploadCloud, Navigation } from "lucide-react";
 import { Place } from "@/types/place";
 import { Badge } from "@/components/ui/badge";
 import { RatingStars } from "@/components/common/RatingStars";
@@ -66,14 +65,16 @@ export const PlaceCard = memo(function PlaceCard({
     : false;
   const [imgError, setImgError] = useState(false);
 
-  // Compute direct distance if user location is available
+  // Compute direct distance if user location is available or fall back to place.distanceKm
   const distanceKm = useMemo(() => {
-    if (!userLocation || !place.latitude || !place.longitude) return null;
-    return routingService.calculateDirectDistanceKm(userLocation, {
-      latitude: place.latitude,
-      longitude: place.longitude,
-    });
-  }, [userLocation, place.latitude, place.longitude]);
+    if (userLocation && place.latitude && place.longitude) {
+      return routingService.calculateDirectDistanceKm(userLocation, {
+        latitude: place.latitude,
+        longitude: place.longitude,
+      });
+    }
+    return place.distanceKm ?? null;
+  }, [userLocation, place.latitude, place.longitude, place.distanceKm]);
 
   const toggleBookmark = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -109,6 +110,7 @@ export const PlaceCard = memo(function PlaceCard({
       setIsCheckingCollections(false);
     }
   };
+
   const handleCardInteraction = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest("button")) return;
@@ -131,7 +133,7 @@ export const PlaceCard = memo(function PlaceCard({
       )}
     >
       {/* Card Image / Visual Header */}
-      <div className="relative block h-44 sm:h-48 w-full overflow-hidden bg-muted">
+      <div className="relative block h-44 sm:h-48 w-full overflow-hidden bg-slate-100">
         {/* Main Clickable Background to Detail Page */}
         <Link
           href={`/places/${place.slug}`}
@@ -156,14 +158,14 @@ export const PlaceCard = memo(function PlaceCard({
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-black/30" />
             </>
           ) : (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-4 bg-muted/50 text-center transition-colors group-hover:bg-muted/70">
-              <div className="size-10 rounded-full bg-background/80 shadow-xs flex items-center justify-center text-muted-foreground/80 mb-1.5">
-                <Camera className="size-5" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-4 bg-slate-100 text-center transition-colors group-hover:bg-slate-200/70">
+              <div className="size-10 rounded-full bg-white shadow-xs flex items-center justify-center text-slate-400 mb-1.5">
+                <i className="fa-solid fa-camera text-base" />
               </div>
-              <span className="text-xs font-semibold text-foreground/85">
+              <span className="text-xs font-semibold text-slate-700">
                 Chưa có ảnh thực tế
               </span>
-              <span className="text-[11px] text-muted-foreground line-clamp-1">
+              <span className="text-[11px] text-slate-400 line-clamp-1">
                 Hãy là người đầu tiên chia sẻ
               </span>
             </div>
@@ -180,9 +182,9 @@ export const PlaceCard = memo(function PlaceCard({
                 e.stopPropagation();
                 onContributePhoto(place);
               }}
-              className="inline-flex items-center gap-1 rounded-md bg-background/90 hover:bg-background border border-border/80 px-2.5 py-1 text-[11px] font-medium text-foreground shadow-xs transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-white/95 hover:bg-white border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-800 shadow-xs transition-colors cursor-pointer"
             >
-              <UploadCloud className="size-3 text-primary" />
+              <i className="fa-solid fa-cloud-arrow-up text-xs text-[#0194F3]" />
               <span>Đóng góp ảnh</span>
             </button>
           </div>
@@ -199,8 +201,8 @@ export const PlaceCard = memo(function PlaceCard({
             </Badge>
 
             {place.matchScore && (
-              <Badge className="bg-[#0194F3] text-white backdrop-blur-md text-[11px] font-bold py-0.5 px-2 shadow-xs gap-1">
-                <Sparkles className="size-3" />
+              <Badge className="bg-[#0194F3] text-white backdrop-blur-md text-[11px] font-bold py-0.5 px-2 shadow-xs gap-1.5">
+                <i className="fa-solid fa-wand-magic-sparkles text-[10px]" />
                 <span>{place.matchScore}% Phù hợp</span>
               </Badge>
             )}
@@ -212,10 +214,10 @@ export const PlaceCard = memo(function PlaceCard({
             onClick={toggleBookmark}
             disabled={toggleMutation.isPending || isCheckingCollections}
             className={cn(
-              "pointer-events-auto flex min-h-[44px] min-w-[44px] items-center justify-center rounded-full backdrop-blur-md transition-colors duration-150 motion-reduce:transition-none active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary shadow-xs cursor-pointer",
+              "pointer-events-auto flex min-h-[40px] min-w-[40px] items-center justify-center rounded-full backdrop-blur-md transition-colors duration-150 motion-reduce:transition-none active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0194F3] shadow-xs cursor-pointer",
               isBookmarked
                 ? "bg-rose-500 text-white shadow-md hover:bg-rose-600"
-                : "bg-background/85 text-foreground hover:bg-background hover:text-rose-500"
+                : "bg-white/90 text-slate-600 hover:bg-white hover:text-rose-500 shadow-xs"
             )}
             aria-label={
               isBookmarked
@@ -232,10 +234,10 @@ export const PlaceCard = memo(function PlaceCard({
                 : "Lưu địa điểm"
             }
           >
-            <Heart
+            <i
               className={cn(
-                "size-4.5 transition-transform",
-                isBookmarked ? "fill-current scale-110" : ""
+                "fa-solid fa-heart text-sm transition-transform",
+                isBookmarked ? "text-white scale-110" : "text-slate-600 group-hover/btn:text-rose-500"
               )}
             />
           </button>
@@ -246,12 +248,12 @@ export const PlaceCard = memo(function PlaceCard({
           <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-xs font-medium z-10 pointer-events-none">
             <div className="flex items-center gap-1.5 text-white drop-shadow-sm">
               <div className="flex items-center gap-1">
-                <MapPin className="size-3.5 text-primary" />
+                <i className="fa-solid fa-location-dot text-[#0194F3] text-xs shrink-0 drop-shadow-xs" />
                 <span>{place.city}</span>
               </div>
               {distanceKm !== null && distanceKm > 0 && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-black/65 text-white font-semibold px-2 py-0.5 backdrop-blur-xs text-[10px] border border-white/20 shadow-2xs">
-                  <Navigation className="size-2.5 text-primary shrink-0" />
+                  <i className="fa-solid fa-route text-[#0194F3] text-[10px] shrink-0" />
                   <span>~{routingService.formatDistanceKm(distanceKm)}</span>
                 </span>
               )}
@@ -275,7 +277,7 @@ export const PlaceCard = memo(function PlaceCard({
           </Link>
 
           {place.tagline && (
-            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+            <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
               {place.tagline}
             </p>
           )}
@@ -286,7 +288,7 @@ export const PlaceCard = memo(function PlaceCard({
           {place.tags.slice(0, 3).map((tag) => (
             <span
               key={tag}
-              className="rounded-md bg-muted/70 px-2 py-0.5 text-[10px] font-medium text-muted-foreground"
+              className="rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600"
             >
               #{tag}
             </span>
@@ -294,7 +296,7 @@ export const PlaceCard = memo(function PlaceCard({
         </div>
 
         {/* Footer info: Rating & Reviews */}
-        <div className="flex items-center justify-between pt-2 border-t border-border/70 text-xs">
+        <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-xs">
           {place.rating > 0 ? (
             <RatingStars
               rating={place.rating}
@@ -303,7 +305,7 @@ export const PlaceCard = memo(function PlaceCard({
               size="sm"
             />
           ) : (
-            <span className="text-[11px] text-muted-foreground flex items-center gap-1.5">
+            <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
               <span className="size-1.5 rounded-full bg-emerald-500" />
               Mới • Chưa có đánh giá
             </span>

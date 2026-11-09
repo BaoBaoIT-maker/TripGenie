@@ -3,6 +3,7 @@ import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
 import { IUsersRepository } from './interfaces/users-repository.interface';
 import { User, UserPreference, BudgetLevel } from '@prisma/client';
 import { UpdateUserPreferenceDto } from './dto/update-user-preference.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Injectable()
 export class UsersService {
@@ -37,6 +38,32 @@ export class UsersService {
     return this.usersRepository.update(userId, {
       avatarUrl: avatarUrl.trim(),
     });
+  }
+
+  async updateProfile(userId: string, dto: UpdateProfileDto): Promise<User> {
+    const user = await this.usersRepository.findById(userId);
+    if (!user) {
+      throw new NotFoundException('Không tìm thấy người dùng');
+    }
+
+    const updateData: { fullName?: string; bio?: string; avatarUrl?: string } = {};
+
+    if (dto.fullName !== undefined) {
+      const trimmed = dto.fullName.trim();
+      if (trimmed.length > 0) {
+        updateData.fullName = trimmed;
+      }
+    }
+
+    if (dto.bio !== undefined) {
+      updateData.bio = dto.bio.trim();
+    }
+
+    if (dto.avatarUrl !== undefined) {
+      updateData.avatarUrl = dto.avatarUrl.trim();
+    }
+
+    return this.usersRepository.update(userId, updateData);
   }
 
   async getUserPreferences(userId: string): Promise<UserPreference> {

@@ -3,6 +3,7 @@ import { UsersService } from './users.service';
 import { UpdateUsernameDto } from './dto/update-username.dto';
 import { UpdateUserPreferenceDto } from './dto/update-user-preference.dto';
 import { UpdateAvatarDto } from './dto/update-avatar.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '@/common/types';
@@ -51,6 +52,30 @@ export class UsersController {
         avatarUrl: updated.avatarUrl,
         role: updated.role,
         isVerified: updated.isVerified,
+      },
+    };
+  }
+
+  @Patch('me/profile')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async updateProfile(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateProfileDto,
+  ) {
+    const updated = await this.usersService.updateProfile(user.id, dto);
+    return {
+      message: 'Cập nhật thông tin hồ sơ thành công',
+      user: {
+        id: updated.id,
+        username: updated.username,
+        email: updated.email,
+        fullName: updated.fullName,
+        avatarUrl: updated.avatarUrl,
+        bio: updated.bio,
+        role: updated.role,
+        isVerified: updated.isVerified,
+        isVerifiedCreator: updated.isVerifiedCreator,
       },
     };
   }

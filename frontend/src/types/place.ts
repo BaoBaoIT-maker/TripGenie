@@ -61,4 +61,5 @@ export interface Place {
   matchReason?: string;
   openingHoursText?: string;
   featured?: boolean;
+  distanceKm?: number;
 }

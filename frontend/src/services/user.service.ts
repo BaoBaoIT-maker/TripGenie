@@ -15,4 +15,14 @@ export const userService = {
       body: JSON.stringify({ username }),
     });
   },
+  async updateProfile(data: {
+    fullName?: string;
+    bio?: string;
+    avatarUrl?: string;
+  }): Promise<{ message: string; user: AuthUser }> {
+    return apiClient<{ message: string; user: AuthUser }>('/users/me/profile', {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
 };

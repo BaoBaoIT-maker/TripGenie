@@ -59,7 +59,7 @@ export interface PostAuthorSubtitleInfo {
   contextLabel: string;
 }
 
-function deriveHandleFromFullName(fullName: string): string {
+export function deriveHandleFromFullName(fullName: string): string {
   const normalized = fullName
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")

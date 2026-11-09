@@ -490,7 +490,7 @@ export default function PlaceDetailPage({ params }: PlaceDetailPageProps) {
                 ) : (
                   <button
                     type="button"
-                    onClick={requestLocation}
+                    onClick={() => requestLocation()}
                     disabled={locating}
                     className="text-[11px] font-semibold text-primary hover:underline"
                   >

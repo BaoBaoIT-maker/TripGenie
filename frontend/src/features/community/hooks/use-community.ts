@@ -13,6 +13,7 @@ import {
   CommunityFeedQuery,
 } from "@/services/community.service";
 import { itineraryService } from "@/services/itinerary-planner.service";
+import { userService } from "@/services/user.service";
 import type {
   CommunityCommentItem,
   CommunityFeedResponse,
@@ -151,7 +152,10 @@ export function useCommentContext(
   });
 }
 
-export function useCreatorProfile(identifier: string) {
+export function useCreatorProfile(
+  identifier: string,
+  initialData?: CreatorProfileData
+) {
   return useQuery({
     queryKey: COMMUNITY_QUERY_KEYS.creator(identifier),
     queryFn: async () => {
@@ -159,6 +163,25 @@ export function useCreatorProfile(identifier: string) {
       return res.profile;
     },
     enabled: Boolean(identifier),
+    initialData,
+  });
+}
+
+export function useUpdateProfileMutation() {
+  const queryClient = useQueryClient();
+  const { refetchUser } = useAuth();
+
+  return useMutation({
+    mutationFn: (data: { fullName?: string; bio?: string; avatarUrl?: string }) =>
+      userService.updateProfile(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: COMMUNITY_QUERY_KEYS.all });
+      refetchUser();
+      toast.success("Cập nhật thông tin hồ sơ thành công!");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message || "Cập nhật hồ sơ thất bại");
+    },
   });
 }
 

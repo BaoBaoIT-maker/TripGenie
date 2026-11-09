@@ -1,5 +1,8 @@
 export const USERS_CONSTANTS = {
   MAX_AVATAR_URL_LENGTH: 500,
+  MAX_BIO_LENGTH: 300,
+  MIN_FULLNAME_LENGTH: 2,
+  MAX_FULLNAME_LENGTH: 70,
   /**
    * Only allows safe relative static avatars (/avatars/...), local uploads (/api/v1/uploads/...),
    * or valid HTTP/HTTPS URLs. Blocks large base64 data URLs (which bloat DB and API payloads)

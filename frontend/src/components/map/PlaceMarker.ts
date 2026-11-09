@@ -4,7 +4,7 @@ export interface PlaceMarkerOptions {
   selected?: boolean;
   hovered?: boolean;
   onSelect?: (placeId: string) => void;
-  /** Sequential number label (e.g. "1", "2"). When set, renders bold number with custom/day bg instead of category svg. */
+  /** Sequential number label (e.g. "1", "2"). When set, renders bold number with custom/day bg instead of category icon. */
   label?: string;
   /** Custom background color for marker pin (e.g. day color hex like #0D9488, #6366F1) */
   customColor?: string;
@@ -12,89 +12,98 @@ export interface PlaceMarkerOptions {
 
 interface CategoryStyle {
   bg: string;
-  svgIcon: string;
+  stemBorderClass: string;
+  iconHtml: string;
 }
 
-
-// Clean inline vector SVG icons (Google Maps / Apple Maps style)
+// Clean Font Awesome 6 icons matching standard map categories
 const CATEGORY_STYLES: Record<string, CategoryStyle> = {
   cafe: {
     bg: "bg-amber-700 text-white",
-    // Coffee cup
-    svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" x2="6" y1="2" y2="4"/><line x1="10" x2="10" y1="2" y2="4"/><line x1="14" x2="14" y1="2" y2="4"/></svg>`,
+    stemBorderClass: "border-t-amber-700",
+    iconHtml: `<i class="fa-solid fa-mug-saucer text-[11px] leading-none"></i>`,
   },
   "ca-phe": {
     bg: "bg-amber-700 text-white",
-    svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" x2="6" y1="2" y2="4"/><line x1="10" x2="10" y1="2" y2="4"/><line x1="14" x2="14" y1="2" y2="4"/></svg>`,
+    stemBorderClass: "border-t-amber-700",
+    iconHtml: `<i class="fa-solid fa-mug-saucer text-[11px] leading-none"></i>`,
   },
   restaurant: {
     bg: "bg-orange-600 text-white",
-    // Utensils
-    svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>`,
+    stemBorderClass: "border-t-orange-600",
+    iconHtml: `<i class="fa-solid fa-utensils text-[11px] leading-none"></i>`,
   },
   "nha-hang": {
     bg: "bg-orange-600 text-white",
-    svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg>`,
+    stemBorderClass: "border-t-orange-600",
+    iconHtml: `<i class="fa-solid fa-utensils text-[11px] leading-none"></i>`,
   },
   sightseeing: {
     bg: "bg-blue-600 text-white",
-    // Landmark temple
-    svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="22" y2="22"/><line x1="4" x2="20" y1="18" y2="18"/><path d="m12 2 8 6H4z"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/></svg>`,
+    stemBorderClass: "border-t-blue-600",
+    iconHtml: `<i class="fa-solid fa-landmark text-[11px] leading-none"></i>`,
   },
   "diem-tham-quan": {
     bg: "bg-blue-600 text-white",
-    svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="22" y2="22"/><line x1="4" x2="20" y1="18" y2="18"/><path d="m12 2 8 6H4z"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/></svg>`,
+    stemBorderClass: "border-t-blue-600",
+    iconHtml: `<i class="fa-solid fa-landmark text-[11px] leading-none"></i>`,
   },
   culture: {
     bg: "bg-indigo-600 text-white",
-    svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="22" y2="22"/><line x1="4" x2="20" y1="18" y2="18"/><path d="m12 2 8 6H4z"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/></svg>`,
+    stemBorderClass: "border-t-indigo-600",
+    iconHtml: `<i class="fa-solid fa-landmark text-[11px] leading-none"></i>`,
   },
   nature: {
     bg: "bg-emerald-600 text-white",
-    // Mountain
-    svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>`,
+    stemBorderClass: "border-t-emerald-600",
+    iconHtml: `<i class="fa-solid fa-mountain-sun text-[11px] leading-none"></i>`,
   },
   "thien-nhien": {
     bg: "bg-emerald-600 text-white",
-    svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/></svg>`,
+    stemBorderClass: "border-t-emerald-600",
+    iconHtml: `<i class="fa-solid fa-mountain-sun text-[11px] leading-none"></i>`,
   },
   "bai-bien": {
     bg: "bg-teal-600 text-white",
-    // Waves
-    svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></svg>`,
+    stemBorderClass: "border-t-teal-600",
+    iconHtml: `<i class="fa-solid fa-umbrella-beach text-[11px] leading-none"></i>`,
   },
   entertainment: {
     bg: "bg-purple-600 text-white",
-    // Sparkles / Star
-    svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+    stemBorderClass: "border-t-purple-600",
+    iconHtml: `<i class="fa-solid fa-ticket text-[11px] leading-none"></i>`,
   },
   "vui-choi": {
     bg: "bg-purple-600 text-white",
-    svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+    stemBorderClass: "border-t-purple-600",
+    iconHtml: `<i class="fa-solid fa-ticket text-[11px] leading-none"></i>`,
   },
   relaxation: {
     bg: "bg-rose-600 text-white",
-    // Bed / Hotel
-    svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>`,
+    stemBorderClass: "border-t-rose-600",
+    iconHtml: `<i class="fa-solid fa-bed text-[11px] leading-none"></i>`,
   },
   "khach-san": {
     bg: "bg-rose-600 text-white",
-    svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>`,
+    stemBorderClass: "border-t-rose-600",
+    iconHtml: `<i class="fa-solid fa-bed text-[11px] leading-none"></i>`,
   },
   nightlife: {
     bg: "bg-fuchsia-600 text-white",
-    // Wine
-    svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="m19 3-7 8-7-8Z"/></svg>`,
+    stemBorderClass: "border-t-fuchsia-600",
+    iconHtml: `<i class="fa-solid fa-martini-glass-citrus text-[11px] leading-none"></i>`,
   },
   "bar-pub": {
     bg: "bg-fuchsia-600 text-white",
-    svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22h8"/><path d="M12 11v11"/><path d="m19 3-7 8-7-8Z"/></svg>`,
+    stemBorderClass: "border-t-fuchsia-600",
+    iconHtml: `<i class="fa-solid fa-martini-glass-citrus text-[11px] leading-none"></i>`,
   },
 };
 
 const DEFAULT_STYLE: CategoryStyle = {
-  bg: "bg-sky-600 text-white",
-  svgIcon: `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>`,
+  bg: "bg-[#0194F3] text-white",
+  stemBorderClass: "border-t-[#0194F3]",
+  iconHtml: `<i class="fa-solid fa-location-dot text-[11px] leading-none"></i>`,
 };
 
 export function getCategoryStyle(categoryKey?: string): CategoryStyle {
@@ -104,12 +113,12 @@ export function getCategoryStyle(categoryKey?: string): CategoryStyle {
 }
 
 export function getMarkerButtonClasses(selected: boolean, hovered: boolean, categoryBg?: string): string {
-  const bg = categoryBg || "bg-sky-600 text-white";
+  const bg = categoryBg || "bg-[#0194F3] text-white";
   return [
     "relative flex items-center justify-center rounded-full transition-all duration-200 cursor-pointer select-none border-2 border-white shadow-md",
     bg,
     selected
-      ? "z-30 scale-125 ring-4 ring-primary/40 shadow-xl size-8"
+      ? "z-30 scale-125 ring-4 ring-[#0194F3]/40 shadow-xl size-8"
       : hovered
         ? "z-20 scale-115 ring-2 ring-black/20 shadow-lg size-7"
         : "z-10 size-6.5 hover:scale-115 hover:shadow-lg",
@@ -123,7 +132,11 @@ export function createPlaceMarkerElement(
   const place = "place" in item ? item.place : item;
   // When a sequential label is provided (itinerary mode), use customColor if supplied, else slate-900 bg
   const style = options.label
-    ? { bg: options.customColor ? "" : "bg-slate-900 text-white", svgIcon: "" }
+    ? {
+        bg: options.customColor ? "" : "bg-slate-900 text-white",
+        stemBorderClass: options.customColor ? "" : "border-t-slate-900",
+        iconHtml: "",
+      }
     : getCategoryStyle(place.category);
 
   // Outer container: coordinates managed strictly by MapLibre
@@ -133,7 +146,7 @@ export function createPlaceMarkerElement(
 
   // Name tooltip chip (appears on hover or when selected)
   const nameTooltip = document.createElement("div");
-  nameTooltip.className = `absolute -top-7 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-background/95 border border-border/80 text-foreground text-[10px] font-bold shadow-md whitespace-nowrap pointer-events-none transition-all duration-150 ${
+  nameTooltip.className = `absolute -top-7 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-white/95 border border-slate-200 text-slate-800 text-[10px] font-bold shadow-md whitespace-nowrap pointer-events-none transition-all duration-150 ${
     options.selected
       ? "hidden"
       : options.hovered
@@ -165,20 +178,22 @@ export function createPlaceMarkerElement(
     button.style.fontWeight = "700";
     button.style.fontSize = "11px";
   } else {
-    button.innerHTML = style.svgIcon;
+    button.innerHTML = style.iconHtml;
   }
 
-  // Tiny bottom pointer stem for exact location pinpointing
+  // Tiny bottom pointer stem for exact location pinpointing (optical alignment)
   const stem = document.createElement("div");
-  stem.className = "w-0 h-0 border-l-[3.5px] border-l-transparent border-r-[3.5px] border-r-transparent border-t-[4px] -mt-[1px] shadow-xs";
+  stem.className =
+    "absolute -bottom-[5px] left-1/2 -translate-x-1/2 w-0 h-0 border-l-[3.5px] border-l-transparent border-r-[3.5px] border-r-transparent border-t-[5px] shadow-xs pointer-events-none";
   if (options.customColor) {
     stem.style.borderTopColor = options.customColor;
+  } else if (style.stemBorderClass) {
+    stem.className += " " + style.stemBorderClass;
   } else {
     stem.className += " border-t-white";
   }
 
   button.appendChild(stem);
-
 
   if (options.onSelect) {
     container.addEventListener("click", (event) => {

@@ -30,7 +30,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { PlaceCard } from "@/components/place/PlaceCard";
-import { ExploreFilterSheet } from "@/components/place/ExploreFilterSheet";
+import { ExploreFilterModal } from "@/components/place/ExploreFilterModal";
+import { ExploreCardListSkeleton } from "@/components/place/ExploreListSkeleton";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/common/EmptyState";
@@ -56,6 +57,19 @@ const AI_SUGGESTIONS = [
   "Địa điểm lãng mạn ngắm hoàng hôn bán đảo Sơn Trà",
   "Quán ăn gần Chùa Cầu Hội An",
 ];
+
+const SORT_LABELS: Record<ExploreSort, string> = {
+  rating: "Đánh giá cao nhất",
+  reviews: "Nhiều đánh giá nhất",
+  name: "Tên (A - Z)",
+};
+
+const PAGE_SIZE_LABELS: Record<string, string> = {
+  "12": "12 / trang",
+  "24": "24 / trang",
+  "48": "48 / trang",
+  all: "Tất cả",
+};
 
 
 interface ExploreSearchBarProps {
@@ -389,18 +403,19 @@ function ExploreContent() {
   const [useGpsSearch, setUseGpsSearch] = useState(false);
   const [radiusKm, setRadiusKm] = useState<RadiusKm>(5);
   const [minRating, setMinRating] = useState<number | null>(null);
-  const [selectedBudgetLevels, setSelectedBudgetLevels] = useState<string[]>([]);
+  const [selectedBudgetLevel, setSelectedBudgetLevel] = useState<string | null>(null);
   const [openNow, setOpenNow] = useState<boolean>(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const isFirstMountRef = useRef(true);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
     if (minRating !== null) count++;
-    if (selectedBudgetLevels.length > 0) count += selectedBudgetLevels.length;
+    if (selectedBudgetLevel !== null) count++;
     if (selectedAudience !== "all") count++;
     if (useGpsSearch && radiusKm !== 5) count++;
     return count;
-  }, [minRating, selectedBudgetLevels, selectedAudience, useGpsSearch, radiusKm]);
+  }, [minRating, selectedBudgetLevel, selectedAudience, useGpsSearch, radiusKm]);
 
   // Pagination & Data
   const [page, setPage] = useState(1);
@@ -597,7 +612,7 @@ function ExploreContent() {
         areaId,
         categorySlugs,
         minRating: minRating || undefined,
-        budgetLevels: selectedBudgetLevels.length > 0 ? selectedBudgetLevels : undefined,
+        budgetLevels: selectedBudgetLevel ? [selectedBudgetLevel] : undefined,
         openNow: openNow ? true : undefined,
         latitude: effectiveLat,
         longitude: effectiveLng,
@@ -663,7 +678,7 @@ function ExploreContent() {
     selectedAudience,
     selectedSort,
     minRating,
-    selectedBudgetLevels,
+    selectedBudgetLevel,
     openNow,
     useGpsSearch,
     userLocation,
@@ -677,6 +692,11 @@ function ExploreContent() {
 
   useEffect(() => {
     let ignore = false;
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false;
+      fetchPlaces();
+      return;
+    }
     const timer = setTimeout(() => {
       if (!ignore) {
         fetchPlaces();
@@ -856,7 +876,7 @@ function ExploreContent() {
     setUseGpsSearch(false);
     setRadiusKm(5);
     setMinRating(null);
-    setSelectedBudgetLevels([]);
+    setSelectedBudgetLevel(null);
     setOpenNow(false);
     setPageSize(24);
     setPage(1);
@@ -911,6 +931,8 @@ function ExploreContent() {
     requestLocation();
   }, [requestLocation, setPage]);
 
+  const handleViewportChange = useCallback(() => {}, []);
+
   const isFiltering =
     keyword !== "" ||
     pinNearbyCenter !== null ||
@@ -920,7 +942,7 @@ function ExploreContent() {
     selectedAudience !== "all" ||
     useGpsSearch ||
     minRating !== null ||
-    selectedBudgetLevels.length > 0 ||
+    selectedBudgetLevel !== null ||
     openNow;
 
   return (
@@ -1088,14 +1110,14 @@ function ExploreContent() {
               className={cn(
                 "h-10 rounded-xl font-semibold text-xs gap-1.5 transition-all cursor-pointer border shadow-2xs",
                 activeFilterCount > 0
-                  ? "bg-secondary border-primary text-primary hover:bg-secondary/80"
+                  ? "bg-[#0194F3]/10 border-[#0194F3] text-[#0194F3] hover:bg-[#0194F3]/15 font-bold"
                   : "bg-card border-border text-foreground hover:bg-muted"
               )}
             >
               <SlidersHorizontal className="size-3.5" />
               <span>Bộ lọc</span>
               {activeFilterCount > 0 && (
-                <span className="size-4.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+                <span className="size-4.5 rounded-full bg-[#0194F3] text-white text-[10px] font-bold flex items-center justify-center">
                   {activeFilterCount}
                 </span>
               )}
@@ -1143,14 +1165,14 @@ function ExploreContent() {
                 }}
               >
                 <SelectTrigger className="h-10 w-36 rounded-xl text-xs font-semibold bg-card border-border shadow-2xs text-foreground">
-                  <SelectValue placeholder="Sắp xếp" />
+                  <SelectValue placeholder="Sắp xếp">
+                    {SORT_LABELS[selectedSort] || "Sắp xếp"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent align="end">
                   <SelectItem value="rating">Đánh giá cao nhất</SelectItem>
-                  <SelectItem value="popular">Phổ biến nhất</SelectItem>
-                  <SelectItem value="distance">Gần tôi nhất</SelectItem>
-                  <SelectItem value="price_asc">Giá: Thấp đến Cao</SelectItem>
-                  <SelectItem value="price_desc">Giá: Cao đến Thấp</SelectItem>
+                  <SelectItem value="reviews">Nhiều đánh giá nhất</SelectItem>
+                  <SelectItem value="name">Tên (A - Z)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1170,8 +1192,8 @@ function ExploreContent() {
               className={cn(
                 "inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all cursor-pointer shadow-2xs",
                 isSelected
-                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
-                  : "bg-card border border-border text-foreground hover:bg-muted"
+                  ? "bg-[#0194F3] text-white shadow-md shadow-[#0194F3]/25 hover:bg-[#007FE3]"
+                  : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
               )}
             >
               <span>{cat.label}</span>
@@ -1202,14 +1224,14 @@ function ExploreContent() {
             className={cn(
               "h-9 rounded-xl font-semibold text-xs gap-2 transition-all cursor-pointer border shadow-2xs",
               activeFilterCount > 0
-                ? "bg-secondary border-primary text-primary hover:bg-secondary/80"
+                ? "bg-[#0194F3]/10 border-[#0194F3] text-[#0194F3] hover:bg-[#0194F3]/15 font-bold"
                 : "bg-card border-border text-foreground hover:bg-muted"
             )}
           >
             <SlidersHorizontal className="size-3.5" />
             <span>Bộ lọc</span>
             {activeFilterCount > 0 && (
-              <span className="size-5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center ml-0.5">
+              <span className="size-5 rounded-full bg-[#0194F3] text-white text-[10px] font-bold flex items-center justify-center ml-0.5">
                 {activeFilterCount}
               </span>
             )}
@@ -1257,108 +1279,93 @@ function ExploreContent() {
             }}
           >
             <SelectTrigger className="h-9 w-40 rounded-xl text-xs font-semibold bg-card border-border shadow-2xs text-foreground">
-              <SelectValue placeholder="Sắp xếp" />
+              <SelectValue placeholder="Sắp xếp">
+                {SORT_LABELS[selectedSort] || "Sắp xếp"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent align="end">
               <SelectItem value="rating">Đánh giá cao nhất</SelectItem>
-              <SelectItem value="popular">Phổ biến nhất</SelectItem>
-              <SelectItem value="distance">Gần tôi nhất</SelectItem>
-              <SelectItem value="price_asc">Giá: Thấp đến Cao</SelectItem>
-              <SelectItem value="price_desc">Giá: Cao đến Thấp</SelectItem>
+              <SelectItem value="reviews">Nhiều đánh giá nhất</SelectItem>
+              <SelectItem value="name">Tên (A - Z)</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      {/* Advanced Filter Modal/Sheet */}
-      <ExploreFilterSheet
+      {/* Advanced Filter Modal (Centered Compact Dialog) */}
+      <ExploreFilterModal
         open={isFilterSheetOpen}
         onOpenChange={setIsFilterSheetOpen}
         minRating={minRating}
-        onMinRatingChange={(val) => {
-          setMinRating(val);
-          setPage(1);
-        }}
-        selectedBudgetLevels={selectedBudgetLevels}
-        onBudgetLevelToggle={(id) => {
-          setSelectedBudgetLevels((prev) =>
-            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-          );
-          setPage(1);
-        }}
+        selectedBudgetLevel={selectedBudgetLevel}
         selectedAudience={selectedAudience}
-        onAudienceChange={(val) => {
-          setSelectedAudience(val);
-          setPage(1);
-        }}
         useGpsSearch={useGpsSearch}
         radiusKm={radiusKm}
-        onRadiusKmChange={(val) => {
-          setRadiusKm(val);
+        onApplyFilters={({ minRating: r, budgetLevel: b, audience: a, radiusKm: rad }) => {
+          setMinRating(r);
+          setSelectedBudgetLevel(b);
+          setSelectedAudience(a);
+          setRadiusKm(rad);
           setPage(1);
         }}
-        onReset={resetFilters}
-        activeFilterCount={activeFilterCount}
+        onResetFilters={resetFilters}
       />
 
-      {/* Place Results Display */}
-      {loading ? (
-        <div className="flex-1 flex flex-col items-center justify-center py-20 space-y-3">
-          <Loader2 className="size-7 animate-spin text-muted-foreground" />
-          <p className="text-xs text-muted-foreground font-medium">
-            Đang tải dữ liệu địa điểm...
-          </p>
-        </div>
-      ) : (
-        /* ================= UNIFIED SPLIT-VIEW (AIRBNB STYLE) ================= */
-        <div className="relative lg:flex-1 lg:min-h-0">
-          <div className="h-full lg:grid lg:grid-cols-[minmax(0,48%)_minmax(0,52%)] lg:gap-5 items-stretch">
-            {/* Left Column: Places List or Geocoded Pin or Empty */}
-            <div
-              ref={listContainerRef}
-              className={cn(
-                "flex flex-col gap-4 lg:h-full lg:overflow-y-auto lg:pr-3 scrollbar-thin",
-                showMobileMap ? "hidden lg:flex" : "flex"
-              )}
-            >
-              {/* Fallback Banner if applicable */}
-              {isFallbackResult && places.length > 0 && (
-                <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs">
-                  <Sparkles className="size-4 shrink-0 text-amber-600" />
-                  <span>
-                    Không tìm thấy địa điểm chính xác cho <strong>&quot;{keyword}&quot;</strong>. Gợi ý các địa điểm tương tự:
-                  </span>
-                </div>
-              )}
-
-              {places.length > 0 ? (
-                <>
-                  {/* Top Bar above Split View Cards: Count & Right-aligned Page Size Dropdown */}
-                  <div className="flex items-center justify-between pb-1">
-                    <span className="text-xs text-muted-foreground font-medium">
-                      Tìm thấy <strong className="text-foreground font-semibold">{totalCount.toLocaleString("vi-VN")}</strong> địa điểm
+      {/* ================= UNIFIED SPLIT-VIEW (AIRBNB STYLE) ================= */}
+      <div className="relative lg:flex-1 lg:min-h-0">
+        <div className="h-full lg:grid lg:grid-cols-[minmax(0,48%)_minmax(0,52%)] lg:gap-5 items-stretch">
+          {/* Left Column: Places List or Geocoded Pin or Empty */}
+          <div
+            ref={listContainerRef}
+            className={cn(
+              "flex flex-col gap-4 lg:h-full lg:overflow-y-auto lg:pr-3 scrollbar-thin",
+              showMobileMap ? "hidden lg:flex" : "flex"
+            )}
+          >
+            {loading ? (
+              <ExploreCardListSkeleton count={pageSize === 12 ? 6 : 8} />
+            ) : (
+              <>
+                {/* Fallback Banner if applicable */}
+                {isFallbackResult && places.length > 0 && (
+                  <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs">
+                    <Sparkles className="size-4 shrink-0 text-amber-600" />
+                    <span>
+                      Không tìm thấy địa điểm chính xác cho <strong>&quot;{keyword}&quot;</strong>. Gợi ý các địa điểm tương tự:
                     </span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-medium text-muted-foreground">Hiển thị:</span>
-                      <Select
-                        value={String(pageSize)}
-                        onValueChange={(val) => {
-                          setPageSize(val === "all" ? "all" : Number(val));
-                          setPage(1);
-                        }}
-                      >
-                        <SelectTrigger className="h-8.5 w-32 rounded-xl text-xs font-semibold bg-card border-border/80 shadow-2xs">
-                          <SelectValue placeholder="Số lượng" />
-                        </SelectTrigger>
-                        <SelectContent align="end">
-                          <SelectItem value="12">12 / trang</SelectItem>
-                          <SelectItem value="24">24 / trang</SelectItem>
-                          <SelectItem value="48">48 / trang</SelectItem>
-                          <SelectItem value="all">Tất cả</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
                   </div>
+                )}
+
+                {places.length > 0 ? (
+                  <>
+                    {/* Top Bar above Split View Cards: Count & Right-aligned Page Size Dropdown */}
+                    <div className="flex items-center justify-between pb-1">
+                      <span className="text-xs text-muted-foreground font-medium">
+                        Tìm thấy <strong className="text-foreground font-semibold">{totalCount.toLocaleString("vi-VN")}</strong> địa điểm
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-medium text-muted-foreground">Hiển thị:</span>
+                        <Select
+                          value={String(pageSize)}
+                          onValueChange={(val) => {
+                            setPageSize(val === "all" ? "all" : Number(val));
+                            setPage(1);
+                          }}
+                        >
+                          <SelectTrigger className="h-8.5 w-32 rounded-xl text-xs font-semibold bg-card border-border/80 shadow-2xs">
+                            <SelectValue placeholder="Số lượng">
+                              {PAGE_SIZE_LABELS[String(pageSize)] || "24 / trang"}
+                            </SelectValue>
+                          </SelectTrigger>
+                          <SelectContent align="end">
+                            <SelectItem value="12">12 / trang</SelectItem>
+                            <SelectItem value="24">24 / trang</SelectItem>
+                            <SelectItem value="48">48 / trang</SelectItem>
+                            <SelectItem value="all">Tất cả</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {places.map((place) => (
@@ -1374,7 +1381,12 @@ function ExploreContent() {
                           isSelected={selectedPlaceId === place.id}
                           onCardClick={(e, p) => handlePlaceCardClick(p, e)}
                           onContributePhoto={(p) => setContributePlace(p)}
-                          userLocation={userLocation}
+                          userLocation={
+                            userLocation ||
+                            (pinNearbyCenter
+                              ? { latitude: pinNearbyCenter.latitude, longitude: pinNearbyCenter.longitude }
+                              : null)
+                          }
                         />
                       </div>
                     ))}
@@ -1469,7 +1481,9 @@ function ExploreContent() {
                   }
                 />
               )}
-            </div>
+            </>
+          )}
+        </div>
 
             {/* Right Column: Map (VietMap) - Fully Stretched in Split View */}
             <div
@@ -1485,7 +1499,7 @@ function ExploreContent() {
                 selectedPlaceId={selectedPlaceId}
                 hoveredPlaceId={hoveredPlaceId}
                 onSelectPlace={handleSelectPlace}
-                onViewportChange={() => {}}
+                onViewportChange={handleViewportChange}
                 onRequestCurrentLocation={handleRequestCurrentLocation}
                 locating={locating}
                 selectedProvinceName={selectedProvinceName}
@@ -1556,7 +1570,6 @@ function ExploreContent() {
             </button>
           </div>
         </div>
-      )}
 
       {/* Photo Contribution Modal with Admin Moderation Notice */}
       <PhotoContributeModal

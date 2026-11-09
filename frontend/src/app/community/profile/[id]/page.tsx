@@ -1,313 +1,154 @@
-"use client";
-
-import { useState, use } from "react";
+import { Suspense } from "react";
+import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  CalendarDays,
-  CheckCircle2,
-  Copy,
-  ExternalLink,
-  Grid,
-  Heart,
-  MapPin,
-  RefreshCw,
-} from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { PostCard } from "@/components/community/PostCard";
-import { CloneItineraryPreviewModal } from "@/components/community/CloneItineraryPreviewModal";
-import { useCreatorProfile } from "@/features/community/hooks/use-community";
-import { formatVnd } from "@/features/planner/model/itinerary-format";
-import { useAuth } from "@/features/auth/hooks/use-auth";
-import type { CommunityLinkedItinerarySummary } from "@/types/community";
+import { ArrowLeft } from "lucide-react";
+import { CreatorProfileClientShell } from "@/components/community/CreatorProfileClientShell";
+import CreatorProfileLoading from "./loading";
+import type { CreatorProfileData } from "@/types/community";
+import { deriveHandleFromFullName } from "@/services/community.service";
 
-interface CreatorProfilePageProps {
+interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export default function CreatorProfilePage({ params }: CreatorProfilePageProps) {
-  const resolvedParams = use(params);
-  const identifier = decodeURIComponent(resolvedParams.id || "");
-  const { user: currentUser } = useAuth();
+const SERVER_API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
 
-  const [activeTab, setActiveTab] = useState<"posts" | "itineraries">("posts");
-  const [previewItinerary, setPreviewItinerary] =
-    useState<CommunityLinkedItinerarySummary | null>(null);
+const SSR_FETCH_TIMEOUT_MS = 3000;
 
-  const {
-    data: profile,
-    isLoading,
-    isError,
-    refetch,
-  } = useCreatorProfile(identifier);
+async function fetchServerProfile(
+  identifier: string,
+  cookieHeader: string
+): Promise<CreatorProfileData | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), SSR_FETCH_TIMEOUT_MS);
 
-  if (isLoading) {
-    return (
-      <div className="max-w-5xl mx-auto w-full px-4 py-8 sm:px-6 lg:px-8 space-y-6">
-        <div className="h-48 rounded-2xl border border-border bg-card animate-pulse p-6" />
-        <div className="h-80 rounded-2xl border border-border bg-card animate-pulse p-6" />
-      </div>
+    const cleanId = identifier.replace(/^@/, "").trim();
+    const response = await fetch(
+      `${SERVER_API_BASE_URL}/community/creators/${encodeURIComponent(cleanId)}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          ...(cookieHeader ? { Cookie: cookieHeader } : {}),
+        },
+        cache: "no-store",
+        signal: controller.signal,
+      }
     );
+
+    clearTimeout(timer);
+
+    if (!response.ok) return null;
+    const json = (await response.json()) as Record<string, unknown>;
+    const target =
+      json && typeof json === "object" && "data" in json && "success" in json
+        ? (json.data as Record<string, unknown>)
+        : json;
+
+    return (target.profile || target) as CreatorProfileData;
+  } catch {
+    return null;
+  }
+}
+
+export async function generateMetadata({
+  params,
+}: PageProps): Promise<Metadata> {
+  const resolvedParams = await params;
+  const identifier = decodeURIComponent(resolvedParams.id || "");
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
+
+  const profile = await fetchServerProfile(identifier, cookieHeader);
+
+  if (!profile || !profile.user) {
+    return {
+      title: "Hồ sơ Thổ địa | TripGenie Vietnam",
+      description: "Khám phá các bài chia sẻ và lộ trình du lịch thực tế trên TripGenie.",
+    };
   }
 
-  if (isError || !profile) {
+  const { user, stats } = profile;
+  const handle = user.username
+    ? `@${user.username}`
+    : deriveHandleFromFullName(user.fullName);
+  const title = `${user.fullName} (${handle}) • Hồ sơ Thổ địa | TripGenie`;
+  const description =
+    user.bio ||
+    `Khám phá ${stats.postCount} bài chia sẻ và ${stats.publicItineraryCount} lộ trình du lịch thực tế của ${user.fullName} trên TripGenie.`;
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      type: "profile",
+      username: user.username || undefined,
+      images: user.avatarUrl
+        ? [
+            {
+              url: user.avatarUrl,
+              width: 400,
+              height: 400,
+              alt: user.fullName,
+            },
+          ]
+        : [],
+    },
+    twitter: {
+      card: "summary",
+      title,
+      description,
+      images: user.avatarUrl ? [user.avatarUrl] : [],
+    },
+  };
+}
+
+export default async function CreatorProfilePage({ params }: PageProps) {
+  const resolvedParams = await params;
+  const identifier = decodeURIComponent(resolvedParams.id || "");
+  const cookieStore = await cookies();
+  const cookieHeader = cookieStore.toString();
+
+  const profile = await fetchServerProfile(identifier, cookieHeader);
+
+  if (!profile || !profile.user) {
     return (
-      <div className="max-w-3xl mx-auto w-full px-4 py-12 text-center space-y-4">
-        <div className="rounded-2xl border border-border bg-card p-10 space-y-3">
-          <h1 className="text-xl font-bold font-heading text-foreground">
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6 text-center">
+        <div className="bg-white border border-[#E2E8F0] rounded-[20px] p-8 sm:p-10 max-w-md w-full shadow-sm space-y-4">
+          <div className="size-16 rounded-full bg-[#F1F5F9] text-[#94A3B8] inline-flex items-center justify-center text-2xl mx-auto">
+            <i className="fa-solid fa-user-slash" aria-hidden="true" />
+          </div>
+          <h1 className="text-lg font-bold text-[#0F172A]">
             Không tìm thấy trang cá nhân
           </h1>
-          <p className="text-xs text-muted-foreground">
-            Tài khoản này không tồn tại hoặc đã ngừng hoạt động.
+          <p className="text-[13px] text-[#64748B] leading-relaxed">
+            Tài khoản <span className="font-semibold text-[#0F172A]">@{identifier}</span> không tồn tại hoặc đã ngừng hoạt động.
           </p>
-          <div className="flex items-center justify-center gap-2.5 pt-2">
-            <Link href="/community">
-              <Button
-                variant="outline"
-                className="h-10 px-4 rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
-              >
-                <ArrowLeft className="size-3.5" />
-                <span>Quay lại Cộng đồng</span>
-              </Button>
-            </Link>
-            <Button
-              onClick={() => refetch()}
-              className="h-10 px-4 rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
+          <div className="pt-2">
+            <Link
+              href="/community"
+              className="inline-flex items-center gap-2 h-10 px-5 rounded-[10px] bg-[#0F172A] hover:bg-[#1E293B] text-white text-[13px] font-semibold transition-colors"
             >
-              <RefreshCw className="size-3.5" />
-              <span>Thử lại</span>
-            </Button>
+              <ArrowLeft className="size-4" />
+              <span>Quay lại Cộng đồng</span>
+            </Link>
           </div>
         </div>
       </div>
     );
   }
 
-  const { user: creator, stats, posts, publicItineraries } = profile;
-  const isMe = currentUser?.id === creator.id;
-
   return (
-    <div className="max-w-5xl mx-auto w-full px-4 py-8 sm:px-6 lg:px-8 space-y-6 pb-20">
-      {/* Back navigation */}
-      <div className="flex items-center justify-between">
-        <Link
-          href="/community"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="size-4" />
-          <span>Quay lại bảng tin Cộng đồng</span>
-        </Link>
-
-        {isMe && (
-          <Link href="/profile">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 px-3.5 rounded-xl text-xs font-semibold cursor-pointer"
-            >
-              Quản lý tài khoản
-            </Button>
-          </Link>
-        )}
-      </div>
-
-      {/* TikTok-Style Creator Header Card */}
-      <section className="rounded-2xl border border-border/80 bg-card p-6 sm:p-8 shadow-xs space-y-6">
-        <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6">
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 text-center sm:text-left">
-            <Avatar className="size-20 sm:size-24 border-2 border-primary/30 shadow-xs shrink-0">
-              <AvatarImage
-                src={creator.avatarUrl || undefined}
-                alt={creator.fullName}
-              />
-              <AvatarFallback className="text-xl font-bold bg-primary text-primary-foreground">
-                {creator.fullName.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-
-            <div className="space-y-2">
-              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                <h1 className="text-2xl sm:text-3xl font-bold font-heading text-foreground">
-                  {creator.fullName}
-                </h1>
-                {(creator.isVerifiedCreator ?? creator.isVerified) && (
-                  <CheckCircle2
-                    className="size-5 text-[#0194F3] shrink-0"
-                    aria-label="Thổ địa xác thực"
-                  />
-                )}
-              </div>
-
-              {creator.username && (
-                <p className="text-xs sm:text-sm font-medium text-muted-foreground">
-                  @{creator.username}
-                </p>
-              )}
-
-              <p className="text-xs sm:text-sm text-foreground/90 max-w-xl leading-relaxed">
-                {creator.bio ||
-                  "Thành viên yêu thích khám phá văn hóa, ẩm thực và chia sẻ lịch trình du lịch thực tế trên TripGenie."}
-              </p>
-            </div>
-          </div>
-
-          {/* TikTok-style 3 Aggregate Counters */}
-          <div className="grid grid-cols-3 gap-4 sm:gap-6 px-5 py-3.5 rounded-2xl border border-border bg-background shrink-0">
-            <div className="text-center space-y-0.5">
-              <div className="text-base sm:text-lg font-bold text-foreground">
-                {stats.postCount}
-              </div>
-              <div className="text-xs text-muted-foreground">Bài đăng</div>
-            </div>
-
-            <div className="text-center border-l border-border pl-4 sm:pl-6 space-y-0.5">
-              <div className="text-base sm:text-lg font-bold text-rose-500 flex items-center justify-center gap-1">
-                <Heart className="size-3.5 fill-current" />
-                <span>{stats.totalLikesReceived}</span>
-              </div>
-              <div className="text-xs text-muted-foreground">Lượt thích</div>
-            </div>
-
-            <div className="text-center border-l border-border pl-4 sm:pl-6 space-y-0.5">
-              <div className="text-base sm:text-lg font-bold text-primary">
-                {stats.totalClonesReceived}
-              </div>
-              <div className="text-xs text-muted-foreground">Nhân bản</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Content Switcher Tabs (TikTok Profile Tabs) */}
-        <div className="flex items-center gap-2 border-t border-border pt-4">
-          <button
-            type="button"
-            onClick={() => setActiveTab("posts")}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer min-h-[42px] ${
-              activeTab === "posts"
-                ? "bg-primary text-primary-foreground shadow-xs"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            }`}
-          >
-            <Grid className="size-4" />
-            <span>Bài đăng chia sẻ ({posts.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab("itineraries")}
-            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer min-h-[42px] ${
-              activeTab === "itineraries"
-                ? "bg-primary text-primary-foreground shadow-xs"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            }`}
-          >
-            <CalendarDays className="size-4" />
-            <span>Lịch trình công khai ({publicItineraries.length})</span>
-          </button>
-        </div>
-      </section>
-
-      {/* Tab 1: Creator's Published Posts */}
-      {activeTab === "posts" && (
-        <div className="space-y-6">
-          {posts.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center space-y-2">
-              <Grid className="size-8 mx-auto text-muted-foreground/60" />
-              <p className="text-sm font-bold text-foreground">
-                Chưa có bài đăng nào
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Thành viên này chưa đăng tải bài viết công khai nào lên cộng đồng.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {posts.map((post) => (
-                <PostCard key={post.id} post={post} />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tab 2: Creator's Public Itineraries */}
-      {activeTab === "itineraries" && (
-        <div className="space-y-4">
-          {publicItineraries.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center space-y-2">
-              <CalendarDays className="size-8 mx-auto text-muted-foreground/60" />
-              <p className="text-sm font-bold text-foreground">
-                Chưa có lịch trình công khai
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Thành viên này chưa chia sẻ lịch trình công khai nào.
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {publicItineraries.map((itin) => (
-                <div
-                  key={itin.id}
-                  className="rounded-2xl border border-border/80 bg-card p-5 flex flex-col justify-between space-y-4 shadow-xs hover:border-primary/40 transition-all"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-semibold">
-                        <MapPin className="size-3 text-primary" />
-                        <span>
-                          {itin.areaName || itin.destination || "Việt Nam"}
-                        </span>
-                      </span>
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {itin.totalPlaces} địa điểm
-                      </span>
-                    </div>
-
-                    <h3 className="text-base font-bold font-heading text-foreground">
-                      {itin.title}
-                    </h3>
-
-                    {itin.estimatedCost && itin.estimatedCost > 0 && (
-                      <p className="text-xs text-muted-foreground">
-                        Chi phí dự kiến:{" "}
-                        <span className="font-semibold text-foreground">
-                          ~{formatVnd(itin.estimatedCost)}
-                        </span>
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 pt-3 border-t border-border/60">
-                    <Link
-                      href={`/itineraries/${itin.id}`}
-                      className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-xl border border-border bg-background hover:bg-muted text-xs font-semibold text-foreground transition-colors"
-                    >
-                      <ExternalLink className="size-3.5" />
-                      <span>Xem lịch trình</span>
-                    </Link>
-                    <Button
-                      size="sm"
-                      onClick={() => setPreviewItinerary(itin)}
-                      className="h-9 px-3.5 rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
-                    >
-                      <Copy className="size-3.5" />
-                      <span>Nhân bản</span>
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Compact Itinerary Preview & Clone Confirmation Modal */}
-      <CloneItineraryPreviewModal
-        open={Boolean(previewItinerary)}
-        onClose={() => setPreviewItinerary(null)}
-        itinerarySummary={previewItinerary}
+    <Suspense fallback={<CreatorProfileLoading />}>
+      <CreatorProfileClientShell
+        initialProfile={profile}
+        identifier={identifier}
       />
-    </div>
+    </Suspense>
   );
 }

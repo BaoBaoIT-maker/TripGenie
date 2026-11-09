@@ -60,9 +60,6 @@ export function CheckinStoriesSection({
           />
           Check-in Mới Nhất
         </h3>
-        <span className="text-[11px] font-bold text-[#0194F3] flex items-center gap-1">
-          <i className="fa-solid fa-bolt" aria-hidden="true" /> 24h qua
-        </span>
       </div>
 
       <div className="relative group/carousel min-w-0 w-full">
@@ -201,24 +198,6 @@ export function TopCreatorsSection({
           />
           Tác Giả Nổi Bật
         </h3>
-        {topCreators[0] && (
-          <Link
-            href={`/community/profile/${encodeURIComponent(
-              topCreators[0].author?.username ||
-                topCreators[0].username ||
-                topCreators[0].author?.id ||
-                topCreators[0].id ||
-                ""
-            )}`}
-            className="text-[11px] font-bold text-[#0194F3] hover:text-[#007FE3] flex items-center gap-1 transition-colors"
-          >
-            <span>Xem tất cả</span>
-            <i
-              className="fa-solid fa-chevron-right text-[9px]"
-              aria-hidden="true"
-            />
-          </Link>
-        )}
       </div>
 
       <div className="flex flex-col gap-3">

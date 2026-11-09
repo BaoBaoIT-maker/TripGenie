@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import dynamic from "next/dynamic";
 import type { VietMapProps } from "@/features/map/types";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,6 +15,6 @@ const DynamicVietMap = dynamic(() => import("./VietMap"), {
   ),
 });
 
-export function VietMapLoader(props: VietMapProps) {
+export const VietMapLoader = memo(function VietMapLoader(props: VietMapProps) {
   return <DynamicVietMap {...props} />;
-}
+});

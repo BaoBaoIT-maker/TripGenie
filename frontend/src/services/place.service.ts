@@ -164,6 +164,7 @@ export interface BackendPlaceItem {
     slug?: string;
   } | null;
   similarityScore?: number | null;
+  distanceMeters?: number | null;
 }
 
 export function optimizeImageUrl(rawUrl?: string | null): string {
@@ -253,8 +254,15 @@ export function mapBackendPlaceToPlace(dto: BackendPlaceItem): Place {
       : undefined,
     openingHoursText,
     featured: realRating >= 4.5 || Boolean(dto.imageCount && dto.imageCount > 0),
+    distanceKm:
+      typeof dto.distanceMeters === "number" && dto.distanceMeters >= 0
+        ? Math.round(dto.distanceMeters / 100) / 10
+        : undefined,
   };
 }
+
+const SEARCH_CACHE = new Map<string, { data: PaginatedPlacesResult; timestamp: number }>();
+const SEARCH_CACHE_TTL_MS = 60 * 1000; // 60 seconds
 
 export const placeService = {
   /**
@@ -305,12 +313,18 @@ export const placeService = {
       searchParams.set("page", String(params?.page || 1));
       searchParams.set("limit", String(requestedLimit));
 
+      const cacheKey = searchParams.toString();
+      const cached = SEARCH_CACHE.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < SEARCH_CACHE_TTL_MS) {
+        return cached.data;
+      }
+
       const payload = await apiClient<{
         items: BackendPlaceItem[];
         meta: { totalItems: number; page: number; limit: number; totalPages: number };
         geocoded?: GeocodedLocation;
         isFallback?: boolean;
-      }>(`/places/search?${searchParams.toString()}`);
+      }>(`/places/search?${cacheKey}`);
 
       const rawItems = Array.isArray(payload.items) ? payload.items : [];
       const items = rawItems.slice(0, requestedLimit);
@@ -324,7 +338,7 @@ export const placeService = {
         return aHas === bHas ? 0 : aHas ? -1 : 1;
       });
 
-      return {
+      const result: PaginatedPlacesResult = {
         places: mappedPlaces,
         total: meta.totalItems,
         page: meta.page,
@@ -333,6 +347,9 @@ export const placeService = {
         geocoded: payload.geocoded,
         isFallback: payload.isFallback,
       };
+
+      SEARCH_CACHE.set(cacheKey, { data: result, timestamp: Date.now() });
+      return result;
   },
 
   /**

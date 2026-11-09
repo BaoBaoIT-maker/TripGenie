@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../database/prisma.service';
 import { writeNotification } from '../notifications/notification-writer';
+import { NotificationTargetType } from '../notifications/notifications.constants';
 import { TRIP_COMPANIONS_CONSTANTS } from './trip-companions.constants';
 import {
   CompanionMemberDto,
@@ -198,9 +199,9 @@ export class TripCompanionsRepository {
         recipientId: inviteeId,
         actorId: inviterId,
         type: 'TRIP_INVITED',
+        targetType: NotificationTargetType.TRIP_INVITATION,
+        targetId: invitation.id,
         eventKey: `${TRIP_COMPANIONS_CONSTANTS.EVENT_KEY_INVITE_PREFIX}:${invitation.id}`,
-        itineraryId,
-        invitationId: invitation.id,
       });
 
       return {
@@ -462,9 +463,9 @@ export class TripCompanionsRepository {
         recipientId: inv.inviterId,
         actorId: inviteeId,
         type: 'TRIP_INVITATION_ACCEPTED',
+        targetType: NotificationTargetType.TRIP_INVITATION,
+        targetId: inv.id,
         eventKey: `${TRIP_COMPANIONS_CONSTANTS.EVENT_KEY_RESULT_PREFIX}:${inv.id}:ACCEPTED`,
-        itineraryId: inv.tripGroup.itinerary.id,
-        invitationId: inv.id,
       });
 
       return {
@@ -520,9 +521,9 @@ export class TripCompanionsRepository {
         recipientId: inv.inviterId,
         actorId: inviteeId,
         type: 'TRIP_INVITATION_DECLINED',
+        targetType: NotificationTargetType.TRIP_INVITATION,
+        targetId: inv.id,
         eventKey: `${TRIP_COMPANIONS_CONSTANTS.EVENT_KEY_RESULT_PREFIX}:${inv.id}:DECLINED`,
-        itineraryId: inv.tripGroup.itinerary.id,
-        invitationId: inv.id,
       });
 
       return { success: true, status: 'DECLINED' };
@@ -572,7 +573,12 @@ export class TripCompanionsRepository {
 
       // Remove recipient notification so it does not linger
       await tx.notification.deleteMany({
-        where: { invitationId: inv.id },
+        where: {
+          OR: [
+            { targetType: NotificationTargetType.TRIP_INVITATION, targetId: inv.id },
+            { invitationId: inv.id },
+          ],
+        },
       });
 
       return { success: true, status: 'REVOKED' };

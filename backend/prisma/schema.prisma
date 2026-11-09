@@ -908,6 +908,9 @@ model Notification {
   recipientId  String           @map("recipient_id") @db.Uuid
   actorId      String?          @map("actor_id") @db.Uuid
   type         NotificationType
+  targetType   String           @map("target_type") @db.VarChar(32)
+  targetId     String           @map("target_id") @db.Uuid
+  metadata     Json             @default("{}") @map("metadata") @db.JsonB
   postId       String?          @map("post_id") @db.Uuid
   commentId    String?          @map("comment_id") @db.Uuid
   itineraryId  String?          @map("itinerary_id") @db.Uuid
@@ -926,6 +929,7 @@ model Notification {
   @@unique([recipientId, eventKey])
   @@index([recipientId, createdAt, id])
   @@index([recipientId, readAt, createdAt, id])
+  @@index([targetType, targetId])
   @@index([postId])
   @@index([commentId])
   @@index([itineraryId])

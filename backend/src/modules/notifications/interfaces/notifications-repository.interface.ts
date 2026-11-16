@@ -41,8 +41,16 @@ export interface QueryNotificationsParams {
 }
 
 export interface INotificationsRepository {
-  list(recipientId: string, params: QueryNotificationsParams): Promise<NotificationListResult>;
+  list(
+    recipientId: string,
+    params: QueryNotificationsParams,
+  ): Promise<NotificationListResult>;
   countUnread(recipientId: string): Promise<number>;
-  markRead(recipientId: string, id: string): Promise<{ id: string; readAt: string }>;
-  markAllRead(recipientId: string): Promise<{ updatedCount: number; readAt: string }>;
+  markRead(
+    recipientId: string,
+    id: string,
+  ): Promise<{ id: string; readAt: string }>;
+  markAllRead(
+    recipientId: string,
+  ): Promise<{ updatedCount: number; readAt: string }>;
 }

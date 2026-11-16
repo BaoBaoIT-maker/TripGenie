@@ -68,7 +68,12 @@ export class TripCompanionsController {
     @CurrentUser('id') ownerId: string,
     @Body() dto: UpdateMemberRoleDto,
   ): Promise<{ userId: string; role: 'VIEWER' | 'EDITOR' }> {
-    return this.service.updateMemberRole(itineraryId, ownerId, targetUserId, dto.role);
+    return this.service.updateMemberRole(
+      itineraryId,
+      ownerId,
+      targetUserId,
+      dto.role,
+    );
   }
 
   /**

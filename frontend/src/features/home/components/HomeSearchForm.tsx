@@ -104,7 +104,7 @@ export function HomeSearchForm({ areas }: HomeSearchFormProps) {
       {/* Quick Action Links Underneath */}
       <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-6 text-xs font-medium text-white/90 drop-shadow-sm">
         <Link
-          href="/planner/new?mode=ai"
+          href="/planner"
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur-md transition-colors text-white"
         >
           <Sparkles className="size-3.5 text-amber-300" />

@@ -27,10 +27,7 @@ export class AdvisorController {
   @UseGuards(JwtAuthGuard)
   @Post('chat')
   @HttpCode(HttpStatus.OK)
-  async chat(
-    @Body() dto: AdvisorChatDto,
-    @CurrentUser('id') userId: string,
-  ) {
+  async chat(@Body() dto: AdvisorChatDto, @CurrentUser('id') userId: string) {
     return this.advisorService.chat(dto, userId);
   }
 

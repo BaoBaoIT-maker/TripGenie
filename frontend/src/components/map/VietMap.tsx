@@ -815,10 +815,14 @@ export default function VietMap({
               id: "vietnam-provinces-line",
               type: "line",
               source: "vietnam-provinces",
+              layout: {
+                "line-join": "round",
+                "line-cap": "round",
+              },
               paint: {
-                "line-color": "#2563eb",
-                "line-width": 1.5,
-                "line-opacity": 0.5,
+                "line-color": "#94a3b8",
+                "line-width": 1.2,
+                "line-opacity": 0.35,
               },
             });
           }
@@ -944,13 +948,37 @@ export default function VietMap({
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
+    // Giữ phần ruột tỉnh trong suốt hoàn toàn, không phủ mờ bề mặt bản đồ
     if (map.getLayer("vietnam-provinces-fill")) {
-      map.setPaintProperty("vietnam-provinces-fill", "fill-opacity", [
-        "case",
-        ["==", ["get", "ten_tinh"], selectedProvinceName || ""],
-        0.18,
-        0.0,
-      ]);
+      map.setPaintProperty("vietnam-provinces-fill", "fill-opacity", 0.0);
+    }
+
+    // Làm đậm đường viền ranh giới tỉnh thành được chọn bằng màu xanh nhận diện
+    if (map.getLayer("vietnam-provinces-line")) {
+      if (selectedProvinceName) {
+        map.setPaintProperty("vietnam-provinces-line", "line-color", [
+          "case",
+          ["==", ["get", "ten_tinh"], selectedProvinceName],
+          "#0194F3",
+          "#94a3b8",
+        ]);
+        map.setPaintProperty("vietnam-provinces-line", "line-width", [
+          "case",
+          ["==", ["get", "ten_tinh"], selectedProvinceName],
+          3.5,
+          1.0,
+        ]);
+        map.setPaintProperty("vietnam-provinces-line", "line-opacity", [
+          "case",
+          ["==", ["get", "ten_tinh"], selectedProvinceName],
+          1.0,
+          0.3,
+        ]);
+      } else {
+        map.setPaintProperty("vietnam-provinces-line", "line-color", "#94a3b8");
+        map.setPaintProperty("vietnam-provinces-line", "line-width", 1.2);
+        map.setPaintProperty("vietnam-provinces-line", "line-opacity", 0.35);
+      }
     }
 
     if (selectedProvinceName && boundsMap[selectedProvinceName] && !selectedPlaceId) {

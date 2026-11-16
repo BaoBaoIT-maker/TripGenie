@@ -13,9 +13,6 @@ import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
       useClass: UsersRepository,
     },
   ],
-  exports: [
-    UsersService,
-    INJECT_TOKENS.USER_REPOSITORY,
-  ],
+  exports: [UsersService, INJECT_TOKENS.USER_REPOSITORY],
 })
 export class UsersModule {}

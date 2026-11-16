@@ -112,9 +112,7 @@ export interface IPlaceRepository {
   /**
    * Resolves an administrative area name or alias to its area record in travel_areas.
    */
-  findAreaByName(
-    name: string,
-  ): Promise<{ id: number; name: string } | null>;
+  findAreaByName(name: string): Promise<{ id: number; name: string } | null>;
 
   /**
    * Finds nearby places within a specific radius from given GPS coordinates.
@@ -160,5 +158,8 @@ export interface IPlaceRepository {
   /**
    * Finds places that do not yet have an embedding in place_embeddings.
    */
-  findPlacesWithoutEmbedding(limit: number, areaId?: number): Promise<PlaceForEmbedding[]>;
+  findPlacesWithoutEmbedding(
+    limit: number,
+    areaId?: number,
+  ): Promise<PlaceForEmbedding[]>;
 }

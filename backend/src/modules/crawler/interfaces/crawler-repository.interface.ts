@@ -4,13 +4,24 @@ export interface ICrawlerRepository {
   getAreaById(areaId: number): Promise<any | null>;
   getCategoryBySlug(slug: string): Promise<any | null>;
   getCategoryMap(): Promise<Map<string, number>>;
-  findPlaceSourceByExternal(provider: string, externalId: string): Promise<any | null>;
-  findNearbyPlaces(lat: number, lng: number, radiusMeters: number): Promise<any[]>;
+  findPlaceSourceByExternal(
+    provider: string,
+    externalId: string,
+  ): Promise<any | null>;
+  findNearbyPlaces(
+    lat: number,
+    lng: number,
+    radiusMeters: number,
+  ): Promise<any[]>;
   getPlaceById(id: string): Promise<any | null>;
   getUnenrichedPlacesByArea(areaId: number, limit?: number): Promise<any[]>;
   updatePlace(id: string, data: UpdatePlaceInput): Promise<any>;
   createPlace(data: CreatePlaceInput): Promise<any>;
-  createPlaceImages(placeId: string, photoUrls: string[], sourceName?: string): Promise<number>;
+  createPlaceImages(
+    placeId: string,
+    photoUrls: string[],
+    sourceName?: string,
+  ): Promise<number>;
   createPlaceSource(data: CreatePlaceSourceInput): Promise<any>;
   updatePlaceSource(id: string, data: UpdatePlaceSourceInput): Promise<any>;
   createCrawlJob(data: CreateCrawlJobInput): Promise<any>;

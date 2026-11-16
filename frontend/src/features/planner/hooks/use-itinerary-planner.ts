@@ -1,22 +1,53 @@
 import { useQuery, useMutation, useQueryClient, skipToken } from '@tanstack/react-query';
 import { itineraryService, ApiError } from '@/services/itinerary-planner.service';
 import { COPILOT_TOOL_NAMES } from '@/features/planner/utils/itinerary-schedule.util';
+import { NON_RETRYABLE_HTTP_STATUS } from '@/features/planner/constants/itinerary.constants';
 import type {
   GenerateItineraryRequest,
   TransitPreviewRequest,
   ItineraryDetail,
   TourBriefing,
   TransitMode,
+  AddDestinationRequest,
+  UpdateDestinationRequest,
+  UpdateItineraryMetaRequest,
+  MoveDirection,
 } from '@/types/itinerary';
 
 const TRANSIT_STALE_MS = 10 * 60 * 1000; // 10 min — pricing rarely changes mid-session
+const WEATHER_STALE_MS = 10 * 60 * 1000;
 
 export const itineraryKeys = {
   all: ['itineraries'] as const,
   lists: () => ['itineraries', 'list'] as const,
   detail: (id: string) => ['itineraries', 'detail', id] as const,
+  weather: (id: string) => ['itineraries', 'weather', id] as const,
 };
 
+type ListInvalidation = 'none' | 'lists' | 'all';
+
+/**
+ * Mutation whose response is the fresh ItineraryDetail: seeds the detail cache and,
+ * when requested, refreshes dependent list queries.
+ */
+function useItineraryDetailMutation<TVariables>(
+  itineraryId: string,
+  mutationFn: (variables: TVariables) => Promise<ItineraryDetail>,
+  invalidate: ListInvalidation = 'none',
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn,
+    onSuccess: (updated) => {
+      queryClient.setQueryData(itineraryKeys.detail(itineraryId), updated);
+      if (invalidate !== 'none') {
+        queryClient.invalidateQueries({
+          queryKey: invalidate === 'all' ? itineraryKeys.all : itineraryKeys.lists(),
+        });
+      }
+    },
+  });
+}
 /** List itineraries owned by the current authenticated user. */
 export function useItinerariesListQuery(scope: 'OWNED' | 'JOINED' = 'OWNED', options?: { enabled?: boolean }) {
   return useQuery({
@@ -45,9 +76,9 @@ export function useItineraryQuery(id: string) {
     queryFn: () => itineraryService.getItinerary(id),
     enabled: Boolean(id),
     staleTime: 60 * 1000,
-    refetchOnMount: 'always',
+    refetchOnMount: true,
     retry: (_, err) => {
-      if (err instanceof ApiError && [401, 403, 404].includes(err.status)) return false;
+      if (err instanceof ApiError && NON_RETRYABLE_HTTP_STATUS.includes(err.status)) return false;
       return true;
     },
   });
@@ -117,8 +148,15 @@ export function useUpdateTransitMode() {
 export function useCopilotChat(itineraryId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ message, sessionId }: { message: string; sessionId?: string }) =>
-      itineraryService.chatCopilot(itineraryId, message, sessionId),
+    mutationFn: ({
+      message,
+      sessionId,
+      autoApply,
+    }: {
+      message: string;
+      sessionId?: string;
+      autoApply?: boolean;
+    }) => itineraryService.chatCopilot(itineraryId, message, sessionId, autoApply),
     onSuccess: (res) => {
       if (res.modified && res.itinerary) {
         queryClient.setQueryData(itineraryKeys.detail(itineraryId), res.itinerary);
@@ -154,14 +192,11 @@ export function useActivityAlternatives(itineraryId: string, destinationId: stri
 
 /** 1-click direct swap on place card (Hybrid model). */
 export function useDirectSwapActivity(itineraryId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ destinationId, newPlaceId }: { destinationId: string; newPlaceId: string }) =>
+  return useItineraryDetailMutation(
+    itineraryId,
+    ({ destinationId, newPlaceId }: { destinationId: string; newPlaceId: string }) =>
       itineraryService.directSwapActivity(itineraryId, destinationId, newPlaceId),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(itineraryKeys.detail(itineraryId), updated);
-    },
-  });
+  );
 }
 
 /** Apply a user-confirmed proposal from Genie Copilot to update itinerary in DB. */
@@ -187,26 +222,20 @@ export function useApplyProposal(itineraryId: string) {
 
 /** Update itinerary cover photo */
 export function useUpdateCoverPhoto(itineraryId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (coverPhoto: string) => itineraryService.updateCoverPhoto(itineraryId, coverPhoto),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(itineraryKeys.detail(itineraryId), updated);
-      queryClient.invalidateQueries({ queryKey: itineraryKeys.all });
-    },
-  });
+  return useItineraryDetailMutation(
+    itineraryId,
+    (coverPhoto: string) => itineraryService.updateCoverPhoto(itineraryId, coverPhoto),
+    'all',
+  );
 }
 
 /** Update itinerary tour leader & assembly briefing info */
 export function useUpdateTourBriefing(itineraryId: string) {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (dto: TourBriefing) => itineraryService.updateTourBriefing(itineraryId, dto),
-    onSuccess: (updated) => {
-      queryClient.setQueryData(itineraryKeys.detail(itineraryId), updated);
-      queryClient.invalidateQueries({ queryKey: itineraryKeys.all });
-    },
-  });
+  return useItineraryDetailMutation(
+    itineraryId,
+    (dto: TourBriefing) => itineraryService.updateTourBriefing(itineraryId, dto),
+    'all',
+  );
 }
 
 /** Add a specific place directly to a chosen day & time slot of an existing itinerary. */
@@ -239,4 +268,68 @@ export function useAddPlaceToItinerary() {
       queryClient.invalidateQueries({ queryKey: itineraryKeys.all });
     },
   });
+}
+
+/** Fetch trip weather forecast / seasonal climate trend cached on the backend. */
+export function useItineraryWeatherQuery(id: string) {
+  return useQuery({
+    queryKey: itineraryKeys.weather(id),
+    queryFn: () => itineraryService.getWeather(id),
+    enabled: Boolean(id),
+    staleTime: WEATHER_STALE_MS,
+    retry: (_, err) => {
+      if (err instanceof ApiError && NON_RETRYABLE_HTTP_STATUS.includes(err.status)) return false;
+      return true;
+    },
+  });
+}
+
+/** Update trip metadata (title/description for editors & owners, partySize for owners). */
+export function useUpdateItineraryMeta(itineraryId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: UpdateItineraryMetaRequest) =>
+      itineraryService.updateItineraryMeta(itineraryId, dto),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(itineraryKeys.detail(itineraryId), updated);
+      queryClient.invalidateQueries({ queryKey: itineraryKeys.lists() });
+      queryClient.invalidateQueries({ queryKey: ['itinerary-weather', itineraryId] });
+    },
+  });
+}
+
+/** Move a destination up or down within the same day (swap order + shift times). */
+export function useMoveDestination(itineraryId: string) {
+  return useItineraryDetailMutation(
+    itineraryId,
+    ({ destinationId, direction }: { destinationId: string; direction: MoveDirection }) =>
+      itineraryService.moveDestination(itineraryId, destinationId, direction),
+  );
+}
+
+/** Direct DB add destination into a specific day without LLM round-trip. */
+export function useAddDestination(itineraryId: string) {
+  return useItineraryDetailMutation(
+    itineraryId,
+    (dto: AddDestinationRequest) => itineraryService.addDestination(itineraryId, dto),
+    'lists',
+  );
+}
+
+/** Direct DB update destination (dayNumber, startTime, endTime, notes). */
+export function useUpdateDestination(itineraryId: string) {
+  return useItineraryDetailMutation(
+    itineraryId,
+    ({ destinationId, dto }: { destinationId: string; dto: UpdateDestinationRequest }) =>
+      itineraryService.updateDestination(itineraryId, destinationId, dto),
+  );
+}
+
+/** Direct DB remove destination from an itinerary (recomputes totalPlaces & budget). */
+export function useRemoveDestination(itineraryId: string) {
+  return useItineraryDetailMutation(
+    itineraryId,
+    (destinationId: string) => itineraryService.removeDestination(itineraryId, destinationId),
+    'lists',
+  );
 }

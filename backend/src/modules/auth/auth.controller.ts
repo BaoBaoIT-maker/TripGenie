@@ -36,7 +36,10 @@ export class AuthController {
     private readonly configService: ConfigService,
   ) {}
 
-  private setAuthCookies(res: Response, tokens: { accessToken: string; refreshToken: string }) {
+  private setAuthCookies(
+    res: Response,
+    tokens: { accessToken: string; refreshToken: string },
+  ) {
     const isProd = process.env.NODE_ENV === 'production';
 
     res.cookie('accessToken', tokens.accessToken, {
@@ -90,7 +93,8 @@ export class AuthController {
     @Param('registrationId') registrationId: string,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.checkRegistrationStatus(registrationId);
+    const result =
+      await this.authService.checkRegistrationStatus(registrationId);
     if (result.verified && result.tokens) {
       this.setAuthCookies(res, result.tokens);
     }
@@ -135,7 +139,9 @@ export class AuthController {
     const refreshToken = req.cookies?.refreshToken;
     if (!refreshToken) {
       this.clearAuthCookies(res);
-      throw new UnauthorizedException('Không tìm thấy refresh token trong cookie');
+      throw new UnauthorizedException(
+        'Không tìm thấy refresh token trong cookie',
+      );
     }
 
     try {
@@ -150,10 +156,7 @@ export class AuthController {
 
   @Post('logout')
   @HttpCode(HttpStatus.OK)
-  async logout(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const accessToken = req.cookies?.accessToken;
     const refreshToken = req.cookies?.refreshToken;
 
@@ -165,7 +168,9 @@ export class AuthController {
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  async getProfile(@CurrentUser() user: AuthenticatedUser): Promise<UserResponse> {
+  async getProfile(
+    @CurrentUser() user: AuthenticatedUser,
+  ): Promise<UserResponse> {
     return this.authService.getProfile(user.id);
   }
 
@@ -178,7 +183,8 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(AuthGuard('google'))
   async googleAuthRedirect(@Req() req: any, @Res() res: Response) {
-    const frontendUrl = this.configService.getOrThrow<string>('FRONTEND_BASE_URL');
+    const frontendUrl =
+      this.configService.getOrThrow<string>('FRONTEND_BASE_URL');
 
     try {
       const result = await this.authService.handleOAuthCallback(req.user);
@@ -187,9 +193,7 @@ export class AuthController {
     } catch (err: any) {
       const errorCode =
         err?.status === 409 ? 'account_collision' : 'oauth_failed';
-      return res.redirect(
-        `${frontendUrl}/login?error=${errorCode}`,
-      );
+      return res.redirect(`${frontendUrl}/login?error=${errorCode}`);
     }
   }
 }

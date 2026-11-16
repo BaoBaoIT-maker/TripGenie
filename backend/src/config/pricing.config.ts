@@ -4,46 +4,48 @@
  * Follows AGENTS.md rule: Zero hardcoded magic numbers in business logic.
  */
 
+import { normalizeVietnamese } from '../common/utils/string.util';
+
 export const PRICING_CONFIG = {
   // 1. Fuel & Highway Tolls
   FUEL: {
-    GAS_PRICE_PER_LITER: 23_000,          // Current gasoline RON95/E5 benchmark (VNĐ)
+    GAS_PRICE_PER_LITER: 23_000, // Current gasoline RON95/E5 benchmark (VNĐ)
     MOTORBIKE_CONSUMPTION_PER_100KM: 2.2, // Motorbike consumption: 2.2 liters / 100km
-    CAR_CONSUMPTION_PER_100KM: 7.5,       // Sedan/SUV consumption: 7.5 liters / 100km
-    HIGHWAY_TOLL_PER_KM: 1_100,           // Average highway BOT toll in Vietnam: ~1,100 VNĐ / km
+    CAR_CONSUMPTION_PER_100KM: 7.5, // Sedan/SUV consumption: 7.5 liters / 100km
+    HIGHWAY_TOLL_PER_KM: 1_100, // Average highway BOT toll in Vietnam: ~1,100 VNĐ / km
   },
 
   // 2. Intercity Transit Rates (Road)
   INTERCITY: {
-    SLEEPER_BUS_PER_KM: 950,              // Standard sleeper bus tariff: ~950 VNĐ / km
-    LIMOUSINE_BUS_PER_KM: 1_400,          // VIP Limousine bus tariff: ~1,400 VNĐ / km
-    TRAIN_PER_KM: 850,                    // Train soft-seat/sleeper average: ~850 VNĐ / km
-    ROAD_DETOUR_FACTOR: 1.35,             // Crow-fly -> road distance multiplier for VN highways
-    HIGHWAY_SHARE: 0.6,                   // Share of a car trip on tolled expressway
-    AUTO_FLIGHT_MIN_KM: 450,              // No mode chosen: farther than this defaults to FLIGHT
+    SLEEPER_BUS_PER_KM: 950, // Standard sleeper bus tariff: ~950 VNĐ / km
+    LIMOUSINE_BUS_PER_KM: 1_400, // VIP Limousine bus tariff: ~1,400 VNĐ / km
+    TRAIN_PER_KM: 850, // Train soft-seat/sleeper average: ~850 VNĐ / km
+    ROAD_DETOUR_FACTOR: 1.35, // Crow-fly -> road distance multiplier for VN highways
+    HIGHWAY_SHARE: 0.6, // Share of a car trip on tolled expressway
+    AUTO_FLIGHT_MIN_KM: 450, // No mode chosen: farther than this defaults to FLIGHT
     FLIGHT: {
-      BASE_AIRPORT_FEE: 650_000,          // Fixed airport handling, passenger security, takeoff/landing overhead (VNĐ)
-      RATE_PER_KM: 950,                   // Variable cruising flight tariff per air distance km (VNĐ / km)
-      CRUISE_SPEED_KMH: 750,              // Airbus A320/A321 average commercial cruise speed (km/h)
-      TAXI_TAKEOFF_MINUTES: 30,           // Runway taxiing, climb & descent buffer time (minutes)
-      MIN_FLIGHT_MINUTES: 45,             // Minimum commercial flight schedule duration (minutes)
-      LONG_HAUL_KM: 800,                  // Above this road distance: long-haul fare/duration
-      ONE_WAY_SHORT: 1_400_000,           // Benchmark baseline for short route (<800km)
-      ONE_WAY_LONG: 1_700_000,            // Benchmark baseline for long route (>=800km)
+      BASE_AIRPORT_FEE: 650_000, // Fixed airport handling, passenger security, takeoff/landing overhead (VNĐ)
+      RATE_PER_KM: 950, // Variable cruising flight tariff per air distance km (VNĐ / km)
+      CRUISE_SPEED_KMH: 750, // Airbus A320/A321 average commercial cruise speed (km/h)
+      TAXI_TAKEOFF_MINUTES: 30, // Runway taxiing, climb & descent buffer time (minutes)
+      MIN_FLIGHT_MINUTES: 45, // Minimum commercial flight schedule duration (minutes)
+      LONG_HAUL_KM: 800, // Above this road distance: long-haul fare/duration
+      ONE_WAY_SHORT: 1_400_000, // Benchmark baseline for short route (<800km)
+      ONE_WAY_LONG: 1_700_000, // Benchmark baseline for long route (>=800km)
       MINUTES_SHORT: 80,
       MINUTES_LONG: 120,
       BUDGET_MULTIPLIERS: {
-        LOW: 0.8,                         // Budget eco / promo / carry-on only (~80% base)
-        MEDIUM: 1.0,                      // Standard economy with checked luggage (100% base)
-        HIGH: 1.7,                        // Flexible premium economy / early booking VNA (~170% base)
-        LUXURY: 2.8,                      // Business class / peak flexibility (~280% base)
+        LOW: 0.8, // Budget eco / promo / carry-on only (~80% base)
+        MEDIUM: 1.0, // Standard economy with checked luggage (100% base)
+        HIGH: 1.7, // Flexible premium economy / early booking VNA (~170% base)
+        LUXURY: 2.8, // Business class / peak flexibility (~280% base)
       },
       PEAK_MULTIPLIERS: {
-        TET_PEAK: 1.6,                    // Lunar New Year peak window (+60%)
-        SUMMER_PEAK: 1.25,                // Summer peak vacation (June - July, +25%)
-        WEEKEND_PEAK: 1.15,               // Friday evening & Sunday peak (+15%)
-        LAST_MINUTE_SURCHARGE: 1.3,       // Booking within 3 days of departure (+30%)
-        EARLY_BIRD_DISCOUNT: 0.9,         // Booking > 30 days in advance (-10%)
+        TET_PEAK: 1.6, // Lunar New Year peak window (+60%)
+        SUMMER_PEAK: 1.25, // Summer peak vacation (June - July, +25%)
+        WEEKEND_PEAK: 1.15, // Friday evening & Sunday peak (+15%)
+        LAST_MINUTE_SURCHARGE: 1.3, // Booking within 3 days of departure (+30%)
+        EARLY_BIRD_DISCOUNT: 0.9, // Booking > 30 days in advance (-10%)
       },
     },
     AVG_SPEED_KMH: {
@@ -53,26 +55,26 @@ export const PRICING_CONFIG = {
       TRAIN: 55,
     },
     TRANSFER: {
-      BUS_PER_KM: 1_200,                    // Connecting shuttle/bus fare: ~1,200 VNĐ / km
-      FERRY_ONE_WAY_PASSENGER: 320_000,     // Superdong / Phu Quoc Express speedboat one-way ticket (VNĐ)
-      FERRY_ONE_WAY_MOTORBIKE: 280_000,     // Thanh Thoi ferry passenger + motorbike ticket (VNĐ)
-      FERRY_MINUTES: 140,                   // Speedboat crossing time: ~2h20m
-      MOTORBIKE_FERRY_MINUTES: 180,         // Ferry crossing with motorbike: ~3h
-      ISLAND_PORT_DISTANCE_KM: 45,          // Typical mainland port to island sea crossing distance (km)
-      ISLAND_MAINLAND_BUS_FARE: 180_000,    // Connecting coach fare from railway/airport hub to ferry port (VNĐ)
-      ISLAND_MAINLAND_BUS_MINUTES: 240,     // Connecting coach duration to mainland ferry port (minutes)
-      LOCAL_HUB_MAX_DISTANCE_KM: 45,        // Satellite hub radius considered local transfer (e.g., DAD -> Hoi An ~28km)
-      ISLAND_DIRECT_HUB_MAX_KM: 25,         // Max distance for an airport located on the island itself (PQC, VCS)
-      MIN_FLIGHT_DISTANCE_KM: 150,          // Minimum road distance for commercial flights before road fallback
-      DEFAULT_AIRPORT_TRANSFER_KM: 12,      // Fallback distance from airport to city center (km)
-      DEFAULT_RAIL_TRANSFER_KM: 80,         // Fallback distance from regional train station to mountain/coastal town (km)
-      MIN_TRAIN_DISTANCE_KM: 100,           // Minimum mainline railway distance (km)
-      TRAIN_ISLAND_LAND_RATIO: 0.65,        // Share of total island route covered by mainline rail before port transfer
-      OVERNIGHT_BUS_MIN_MINUTES: 360,       // Duration threshold (>6h) to recommend overnight sleeper bus
-      MIN_LOCAL_TRANSFER_KM: 4,             // Minimum distance from urban airport/station to downtown hotel (km)
-      LOCAL_TRANSFER_MINS_PER_KM: 1.3,      // Minutes per km for local airport/station shuttle into center
-      MIN_LOCAL_TRANSFER_MINUTES: 15,       // Minimum local transfer time including pickup (minutes)
-      REGIONAL_TRANSFER_MINS_PER_KM: 1.35,  // Minutes per km for inter-provincial connecting limousine/bus
+      BUS_PER_KM: 1_200, // Connecting shuttle/bus fare: ~1,200 VNĐ / km
+      FERRY_ONE_WAY_PASSENGER: 320_000, // Superdong / Phu Quoc Express speedboat one-way ticket (VNĐ)
+      FERRY_ONE_WAY_MOTORBIKE: 280_000, // Thanh Thoi ferry passenger + motorbike ticket (VNĐ)
+      FERRY_MINUTES: 140, // Speedboat crossing time: ~2h20m
+      MOTORBIKE_FERRY_MINUTES: 180, // Ferry crossing with motorbike: ~3h
+      ISLAND_PORT_DISTANCE_KM: 45, // Typical mainland port to island sea crossing distance (km)
+      ISLAND_MAINLAND_BUS_FARE: 180_000, // Connecting coach fare from railway/airport hub to ferry port (VNĐ)
+      ISLAND_MAINLAND_BUS_MINUTES: 240, // Connecting coach duration to mainland ferry port (minutes)
+      LOCAL_HUB_MAX_DISTANCE_KM: 45, // Satellite hub radius considered local transfer (e.g., DAD -> Hoi An ~28km)
+      ISLAND_DIRECT_HUB_MAX_KM: 25, // Max distance for an airport located on the island itself (PQC, VCS)
+      MIN_FLIGHT_DISTANCE_KM: 150, // Minimum road distance for commercial flights before road fallback
+      DEFAULT_AIRPORT_TRANSFER_KM: 12, // Fallback distance from airport to city center (km)
+      DEFAULT_RAIL_TRANSFER_KM: 80, // Fallback distance from regional train station to mountain/coastal town (km)
+      MIN_TRAIN_DISTANCE_KM: 100, // Minimum mainline railway distance (km)
+      TRAIN_ISLAND_LAND_RATIO: 0.65, // Share of total island route covered by mainline rail before port transfer
+      OVERNIGHT_BUS_MIN_MINUTES: 360, // Duration threshold (>6h) to recommend overnight sleeper bus
+      MIN_LOCAL_TRANSFER_KM: 4, // Minimum distance from urban airport/station to downtown hotel (km)
+      LOCAL_TRANSFER_MINS_PER_KM: 1.3, // Minutes per km for local airport/station shuttle into center
+      MIN_LOCAL_TRANSFER_MINUTES: 15, // Minimum local transfer time including pickup (minutes)
+      REGIONAL_TRANSFER_MINS_PER_KM: 1.35, // Minutes per km for inter-provincial connecting limousine/bus
     },
     CARRIERS: {
       FLIGHT_DIRECT: 'Vietnam Airlines, Vietjet Air, Bamboo Airways',
@@ -86,39 +88,47 @@ export const PRICING_CONFIG = {
 
   // 3. Intracity Transit Rates (Inside Destination City)
   INTRACITY: {
-    AVG_DAILY_KM: 35,                       // Typical sightseeing mileage per day (GrabBike/Taxi billing)
-    TICKETS_PER_DAY: 120_000,               // Attraction tickets estimate per day (VNĐ)
-    MOTORBIKE_RENTAL_PER_DAY: 130_000,      // Motorbike daily rental fee: 130,000 VNĐ / day
-    DAILY_MOTORBIKE_GAS_ALLOWANCE: 40_000,  // Daily city touring fuel allowance: ~40,000 VNĐ / day
-    GRAB_BIKE_PER_KM: 6_500,                // Tech motorbike taxi (GrabBike/Be): ~6,500 VNĐ / km
-    TAXI_CAR_PER_KM: 14_000,                // 4-seat taxi / GrabCar: ~14,000 VNĐ / km
-    WALK_THRESHOLD_KM: 0.8,                 // Max distance for walking between stops (km)
-    WALK_SPEED_KMH: 4.5,                    // Average walking speed (km/h)
-    BIKE_SPEED_KMH: 25,                     // Average urban motorbike speed (km/h)
-    CAR_SPEED_KMH: 22,                      // Average urban car/taxi speed (km/h)
-    ROAD_DETOUR_FACTOR: 1.25,               // Urban street detour multiplier over straight-line distance
-    MIN_WALK_MINUTES: 2,                    // Minimum walking duration between adjacent stops
-    MIN_BIKE_MINUTES: 3,                    // Minimum motorbike duration between stops
-    MIN_CAR_MINUTES: 4,                     // Minimum car/taxi duration between stops
-    BIKE_TRAFFIC_BUFFER_MINUTES: 2,         // Urban intersection buffer for motorbike
-    CAR_TRAFFIC_BUFFER_MINUTES: 3,          // Urban intersection & pickup buffer for car/taxi
+    AVG_DAILY_KM: 35, // Typical sightseeing mileage per day (GrabBike/Taxi billing)
+    TICKETS_PER_DAY: 120_000, // Attraction tickets estimate per day (VNĐ)
+    MOTORBIKE_RENTAL_PER_DAY: 130_000, // Motorbike daily rental fee: 130,000 VNĐ / day
+    DAILY_MOTORBIKE_GAS_ALLOWANCE: 40_000, // Daily city touring fuel allowance: ~40,000 VNĐ / day
+    GRAB_BIKE_PER_KM: 6_500, // Tech motorbike taxi (GrabBike/Be): ~6,500 VNĐ / km
+    TAXI_CAR_PER_KM: 14_000, // 4-seat taxi / GrabCar: ~14,000 VNĐ / km
+    WALK_THRESHOLD_KM: 0.8, // Max distance for walking between stops (km)
+    WALK_SPEED_KMH: 4.5, // Average walking speed (km/h)
+    BIKE_SPEED_KMH: 25, // Average urban motorbike speed (km/h)
+    CAR_SPEED_KMH: 22, // Average urban car/taxi speed (km/h)
+    ROAD_DETOUR_FACTOR: 1.25, // Urban street detour multiplier over straight-line distance
+    MIN_WALK_MINUTES: 2, // Minimum walking duration between adjacent stops
+    MIN_BIKE_MINUTES: 3, // Minimum motorbike duration between stops
+    MIN_CAR_MINUTES: 4, // Minimum car/taxi duration between stops
+    BIKE_TRAFFIC_BUFFER_MINUTES: 2, // Urban intersection buffer for motorbike
+    CAR_TRAFFIC_BUFFER_MINUTES: 3, // Urban intersection & pickup buffer for car/taxi
   },
 
   // 4. Default Daily Living Expenses by Budget Level
   LIVING_EXPENSES: {
     MEALS_PER_DAY: 3,
     FOOD_PER_DAY: {
-      LOW: 120_000,    // 3 budget meals (street food, pho, banh mi)
+      LOW: 120_000, // 3 budget meals (street food, pho, banh mi)
       MEDIUM: 280_000, // Good local specialties & comfortable dining
-      HIGH: 700_000,   // Seafood feasts, fine dining, upscale cafes
+      HIGH: 700_000, // Seafood feasts, fine dining, upscale cafes
       LUXURY: 1_500_000,
     },
     HOTEL_PER_NIGHT: {
-      LOW: 250_000,    // Hostels, budget homestays, dorms
+      LOW: 250_000, // Hostels, budget homestays, dorms
       MEDIUM: 650_000, // 3-star boutique hotels, cozy homestays
       HIGH: 1_800_000, // 4-5 star resorts & luxury hotels
       LUXURY: 4_500_000,
     },
+  },
+  PARTY_SCALING: {
+    MIN_PARTY_SIZE: 1,
+    MAX_PARTY_SIZE: 20, // Aligned with TripGroup.maxMembers default
+    HOTEL_GUESTS_PER_ROOM: 2,
+    CAR_PASSENGERS: 4,
+    MOTORBIKE_RIDERS: 2,
+    GRAB_BIKE_RIDERS: 1,
   },
   PLACE_COST_ESTIMATES: {
     DEFAULT_PRICE_LEVEL: 'MEDIUM',
@@ -139,25 +149,62 @@ export const PRICING_CONFIG = {
     DINING_NAME_KEYWORDS: ['quán', 'phở', 'bún', 'cơm'],
     FREE_PUBLIC_CATEGORY_SLUGS: ['thien-nhien', 'cho-sieu-thi'],
     FREE_PUBLIC_CATEGORY_KEYWORDS: ['thiên nhiên', 'biển', 'chợ'],
-    FREE_PUBLIC_NAME_KEYWORDS: ['công viên', 'hồ ', 'bãi biển', 'cầu ', 'phố đi bộ'],
+    FREE_PUBLIC_NAME_KEYWORDS: [
+      'công viên',
+      'hồ ',
+      'bãi biển',
+      'cầu ',
+      'phố đi bộ',
+    ],
   },
 
   // 5. Road Transit Safety Thresholds
   SAFETY_THRESHOLDS: {
-    MOTORBIKE_MAX_DISTANCE_KM: 350,       // Distance > 350km triggers safety warning for motorbikes
-    CAR_MAX_CONTINUOUS_KM: 600,           // Distance > 600km triggers fatigue/driver-swap notice
+    MOTORBIKE_MAX_DISTANCE_KM: 350, // Distance > 350km triggers safety warning for motorbikes
+    CAR_MAX_CONTINUOUS_KM: 600, // Distance > 600km triggers fatigue/driver-swap notice
   },
 
   // 6. Regional Destination Tiers & Cost Multipliers
   DESTINATION_TIERS: {
-    TIER_1_CITIES: ['hồ chí minh', 'ho chi minh', 'sài gòn', 'sai gon', 'hà nội', 'ha noi', 'phú quốc', 'phu quoc', 'côn đảo', 'con dao'],
+    TIER_1_CITIES: [
+      'hồ chí minh',
+      'ho chi minh',
+      'sài gòn',
+      'sai gon',
+      'hà nội',
+      'ha noi',
+      'phú quốc',
+      'phu quoc',
+      'côn đảo',
+      'con dao',
+    ],
     TIER_1_MULTIPLIER: 1.25,
     TIER_2_MULTIPLIER: 1.0,
     TIER_3_CITIES: [
-      'cần thơ', 'can tho', 'quy nhơn', 'quy nhon', 'bình định', 'phú yên', 'tuy hòa',
-      'ninh bình', 'hà giang', 'măng đen', 'đồng tháp', 'bến tre', 'an giang', 'châu đốc',
-      'sóc trăng', 'bạc liêu', 'cà mau', 'trà vinh', 'tây ninh', 'kon tum', 'gia lai',
-      'đắk lắk', 'dak lak', 'buôn ma thuột'
+      'cần thơ',
+      'can tho',
+      'quy nhơn',
+      'quy nhon',
+      'bình định',
+      'phú yên',
+      'tuy hòa',
+      'ninh bình',
+      'hà giang',
+      'măng đen',
+      'đồng tháp',
+      'bến tre',
+      'an giang',
+      'châu đốc',
+      'sóc trăng',
+      'bạc liêu',
+      'cà mau',
+      'trà vinh',
+      'tây ninh',
+      'kon tum',
+      'gia lai',
+      'đắk lắk',
+      'dak lak',
+      'buôn ma thuột',
     ],
     TIER_3_MULTIPLIER: 0.8,
   },
@@ -185,10 +232,16 @@ export const PRICING_CONFIG = {
     'binh hung',
   ],
   DEEP_LINKS: {
-    GOOGLE_FLIGHTS_BASE: process.env.GOOGLE_FLIGHTS_BASE_URL || 'https://www.google.com/travel/flights',
-    GOOGLE_MAPS_DIR_BASE: process.env.GOOGLE_MAPS_DIR_BASE_URL || 'https://www.google.com/maps/dir/?api=1',
-    VEXERE_BUS_BASE: process.env.VEXERE_BUS_BASE_URL || 'https://vexere.com/vi-VN/ve-xe-khach',
-    VEXERE_TRAIN_URL: process.env.VEXERE_TRAIN_URL || 'https://vexere.com/vi-VN/ve-tau-hoa',
+    GOOGLE_FLIGHTS_BASE:
+      process.env.GOOGLE_FLIGHTS_BASE_URL ||
+      'https://www.google.com/travel/flights',
+    GOOGLE_MAPS_DIR_BASE:
+      process.env.GOOGLE_MAPS_DIR_BASE_URL ||
+      'https://www.google.com/maps/dir/?api=1',
+    VEXERE_BUS_BASE:
+      process.env.VEXERE_BUS_BASE_URL || 'https://vexere.com/vi-VN/ve-xe-khach',
+    VEXERE_TRAIN_URL:
+      process.env.VEXERE_TRAIN_URL || 'https://vexere.com/vi-VN/ve-tau-hoa',
     DSVN_URL: process.env.DSVN_URL || 'https://dsvn.vn',
   },
 };
@@ -213,6 +266,113 @@ export function buildGoogleMapsDirUrl(params: {
   return `${PRICING_CONFIG.DEEP_LINKS.GOOGLE_MAPS_DIR_BASE}&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=${travelMode}`;
 }
 
+export interface VexereBusPartner {
+  slug: string;
+  externalId: string;
+  aliases: readonly string[];
+}
+
+export const VEXERE_BUS_PARTNERS: readonly VexereBusPartner[] = [
+  {
+    slug: 'sai-gon',
+    externalId: '129',
+    aliases: ['sai gon', 'tp. ho chi minh', 'ho chi minh', 'tphcm', 'sg'],
+  },
+  { slug: 'ha-noi', externalId: '124', aliases: ['ha noi', 'hn', 'thu do'] },
+  { slug: 'da-nang', externalId: '115', aliases: ['da nang', 'dn'] },
+  { slug: 'da-lat', externalId: '137', aliases: ['da lat', 'lam dong'] },
+  { slug: 'nha-trang', externalId: '139', aliases: ['nha trang', 'khanh hoa'] },
+  { slug: 'vung-tau', externalId: '16', aliases: ['vung tau', 'ba ria'] },
+  { slug: 'can-tho', externalId: '113', aliases: ['can tho'] },
+  {
+    slug: 'thua-thien-hue',
+    externalId: '158',
+    aliases: ['hue', 'thua thien hue'],
+  },
+  {
+    slug: 'kien-giang',
+    externalId: '138',
+    aliases: ['phu quoc', 'kien giang', 'rach gia', 'ha tien'],
+  },
+  {
+    slug: 'quang-nam',
+    externalId: '147',
+    aliases: ['hoi an', 'quang nam', 'tam ky'],
+  },
+  { slug: 'binh-dinh', externalId: '18', aliases: ['quy nhon', 'binh dinh'] },
+  {
+    slug: 'binh-thuan',
+    externalId: '19',
+    aliases: ['phan thiet', 'mui ne', 'binh thuan'],
+  },
+  {
+    slug: 'dak-lak',
+    externalId: '120',
+    aliases: ['buon ma thuot', 'dak lak', 'bmt'],
+  },
+  { slug: 'lao-cai', externalId: '140', aliases: ['sa pa', 'sapa', 'lao cai'] },
+  { slug: 'ninh-binh', externalId: '143', aliases: ['ninh binh', 'trang an'] },
+  {
+    slug: 'quang-binh',
+    externalId: '146',
+    aliases: ['dong hoi', 'quang binh', 'phong nha'],
+  },
+  { slug: 'hai-phong', externalId: '127', aliases: ['hai phong', 'cat ba'] },
+  { slug: 'quang-ninh', externalId: '148', aliases: ['ha long', 'quang ninh'] },
+  { slug: 'ca-mau', externalId: '112', aliases: ['ca mau'] },
+  { slug: 'ha-tinh', externalId: '125', aliases: ['ha tinh'] },
+  { slug: 'thanh-hoa', externalId: '157', aliases: ['thanh hoa', 'sam son'] },
+  {
+    slug: 'nghe-an',
+    externalId: '142',
+    aliases: ['vinh', 'nghe an', 'cua lo'],
+  },
+];
+
+function normalizePartnerTerm(term: string): string {
+  return normalizeVietnamese(term)
+    .replace(/đ/g, 'd')
+    .replace(
+      /^(ga|ben tau|ben xe|cang|san bay|trung tam|tp\.?|thanh pho|tinh|huyen|quan|dao)\s+/i,
+      '',
+    )
+    .trim();
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+export function resolveVexereBusPartner(
+  cityName?: string | null,
+): VexereBusPartner | null {
+  if (!cityName) return null;
+  const cleaned = normalizePartnerTerm(cityName);
+  if (!cleaned) return null;
+
+  for (const partner of VEXERE_BUS_PARTNERS) {
+    const slugWords = partner.slug.replace(/-/g, ' ');
+    if (cleaned === slugWords || partner.aliases.includes(cleaned)) {
+      return partner;
+    }
+  }
+
+  for (const partner of VEXERE_BUS_PARTNERS) {
+    for (const alias of partner.aliases) {
+      if (!alias.includes(' ') && alias !== 'sapa') continue;
+      if (
+        new RegExp(`(?:^|[^a-z0-9])${escapeRegex(alias)}(?:$|[^a-z0-9])`).test(
+          cleaned,
+        )
+      ) {
+        return partner;
+      }
+    }
+  }
+
+  return null;
+}
+
 export function buildVexereBusUrl(params?: {
   fromSlug?: string;
   toSlug?: string;
@@ -221,7 +381,12 @@ export function buildVexereBusUrl(params?: {
   departDateVn?: string;
 }): string {
   const base = PRICING_CONFIG.DEEP_LINKS.VEXERE_BUS_BASE;
-  if (params?.fromSlug && params?.toSlug && params?.fromExternalId && params?.toExternalId) {
+  if (
+    params?.fromSlug &&
+    params?.toSlug &&
+    params?.fromExternalId &&
+    params?.toExternalId
+  ) {
     return `${base}-tu-${params.fromSlug}-di-${params.toSlug}-${params.fromExternalId}t${params.toExternalId}1.html?date=${params.departDateVn || ''}`;
   }
   return base;
@@ -235,13 +400,18 @@ export function buildVexereBusUrl(params?: {
  */
 export function getDestinationTierMultiplier(cityName?: string | null): number {
   if (!cityName) return PRICING_CONFIG.DESTINATION_TIERS.TIER_2_MULTIPLIER;
-  const normalized = cityName.toLowerCase().replace(/^(tp\.|thành phố|tỉnh|huyện|quận)\s*/i, '').trim();
+  const normalized = cityName
+    .toLowerCase()
+    .replace(/^(tp\.|thành phố|tỉnh|huyện|quận)\s*/i, '')
+    .trim();
 
   for (const city of PRICING_CONFIG.DESTINATION_TIERS.TIER_1_CITIES) {
-    if (normalized.includes(city)) return PRICING_CONFIG.DESTINATION_TIERS.TIER_1_MULTIPLIER;
+    if (normalized.includes(city))
+      return PRICING_CONFIG.DESTINATION_TIERS.TIER_1_MULTIPLIER;
   }
   for (const city of PRICING_CONFIG.DESTINATION_TIERS.TIER_3_CITIES) {
-    if (normalized.includes(city)) return PRICING_CONFIG.DESTINATION_TIERS.TIER_3_MULTIPLIER;
+    if (normalized.includes(city))
+      return PRICING_CONFIG.DESTINATION_TIERS.TIER_3_MULTIPLIER;
   }
   return PRICING_CONFIG.DESTINATION_TIERS.TIER_2_MULTIPLIER;
 }
@@ -258,14 +428,22 @@ export interface PlaceCostEstimate {
  * - Dining/Cafe: median of scraped menu range (min + max) / 2.
  */
 export function calculatePlaceEstimatedCost(params: {
-  category?: { name?: string | null; nameVi?: string | null; slug?: string | null } | null;
+  category?: {
+    name?: string | null;
+    nameVi?: string | null;
+    slug?: string | null;
+  } | null;
   priceRange?: any;
   priceLevel?: string | null;
   placeName?: string | null;
 }): PlaceCostEstimate {
   const cfg = PRICING_CONFIG.PLACE_COST_ESTIMATES;
   const catSlug = params.category?.slug?.toLowerCase() || '';
-  const catName = (params.category?.nameVi || params.category?.name || '').toLowerCase();
+  const catName = (
+    params.category?.nameVi ||
+    params.category?.name ||
+    ''
+  ).toLowerCase();
   const placeName = (params.placeName || '').toLowerCase();
   const levelKey = (
     params.priceLevel || cfg.DEFAULT_PRICE_LEVEL
@@ -276,8 +454,10 @@ export function calculatePlaceEstimatedCost(params: {
     cfg.DINING_CATEGORY_KEYWORDS.some((kw) => catName.includes(kw)) ||
     cfg.DINING_NAME_KEYWORDS.some((kw) => placeName.includes(kw));
 
-  const min = params.priceRange?.min != null ? Number(params.priceRange.min) : null;
-  const max = params.priceRange?.max != null ? Number(params.priceRange.max) : null;
+  const min =
+    params.priceRange?.min != null ? Number(params.priceRange.min) : null;
+  const max =
+    params.priceRange?.max != null ? Number(params.priceRange.max) : null;
 
   if (isDining) {
     let cost = 0;
@@ -388,7 +568,9 @@ export function calculateFlightDuration(airDistanceKm: number): number {
  * Base = Fixed airport overhead + (airDistanceKm * Rate per km).
  * Then applies contextual multipliers: Budget Tier, Seasonality (Tet/Summer), Day of week, and Advance Purchase.
  */
-export function calculateFlightFare(params: FlightPricingParams): FlightPricingResult {
+export function calculateFlightFare(
+  params: FlightPricingParams,
+): FlightPricingResult {
   const F = PRICING_CONFIG.INTERCITY.FLIGHT;
   const airDist = Math.max(1, params.airDistanceKm);
   const baseFare = Math.round(F.BASE_AIRPORT_FEE + airDist * F.RATE_PER_KM);
@@ -437,7 +619,11 @@ export function calculateFlightFare(params: FlightPricingParams): FlightPricingR
   }
 
   const rawTotal =
-    baseFare * budgetMultiplier * seasonMultiplier * dayOfWeekMultiplier * advanceMultiplier;
+    baseFare *
+    budgetMultiplier *
+    seasonMultiplier *
+    dayOfWeekMultiplier *
+    advanceMultiplier;
   // Round to nearest 10,000 VNĐ for realistic airline pricing representation
   const finalFare = Math.round(rawTotal / 10_000) * 10_000;
 
@@ -454,3 +640,82 @@ export function calculateFlightFare(params: FlightPricingParams): FlightPricingR
   };
 }
 
+export interface UnitBudgetBreakdownInput {
+  transitRoundTrip: number;
+  accommodation: number;
+  food: number;
+  tickets: number;
+  localTransit: number;
+}
+
+export interface ScaledBudgetBreakdownResult extends UnitBudgetBreakdownInput {
+  totalEstimated: number;
+  perPersonEstimated: number;
+  partySize: number;
+}
+
+/**
+ * Scales 1-person / 1-unit baseline travel expenses by partySize:
+ * - food & tickets & public intercity tickets (flight/bus/train): scale 1:1 per traveler
+ * - accommodation: scaled per shared room (HOTEL_GUESTS_PER_ROOM = 2)
+ * - self-drive / intracity vehicles: scaled per vehicle capacity
+ */
+export function scaleBudgetBreakdownForParty(
+  unitBase: UnitBudgetBreakdownInput,
+  params: {
+    partySize?: number | null;
+    intercityMode?: string | null;
+    intracityMode?: string | null;
+  },
+): ScaledBudgetBreakdownResult {
+  const S = PRICING_CONFIG.PARTY_SCALING;
+  const partySize = Math.max(
+    S.MIN_PARTY_SIZE,
+    Math.min(
+      S.MAX_PARTY_SIZE,
+      Math.trunc(params.partySize || S.MIN_PARTY_SIZE),
+    ),
+  );
+
+  const intercityMode = (params.intercityMode || '').toUpperCase();
+  const transitMultiplier =
+    intercityMode === 'PERSONAL_CAR'
+      ? Math.ceil(partySize / S.CAR_PASSENGERS)
+      : intercityMode === 'PERSONAL_MOTORBIKE'
+        ? Math.ceil(partySize / S.MOTORBIKE_RIDERS)
+        : partySize;
+
+  const intracityMode = (params.intracityMode || '').toUpperCase();
+  const localTransitMultiplier =
+    intracityMode === 'TAXI_CAR'
+      ? Math.ceil(partySize / S.CAR_PASSENGERS)
+      : intracityMode === 'GRAB_BIKE'
+        ? Math.ceil(partySize / S.GRAB_BIKE_RIDERS)
+        : Math.ceil(partySize / S.MOTORBIKE_RIDERS);
+
+  const roomCount = Math.ceil(partySize / S.HOTEL_GUESTS_PER_ROOM);
+
+  const transitRoundTrip = Math.round(
+    (unitBase.transitRoundTrip || 0) * transitMultiplier,
+  );
+  const accommodation = Math.round((unitBase.accommodation || 0) * roomCount);
+  const food = Math.round((unitBase.food || 0) * partySize);
+  const tickets = Math.round((unitBase.tickets || 0) * partySize);
+  const localTransit = Math.round(
+    (unitBase.localTransit || 0) * localTransitMultiplier,
+  );
+  const totalEstimated =
+    transitRoundTrip + accommodation + food + tickets + localTransit;
+  const perPersonEstimated = Math.round(totalEstimated / partySize);
+
+  return {
+    transitRoundTrip,
+    accommodation,
+    food,
+    tickets,
+    localTransit,
+    totalEstimated,
+    perPersonEstimated,
+    partySize,
+  };
+}

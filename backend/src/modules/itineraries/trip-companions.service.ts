@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { TripCompanionsRepository } from './trip-companions.repository';
 import {
   CompanionsListResponseDto,
@@ -23,7 +27,9 @@ export class TripCompanionsService {
     }
 
     if (user.id === inviterId) {
-      throw new BadRequestException('Bạn không thể tự gửi lời mời cho chính mình.');
+      throw new BadRequestException(
+        'Bạn không thể tự gửi lời mời cho chính mình.',
+      );
     }
 
     return this.repository.createInvitation(itineraryId, inviterId, user.id);
@@ -70,7 +76,12 @@ export class TripCompanionsService {
     targetUserId: string,
     newRole: 'VIEWER' | 'EDITOR',
   ): Promise<{ userId: string; role: 'VIEWER' | 'EDITOR' }> {
-    return this.repository.updateMemberRole(itineraryId, ownerId, targetUserId, newRole);
+    return this.repository.updateMemberRole(
+      itineraryId,
+      ownerId,
+      targetUserId,
+      newRole,
+    );
   }
 
   async removeMember(

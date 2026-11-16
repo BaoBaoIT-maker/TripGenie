@@ -11,6 +11,7 @@ export function LandingFooter() {
               alt="TripGenie Logo"
               width={48}
               height={48}
+              style={{ width: "auto", height: "auto" }}
               className="h-12 w-auto object-contain"
             />
             <div>

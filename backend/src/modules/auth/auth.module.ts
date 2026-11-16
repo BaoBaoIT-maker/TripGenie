@@ -37,6 +37,11 @@ import { AUTH_CONSTANTS } from '@/common/constants/auth.constants';
     GoogleStrategy,
     FacebookStrategy,
   ],
-  exports: [AuthService, OtpService, PasswordResetService, TokenBlacklistService],
+  exports: [
+    AuthService,
+    OtpService,
+    PasswordResetService,
+    TokenBlacklistService,
+  ],
 })
 export class AuthModule {}

@@ -16,14 +16,31 @@ import { AdvisorModule } from './modules/advisor/advisor.module';
 import { CollectionsModule } from './modules/collections/collections.module';
 import { CommunityModule } from './modules/community/community.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
-import { appConfig, databaseConfig, jwtConfig, redisConfig, aiConfig, crawlerConfig } from './config';
+import { WeatherModule } from './modules/weather/weather.module';
+import {
+  appConfig,
+  databaseConfig,
+  jwtConfig,
+  redisConfig,
+  aiConfig,
+  crawlerConfig,
+  weatherConfig,
+} from './config';
 import { envValidationSchema } from './config/env.validation';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, databaseConfig, jwtConfig, redisConfig, aiConfig, crawlerConfig],
+      load: [
+        appConfig,
+        databaseConfig,
+        jwtConfig,
+        redisConfig,
+        aiConfig,
+        crawlerConfig,
+        weatherConfig,
+      ],
       validationSchema: envValidationSchema,
     }),
     BullModule.forRootAsync({
@@ -31,7 +48,8 @@ import { envValidationSchema } from './config/env.validation';
       useFactory: (configService: ConfigService) => {
         const redisUrl = configService.get<string>('REDIS_URL');
         if (redisUrl?.startsWith('redis')) {
-          const isLocal = redisUrl.includes('localhost') || redisUrl.includes('127.0.0.1');
+          const isLocal =
+            redisUrl.includes('localhost') || redisUrl.includes('127.0.0.1');
           try {
             const parsed = new URL(redisUrl);
             return {
@@ -70,6 +88,7 @@ import { envValidationSchema } from './config/env.validation';
     CollectionsModule,
     CommunityModule,
     NotificationsModule,
+    WeatherModule,
   ],
   controllers: [AppController],
   providers: [AppService],

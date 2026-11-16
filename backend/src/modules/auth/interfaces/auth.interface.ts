@@ -16,8 +16,10 @@ export interface UserResponse {
   email?: string | null;
   fullName: string;
   avatarUrl?: string | null;
+  bio?: string | null;
   role: UserRole;
   isVerified: boolean;
+  isVerifiedCreator?: boolean;
   authMethods: ('LOCAL' | 'GOOGLE')[];
   capabilities: UserCapabilities;
 }

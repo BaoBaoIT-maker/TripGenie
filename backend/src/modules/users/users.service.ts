@@ -1,4 +1,9 @@
-import { Injectable, Inject, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  ConflictException,
+  NotFoundException,
+} from '@nestjs/common';
 import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
 import { IUsersRepository } from './interfaces/users-repository.interface';
 import { User, UserPreference, BudgetLevel } from '@prisma/client';
@@ -46,7 +51,8 @@ export class UsersService {
       throw new NotFoundException('Không tìm thấy người dùng');
     }
 
-    const updateData: { fullName?: string; bio?: string; avatarUrl?: string } = {};
+    const updateData: { fullName?: string; bio?: string; avatarUrl?: string } =
+      {};
 
     if (dto.fullName !== undefined) {
       const trimmed = dto.fullName.trim();
@@ -81,7 +87,7 @@ export class UsersService {
       preferredCategories: ['am-thuc', 'cafe', 'diem-tham-quan'],
       dietaryRestrictions: [],
       updatedAt: new Date(),
-    } as UserPreference;
+    };
   }
 
   async updateUserPreferences(

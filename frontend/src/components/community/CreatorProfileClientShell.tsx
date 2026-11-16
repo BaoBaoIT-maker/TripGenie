@@ -33,6 +33,7 @@ import type {
 } from "@/types/community";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useCreatorProfile } from "@/features/community/hooks/use-community";
+import { TripCard } from "@/features/planner/components/TripCard";
 import { formatVnd } from "@/features/planner/model/itinerary-format";
 import {
   COMMUNITY_UI_CONSTANTS,
@@ -199,10 +200,11 @@ export function CreatorProfileClientShell({
               <h1 className="text-[19px] font-bold text-[#0F172A] tracking-[-0.01em]">
                 {displayHandle}
               </h1>
-              {targetUser.isVerifiedCreator && (
+              {(targetUser.isVerifiedCreator ?? targetUser.isVerified) && (
                 <span
                   title="Thổ địa được xác thực bởi TripGenie"
-                  className="text-[#0194F3] text-[16px] inline-flex items-center"
+                  aria-label="Thổ địa được xác thực bởi TripGenie"
+                  className="text-brand-blue text-[16px] inline-flex items-center shrink-0"
                 >
                   <i
                     className="fa-solid fa-circle-check"
@@ -567,62 +569,13 @@ export function CreatorProfileClientShell({
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {publicItineraries.map((itin) => (
-                    <div
+                    <TripCard
                       key={itin.id}
-                      className="border border-[#E2E8F0] hover:border-[#0194F3] rounded-[16px] p-4 bg-white flex flex-col justify-between gap-3.5 transition-colors shadow-[0_1px_2px_rgba(0,0,0,0.02)]"
-                    >
-                      <div>
-                        {/* Destination pill & duration */}
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-[8px] bg-[#F0F7FF] text-[#0194F3] text-[11px] font-bold">
-                            <MapPin className="size-3" />
-                            <span>{itin.destination || itin.areaName || "Điểm đến"}</span>
-                          </span>
-                          <span className="text-[11.5px] font-medium text-[#64748B]">
-                            {formatTripDuration(itin.startDate, itin.endDate, true) ||
-                              `${itin.totalPlaces || 0} Điểm`}
-                          </span>
-                        </div>
-
-                        {/* Title */}
-                        <h3 className="text-[14.5px] font-bold text-[#0F172A] line-clamp-2 leading-snug mb-1.5">
-                          {itin.title}
-                        </h3>
-
-                        {/* Estimated Budget & Clones */}
-                        <p className="text-[12px] text-[#64748B]">
-                          Ước tính:{" "}
-                          <strong className="text-[#0F172A] font-semibold">
-                            {formatVnd(itin.estimatedCost || 0)}
-                          </strong>
-                          {itin.totalPlaces > 0 && ` • ${itin.totalPlaces} Điểm`}
-                        </p>
-                      </div>
-
-                      {/* Card Actions */}
-                      <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#F1F5F9]">
-                        <Link
-                          href={`/planner/${itin.id}`}
-                          className="h-[34px] px-3 rounded-[8px] border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#334155] text-[12px] font-semibold inline-flex items-center gap-1 transition-colors"
-                        >
-                          <span>Xem chi tiết</span>
-                        </Link>
-
-                        <button
-                          type="button"
-                          onClick={() => setSelectedItinForClone(itin)}
-                          className="h-[34px] px-3.5 rounded-[8px] bg-[#0194F3] hover:bg-[#007FE3] text-white text-[12px] font-bold inline-flex items-center gap-1.5 cursor-pointer shadow-[0_1px_3px_rgba(1,148,243,0.2)] transition-all"
-                        >
-                          <i
-                            className="fa-solid fa-clone text-[11px]"
-                            aria-hidden="true"
-                          />
-                          <span>Dùng mẫu</span>
-                        </button>
-                      </div>
-                    </div>
+                      itin={itin}
+                      onClone={() => setSelectedItinForClone(itin)}
+                    />
                   ))}
                 </div>
               )}

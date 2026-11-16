@@ -22,8 +22,7 @@ export interface TripInvitationNotificationInput extends BaseNotificationInput {
 }
 
 export type WriteNotificationInput =
-  | CommunityNotificationInput
-  | TripInvitationNotificationInput;
+  CommunityNotificationInput | TripInvitationNotificationInput;
 
 /**
  * Transaction-safe notification writer helper.

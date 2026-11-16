@@ -3,7 +3,6 @@
 import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Compass, ExternalLink, MapPin, Star } from 'lucide-react';
 import { ADVISOR_UI_CONSTANTS, AdvisorPlaceSummary } from '@/types/advisor';
 
 interface AdvisorPlaceCardProps {
@@ -22,7 +21,7 @@ export function AdvisorPlaceCard({ place, onNavigate }: AdvisorPlaceCardProps) {
     <Link
       href={`/places/${place.id}`}
       onClick={onNavigate}
-      className="group flex min-h-[44px] cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-2.5 text-card-foreground shadow-xs transition-all duration-200 motion-reduce:transition-none hover:border-primary/40 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="group flex min-h-[44px] cursor-pointer items-start gap-3 rounded-xl border border-border bg-card p-2.5 text-card-foreground shadow-2xs transition-all duration-200 motion-reduce:transition-none hover:border-primary/50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
         {place.primaryImage && !imgError ? (
@@ -40,7 +39,7 @@ export function AdvisorPlaceCard({ place, onNavigate }: AdvisorPlaceCardProps) {
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center bg-secondary text-secondary-foreground">
-            <Compass className="h-6 w-6" aria-hidden="true" />
+            <i className="fa-solid fa-map-location-dot text-lg" aria-hidden="true" />
           </div>
         )}
       </div>
@@ -50,8 +49,8 @@ export function AdvisorPlaceCard({ place, onNavigate }: AdvisorPlaceCardProps) {
           <h4 className="truncate text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
             {place.name}
           </h4>
-          <ExternalLink
-            className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-primary"
+          <i
+            className="fa-solid fa-arrow-up-right-from-square mt-0.5 text-[11px] shrink-0 text-muted-foreground transition-colors group-hover:text-primary"
             aria-hidden="true"
           />
         </div>
@@ -62,9 +61,9 @@ export function AdvisorPlaceCard({ place, onNavigate }: AdvisorPlaceCardProps) {
           </span>
 
           {place.ratingAvg > 0 && (
-            <span className="inline-flex items-center gap-0.5 font-semibold text-foreground">
-              <Star
-                className="h-3 w-3 fill-current text-primary"
+            <span className="inline-flex items-center gap-1 font-semibold text-foreground">
+              <i
+                className="fa-solid fa-star text-[11px] text-amber-500"
                 aria-hidden="true"
               />
               {place.ratingAvg.toFixed(1)}
@@ -83,9 +82,9 @@ export function AdvisorPlaceCard({ place, onNavigate }: AdvisorPlaceCardProps) {
           )}
         </div>
 
-        <p className="mt-1 flex items-center gap-1 truncate text-xs text-muted-foreground">
-          <MapPin
-            className="h-3 w-3 shrink-0 text-muted-foreground"
+        <p className="mt-1 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+          <i
+            className="fa-solid fa-location-dot text-[11px] shrink-0 text-muted-foreground"
             aria-hidden="true"
           />
           <span className="truncate">{place.address}</span>

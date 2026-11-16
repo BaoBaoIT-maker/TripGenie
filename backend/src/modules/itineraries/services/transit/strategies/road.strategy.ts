@@ -18,10 +18,14 @@ import {
 @Injectable()
 export class RoadTransitStrategy implements ITransitStrategy {
   constructor(
-    public readonly mode: TransitModeEnum.PERSONAL_MOTORBIKE | TransitModeEnum.PERSONAL_CAR,
+    public readonly mode:
+      TransitModeEnum.PERSONAL_MOTORBIKE | TransitModeEnum.PERSONAL_CAR,
   ) {}
 
-  summarize(res: IntercityTransitResult, roadDistanceKm: number): TransitModeSummary | null {
+  summarize(
+    res: IntercityTransitResult,
+    roadDistanceKm: number,
+  ): TransitModeSummary | null {
     if (this.mode !== TransitModeEnum.PERSONAL_MOTORBIKE) return null;
     const durHours = Math.max(1, Math.round(res.durationMinutes / 60));
     return {
@@ -33,32 +37,36 @@ export class RoadTransitStrategy implements ITransitStrategy {
       durationMinutes: res.durationMinutes,
       isMultiModal: Boolean(res.isMultiModal),
       warning:
-        roadDistanceKm > PRICING_CONFIG.SAFETY_THRESHOLDS.MOTORBIKE_MAX_DISTANCE_KM
+        roadDistanceKm >
+        PRICING_CONFIG.SAFETY_THRESHOLDS.MOTORBIKE_MAX_DISTANCE_KM
           ? 'Chú ý cự ly xa'
           : undefined,
     };
   }
 
-  async calculate(ctx: TransitStrategyContext): Promise<IntercityTransitResult> {
-    const {
-      originCity,
-      destCity,
-      roadDistanceKm,
-      isIsland,
-    } = ctx;
+  async calculate(
+    ctx: TransitStrategyContext,
+  ): Promise<IntercityTransitResult> {
+    const { originCity, destCity, roadDistanceKm, isIsland } = ctx;
 
     const isMotorbike = this.mode === TransitModeEnum.PERSONAL_MOTORBIKE;
     const speed = PRICING_CONFIG.INTERCITY.AVG_SPEED_KMH;
     const gasPrice = PRICING_CONFIG.FUEL.GAS_PRICE_PER_LITER;
     const T = PRICING_CONFIG.INTERCITY.TRANSFER;
-    const ferryPortName = ctx.nearestFerryHub?.name || PRICING_CONFIG.DEFAULTS.FERRY_PORT_NAME;
+    const ferryPortName =
+      ctx.nearestFerryHub?.name || PRICING_CONFIG.DEFAULTS.FERRY_PORT_NAME;
 
     if (isMotorbike) {
       const fuelLiters = Number(
-        ((roadDistanceKm / 100) * PRICING_CONFIG.FUEL.MOTORBIKE_CONSUMPTION_PER_100KM).toFixed(1),
+        (
+          (roadDistanceKm / 100) *
+          PRICING_CONFIG.FUEL.MOTORBIKE_CONSUMPTION_PER_100KM
+        ).toFixed(1),
       );
       const baseFuelCost = Math.round(fuelLiters * gasPrice);
-      const baseDriveMinutes = Math.round((roadDistanceKm / speed.PERSONAL_MOTORBIKE) * 60);
+      const baseDriveMinutes = Math.round(
+        (roadDistanceKm / speed.PERSONAL_MOTORBIKE) * 60,
+      );
       let fuelCost = baseFuelCost;
       let durationMinutes = baseDriveMinutes;
       let transferLeg: TransitTransferLeg | undefined;
@@ -85,7 +93,8 @@ export class RoadTransitStrategy implements ITransitStrategy {
         ];
       } else {
         routeSteps =
-          roadDistanceKm > PRICING_CONFIG.SAFETY_THRESHOLDS.MOTORBIKE_MAX_DISTANCE_KM
+          roadDistanceKm >
+          PRICING_CONFIG.SAFETY_THRESHOLDS.MOTORBIKE_MAX_DISTANCE_KM
             ? [
                 `Quãng đường ~${roadDistanceKm}km đi xe máy mất hơn ${formatDurationVi(baseDriveMinutes)} liên tục, vượt ngưỡng an toàn (>${PRICING_CONFIG.SAFETY_THRESHOLDS.MOTORBIKE_MAX_DISTANCE_KM}km).`,
                 `Khuyến nghị: Bạn nên chuyển sang Xe khách giường nằm hoặc Máy bay để giữ sức khỏe cho chuyến đi!`,
@@ -96,7 +105,10 @@ export class RoadTransitStrategy implements ITransitStrategy {
               ];
       }
 
-      const safetyAdvisory = checkTransitSafety(TransitModeEnum.PERSONAL_MOTORBIKE, roadDistanceKm);
+      const safetyAdvisory = checkTransitSafety(
+        TransitModeEnum.PERSONAL_MOTORBIKE,
+        roadDistanceKm,
+      );
 
       return {
         mode: this.mode,
@@ -122,7 +134,8 @@ export class RoadTransitStrategy implements ITransitStrategy {
           fuelLiters,
           gasPricePerLiter: gasPrice,
           notes:
-            roadDistanceKm > PRICING_CONFIG.SAFETY_THRESHOLDS.MOTORBIKE_MAX_DISTANCE_KM
+            roadDistanceKm >
+            PRICING_CONFIG.SAFETY_THRESHOLDS.MOTORBIKE_MAX_DISTANCE_KM
               ? `Cực kỳ nguy hiểm khi đi xe máy liên tục >${PRICING_CONFIG.SAFETY_THRESHOLDS.MOTORBIKE_MAX_DISTANCE_KM}km. Nên đổi sang xe khách hoặc máy bay.`
               : 'Nên xuất phát sáng sớm (5:00 - 5:30), kiểm tra lốp, phanh xe và nghỉ chân mỗi 2 tiếng.',
           routeSteps,
@@ -132,7 +145,10 @@ export class RoadTransitStrategy implements ITransitStrategy {
 
     // PERSONAL_CAR
     const fuelLiters = Number(
-      ((roadDistanceKm / 100) * PRICING_CONFIG.FUEL.CAR_CONSUMPTION_PER_100KM).toFixed(1),
+      (
+        (roadDistanceKm / 100) *
+        PRICING_CONFIG.FUEL.CAR_CONSUMPTION_PER_100KM
+      ).toFixed(1),
     );
     const fuelCost = Math.round(fuelLiters * gasPrice);
     const highwayToll = Math.round(
@@ -141,9 +157,14 @@ export class RoadTransitStrategy implements ITransitStrategy {
         PRICING_CONFIG.FUEL.HIGHWAY_TOLL_PER_KM,
     );
     const totalOneWay = fuelCost + highwayToll;
-    const durationMinutes = Math.round((roadDistanceKm / speed.PERSONAL_CAR) * 60);
+    const durationMinutes = Math.round(
+      (roadDistanceKm / speed.PERSONAL_CAR) * 60,
+    );
 
-    const safetyAdvisory = checkTransitSafety(TransitModeEnum.PERSONAL_CAR, roadDistanceKm);
+    const safetyAdvisory = checkTransitSafety(
+      TransitModeEnum.PERSONAL_CAR,
+      roadDistanceKm,
+    );
 
     return {
       mode: this.mode,
@@ -175,4 +196,3 @@ export class RoadTransitStrategy implements ITransitStrategy {
     };
   }
 }
-

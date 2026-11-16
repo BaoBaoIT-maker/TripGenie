@@ -44,20 +44,26 @@ describe('UsersService', () => {
     it('should throw NotFoundException if user does not exist', async () => {
       mockRepo.findById.mockResolvedValue(null);
 
-      await expect(service.updateAvatar('user-999', '/avatars/avatar-1.jpg')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.updateAvatar('user-999', '/avatars/avatar-1.jpg'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should successfully update avatarUrl', async () => {
-      mockRepo.findById.mockResolvedValue({ id: 'user-1', fullName: 'Nguyen Van A' });
+      mockRepo.findById.mockResolvedValue({
+        id: 'user-1',
+        fullName: 'Nguyen Van A',
+      });
       mockRepo.update.mockResolvedValue({
         id: 'user-1',
         fullName: 'Nguyen Van A',
         avatarUrl: '/avatars/avatar-1.jpg',
       });
 
-      const result = await service.updateAvatar('user-1', '  /avatars/avatar-1.jpg  ');
+      const result = await service.updateAvatar(
+        'user-1',
+        '  /avatars/avatar-1.jpg  ',
+      );
 
       expect(mockRepo.update).toHaveBeenCalledWith('user-1', {
         avatarUrl: '/avatars/avatar-1.jpg',

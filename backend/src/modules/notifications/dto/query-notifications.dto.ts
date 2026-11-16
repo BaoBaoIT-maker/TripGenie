@@ -1,6 +1,9 @@
 import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { NOTIFICATIONS_CONSTANTS, NotificationFilter } from '../notifications.constants';
+import {
+  NOTIFICATIONS_CONSTANTS,
+  NotificationFilter,
+} from '../notifications.constants';
 
 export class QueryNotificationsDto {
   @IsOptional()

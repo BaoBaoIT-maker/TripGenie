@@ -1,0 +1,853 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TripGenie — Hành Trình & Kế Hoạch Chuyến Đi</title>
+  
+  <!-- Google Fonts: Inter đồng bộ 100% với Web -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Font Awesome 6.5.2 Pro/Solid -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              50: '#F0F7FF',
+              100: '#E0EFFF',
+              200: '#BAE0FD',
+              400: '#38BDF8',
+              500: '#0194F3',
+              600: '#007FE3',
+              700: '#0066B8',
+            },
+            slate: {
+              50: '#F8FAFC',
+              100: '#F1F5F9',
+              200: '#E2E8F0',
+              300: '#CBD5E1',
+              400: '#94A3B8',
+              500: '#64748B',
+              600: '#475569',
+              700: '#334155',
+              800: '#1E293B',
+              900: '#0F172A',
+            }
+          },
+          boxShadow: {
+            'card': '0 4px 20px -2px rgba(15, 23, 42, 0.05), 0 2px 6px -1px rgba(15, 23, 42, 0.02)',
+            'card-hover': '0 16px 28px -8px rgba(1, 148, 243, 0.12), 0 6px 12px -2px rgba(15, 23, 42, 0.04)',
+            'spotlight': '0 20px 35px -15px rgba(15, 23, 42, 0.25)',
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    html, body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #F8FAFC;
+      color: #1E293B;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      height: 4px;
+      width: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col selection:bg-[#0194F3] selection:text-white">
+
+  <!-- =========================================================================
+       1. WEBSITE TOP NAVIGATION
+       ========================================================================= -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <!-- Logo Brand -->
+      <a href="#" class="flex items-center gap-2.5 group">
+        <div class="size-9 rounded-xl bg-brand-500 flex items-center justify-center text-white shadow-xs group-hover:scale-105 transition-transform">
+          <i class="fa-solid fa-compass text-lg"></i>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xl font-bold tracking-tight text-slate-900">TripGenie</span>
+          <span class="hidden sm:inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-50 text-brand-500 border border-brand-200">
+            Planner
+          </span>
+        </div>
+      </a>
+
+      <!-- Navigation Links -->
+      <nav class="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-600">
+        <a href="#" class="hover:text-brand-500 transition-colors">Khám phá</a>
+        <a href="#" class="text-brand-500 font-bold border-b-2 border-brand-500 py-5">Lịch trình</a>
+        <a href="#" class="hover:text-brand-500 transition-colors">Cộng đồng</a>
+        <a href="#" class="hover:text-brand-500 transition-colors">Bản đồ</a>
+      </nav>
+
+      <!-- Action & Profile -->
+      <div class="flex items-center gap-3">
+        <button id="toggle-empty-btn" class="text-xs font-semibold px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 transition-colors cursor-pointer shadow-2xs">
+          <i class="fa-solid fa-eye text-slate-400 mr-1.5"></i>Xem giao diện Trống
+        </button>
+        <div class="flex items-center gap-2.5 pl-2 border-l border-slate-200">
+          <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80" alt="Avatar" class="size-8 rounded-full object-cover ring-2 ring-brand-500/20">
+          <span class="hidden sm:inline text-xs font-semibold text-slate-700">Hoàng Khánh</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       2. MAIN WORKSPACE CONTENT
+       ========================================================================= -->
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+    <!-- =====================================================================
+         A. CLEAN EDITORIAL HEADER (Đã bỏ dòng chữ 'Kế Hoạch & Hành Trình' ở trên cùng)
+         ===================================================================== -->
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 border-b border-slate-200/80">
+      <div class="space-y-1">
+        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 flex items-center gap-3">
+          <span>Lịch trình của bạn</span>
+          <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200" id="total-badge">
+            5 chuyến đi
+          </span>
+        </h1>
+        <p class="text-xs sm:text-sm text-slate-500 max-w-xl">
+          Quản lý toàn bộ hành trình du lịch cá nhân và các chuyến đi đồng hành cùng bạn bè.
+        </p>
+      </div>
+
+      <!-- Primary Action -->
+      <div class="flex items-center gap-3">
+        <button 
+          onclick="openCreateTripModal()"
+          class="h-10 px-5 bg-brand-500 hover:bg-brand-600 text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 shrink-0 cursor-pointer active:scale-95"
+        >
+          <i class="fa-solid fa-plus text-xs"></i>
+          <span>Tạo chuyến đi mới</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- =====================================================================
+         B. SPOTLIGHT HERO: CHUYẾN ĐI SẮP TỚI GẦN NHẤT
+         ===================================================================== -->
+    <section id="spotlight-section" class="relative group">
+      <div class="relative w-full rounded-3xl overflow-hidden shadow-spotlight bg-slate-900 border border-white/10">
+        <!-- Ảnh toàn cảnh sắc nét -->
+        <div class="relative h-[280px] sm:h-[310px] w-full overflow-hidden">
+          <img 
+            src="https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=1600&auto=format&fit=crop&q=85" 
+            alt="Đà Nẵng Hội An" 
+            class="w-full h-full object-cover object-center group-hover:scale-102 transition-transform duration-700 ease-out"
+          />
+          <!-- Multi-tier Scrim Gradient -->
+          <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-slate-900/10"></div>
+          <div class="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-slate-950/30 to-transparent"></div>
+        </div>
+
+        <!-- Spotlight Content Overlays -->
+        <div class="absolute inset-0 p-6 sm:p-8 flex flex-col justify-between text-white z-10">
+          <!-- Top Row: Tag Thời lượng + Thời tiết tĩnh kính mờ -->
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <!-- Tag thời lượng -->
+              <span class="px-3 py-1 rounded-full bg-white/20 text-white text-xs font-semibold backdrop-blur-md border border-white/15">
+                4 Ngày 3 Đêm
+              </span>
+
+              <!-- Thời tiết động theo điều kiện thực tế (Nắng đẹp rực rỡ với sắc vàng ấm áp) -->
+              <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/25 text-amber-100 text-xs font-semibold backdrop-blur-md border border-amber-300/30 shadow-2xs">
+                <i class="fa-solid fa-sun text-amber-300 text-xs"></i>
+                <span>Đà Nẵng 29°C • Nắng đẹp</span>
+              </span>
+            </div>
+
+            <!-- Spotlight Menu 3 chấm -->
+            <div class="relative">
+              <button 
+                onclick="toggleDropdown(event, 'spotlight-menu')"
+                class="size-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-md flex items-center justify-center transition-all border border-white/20 cursor-pointer"
+                title="Tùy chọn"
+              >
+                <i class="fa-solid fa-ellipsis"></i>
+              </button>
+              <div id="spotlight-menu" class="dropdown-menu hidden absolute right-0 mt-2 w-48 bg-white text-slate-800 rounded-2xl shadow-xl border border-slate-200 py-1.5 z-30">
+                <a href="#" class="flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold hover:bg-slate-50 hover:text-brand-500 transition-colors">
+                  <i class="fa-solid fa-pen-to-square w-4 text-slate-400"></i> Chỉnh sửa hành trình
+                </a>
+                <button onclick="alert('Đã sao chép liên kết!')" class="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold hover:bg-slate-50 hover:text-brand-500 transition-colors cursor-pointer">
+                  <i class="fa-solid fa-share-nodes w-4 text-slate-400"></i> Chia sẻ liên kết
+                </button>
+                <button onclick="alert('Mời bạn đồng hành!')" class="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold hover:bg-slate-50 hover:text-brand-500 transition-colors cursor-pointer">
+                  <i class="fa-solid fa-user-plus w-4 text-slate-400"></i> Mời bạn đồng hành
+                </button>
+                <div class="h-px bg-slate-100 my-1"></div>
+                <button onclick="confirmDeleteTrip('Kỳ nghỉ hè rực rỡ tại Đà Nẵng')" class="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer">
+                  <i class="fa-solid fa-trash-can w-4 text-rose-500"></i> Xóa lịch trình
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom Row: Title, Metadata, CTA -->
+          <div class="space-y-3.5 max-w-2xl">
+            <div class="space-y-1.5">
+              <div class="flex items-center gap-2 text-white/80 font-medium text-xs sm:text-sm">
+                <i class="fa-solid fa-location-dot text-white/60"></i>
+                <span>Đà Nẵng • Phố cổ Hội An</span>
+              </div>
+              <h2 class="text-xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-md leading-tight">
+                Kỳ nghỉ hè rực rỡ tại Đà Nẵng - Hội An
+              </h2>
+              <p class="text-xs sm:text-sm text-slate-200/90 font-normal">
+                Thời gian: <span class="text-white font-medium">18/06 – 21/06/2026</span> • Dự toán ngân sách: <span class="text-white font-medium">4.200.000 đ</span>
+              </p>
+              
+              <!-- CÁC ĐIỂM THAM QUAN NẰM PHÍA DƯỚI DÒNG DỰ TOÁN NGÂN SÁCH (DÙNG ICON LANDMARK DI TÍCH/DANH THẮNG) -->
+              <div class="flex items-center gap-2 text-xs text-slate-300 pt-0.5">
+                <i class="fa-solid fa-landmark text-white/80 shrink-0 text-xs"></i>
+                <span class="font-medium text-white">12 điểm tham quan nổi bật:</span>
+                <span class="text-slate-200/90 line-clamp-1">Bà Nà Hills, Bán đảo Sơn Trà, Bãi biển Mỹ Khê, Chùa Cầu Hội An...</span>
+              </div>
+            </div>
+
+            <!-- Action & Facepile -->
+            <div class="flex flex-wrap items-center gap-4 pt-1">
+              <a 
+                href="#"
+                class="inline-flex items-center gap-2 px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md cursor-pointer"
+              >
+                <span>Xem lịch trình chi tiết</span>
+                <i class="fa-solid fa-arrow-right text-xs"></i>
+              </a>
+
+              <!-- Companions Facepile -->
+              <div class="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/15">
+                <div class="flex items-center -space-x-2">
+                  <img class="size-6 rounded-full ring-2 ring-slate-900 object-cover" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=60&auto=format&fit=crop&q=80" alt="F1">
+                  <img class="size-6 rounded-full ring-2 ring-slate-900 object-cover" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60&auto=format&fit=crop&q=80" alt="F2">
+                  <span class="size-6 rounded-full bg-brand-500 ring-2 ring-slate-900 flex items-center justify-center text-[10px] font-bold text-white">+1</span>
+                </div>
+                <span class="text-xs font-medium text-slate-200">Đi cùng 3 người bạn</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- =====================================================================
+         C. THANH ĐIỀU KHIỂN DANH SÁCH (UNIFIED TOOLBAR: FILTER + SEARCH)
+         ===================================================================== -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 pb-1">
+      <!-- Segmented Scope Filter (Bấm 1 chạm trực quan) -->
+      <div class="inline-flex p-1 bg-slate-200/60 rounded-xl text-xs font-semibold self-start sm:self-auto">
+        <button 
+          onclick="filterByScope('ALL', this)" 
+          class="scope-btn px-3.5 py-1.5 rounded-lg bg-white text-slate-900 shadow-2xs font-bold transition-all cursor-pointer"
+          data-scope="ALL"
+        >
+          Tất cả (5)
+        </button>
+        <button 
+          onclick="filterByScope('OWNED', this)" 
+          class="scope-btn px-3.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all cursor-pointer"
+          data-scope="OWNED"
+        >
+          Của tôi (4)
+        </button>
+        <button 
+          onclick="filterByScope('JOINED', this)" 
+          class="scope-btn px-3.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all cursor-pointer"
+          data-scope="JOINED"
+        >
+          Được mời (1)
+        </button>
+      </div>
+
+      <!-- Ô tìm kiếm tinh gọn đặt chuẩn ngay trên danh sách -->
+      <div class="relative w-full sm:w-72">
+        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+        <input 
+          type="text" 
+          id="search-input" 
+          placeholder="Tìm theo tên chuyến đi, điểm đến..." 
+          class="w-full h-9 pl-9 pr-3 rounded-xl text-xs sm:text-sm bg-white border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 transition-all placeholder:text-slate-400 shadow-2xs"
+        />
+      </div>
+    </div>
+
+    <!-- =====================================================================
+         D. CHRONOLOGICAL SECTION 1: CÁC CHUYẾN ĐI SẮP TỚI
+         ===================================================================== -->
+    <div class="space-y-4">
+      <div class="flex items-center gap-2 border-b border-slate-200/80 pb-2">
+        <h2 class="text-base font-bold text-slate-800">
+          Chuyến đi sắp tới
+        </h2>
+        <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-brand-50 text-brand-500 border border-brand-200" id="upcoming-count">
+          2
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+
+        <!-- TRIP 1: Ninh Bình -->
+        <div class="trip-card group flex flex-col cursor-pointer" data-timeline="UPCOMING" data-scope="OWNED" data-title="khám phá non nước ninh bình tràng an">
+          <div class="relative aspect-[16/11] w-full rounded-2xl overflow-hidden bg-slate-100 shadow-card group-hover:shadow-card-hover group-hover:-translate-y-1 transition-all duration-300">
+            <img 
+              src="https://images.unsplash.com/photo-1528127269322-539801943592?w=800&auto=format&fit=crop&q=80" 
+              alt="Ninh Bình" 
+              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+            />
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-transparent"></div>
+
+            <!-- Top Left: Tag Thời lượng tinh gọn -->
+            <div class="absolute top-3 left-3 z-10">
+              <span class="px-2.5 py-1 rounded-lg bg-black/40 text-white text-[11px] font-semibold shadow-xs backdrop-blur-md border border-white/20 flex items-center gap-1.5">
+                <i class="fa-solid fa-clock text-white/70 text-[10px]"></i>
+                <span>2N1Đ</span>
+              </span>
+            </div>
+
+            <!-- Top Right: Menu 3 chấm -->
+            <div class="absolute top-3 right-3 z-20">
+              <button 
+                onclick="toggleDropdown(event, 'menu-nb')"
+                class="size-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-md flex items-center justify-center transition-all border border-white/20 cursor-pointer active:scale-90"
+                title="Tùy chọn"
+              >
+                <i class="fa-solid fa-ellipsis text-xs"></i>
+              </button>
+              <div id="menu-nb" class="dropdown-menu hidden absolute right-0 mt-2 w-48 bg-white text-slate-800 rounded-2xl shadow-xl border border-slate-200 py-1.5 z-30">
+                <a href="#" class="flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold hover:bg-slate-50 hover:text-brand-500 transition-colors">
+                  <i class="fa-solid fa-eye w-4 text-slate-400"></i> Xem chi tiết
+                </a>
+                <a href="#" class="flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold hover:bg-slate-50 hover:text-brand-500 transition-colors">
+                  <i class="fa-solid fa-pen-to-square w-4 text-slate-400"></i> Chỉnh sửa
+                </a>
+                <div class="h-px bg-slate-100 my-1"></div>
+                <button onclick="confirmDeleteTrip('Khám phá non nước Ninh Bình')" class="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer">
+                  <i class="fa-solid fa-trash-can w-4 text-rose-500"></i> Xóa chuyến đi
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Body Card: Cấu trúc dữ liệu chuẩn hóa, icon trung tính -->
+          <div class="pt-3.5 space-y-2">
+            <div class="flex items-center justify-between text-xs text-slate-500 font-medium">
+              <div class="flex items-center gap-1.5">
+                <i class="fa-solid fa-location-dot text-slate-400 text-[11px]"></i>
+                <span class="font-semibold text-slate-700">Ninh Bình</span>
+              </div>
+              <!-- Weather Tag theo điều kiện: Dịu mát -->
+              <span class="inline-flex items-center gap-1 text-[11px] font-medium text-sky-700 bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200/60">
+                <i class="fa-solid fa-cloud text-sky-400 text-[10px]"></i>
+                <span>27°C Mát</span>
+              </span>
+            </div>
+
+            <h3 class="font-bold text-slate-900 text-[15px] sm:text-base leading-snug line-clamp-1 group-hover:text-brand-500 transition-colors">
+              Khám phá non nước Ninh Bình & Tràng An
+            </h3>
+
+            <div class="flex items-center justify-between text-xs text-slate-500 font-medium">
+              <div class="flex items-center gap-1.5">
+                <i class="fa-solid fa-calendar text-slate-400 text-[11px]"></i>
+                <span>05/07 – 06/07/2026</span>
+              </div>
+              <div class="flex items-center gap-1.5 text-slate-600">
+                <i class="fa-solid fa-landmark text-slate-400 text-[11px]"></i>
+                <span>6 điểm tham quan</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+              <span class="font-bold text-slate-800">1.800.000 đ</span>
+              <span class="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+                <i class="fa-solid fa-user text-[10px]"></i> Đi một mình
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TRIP 2: Phú Quốc (Shared Trip) -->
+        <div class="trip-card group flex flex-col cursor-pointer" data-timeline="UPCOMING" data-scope="JOINED" data-title="xuyên rừng phú quốc hoàng hôn sunset sanato">
+          <div class="relative aspect-[16/11] w-full rounded-2xl overflow-hidden bg-slate-100 shadow-card group-hover:shadow-card-hover group-hover:-translate-y-1 transition-all duration-300">
+            <img 
+              src="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&auto=format&fit=crop&q=80" 
+              alt="Phú Quốc" 
+              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+            />
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-transparent"></div>
+
+            <!-- Top Left: Tag Thời lượng -->
+            <div class="absolute top-3 left-3 z-10">
+              <span class="px-2.5 py-1 rounded-lg bg-black/40 text-white text-[11px] font-semibold shadow-xs backdrop-blur-md border border-white/20 flex items-center gap-1.5">
+                <i class="fa-solid fa-clock text-white/70 text-[10px]"></i>
+                <span>4N3Đ</span>
+              </span>
+            </div>
+
+            <!-- Top Right: Menu 3 chấm -->
+            <div class="absolute top-3 right-3 z-20">
+              <button 
+                onclick="toggleDropdown(event, 'menu-pq')"
+                class="size-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-md flex items-center justify-center transition-all border border-white/20 cursor-pointer active:scale-90"
+              >
+                <i class="fa-solid fa-ellipsis text-xs"></i>
+              </button>
+              <div id="menu-pq" class="dropdown-menu hidden absolute right-0 mt-2 w-48 bg-white text-slate-800 rounded-2xl shadow-xl border border-slate-200 py-1.5 z-30">
+                <a href="#" class="flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold hover:bg-slate-50 hover:text-brand-500 transition-colors">
+                  <i class="fa-solid fa-eye w-4 text-slate-400"></i> Xem chi tiết
+                </a>
+                <button onclick="confirmDeleteTrip('Xuyên rừng Phú Quốc')" class="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer">
+                  <i class="fa-solid fa-trash-can w-4 text-rose-500"></i> Xóa chuyến đi
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Body Card -->
+          <div class="pt-3.5 space-y-2">
+            <div class="flex items-center justify-between text-xs text-slate-500 font-medium">
+              <div class="flex items-center gap-1.5">
+                <i class="fa-solid fa-location-dot text-slate-400 text-[11px]"></i>
+                <span class="font-semibold text-slate-700">Phú Quốc, Kiên Giang</span>
+              </div>
+              <!-- Weather Tag theo điều kiện: Nắng vàng rực rỡ biển -->
+              <span class="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
+                <i class="fa-solid fa-sun text-amber-500 text-[10px]"></i>
+                <span>31°C Nắng</span>
+              </span>
+            </div>
+
+            <h3 class="font-bold text-slate-900 text-[15px] sm:text-base leading-snug line-clamp-1 group-hover:text-brand-500 transition-colors">
+              Xuyên rừng Phú Quốc & Sunset Sanato
+            </h3>
+
+            <div class="flex items-center justify-between text-xs text-slate-500 font-medium">
+              <div class="flex items-center gap-1.5">
+                <i class="fa-solid fa-calendar text-slate-400 text-[11px]"></i>
+                <span>28/08 – 31/08/2026</span>
+              </div>
+              <div class="flex items-center gap-1.5 text-slate-600">
+                <i class="fa-solid fa-landmark text-slate-400 text-[11px]"></i>
+                <span>10 điểm tham quan</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+              <span class="font-bold text-slate-800">3.500.000 đ</span>
+              <!-- Hiển thị Người đi cùng chuẩn xác (fixed kích thước w-5 h-5 ring-2) -->
+              <div class="flex items-center gap-2">
+                <div class="flex items-center -space-x-2">
+                  <img class="w-5 h-5 rounded-full ring-2 ring-white object-cover shadow-2xs" src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=60&auto=format&fit=crop" alt="Hoàng Yến" title="Hoàng Yến">
+                  <img class="w-5 h-5 rounded-full ring-2 ring-white object-cover shadow-2xs" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=60&auto=format&fit=crop" alt="Minh Đức" title="Minh Đức">
+                  <span class="w-5 h-5 rounded-full bg-slate-100 ring-2 ring-white flex items-center justify-center text-[9px] font-bold text-slate-600 shadow-2xs">+2</span>
+                </div>
+                <span class="text-[11px] font-medium text-slate-600">4 người đi</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- THẺ CANVAS TẠO MỚI -->
+        <div 
+          onclick="openCreateTripModal()"
+          class="group flex flex-col justify-center items-center p-8 rounded-2xl border-2 border-dashed border-slate-200 hover:border-brand-500 bg-white/60 hover:bg-brand-50/40 transition-all duration-300 cursor-pointer min-h-[220px]"
+        >
+          <div class="size-12 rounded-2xl bg-brand-50 text-brand-500 group-hover:bg-brand-500 group-hover:text-white flex items-center justify-center text-lg transition-all shadow-2xs group-hover:scale-110 mb-3">
+            <i class="fa-solid fa-plus"></i>
+          </div>
+          <div class="text-sm font-bold text-slate-800 group-hover:text-brand-600 transition-colors text-center">
+            Lập kế hoạch mới
+          </div>
+          <p class="text-xs text-slate-400 text-center mt-1 max-w-[180px]">
+            Tạo nhanh bằng Genie AI hoặc xếp lịch thủ công
+          </p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- =====================================================================
+         E. CHRONOLOGICAL SECTION 2: KỶ NIỆM CÁC CHUYẾN ĐI TRƯỚC
+         ===================================================================== -->
+    <div class="space-y-4 pt-4">
+      <div class="flex items-center gap-2 border-b border-slate-200/80 pb-2">
+        <h2 class="text-base font-bold text-slate-800">
+          Kỷ niệm các chuyến đi trước
+        </h2>
+        <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600" id="past-count">
+          2
+        </span>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+
+        <!-- TRIP 3: Đà Lạt -->
+        <div class="trip-card group flex flex-col cursor-pointer" data-timeline="PAST" data-scope="OWNED" data-title="đà lạt săn mây cafe đồi thông">
+          <div class="relative aspect-[16/11] w-full rounded-2xl overflow-hidden bg-slate-100 shadow-card group-hover:shadow-card-hover group-hover:-translate-y-1 transition-all duration-300">
+            <img 
+              src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80" 
+              alt="Đà Lạt" 
+              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+            />
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-transparent"></div>
+
+            <!-- Top Left: Tag Thời lượng -->
+            <div class="absolute top-3 left-3 z-10">
+              <span class="px-2.5 py-1 rounded-lg bg-black/40 text-white text-[11px] font-semibold shadow-xs backdrop-blur-md border border-white/20 flex items-center gap-1.5">
+                <i class="fa-solid fa-clock text-white/70 text-[10px]"></i>
+                <span>3N2Đ</span>
+              </span>
+            </div>
+
+            <!-- Top Right: Menu 3 chấm -->
+            <div class="absolute top-3 right-3 z-20">
+              <button 
+                onclick="toggleDropdown(event, 'menu-dl')"
+                class="size-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-md flex items-center justify-center transition-all border border-white/20 cursor-pointer active:scale-90"
+              >
+                <i class="fa-solid fa-ellipsis text-xs"></i>
+              </button>
+              <div id="menu-dl" class="dropdown-menu hidden absolute right-0 mt-2 w-48 bg-white text-slate-800 rounded-2xl shadow-xl border border-slate-200 py-1.5 z-30">
+                <a href="#" class="flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold hover:bg-slate-50 hover:text-brand-500 transition-colors">
+                  <i class="fa-solid fa-eye w-4 text-slate-400"></i> Xem chi tiết
+                </a>
+                <button onclick="confirmDeleteTrip('Săn mây Đà Lạt')" class="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer">
+                  <i class="fa-solid fa-trash-can w-4 text-rose-500"></i> Xóa chuyến đi
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Body Card -->
+          <div class="pt-3.5 space-y-2">
+            <div class="flex items-center justify-between text-xs text-slate-500 font-medium">
+              <div class="flex items-center gap-1.5">
+                <i class="fa-solid fa-location-dot text-slate-400 text-[11px]"></i>
+                <span class="font-semibold text-slate-700">Đà Lạt, Lâm Đồng</span>
+              </div>
+              <!-- Weather Tag theo điều kiện: Se lạnh sương mù -->
+              <span class="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-200/60">
+                <i class="fa-solid fa-cloud-moon text-indigo-400 text-[10px]"></i>
+                <span>17°C Se lạnh</span>
+              </span>
+            </div>
+
+            <h3 class="font-bold text-slate-900 text-[15px] sm:text-base leading-snug line-clamp-1 group-hover:text-brand-500 transition-colors">
+              Săn mây Đà Lạt & Cafe ngắm đồi thông
+            </h3>
+
+            <div class="flex items-center justify-between text-xs text-slate-500 font-medium">
+              <div class="flex items-center gap-1.5">
+                <i class="fa-solid fa-calendar text-slate-400 text-[11px]"></i>
+                <span>12/04 – 14/04/2026</span>
+              </div>
+              <div class="flex items-center gap-1.5 text-slate-600">
+                <i class="fa-solid fa-landmark text-slate-400 text-[11px]"></i>
+                <span>9 điểm tham quan</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+              <span class="font-bold text-slate-800">2.900.000 đ</span>
+              <!-- Đi cùng 2 bạn -->
+              <div class="flex items-center gap-2">
+                <div class="flex items-center -space-x-2">
+                  <img class="w-5 h-5 rounded-full ring-2 ring-white object-cover shadow-2xs" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=60&auto=format&fit=crop" alt="Lan Anh" title="Lan Anh">
+                  <img class="w-5 h-5 rounded-full ring-2 ring-white object-cover shadow-2xs" src="https://images.unsplash.com/photo-1517841905240-472988babdf9?w=60&auto=format&fit=crop" alt="Quang Huy" title="Quang Huy">
+                </div>
+                <span class="text-[11px] font-medium text-slate-600">2 người đi</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TRIP 4: Hà Nội Food tour -->
+        <div class="trip-card group flex flex-col cursor-pointer" data-timeline="PAST" data-scope="OWNED" data-title="hà nội phố cổ food tour trà đá">
+          <div class="relative aspect-[16/11] w-full rounded-2xl overflow-hidden bg-slate-100 shadow-card group-hover:shadow-card-hover group-hover:-translate-y-1 transition-all duration-300">
+            <img 
+              src="https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=800&auto=format&fit=crop&q=80" 
+              alt="Hà Nội" 
+              class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
+            />
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-transparent"></div>
+
+            <!-- Top Left: Tag Thời lượng -->
+            <div class="absolute top-3 left-3 z-10">
+              <span class="px-2.5 py-1 rounded-lg bg-black/40 text-white text-[11px] font-semibold shadow-xs backdrop-blur-md border border-white/20 flex items-center gap-1.5">
+                <i class="fa-solid fa-clock text-white/70 text-[10px]"></i>
+                <span>2N1Đ</span>
+              </span>
+            </div>
+
+            <!-- Top Right: Menu 3 chấm -->
+            <div class="absolute top-3 right-3 z-20">
+              <button 
+                onclick="toggleDropdown(event, 'menu-hn')"
+                class="size-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-md flex items-center justify-center transition-all border border-white/20 cursor-pointer active:scale-90"
+              >
+                <i class="fa-solid fa-ellipsis text-xs"></i>
+              </button>
+              <div id="menu-hn" class="dropdown-menu hidden absolute right-0 mt-2 w-48 bg-white text-slate-800 rounded-2xl shadow-xl border border-slate-200 py-1.5 z-30">
+                <a href="#" class="flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold hover:bg-slate-50 hover:text-brand-500 transition-colors">
+                  <i class="fa-solid fa-eye w-4 text-slate-400"></i> Xem chi tiết
+                </a>
+                <button onclick="confirmDeleteTrip('Food tour phố cổ Hà Nội')" class="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer">
+                  <i class="fa-solid fa-trash-can w-4 text-rose-500"></i> Xóa chuyến đi
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Body Card -->
+          <div class="pt-3.5 space-y-2">
+            <div class="flex items-center justify-between text-xs text-slate-500 font-medium">
+              <div class="flex items-center gap-1.5">
+                <i class="fa-solid fa-location-dot text-slate-400 text-[11px]"></i>
+                <span class="font-semibold text-slate-700">Hà Nội</span>
+              </div>
+              <!-- Weather Tag theo điều kiện: Mưa rải rác mát mẻ -->
+              <span class="inline-flex items-center gap-1 text-[11px] font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200/60">
+                <i class="fa-solid fa-cloud-rain text-blue-400 text-[10px]"></i>
+                <span>21°C Mưa nhẹ</span>
+              </span>
+            </div>
+
+            <h3 class="font-bold text-slate-900 text-[15px] sm:text-base leading-snug line-clamp-1 group-hover:text-brand-500 transition-colors">
+              Food tour phố cổ Hà Nội & Trà đá vỉa hè
+            </h3>
+
+            <div class="flex items-center justify-between text-xs text-slate-500 font-medium">
+              <div class="flex items-center gap-1.5">
+                <i class="fa-solid fa-calendar text-slate-400 text-[11px]"></i>
+                <span>15/03 – 16/03/2026</span>
+              </div>
+              <div class="flex items-center gap-1.5 text-slate-600">
+                <i class="fa-solid fa-landmark text-slate-400 text-[11px]"></i>
+                <span>14 điểm tham quan</span>
+              </div>
+            </div>
+
+            <div class="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+              <span class="font-bold text-slate-800">1.200.000 đ</span>
+              <span class="text-[11px] font-medium text-slate-400 flex items-center gap-1">
+                <i class="fa-solid fa-user text-[10px]"></i> Đi một mình
+              </span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- =====================================================================
+         F. EMPTY STATE (Trạng thái khi tài khoản chưa có chuyến đi nào)
+         ===================================================================== -->
+    <div id="empty-state-container" class="hidden my-12">
+      <div class="bg-white rounded-3xl border border-slate-200/80 p-12 text-center max-w-lg mx-auto shadow-card space-y-4">
+        <div class="size-16 rounded-2xl bg-brand-50 text-brand-500 mx-auto flex items-center justify-center text-2xl shadow-xs">
+          <i class="fa-solid fa-map-location-dot"></i>
+        </div>
+        <div class="space-y-1.5">
+          <h3 class="text-lg sm:text-xl font-bold text-slate-800">
+            Chưa có kế hoạch chuyến đi nào
+          </h3>
+          <p class="text-xs sm:text-sm text-slate-500 leading-relaxed max-w-sm mx-auto">
+            Bắt đầu hành trình tiếp theo của bạn ngay hôm nay! Hãy để Genie AI thiết kế lộ trình thông minh chỉ trong vài giây.
+          </p>
+        </div>
+        <div class="pt-2 flex flex-wrap items-center justify-center gap-3">
+          <button onclick="openCreateTripModal()" class="px-5 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-xs sm:text-sm font-bold transition-all shadow-xs flex items-center gap-2 cursor-pointer">
+            <i class="fa-solid fa-wand-magic-sparkles"></i>
+            <span>Tạo lịch trình với AI</span>
+          </button>
+          <a href="#" class="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold transition-colors">
+            Khám phá Cộng đồng
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- =========================================================================
+       3. MODAL TẠO CHUYẾN ĐI (AI HOẶC THỦ CÔNG)
+       ========================================================================= -->
+  <div id="create-trip-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-6 sm:p-8 space-y-6 relative border border-slate-200 animate-in fade-in zoom-in-95">
+      <button onclick="closeCreateTripModal()" class="absolute top-5 right-5 size-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center text-sm transition-colors cursor-pointer">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <div class="space-y-1 text-center">
+        <div class="size-12 rounded-2xl bg-brand-50 text-brand-500 mx-auto flex items-center justify-center text-xl mb-3 border border-brand-200">
+          <i class="fa-solid fa-compass"></i>
+        </div>
+        <h3 class="text-xl font-bold text-slate-800 tracking-tight">Bắt đầu chuyến đi mới</h3>
+        <p class="text-xs text-slate-500">Chọn phương thức bạn muốn xây dựng hành trình du lịch</p>
+      </div>
+
+      <div class="space-y-3">
+        <!-- Option 1: AI Planner -->
+        <button onclick="alert('Mở AI Wizard Lập Lịch Trình')" class="w-full text-left p-4 rounded-2xl border-2 border-brand-500/30 bg-brand-50/50 hover:bg-brand-50 hover:border-brand-500 transition-all flex items-start gap-4 group cursor-pointer">
+          <div class="size-10 rounded-xl bg-brand-500 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+            <i class="fa-solid fa-wand-magic-sparkles text-sm"></i>
+          </div>
+          <div>
+            <div class="text-sm font-bold text-slate-900 group-hover:text-brand-600 transition-colors flex items-center gap-2">
+              <span>Tạo tự động với Genie AI</span>
+              <span class="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-brand-500 text-white">Khuyên dùng</span>
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">
+              Nhập điểm đến và số ngày, AI tự động tính cự ly nối chặng, thứ tự tham quan và phân bổ ngân sách.
+            </p>
+          </div>
+        </button>
+
+        <!-- Option 2: Manual Planner -->
+        <button onclick="alert('Chuyển sang trang Lập Kế Hoạch Thủ Công')" class="w-full text-left p-4 rounded-2xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all flex items-start gap-4 group cursor-pointer">
+          <div class="size-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+            <i class="fa-solid fa-pen-to-square text-sm"></i>
+          </div>
+          <div>
+            <div class="text-sm font-bold text-slate-800 group-hover:text-brand-600 transition-colors">
+              Lập lịch trình thủ công
+            </div>
+            <p class="text-xs text-slate-500 mt-0.5 leading-relaxed">
+              Tự tay chọn từng quán ăn, khách sạn và điểm đến theo ý muốn của bạn.
+            </p>
+          </div>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       4. CLIENT-SIDE INTERACTIVITY
+       ========================================================================= -->
+  <script>
+    // 1. Quản lý Dropdown Menu 3 chấm
+    function toggleDropdown(event, menuId) {
+      event.stopPropagation();
+      const menu = document.getElementById(menuId);
+      const allMenus = document.querySelectorAll('.dropdown-menu');
+      
+      allMenus.forEach(m => {
+        if (m.id !== menuId) m.classList.add('hidden');
+      });
+
+      menu.classList.toggle('hidden');
+    }
+
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.dropdown-menu').forEach(m => m.classList.add('hidden'));
+    });
+
+    // 2. Lọc theo Scope (Chuyến đi tôi tạo / Được mời)
+    let currentScope = 'ALL';
+
+    function filterByScope(scope, btn) {
+      currentScope = scope;
+      
+      // Cập nhật trạng thái active của segmented buttons
+      document.querySelectorAll('.scope-btn').forEach(b => {
+        b.className = 'scope-btn px-3.5 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all cursor-pointer font-semibold';
+      });
+      if (btn) {
+        btn.className = 'scope-btn px-3.5 py-1.5 rounded-lg bg-white text-slate-900 shadow-2xs font-bold transition-all cursor-pointer';
+      }
+
+      applyFilters();
+    }
+
+    // 3. Tìm kiếm từ khóa tức thì
+    const searchInput = document.getElementById('search-input');
+    searchInput.addEventListener('input', applyFilters);
+
+    function applyFilters() {
+      const keyword = searchInput.value.toLowerCase().trim();
+      const cards = document.querySelectorAll('.trip-card');
+
+      cards.forEach(card => {
+        const scope = card.getAttribute('data-scope');
+        const title = card.getAttribute('data-title');
+
+        const matchesScope = (currentScope === 'ALL') || (scope === currentScope);
+        const matchesKeyword = !keyword || title.includes(keyword);
+
+        if (matchesScope && matchesKeyword) {
+          card.classList.remove('hidden');
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+    }
+
+    // 4. Modal Tạo chuyến đi
+    function openCreateTripModal() {
+      document.getElementById('create-trip-modal').classList.remove('hidden');
+    }
+    function closeCreateTripModal() {
+      document.getElementById('create-trip-modal').classList.add('hidden');
+    }
+
+    // 5. Xóa chuyến đi giả lập
+    function confirmDeleteTrip(tripTitle) {
+      if (confirm(`Bạn có chắc chắn muốn xóa lịch trình "${tripTitle}"?`)) {
+        alert(`Đã xóa chuyến đi "${tripTitle}" thành công!`);
+      }
+    }
+
+    // 6. Toggle xem giao diện Trống (Empty State)
+    let isShowingEmpty = false;
+    const toggleBtn = document.getElementById('toggle-empty-btn');
+    const spotlightSec = document.getElementById('spotlight-section');
+    const emptyContainer = document.getElementById('empty-state-container');
+
+    toggleBtn.addEventListener('click', () => {
+      isShowingEmpty = !isShowingEmpty;
+      if (isShowingEmpty) {
+        spotlightSec.classList.add('hidden');
+        document.querySelectorAll('.space-y-4').forEach(el => el.classList.add('hidden'));
+        emptyContainer.classList.remove('hidden');
+        toggleBtn.innerHTML = '<i class="fa-solid fa-list text-slate-400 mr-1.5"></i>Xem danh sách đầy đủ';
+      } else {
+        spotlightSec.classList.remove('hidden');
+        document.querySelectorAll('.space-y-4').forEach(el => el.classList.remove('hidden'));
+        emptyContainer.classList.add('hidden');
+        toggleBtn.innerHTML = '<i class="fa-solid fa-eye text-slate-400 mr-1.5"></i>Xem giao diện Trống';
+      }
+    });
+
+    applyFilters();
+  </script>
+</body>
+</html>

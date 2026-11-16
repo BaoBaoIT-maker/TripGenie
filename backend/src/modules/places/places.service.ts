@@ -1,13 +1,22 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
-import { IPlaceRepository, PlaceRow } from './interfaces/place-repository.interface';
+import {
+  IPlaceRepository,
+  PlaceRow,
+} from './interfaces/place-repository.interface';
 import { IEmbeddingService } from './interfaces/embedding-service.interface';
 import { GeoJsonService } from '../geo/services/geojson.service';
-import { GeoJsonFeatureCollection, PlaceGeoInput } from '../geo/interfaces/geo.interface';
+import {
+  GeoJsonFeatureCollection,
+  PlaceGeoInput,
+} from '../geo/interfaces/geo.interface';
 import { NominatimService } from './services/nominatim.service';
 import { SearchPlacesDto } from './dto/search-places.dto';
 import { NearbyPlacesDto } from './dto/nearby-places.dto';
-import { SemanticSearchDto, SyncEmbeddingsDto } from './dto/semantic-search.dto';
+import {
+  SemanticSearchDto,
+  SyncEmbeddingsDto,
+} from './dto/semantic-search.dto';
 import {
   PaginatedPlacesResponseDto,
   PlaceDetailDto,
@@ -46,7 +55,9 @@ export class PlacesService {
    * Matches Google Maps: coordinates/address show a single pin.
    * Frontend adds a "Tìm quanh đây" button for user-initiated nearby search.
    */
-  async searchPlaces(dto: SearchPlacesDto): Promise<PaginatedPlacesResponseDto> {
+  async searchPlaces(
+    dto: SearchPlacesDto,
+  ): Promise<PaginatedPlacesResponseDto> {
     const rawKeyword = dto.keyword?.trim() ?? '';
     const page = dto.page || 1;
     const limit = dto.limit || 20;
@@ -80,13 +91,16 @@ export class PlacesService {
 
     if (parsed?.landmarkAnchor) {
       // Resolve Landmark to coordinates (DB first, fallback to Nominatim)
-      let landmark = await this.placeRepo.findLandmarkCoords(parsed.landmarkAnchor);
+      let landmark = await this.placeRepo.findLandmarkCoords(
+        parsed.landmarkAnchor,
+      );
       if (!landmark) {
         landmark = await this.nominatim.geocode(parsed.landmarkAnchor);
       }
 
       if (landmark) {
-        const effectiveRadius = parsed.extractedRadiusMeters || dto.radiusMeters || 3000;
+        const effectiveRadius =
+          parsed.extractedRadiusMeters || dto.radiusMeters || 3000;
         const effectiveCategorySlugs = parsed.categorySlug
           ? [parsed.categorySlug]
           : dto.categorySlugs;
@@ -104,11 +118,17 @@ export class PlacesService {
           limit,
         };
 
-        const { items: rawItems, total: dbTotal } = await this.placeRepo.searchPlaces(spatialDto);
+        const { items: rawItems, total: dbTotal } =
+          await this.placeRepo.searchPlaces(spatialDto);
         const items = rawItems.map((row) => this.mapToPlaceItemDto(row));
         return {
           items,
-          meta: { totalItems: dbTotal, page, limit, totalPages: Math.ceil(dbTotal / limit) || 1 },
+          meta: {
+            totalItems: dbTotal,
+            page,
+            limit,
+            totalPages: Math.ceil(dbTotal / limit) || 1,
+          },
           geocoded: landmark,
         };
       }
@@ -116,14 +136,21 @@ export class PlacesService {
 
     // ── Tier 3: Standard Multi-Criteria Search ─────────────────────────────────
     const effectiveCategorySlugs =
-      parsed?.categorySlug && (!dto.categorySlugs || dto.categorySlugs.length === 0)
+      parsed?.categorySlug &&
+      (!dto.categorySlugs || dto.categorySlugs.length === 0)
         ? [parsed.categorySlug]
         : dto.categorySlugs;
 
-    const hasParsedConstraint = Boolean(parsed?.categorySlug || parsed?.areaName || parsed?.landmarkAnchor);
+    const hasParsedConstraint = Boolean(
+      parsed?.categorySlug || parsed?.areaName || parsed?.landmarkAnchor,
+    );
     const effectiveKeyword = parsed
-      ? (parsed.cleanedKeyword.trim() ? parsed.cleanedKeyword.trim() : (hasParsedConstraint ? undefined : rawKeyword?.trim() || undefined))
-      : (rawKeyword?.trim() || undefined);
+      ? parsed.cleanedKeyword.trim()
+        ? parsed.cleanedKeyword.trim()
+        : hasParsedConstraint
+          ? undefined
+          : rawKeyword?.trim() || undefined
+      : rawKeyword?.trim() || undefined;
 
     const searchFilters: SearchPlacesDto = {
       ...dto,
@@ -135,11 +162,16 @@ export class PlacesService {
     };
 
     const openNowOnly = dto.openNow === true;
-    const { items: rawItems, total: dbTotal } = await this.placeRepo.searchPlaces(
-      openNowOnly ? { ...searchFilters, page: 1, limit: OPEN_NOW_SCAN_LIMIT } : searchFilters,
-    );
+    const { items: rawItems, total: dbTotal } =
+      await this.placeRepo.searchPlaces(
+        openNowOnly
+          ? { ...searchFilters, page: 1, limit: OPEN_NOW_SCAN_LIMIT }
+          : searchFilters,
+      );
 
-    let items: PlaceItemDto[] = rawItems.map((row) => this.mapToPlaceItemDto(row));
+    let items: PlaceItemDto[] = rawItems.map((row) =>
+      this.mapToPlaceItemDto(row),
+    );
     let total = dbTotal;
     if (openNowOnly) {
       items = items.filter((item) => item.isOpenNow === true);
@@ -151,7 +183,12 @@ export class PlacesService {
       const totalItems = total;
       return {
         items,
-        meta: { totalItems, page, limit, totalPages: Math.ceil(totalItems / limit) || 1 },
+        meta: {
+          totalItems,
+          page,
+          limit,
+          totalPages: Math.ceil(totalItems / limit) || 1,
+        },
       };
     }
 
@@ -179,7 +216,9 @@ export class PlacesService {
     // ── Tier 4: NLP Semantic Search Fallback (for non-spatial keyword queries) ──
     const fallbackQuery = effectiveKeyword || rawKeyword;
     if (fallbackQuery) {
-      this.logger.log(`Keyword "${fallbackQuery}" not found in DB — falling back to semantic search`);
+      this.logger.log(
+        `Keyword "${fallbackQuery}" not found in DB — falling back to semantic search`,
+      );
       const semantic = await this.searchSemantic({
         query: fallbackQuery,
         areaId: effectiveAreaId ?? dto.areaId,
@@ -200,7 +239,9 @@ export class PlacesService {
   /**
    * Search places and return RFC 7946 compliant GeoJSON FeatureCollection.
    */
-  async searchPlacesGeoJson(dto: SearchPlacesDto): Promise<GeoJsonFeatureCollection> {
+  async searchPlacesGeoJson(
+    dto: SearchPlacesDto,
+  ): Promise<GeoJsonFeatureCollection> {
     const limit = dto.limit ?? 100;
     const { items: rawItems, total } = await this.placeRepo.searchPlaces({
       ...dto,
@@ -217,7 +258,10 @@ export class PlacesService {
       reviewCount: row.review_count ? Number(row.review_count) : null,
       priceLevel: row.price_level || null,
       category: row.category_id
-        ? { id: row.category_id, name: row.category_name_vi || row.category_name || '' }
+        ? {
+            id: row.category_id,
+            name: row.category_name_vi || row.category_name || '',
+          }
         : null,
       area: row.area_id
         ? { id: row.area_id, name: row.area_name_vi || row.area_name || '' }
@@ -272,7 +316,10 @@ export class PlacesService {
     dto: SyncEmbeddingsDto,
   ): Promise<{ processed: number; succeeded: number; failed: number }> {
     const limit = dto.limit || 50;
-    const places = await this.placeRepo.findPlacesWithoutEmbedding(limit, dto.areaId);
+    const places = await this.placeRepo.findPlacesWithoutEmbedding(
+      limit,
+      dto.areaId,
+    );
 
     this.logger.log(`Syncing vector embeddings for ${places.length} places...`);
     let succeeded = 0;
@@ -280,15 +327,23 @@ export class PlacesService {
 
     for (const place of places) {
       try {
-        const categoryName = place.category?.nameVi || place.category?.name || '';
+        const categoryName =
+          place.category?.nameVi || place.category?.name || '';
         const areaName = place.area?.nameVi || place.area?.name || '';
         const address = place.address || '';
-        const tags = Array.isArray(place.tags) && place.tags.length > 0 ? `Đặc trưng: ${place.tags.join(', ')}.` : '';
+        const tags =
+          Array.isArray(place.tags) && place.tags.length > 0
+            ? `Đặc trưng: ${place.tags.join(', ')}.`
+            : '';
         const desc = place.description ? `Mô tả: ${place.description}.` : '';
         const areaPart = areaName ? `Khu vực: ${areaName}.` : '';
-        const contentText = `${place.name}. Danh mục: ${categoryName}. Địa chỉ: ${address}. ${areaPart} ${desc} ${tags}`.trim().replace(/\s+/g, ' ');
+        const contentText =
+          `${place.name}. Danh mục: ${categoryName}. Địa chỉ: ${address}. ${areaPart} ${desc} ${tags}`
+            .trim()
+            .replace(/\s+/g, ' ');
 
-        const vector = await this.embeddingService.generateEmbedding(contentText);
+        const vector =
+          await this.embeddingService.generateEmbedding(contentText);
         await this.placeRepo.upsertPlaceEmbedding(
           place.id,
           contentText,
@@ -393,7 +448,11 @@ export class PlacesService {
     const areas = await this.placeRepo.findTravelAreas();
     return areas.map((area) => {
       const sortedHubs = [...(area.transitHubs || [])].sort((a, b) => {
-        const order: Record<string, number> = { AIRPORT: 1, BUS_TERMINAL: 2, TRAIN_STATION: 3 };
+        const order: Record<string, number> = {
+          AIRPORT: 1,
+          BUS_TERMINAL: 2,
+          TRAIN_STATION: 3,
+        };
         return (order[a.hubType] ?? 99) - (order[b.hubType] ?? 99);
       });
       const primaryHub = sortedHubs[0];

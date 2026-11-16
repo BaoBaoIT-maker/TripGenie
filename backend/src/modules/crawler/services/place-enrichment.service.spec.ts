@@ -20,16 +20,16 @@ describe('PlaceEnrichmentService', () => {
     openingHours: null,
     phone: null,
     website: null,
-    sources: [
-      { rawData: { tags: { wikidata: 'Q379681' } } },
-    ],
+    sources: [{ rawData: { tags: { wikidata: 'Q379681' } } }],
   };
 
   beforeEach(async () => {
     crawlerRepo = {
       getPlaceById: jest.fn().mockResolvedValue(mockPlace),
       getUnenrichedPlacesByArea: jest.fn().mockResolvedValue([mockPlace]),
-      updatePlace: jest.fn().mockResolvedValue({ ...mockPlace, ratingAvg: 4.5 }),
+      updatePlace: jest
+        .fn()
+        .mockResolvedValue({ ...mockPlace, ratingAvg: 4.5 }),
       createPlaceImages: jest.fn().mockResolvedValue(1),
     };
 
@@ -48,7 +48,8 @@ describe('PlaceEnrichmentService', () => {
     wikimediaProvider = {
       providerName: 'wikimedia',
       enrichPlace: jest.fn().mockResolvedValue({
-        description: 'Phố cổ Hội An là một đô thị cổ nằm ở hạ lưu sông Thu Bồn.',
+        description:
+          'Phố cổ Hội An là một đô thị cổ nằm ở hạ lưu sông Thu Bồn.',
         photoUrls: ['https://upload.wikimedia.org/hoian.jpg'],
       }),
     };
@@ -57,7 +58,10 @@ describe('PlaceEnrichmentService', () => {
       providers: [
         PlaceEnrichmentService,
         { provide: INJECT_TOKENS.CRAWLER_REPOSITORY, useValue: crawlerRepo },
-        { provide: INJECT_TOKENS.ENRICHMENT_PROVIDERS, useValue: [wikimediaProvider, foursquareProvider] },
+        {
+          provide: INJECT_TOKENS.ENRICHMENT_PROVIDERS,
+          useValue: [wikimediaProvider, foursquareProvider],
+        },
       ],
     }).compile();
 

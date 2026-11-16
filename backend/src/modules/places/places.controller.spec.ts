@@ -162,7 +162,12 @@ describe('PlacesController', () => {
           nameVi: 'Đà Nẵng',
           slug: 'da-nang',
           type: 'PROVINCE',
-          bbox: { minLat: 15.97, maxLat: 16.16, minLng: 107.98, maxLng: 108.36 },
+          bbox: {
+            minLat: 15.97,
+            maxLat: 16.16,
+            minLng: 107.98,
+            maxLng: 108.36,
+          },
         },
       ];
       service.getTravelAreas.mockResolvedValue(mockAreas);

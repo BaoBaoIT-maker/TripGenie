@@ -1,7 +1,9 @@
 'use client';
 
+import { memo } from 'react';
 import { VietMapLoader } from '@/components/map/VietMapLoader';
 import type { DiscoveryPlace, MapCoordinate, ItineraryPathSegment } from '@/features/map/types';
+import { useItineraryHoverStore } from '../../stores/itinerary-hover-store';
 
 // Module-level no-op callbacks so we don't create new function references on every render
 const noop = () => {};
@@ -20,7 +22,7 @@ interface Props {
   onHoverPlace?: (id: string | null) => void;
 }
 
-export default function ItineraryMap({
+const ItineraryMap = memo(function ItineraryMap({
   places,
   center,
   markerLabels,
@@ -28,9 +30,12 @@ export default function ItineraryMap({
   pathLine,
   pathSegments,
   selectedPlaceId = null,
-  hoveredPlaceId = null,
+  hoveredPlaceId,
   onSelectPlace,
 }: Props) {
+  const storeHoveredPlaceId = useItineraryHoverStore((s) => s.hoveredPlaceId);
+  const effectiveHoveredPlaceId = hoveredPlaceId !== undefined ? hoveredPlaceId : storeHoveredPlaceId;
+
   return (
     <div className="h-full w-full overflow-hidden rounded-2xl border border-slate-200">
       <VietMapLoader
@@ -38,7 +43,7 @@ export default function ItineraryMap({
         center={center}
         radiusKm={20}
         selectedPlaceId={selectedPlaceId}
-        hoveredPlaceId={hoveredPlaceId}
+        hoveredPlaceId={effectiveHoveredPlaceId}
         onSelectPlace={onSelectPlace || noopNull}
         onViewportChange={noop}
         onRequestCurrentLocation={noop}
@@ -51,4 +56,6 @@ export default function ItineraryMap({
       />
     </div>
   );
-}
+});
+
+export default ItineraryMap;

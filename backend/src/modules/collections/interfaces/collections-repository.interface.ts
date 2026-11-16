@@ -68,11 +68,10 @@ export interface ICollectionsRepository {
     collectionId: string,
     placeId: string,
   ): Promise<void>;
-  isPlaceInCollection(
-    collectionId: string,
-    placeId: string,
-  ): Promise<boolean>;
+  isPlaceInCollection(collectionId: string, placeId: string): Promise<boolean>;
   findOrCreateDefaultCollection(userId: string): Promise<Collection>;
-  findCollectionsContainingPlace(userId: string, placeId: string): Promise<string[]>;
+  findCollectionsContainingPlace(
+    userId: string,
+    placeId: string,
+  ): Promise<string[]>;
 }
-

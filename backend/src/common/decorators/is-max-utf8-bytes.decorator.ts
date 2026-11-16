@@ -1,6 +1,13 @@
-import { registerDecorator, ValidationOptions, ValidationArguments } from 'class-validator';
+import {
+  registerDecorator,
+  ValidationOptions,
+  ValidationArguments,
+} from 'class-validator';
 
-export function IsMaxUtf8Bytes(maxBytes: number, validationOptions?: ValidationOptions) {
+export function IsMaxUtf8Bytes(
+  maxBytes: number,
+  validationOptions?: ValidationOptions,
+) {
   return function (object: object, propertyName: string) {
     registerDecorator({
       name: 'isMaxUtf8Bytes',

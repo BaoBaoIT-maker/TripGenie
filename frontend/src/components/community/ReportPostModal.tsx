@@ -134,7 +134,7 @@ export function ReportPostModal({ open, onClose, post }: ReportPostModalProps) {
           <div>
             <h3
               id="report-post-modal-title"
-              className="text-sm font-black text-[#0F172A]"
+              className="text-sm font-bold text-slate-900"
             >
               Báo cáo bài viết vi phạm
             </h3>

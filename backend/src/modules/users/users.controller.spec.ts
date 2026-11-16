@@ -60,7 +60,10 @@ describe('UsersController', () => {
         avatarUrl: '/avatars/avatar-1.jpg',
       });
 
-      expect(mockUsersService.updateAvatar).toHaveBeenCalledWith('user-1', '/avatars/avatar-1.jpg');
+      expect(mockUsersService.updateAvatar).toHaveBeenCalledWith(
+        'user-1',
+        '/avatars/avatar-1.jpg',
+      );
       expect(result.message).toBe('Cập nhật ảnh đại diện thành công');
       expect(result.user.avatarUrl).toBe('/avatars/avatar-1.jpg');
     });
@@ -81,7 +84,9 @@ describe('UsersController', () => {
 
       const result = await controller.getPreferences(mockUser);
       expect(result.preferences).toEqual(mockPref);
-      expect(mockUsersService.getUserPreferences).toHaveBeenCalledWith('user-1');
+      expect(mockUsersService.getUserPreferences).toHaveBeenCalledWith(
+        'user-1',
+      );
     });
   });
 
@@ -93,12 +98,20 @@ describe('UsersController', () => {
         preferredCategories: ['diem-tham-quan'],
         dietaryRestrictions: ['HALAL'],
       };
-      const mockPref = { ...dto, id: 'pref-1', userId: 'user-1', updatedAt: new Date() };
+      const mockPref = {
+        ...dto,
+        id: 'pref-1',
+        userId: 'user-1',
+        updatedAt: new Date(),
+      };
       mockUsersService.updateUserPreferences.mockResolvedValue(mockPref);
 
       const result = await controller.updatePreferences(mockUser, dto);
       expect(result.preferences).toEqual(mockPref);
-      expect(mockUsersService.updateUserPreferences).toHaveBeenCalledWith('user-1', dto);
+      expect(mockUsersService.updateUserPreferences).toHaveBeenCalledWith(
+        'user-1',
+        dto,
+      );
     });
   });
 });

@@ -132,13 +132,15 @@ async function main() {
   await client.connect();
 
   try {
-    // 1. Kiểm tra bảng categories, nếu rỗng thì chạy seed.sql
+    // 1. Kiểm tra bảng categories / travel_areas, nếu rỗng thì chạy seedGeoJson (kèm seed.sql)
     const catCheck = await client.query('SELECT count(*) as count FROM categories;');
-    if (parseInt(catCheck.rows[0].count, 10) === 0) {
-      console.log('🌱 categories table is empty. Running prisma/seed.sql...');
-      const seedSql = fs.readFileSync(path.join(__dirname, '../prisma/seed.sql'), 'utf8');
-      await client.query(seedSql);
-      console.log('✅ prisma/seed.sql executed successfully.');
+    const dnCheck = await client.query("SELECT id FROM travel_areas WHERE slug = 'da-nang' LIMIT 1;");
+    if (parseInt(catCheck.rows[0].count, 10) === 0 || dnCheck.rows.length === 0) {
+      console.log('🌱 Base seed missing. Running seedGeoJson()...');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { seedGeoJson } = require('../prisma/seed_geojson');
+      await seedGeoJson(client);
+      console.log('✅ Base categories & travel_areas seeded successfully.');
     } else {
       console.log(`✅ Database already has ${catCheck.rows[0].count} categories.`);
     }

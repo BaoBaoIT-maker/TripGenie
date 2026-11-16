@@ -34,7 +34,7 @@ export const CURATED_STORIES: CuratedStory[] = [
       lgCol: "lg:col-span-7",
       height: "h-[380px] sm:h-[430px]",
     },
-    targetUrl: "/planner/new?destination=da-nang&duration=3&vibe=foodie",
+    targetUrl: "/explore?keyword=%C4%90%C3%A0+N%E1%BA%B5ng",
   },
   {
     id: "ha-noi",
@@ -53,7 +53,7 @@ export const CURATED_STORIES: CuratedStory[] = [
       lgCol: "lg:col-span-5",
       height: "h-[380px] sm:h-[430px]",
     },
-    targetUrl: "/planner/new?destination=ha-noi&duration=2&vibe=culture",
+    targetUrl: "/explore?keyword=H%C3%A0+N%E1%BB%99i",
   },
   {
     id: "phu-quoc",
@@ -72,7 +72,7 @@ export const CURATED_STORIES: CuratedStory[] = [
       lgCol: "lg:col-span-4",
       height: "h-[420px] sm:h-[460px]",
     },
-    targetUrl: "/planner/new?destination=phu-quoc&duration=3&vibe=beach",
+    targetUrl: "/explore?keyword=Ph%C3%BA+Qu%E1%BB%91c",
   },
   {
     id: "hoi-an",
@@ -91,7 +91,7 @@ export const CURATED_STORIES: CuratedStory[] = [
       lgCol: "lg:col-span-4",
       height: "h-[420px] sm:h-[460px]",
     },
-    targetUrl: "/planner/new?destination=hoi-an&duration=2&vibe=heritage",
+    targetUrl: "/explore?keyword=H%E1%BB%99i+An",
   },
   {
     id: "sa-pa",
@@ -110,6 +110,6 @@ export const CURATED_STORIES: CuratedStory[] = [
       lgCol: "lg:col-span-4",
       height: "h-[420px] sm:h-[460px]",
     },
-    targetUrl: "/planner/new?destination=sa-pa&duration=3&vibe=nature",
+    targetUrl: "/explore?keyword=Sa+Pa",
   },
 ];

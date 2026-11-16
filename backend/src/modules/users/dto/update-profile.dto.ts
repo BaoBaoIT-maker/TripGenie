@@ -1,4 +1,10 @@
-import { IsString, IsOptional, MaxLength, MinLength, Matches } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  MaxLength,
+  MinLength,
+  Matches,
+} from 'class-validator';
 import { USERS_CONSTANTS } from '../users.constants';
 
 export class UpdateProfileDto {

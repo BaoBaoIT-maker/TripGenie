@@ -98,7 +98,7 @@ export function CloneItineraryPreviewModal({
           <div className="min-w-0">
             <h3
               id="clone-preview-modal-title"
-              className="text-[14px] font-black text-[#0F172A] truncate"
+              className="text-[14px] font-bold text-slate-900 truncate"
             >
               {detail?.title || itinerarySummary.title}
             </h3>
@@ -207,7 +207,7 @@ export function CloneItineraryPreviewModal({
           <div className="flex flex-col gap-4">
             {visibleDays.map((day) => (
               <div key={day.dayNumber} className="flex flex-col gap-2">
-                <div className="text-[12px] font-black uppercase tracking-[0.05em] text-[#1E293B] flex items-center gap-2">
+                <div className="text-xs font-bold uppercase tracking-wide text-slate-800 flex items-center gap-2">
                   <i
                     className="fa-solid fa-circle-dot text-[#0194F3] text-[12px]"
                     aria-hidden="true"

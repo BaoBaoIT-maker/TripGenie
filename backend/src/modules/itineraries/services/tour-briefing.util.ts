@@ -6,10 +6,13 @@ export interface TourBriefing {
   notes?: string | null;
 }
 
-const trimToNull = (value?: string | null): string | null => value?.trim() || null;
+const trimToNull = (value?: string | null): string | null =>
+  value?.trim() || null;
 
 /** Trim every field; collapse to null when nothing is left so empty briefings are not stored. */
-export function normalizeTourBriefing(input: TourBriefing): TourBriefing | null {
+export function normalizeTourBriefing(
+  input: TourBriefing,
+): TourBriefing | null {
   const normalized: TourBriefing = {
     leaderName: trimToNull(input.leaderName),
     leaderPhone: trimToNull(input.leaderPhone),

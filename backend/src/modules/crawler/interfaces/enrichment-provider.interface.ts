@@ -25,5 +25,10 @@ export interface IEnrichmentProvider {
   /**
    * Search and return enriched details for a place given its name, GPS coordinates, and optional wikidataId.
    */
-  enrichPlace(name: string, lat: number, lng: number, wikidataId?: string | null): Promise<EnrichedPlaceDetails | null>;
+  enrichPlace(
+    name: string,
+    lat: number,
+    lng: number,
+    wikidataId?: string | null,
+  ): Promise<EnrichedPlaceDetails | null>;
 }

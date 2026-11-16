@@ -18,6 +18,12 @@ import {
 import { formatTimeOfDay } from '../../../common/utils/time-of-day.util';
 import { ItineraryPlannerService } from '../services/itinerary-planner.service';
 import { ItineraryAccessService } from '../services/itinerary-access.service';
+import { TransitService } from '../services/transit.service';
+import {
+  WeatherService,
+  resolveItineraryCoordinates,
+} from '../../weather/weather.service';
+import { WEATHER_THRESHOLDS } from '../../weather/weather.constants';
 import { CopilotToolsService } from './copilot-tools.service';
 import {
   COPILOT_CONSTANTS,
@@ -43,15 +49,21 @@ const PROPOSAL_TITLE_BUILDERS: Record<
   (data?: Record<string, unknown>) => string
 > = {
   [COPILOT_TOOL_NAMES.SWAP_ACTIVITY]: (data) =>
-    data?.dayNumber ? `Đề xuất đổi địa điểm Ngày ${data.dayNumber}` : 'Đề xuất đổi địa điểm',
+    data?.dayNumber
+      ? `Đề xuất đổi địa điểm Ngày ${data.dayNumber}`
+      : 'Đề xuất đổi địa điểm',
   [COPILOT_TOOL_NAMES.SWAP_DAYS]: (data) =>
     data?.dayA && data?.dayB
       ? `Đề xuất hoán đổi Ngày ${data.dayA} và Ngày ${data.dayB}`
       : 'Đề xuất hoán đổi ngày',
   [COPILOT_TOOL_NAMES.ADD_ACTIVITY]: (data) =>
-    data?.dayNumber ? `Đề xuất thêm điểm Ngày ${data.dayNumber}` : 'Đề xuất thêm địa điểm',
+    data?.dayNumber
+      ? `Đề xuất thêm điểm Ngày ${data.dayNumber}`
+      : 'Đề xuất thêm địa điểm',
   [COPILOT_TOOL_NAMES.REMOVE_ACTIVITY]: (data) =>
-    data?.dayNumber ? `Đề xuất xóa điểm Ngày ${data.dayNumber}` : 'Đề xuất xóa địa điểm',
+    data?.dayNumber
+      ? `Đề xuất xóa điểm Ngày ${data.dayNumber}`
+      : 'Đề xuất xóa địa điểm',
   [COPILOT_TOOL_NAMES.MOVE_ACTIVITY]: () => 'Đề xuất chuyển ngày hoạt động',
   [COPILOT_TOOL_NAMES.CHANGE_DESTINATION]: () => 'Đề xuất đổi điểm đến',
 };
@@ -71,6 +83,8 @@ export class CopilotAgentService {
     private readonly toolsService: CopilotToolsService,
     private readonly plannerService: ItineraryPlannerService,
     private readonly accessService: ItineraryAccessService,
+    @Optional() private readonly weatherService?: WeatherService,
+    @Optional() private readonly transitService?: TransitService,
     @Optional()
     @InjectQueue(COPILOT_SUMMARY_QUEUE)
     private readonly summaryQueue?: Queue,
@@ -84,7 +98,9 @@ export class CopilotAgentService {
       'GEMINI_BASE_URL',
       COPILOT_CONSTANTS.GEMINI_BASE_URL,
     );
-    this.httpClient = axios.create({ timeout: COPILOT_CONSTANTS.API_TIMEOUT_MS });
+    this.httpClient = axios.create({
+      timeout: COPILOT_CONSTANTS.API_TIMEOUT_MS,
+    });
 
     // Strategy/Dispatcher map: Open/Closed Principle (OCP) without switch/if-else chains
     this.toolHandlers = {
@@ -105,13 +121,19 @@ export class CopilotAgentService {
       [COPILOT_TOOL_NAMES.SWAP_ACTIVITY]: (itineraryId, args, dryRun) =>
         this.toolsService.swapActivity(itineraryId, {
           dayNumber: args.dayNumber ? Number(args.dayNumber) : undefined,
-          currentPlaceName: args.currentPlaceName ? String(args.currentPlaceName) : undefined,
+          currentPlaceName: args.currentPlaceName
+            ? String(args.currentPlaceName)
+            : undefined,
           mealOrActivityType: args.mealOrActivityType
             ? String(args.mealOrActivityType)
             : undefined,
           query: String(args.query || 'địa điểm tương đương'),
-          categorySlug: args.categorySlug ? String(args.categorySlug) : undefined,
-          destinationId: args.destinationId ? String(args.destinationId) : undefined,
+          categorySlug: args.categorySlug
+            ? String(args.categorySlug)
+            : undefined,
+          destinationId: args.destinationId
+            ? String(args.destinationId)
+            : undefined,
           newPlaceId: args.newPlaceId ? String(args.newPlaceId) : undefined,
           dryRun,
         }),
@@ -120,7 +142,9 @@ export class CopilotAgentService {
           dayNumber: Number(args.dayNumber || 1),
           timeSlot: args.timeSlot ? String(args.timeSlot) : undefined,
           query: String(args.query || 'điểm tham quan'),
-          categorySlug: args.categorySlug ? String(args.categorySlug) : undefined,
+          categorySlug: args.categorySlug
+            ? String(args.categorySlug)
+            : undefined,
           placeId: args.placeId ? String(args.placeId) : undefined,
           dryRun,
         }),
@@ -128,7 +152,9 @@ export class CopilotAgentService {
         this.toolsService.removeActivity(itineraryId, {
           dayNumber: Number(args.dayNumber || 1),
           placeName: String(args.placeName || ''),
-          destinationId: args.destinationId ? String(args.destinationId) : undefined,
+          destinationId: args.destinationId
+            ? String(args.destinationId)
+            : undefined,
           dryRun,
         }),
       [COPILOT_TOOL_NAMES.MOVE_ACTIVITY]: (itineraryId, args, dryRun) =>
@@ -136,8 +162,12 @@ export class CopilotAgentService {
           placeName: String(args.placeName || ''),
           fromDay: Number(args.fromDay || 1),
           toDay: Number(args.toDay || 2),
-          targetTimeSlot: args.targetTimeSlot ? String(args.targetTimeSlot) : undefined,
-          destinationId: args.destinationId ? String(args.destinationId) : undefined,
+          targetTimeSlot: args.targetTimeSlot
+            ? String(args.targetTimeSlot)
+            : undefined,
+          destinationId: args.destinationId
+            ? String(args.destinationId)
+            : undefined,
           dryRun,
         }),
       [COPILOT_TOOL_NAMES.SWAP_DAYS]: (itineraryId, args, dryRun) =>
@@ -168,6 +198,14 @@ export class CopilotAgentService {
     const itinerary = await this.prisma.itinerary.findFirst({
       where: { id: itineraryId, deletedAt: null },
       include: {
+        area: {
+          select: {
+            bboxMinLat: true,
+            bboxMaxLat: true,
+            bboxMinLng: true,
+            bboxMaxLng: true,
+          },
+        },
         destinations: {
           include: { place: { include: { category: true } } },
           orderBy: [{ dayNumber: 'asc' }, { visitOrder: 'asc' }],
@@ -179,7 +217,10 @@ export class CopilotAgentService {
       throw new NotFoundException('Không tìm thấy lịch trình du lịch.');
     }
 
-    await this.accessService.assertCanEdit(itineraryId, userId);
+    const access = await this.accessService.assertIsGroupMember(
+      itineraryId,
+      userId,
+    );
 
     // 1. Resolve / Create Chat Session
     const session = await this.resolveSession(
@@ -198,34 +239,76 @@ export class CopilotAgentService {
     const historyRows = recentRows.reverse();
 
     // 3. Build prompt context and contents with destination places grounding
-    const destinationPlaces = await this.prisma.place.findMany({
-      where: {
-        deletedAt: null,
-        status: 'ACTIVE',
-        OR: itinerary.areaId
-          ? [
-              { areaId: itinerary.areaId },
-              { area: { parentId: itinerary.areaId } },
-              { area: { parent: { parentId: itinerary.areaId } } },
-            ]
-          : [
-              { address: { contains: itinerary.destination || '', mode: 'insensitive' } },
-              { name: { contains: itinerary.destination || '', mode: 'insensitive' } },
-            ],
-      },
-      select: {
-        name: true,
-        category: { select: { nameVi: true, name: true } },
-      },
-      take: COPILOT_CONSTANTS.GROUNDING_PLACES_LIMIT,
-      orderBy: [{ ratingAvg: 'desc' }, { reviewCount: 'desc' }],
-    });
+    const coords =
+      resolveItineraryCoordinates(itinerary) ??
+      (this.transitService && itinerary.destination
+        ? await this.transitService.resolveCityLocation(itinerary.destination)
+        : null);
+    const spanDays =
+      itinerary.startDate && itinerary.endDate
+        ? Math.round(
+            (itinerary.endDate.getTime() - itinerary.startDate.getTime()) /
+              WEATHER_THRESHOLDS.MS_PER_DAY,
+          ) + 1
+        : 0;
+    const maxDay = itinerary.destinations.reduce(
+      (m, d) => Math.max(m, d.dayNumber),
+      1,
+    );
+    const weatherPromise = this.weatherService
+      ? this.weatherService.getTripWeather({
+          lat: coords?.lat,
+          lng: coords?.lng,
+          destination: itinerary.destination,
+          startDate: itinerary.startDate,
+          totalDays: Math.max(spanDays, maxDay, 1),
+        })
+      : Promise.resolve(null);
+
+    const [destinationPlaces, weatherSummary] = await Promise.all([
+      this.prisma.place.findMany({
+        where: {
+          deletedAt: null,
+          status: 'ACTIVE',
+          OR: itinerary.areaId
+            ? [
+                { areaId: itinerary.areaId },
+                { area: { parentId: itinerary.areaId } },
+                { area: { parent: { parentId: itinerary.areaId } } },
+              ]
+            : [
+                {
+                  address: {
+                    contains: itinerary.destination || '',
+                    mode: 'insensitive',
+                  },
+                },
+                {
+                  name: {
+                    contains: itinerary.destination || '',
+                    mode: 'insensitive',
+                  },
+                },
+              ],
+        },
+        select: {
+          name: true,
+          category: { select: { nameVi: true, name: true } },
+        },
+        take: COPILOT_CONSTANTS.GROUNDING_PLACES_LIMIT,
+        orderBy: [{ ratingAvg: 'desc' }, { reviewCount: 'desc' }],
+      }),
+      weatherPromise,
+    ]);
 
     const systemInstruction = this.buildSystemInstruction({
-      destination: itinerary.destination || COPILOT_CONSTANTS.DEFAULT_DESTINATION,
+      destination:
+        itinerary.destination || COPILOT_CONSTANTS.DEFAULT_DESTINATION,
+      partySize: itinerary.partySize ?? 1,
       destinations: itinerary.destinations,
       availablePlaces: destinationPlaces,
       sessionSummary: session.summary,
+      weatherGuidance: weatherSummary?.guidance,
     });
     const contents: GeminiContent[] = buildAlternatingGeminiContents(
       historyRows,
@@ -271,12 +354,12 @@ export class CopilotAgentService {
           `Gemini invoked tool: ${toolName} with args: ${JSON.stringify(toolArgs)}`,
         );
 
-        const isModifyingTool = toolName !== COPILOT_TOOL_NAMES.CHANGE_DESTINATION;
-        const shouldDryRun = isModifyingTool && !autoApply;
-
-        if (!shouldDryRun && isModifyingTool) {
-          await this.accessService.assertCanEdit(itineraryId, userId);
-        }
+        const isModifyingTool =
+          toolName !== COPILOT_TOOL_NAMES.CHANGE_DESTINATION;
+        // VIEWER group members can ask Copilot for suggestions strictly in dry-run proposal mode,
+        // while OWNER / EDITOR may also opt into autoApply=true direct mutations.
+        const canDirectMutate = isModifyingTool && autoApply && access.canEdit;
+        const shouldDryRun = isModifyingTool && !canDirectMutate;
 
         const toolResult = await this.executeTool(
           itineraryId,
@@ -305,21 +388,19 @@ export class CopilotAgentService {
             fromPlaceId: toolResult.data?.oldPlaceId as string | undefined,
             fromPlaceName: toolResult.data?.oldPlaceName as string | undefined,
             fromPlaceCoordinates: toolResult.data?.oldPlaceCoordinates as
-              | { latitude: number; longitude: number }
-              | undefined,
-            toPlaceId: (toolResult.data?.newPlaceId || toolResult.data?.placeId) as
-              | string
-              | undefined,
-            toPlaceName: (toolResult.data?.newPlaceName || toolResult.data?.placeName) as
-              | string
-              | undefined,
-            toPlaceRating: toolResult.data?.newPlaceRating as number | undefined,
-            toPlaceCategory: toolResult.data?.newPlaceCategory as string | undefined,
+              { latitude: number; longitude: number } | undefined,
+            toPlaceId: (toolResult.data?.newPlaceId ||
+              toolResult.data?.placeId) as string | undefined,
+            toPlaceName: (toolResult.data?.newPlaceName ||
+              toolResult.data?.placeName) as string | undefined,
+            toPlaceRating: toolResult.data?.newPlaceRating as
+              number | undefined,
+            toPlaceCategory: toolResult.data?.newPlaceCategory as
+              string | undefined,
             toPlaceAddress: (toolResult.data?.newPlaceAddress ||
               toolResult.data?.address) as string | undefined,
             toPlaceCoordinates: toolResult.data?.newPlaceCoordinates as
-              | { latitude: number; longitude: number }
-              | undefined,
+              { latitude: number; longitude: number } | undefined,
             swapDays:
               toolResult.data?.dayA && toolResult.data?.dayB
                 ? {
@@ -327,7 +408,10 @@ export class CopilotAgentService {
                     dayB: toolResult.data.dayB as number,
                   }
                 : undefined,
-            args: (toolResult.data?.args || toolArgs) as Record<string, unknown>,
+            args: (toolResult.data?.args || toolArgs) as Record<
+              string,
+              unknown
+            >,
           };
         } else {
           modified = toolResult.success;
@@ -365,7 +449,9 @@ export class CopilotAgentService {
               },
             ],
             systemInstruction: { parts: [{ text: systemInstruction }] },
-            generationConfig: { temperature: COPILOT_CONSTANTS.SYNTHESIS_TEMPERATURE },
+            generationConfig: {
+              temperature: COPILOT_CONSTANTS.SYNTHESIS_TEMPERATURE,
+            },
           });
           const secondParts: GeminiPart[] =
             secondResponse.data?.candidates?.[0]?.content?.parts || [];
@@ -412,8 +498,12 @@ export class CopilotAgentService {
           sessionId: session.id,
           sender: 'AGENT',
           content: agentReply,
-          toolCalls: appliedTool ? JSON.parse(JSON.stringify(appliedTool)) : undefined,
-          toolResults: proposal ? JSON.parse(JSON.stringify(proposal)) : undefined,
+          toolCalls: appliedTool
+            ? JSON.parse(JSON.stringify(appliedTool))
+            : undefined,
+          toolResults: proposal
+            ? JSON.parse(JSON.stringify(proposal))
+            : undefined,
         },
       }),
       this.prisma.aiChatSession.update({
@@ -425,7 +515,9 @@ export class CopilotAgentService {
     // 5b. Dispatch background session summarization via BullMQ queue (or async fallback)
     if (session.messageCount + 2 >= COPILOT_CONSTANTS.SUMMARIZATION_THRESHOLD) {
       this.enqueueSessionSummarization(session.id).catch((err) =>
-        this.logger.warn(`Enqueue summarization error: ${(err as Error).message}`),
+        this.logger.warn(
+          `Enqueue summarization error: ${(err as Error).message}`,
+        ),
       );
     }
 
@@ -433,9 +525,14 @@ export class CopilotAgentService {
     let updatedItinerary: unknown = undefined;
     if (modified) {
       try {
-        updatedItinerary = await this.plannerService.getById(itineraryId, userId);
+        updatedItinerary = await this.plannerService.getById(
+          itineraryId,
+          userId,
+        );
       } catch (err) {
-        this.logger.warn(`Could not refresh itinerary detail: ${(err as Error).message}`);
+        this.logger.warn(
+          `Could not refresh itinerary detail: ${(err as Error).message}`,
+        );
       }
     }
 
@@ -458,7 +555,7 @@ export class CopilotAgentService {
     sessionId?: string,
     userId?: string,
   ): Promise<CopilotMessageHistoryItem[]> {
-    await this.accessService.assertCanView(itineraryId, userId);
+    await this.accessService.assertIsGroupMember(itineraryId, userId);
 
     const session = sessionId
       ? await this.prisma.aiChatSession.findFirst({
@@ -572,7 +669,9 @@ export class CopilotAgentService {
             backoff: { type: 'exponential', delay: 3000 },
           },
         );
-        this.logger.debug(`Enqueued summarization job for session ${sessionId} to BullMQ`);
+        this.logger.debug(
+          `Enqueued summarization job for session ${sessionId} to BullMQ`,
+        );
         return;
       }
     } catch (err) {
@@ -582,7 +681,9 @@ export class CopilotAgentService {
     }
 
     this.summarizeSession(sessionId).catch((err) =>
-      this.logger.warn(`Direct background summarization error: ${(err as Error).message}`),
+      this.logger.warn(
+        `Direct background summarization error: ${(err as Error).message}`,
+      ),
     );
   }
 
@@ -616,7 +717,9 @@ export class CopilotAgentService {
     if (eligibleMessages.length === 0) return session.summary;
 
     const lastSummarizedIndex = session.lastSummarizedMessageId
-      ? eligibleMessages.findIndex((m) => m.id === session.lastSummarizedMessageId)
+      ? eligibleMessages.findIndex(
+          (m) => m.id === session.lastSummarizedMessageId,
+        )
       : -1;
 
     const deltaMessages = eligibleMessages.slice(lastSummarizedIndex + 1);
@@ -675,7 +778,9 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
         return newSummary;
       }
     } catch (err) {
-      this.logger.warn(`Could not summarize session ${sessionId}: ${(err as Error).message}`);
+      this.logger.warn(
+        `Could not summarize session ${sessionId}: ${(err as Error).message}`,
+      );
     }
 
     return session.summary;
@@ -685,7 +790,10 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
   // PRIVATE AGENT LOGIC (OCP Dispatcher)
   // ===========================================================================
 
-  private getProposalTitle(toolName: string, data?: Record<string, unknown>): string {
+  private getProposalTitle(
+    toolName: string,
+    data?: Record<string, unknown>,
+  ): string {
     const builder = PROPOSAL_TITLE_BUILDERS[toolName as CopilotToolName];
     return builder ? builder(data) : 'Đề xuất thay đổi lịch trình';
   }
@@ -713,20 +821,24 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
     userId?: string,
     sessionId?: string,
   ) {
+    const effectiveUserId = userId || creatorId;
+
     if (sessionId) {
       const existing = await this.prisma.aiChatSession.findFirst({
-        where: { id: sessionId, linkedItineraryId: itineraryId },
+        where: {
+          id: sessionId,
+          linkedItineraryId: itineraryId,
+          userId: effectiveUserId,
+        },
       });
       if (existing) return existing;
     }
 
     const latest = await this.prisma.aiChatSession.findFirst({
-      where: { linkedItineraryId: itineraryId },
+      where: { linkedItineraryId: itineraryId, userId: effectiveUserId },
       orderBy: { createdAt: 'desc' },
     });
     if (latest) return latest;
-
-    const effectiveUserId = userId || creatorId;
 
     return this.prisma.aiChatSession.create({
       data: {
@@ -740,6 +852,7 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
 
   private buildSystemInstruction(itinerary: {
     destination: string;
+    partySize?: number;
     destinations: Array<{
       dayNumber: number;
       startTime: Date | null;
@@ -755,6 +868,7 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
       category?: { nameVi?: string | null; name: string } | null;
     }>;
     sessionSummary?: string | null;
+    weatherGuidance?: string;
   }): string {
     const dayGroups: Record<number, string[]> = {};
     for (const d of itinerary.destinations) {
@@ -778,8 +892,8 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
       .join('\n');
 
     return `Bạn là Genie Copilot - Trợ lý AI du lịch thông minh, thân thiện của ứng dụng TripGenie.
-Bạn đang đồng hành cùng người dùng trong chuyến đi tại "${itinerary.destination}".
-${itinerary.sessionSummary ? `\nTHÔNG TIN ĐÃ GHI NHẬN TỪ TRƯỚC (BỘ NHỚ DÀI HẠN):\n${itinerary.sessionSummary}\n` : ''}
+Bạn đang đồng hành cùng người dùng trong chuyến đi tại "${itinerary.destination}" (quy mô nhóm: ${itinerary.partySize ?? 1} người).
+${itinerary.sessionSummary ? `\nTHÔNG TIN ĐÃ GHI NHẬN TỪ TRƯỚC (BỘ NHỚ DÀI HẠN):\n${itinerary.sessionSummary}\n` : ''}${itinerary.weatherGuidance ? `\n${itinerary.weatherGuidance}\n` : ''}
 LỊCH TRÌNH HIỆN TẠI CỦA CHUYẾN ĐI:
 ${scheduleSummary || 'Chưa có hoạt động cụ thể.'}
 

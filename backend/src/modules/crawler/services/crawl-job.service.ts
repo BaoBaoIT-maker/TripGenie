@@ -4,8 +4,16 @@ import { Queue } from 'bullmq';
 import { INJECT_TOKENS } from '../../../common/constants/inject-tokens';
 import { ICrawlerRepository } from '../interfaces/crawler-repository.interface';
 import { TriggerRegionCrawlDto } from '../dto/trigger-region-crawl.dto';
-import { CrawlJobStatusDto, TriggerCrawlResponseDto } from '../dto/crawl-job-response.dto';
-import { CrawlJobStatus, CrawlJobType, CrawlProviderName, CrawlerQueueName } from '../../../common/enums/crawler.enum';
+import {
+  CrawlJobStatusDto,
+  TriggerCrawlResponseDto,
+} from '../dto/crawl-job-response.dto';
+import {
+  CrawlJobStatus,
+  CrawlJobType,
+  CrawlProviderName,
+  CrawlerQueueName,
+} from '../../../common/enums/crawler.enum';
 
 @Injectable()
 export class CrawlJobService {
@@ -35,7 +43,9 @@ export class CrawlJobService {
       createdBy: userId,
     });
 
-    this.logger.log(`Created crawl job ${job.id} for area "${area.name}". Pushing to BullMQ queue...`);
+    this.logger.log(
+      `Created crawl job ${job.id} for area "${area.name}". Pushing to BullMQ queue...`,
+    );
 
     // Hand off to BullMQ Queue Worker with auto-retry options (5 attempts, exponential backoff)
     await this.crawlQueue.add(

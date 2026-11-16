@@ -19,7 +19,9 @@ export function checkIsOpenNow(openingHours: unknown): boolean | null {
     const end = parseInt(m[3], 10) * 60 + parseInt(m[4], 10);
 
     // Overnight window (e.g., 18:00 - 02:00) wraps past midnight
-    return end >= start ? current >= start && current <= end : current >= start || current <= end;
+    return end >= start
+      ? current >= start && current <= end
+      : current >= start || current <= end;
   }
 
   if (typeof openingHours === 'object') {

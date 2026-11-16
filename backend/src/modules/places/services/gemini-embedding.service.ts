@@ -1,4 +1,8 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import { IEmbeddingService } from '../interfaces/embedding-service.interface';
@@ -53,8 +57,12 @@ export class GeminiEmbeddingService implements IEmbeddingService {
     } catch (error: any) {
       const status = error.response?.status;
       const details = error.response?.data?.error?.message || error.message;
-      this.logger.error(`Failed to generate embedding (status: ${status}): ${details}`);
-      throw new InternalServerErrorException(`Gemini Embedding error: ${details}`);
+      this.logger.error(
+        `Failed to generate embedding (status: ${status}): ${details}`,
+      );
+      throw new InternalServerErrorException(
+        `Gemini Embedding error: ${details}`,
+      );
     }
   }
 }

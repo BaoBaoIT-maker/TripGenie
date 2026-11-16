@@ -44,13 +44,13 @@ export class CollectionsRepository implements ICollectionsRepository {
     return collections.map((col) => {
       const previewImages = col.places
         .map((p) => p.place.images[0]?.imageUrl)
-        .filter(Boolean) as string[];
+        .filter(Boolean);
 
       const { places, ...rest } = col;
       return {
         ...rest,
         previewImages,
-      } as CollectionWithCount;
+      };
     });
   }
 
@@ -108,7 +108,7 @@ export class CollectionsRepository implements ICollectionsRepository {
       },
     });
 
-    return col as unknown as CollectionDetail | null;
+    return col;
   }
 
   async createCollection(data: {
@@ -229,4 +229,3 @@ export class CollectionsRepository implements ICollectionsRepository {
     return rows.map((r) => r.collectionId);
   }
 }
-

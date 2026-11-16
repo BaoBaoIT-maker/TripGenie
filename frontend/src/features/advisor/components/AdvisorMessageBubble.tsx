@@ -2,11 +2,6 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import {
-  AlertCircle,
-  ArrowUpRight,
-  Compass,
-} from 'lucide-react';
 import { ADVISOR_UI_CONSTANTS, AdvisorMessageItem } from '@/types/advisor';
 import { AdvisorPlaceCard } from './AdvisorPlaceCard';
 
@@ -46,7 +41,7 @@ function renderInlineFormattedText(
           className="mx-0.5 inline-flex cursor-pointer items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-xs font-semibold text-secondary-foreground underline-offset-2 transition-colors motion-reduce:transition-none hover:bg-primary hover:text-primary-foreground"
         >
           <span>{routeLabel}</span>
-          <ArrowUpRight className="h-3 w-3" aria-hidden="true" />
+          <i className="fa-solid fa-arrow-up-right-from-square text-[10px]" aria-hidden="true" />
         </Link>
       );
     }
@@ -77,17 +72,10 @@ export function AdvisorMessageBubble({
   }
 
   return (
-    <div className="flex items-start gap-2.5">
-      <div
-        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-xs"
-        aria-hidden="true"
-      >
-        <Compass className="h-3.5 w-3.5" />
-      </div>
-
-      <div className="min-w-0 flex-1 space-y-2.5">
+    <div className="flex flex-col space-y-2.5">
+      <div className="min-w-0 space-y-2.5">
         <div
-          className={`rounded-2xl rounded-tl-sm border px-4 py-3 text-sm leading-relaxed shadow-xs ${
+          className={`rounded-2xl rounded-tl-xs border px-4 py-3 text-sm leading-relaxed shadow-2xs ${
             message.isError
               ? 'border-destructive/30 bg-destructive/10 text-destructive'
               : 'border-border bg-card text-card-foreground'
@@ -95,7 +83,7 @@ export function AdvisorMessageBubble({
         >
           {message.isError && (
             <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-destructive">
-              <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <i className="fa-solid fa-circle-exclamation text-xs shrink-0" aria-hidden="true" />
               <span>Thông báo kết nối</span>
             </div>
           )}

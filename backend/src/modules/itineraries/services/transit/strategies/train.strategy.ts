@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../../database/prisma.service';
-import { PRICING_CONFIG, checkTransitSafety } from '../../../../../config/pricing.config';
+import {
+  PRICING_CONFIG,
+  checkTransitSafety,
+} from '../../../../../config/pricing.config';
 import { TransitModeEnum } from '../../../dto/generate-itinerary.dto';
 import {
   ITransitStrategy,
@@ -22,17 +25,28 @@ export class TrainTransitStrategy implements ITransitStrategy {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private async resolveStations(
-    ctx: TransitStrategyContext,
-  ): Promise<{ originTrain: TransitHubDto | null; destTrain: TransitHubDto | null }> {
+  private async resolveStations(ctx: TransitStrategyContext): Promise<{
+    originTrain: TransitHubDto | null;
+    destTrain: TransitHubDto | null;
+  }> {
     const hubs =
       ctx.activeHubs ??
       (await this.prisma.transitHub.findMany({
         where: { isActive: true, hubType: 'TRAIN_STATION' },
       }));
     return {
-      originTrain: findNearestHub(hubs, 'TRAIN_STATION', ctx.originCoords.lat, ctx.originCoords.lng),
-      destTrain: findNearestHub(hubs, 'TRAIN_STATION', ctx.destCoords.lat, ctx.destCoords.lng),
+      originTrain: findNearestHub(
+        hubs,
+        'TRAIN_STATION',
+        ctx.originCoords.lat,
+        ctx.originCoords.lng,
+      ),
+      destTrain: findNearestHub(
+        hubs,
+        'TRAIN_STATION',
+        ctx.destCoords.lat,
+        ctx.destCoords.lng,
+      ),
     };
   }
 
@@ -41,7 +55,9 @@ export class TrainTransitStrategy implements ITransitStrategy {
     return {
       mode: this.mode,
       title: 'Tàu hỏa (Đường sắt)',
-      durationText: res.isMultiModal ? `Tàu + Xe (~${durHours}h)` : `Đường sắt (~${durHours}h)`,
+      durationText: res.isMultiModal
+        ? `Tàu + Xe (~${durHours}h)`
+        : `Đường sắt (~${durHours}h)`,
       priceText: `Từ ~${formatVndCurrency(res.estimatedPriceOneWay)}/vé`,
       estimatedPriceOneWay: res.estimatedPriceOneWay,
       durationMinutes: res.durationMinutes,
@@ -49,7 +65,9 @@ export class TrainTransitStrategy implements ITransitStrategy {
     };
   }
 
-  async calculate(ctx: TransitStrategyContext): Promise<IntercityTransitResult> {
+  async calculate(
+    ctx: TransitStrategyContext,
+  ): Promise<IntercityTransitResult> {
     const {
       originCity,
       destCity,
@@ -76,7 +94,12 @@ export class TrainTransitStrategy implements ITransitStrategy {
     let routeSteps: string[] = [];
 
     const hasDirectStation =
-      !isIsland && isDirectCityHub(destTrain, destCoords.areaId, T.LOCAL_HUB_MAX_DISTANCE_KM);
+      !isIsland &&
+      isDirectCityHub(
+        destTrain,
+        destCoords.areaId,
+        T.LOCAL_HUB_MAX_DISTANCE_KM,
+      );
 
     if (isIsland) {
       // 1. Island destination: No railway crosses open sea directly
@@ -89,14 +112,17 @@ export class TrainTransitStrategy implements ITransitStrategy {
         Math.round(roadDistanceKm * T.TRAIN_ISLAND_LAND_RATIO),
       );
       const trainDur = Math.round((trainDist / speed.TRAIN) * 60);
-      const trainFare = Math.round(trainDist * PRICING_CONFIG.INTERCITY.TRAIN_PER_KM);
+      const trainFare = Math.round(
+        trainDist * PRICING_CONFIG.INTERCITY.TRAIN_PER_KM,
+      );
 
       const transferKm = Math.max(
         T.ISLAND_PORT_DISTANCE_KM,
         destTrain?.distanceKm || Math.round(roadDistanceKm - trainDist),
       );
       const transferDur = T.FERRY_MINUTES + T.ISLAND_MAINLAND_BUS_MINUTES;
-      const transferPrice = T.FERRY_ONE_WAY_PASSENGER + T.ISLAND_MAINLAND_BUS_FARE;
+      const transferPrice =
+        T.FERRY_ONE_WAY_PASSENGER + T.ISLAND_MAINLAND_BUS_FARE;
 
       transferLeg = {
         type: 'FERRY',
@@ -122,11 +148,18 @@ export class TrainTransitStrategy implements ITransitStrategy {
       isMultiModal = true;
       destTrainName = destTrain.name;
       const transferDist = destTrain.distanceKm || T.DEFAULT_RAIL_TRANSFER_KM;
-      const trainDist = Math.max(T.MIN_TRAIN_DISTANCE_KM, Math.round(roadDistanceKm - transferDist));
+      const trainDist = Math.max(
+        T.MIN_TRAIN_DISTANCE_KM,
+        Math.round(roadDistanceKm - transferDist),
+      );
       const trainDur = Math.round((trainDist / speed.TRAIN) * 60);
-      const trainFare = Math.round(trainDist * PRICING_CONFIG.INTERCITY.TRAIN_PER_KM);
+      const trainFare = Math.round(
+        trainDist * PRICING_CONFIG.INTERCITY.TRAIN_PER_KM,
+      );
 
-      const transferDur = Math.round(transferDist * T.REGIONAL_TRANSFER_MINS_PER_KM);
+      const transferDur = Math.round(
+        transferDist * T.REGIONAL_TRANSFER_MINS_PER_KM,
+      );
       const transferPrice = Math.round(transferDist * T.BUS_PER_KM);
 
       transferLeg = {
@@ -152,7 +185,9 @@ export class TrainTransitStrategy implements ITransitStrategy {
       isMultiModal = false;
       destTrainName = destTrain?.name || `Ga ${destCity}`;
       trainDurationMinutes = Math.round((roadDistanceKm / speed.TRAIN) * 60);
-      trainPriceOneWay = Math.round(roadDistanceKm * PRICING_CONFIG.INTERCITY.TRAIN_PER_KM);
+      trainPriceOneWay = Math.round(
+        roadDistanceKm * PRICING_CONFIG.INTERCITY.TRAIN_PER_KM,
+      );
 
       const { transferKm, transferMinutes } = computeLocalTransfer(
         destTrain?.distanceKm,
@@ -165,7 +200,10 @@ export class TrainTransitStrategy implements ITransitStrategy {
       ];
     }
 
-    const safetyAdvisory = checkTransitSafety(TransitModeEnum.TRAIN, roadDistanceKm);
+    const safetyAdvisory = checkTransitSafety(
+      TransitModeEnum.TRAIN,
+      roadDistanceKm,
+    );
 
     return {
       mode: this.mode,
@@ -180,7 +218,11 @@ export class TrainTransitStrategy implements ITransitStrategy {
         dsvn: PRICING_CONFIG.DEEP_LINKS.DSVN_URL,
       },
       safetyAdvisory,
-      originHub: isDirectCityHub(originTrain, originCoords.areaId, T.LOCAL_HUB_MAX_DISTANCE_KM)
+      originHub: isDirectCityHub(
+        originTrain,
+        originCoords.areaId,
+        T.LOCAL_HUB_MAX_DISTANCE_KM,
+      )
         ? originTrain || undefined
         : undefined,
       destHub: destTrain || undefined,
@@ -197,5 +239,3 @@ export class TrainTransitStrategy implements ITransitStrategy {
     };
   }
 }
-
-

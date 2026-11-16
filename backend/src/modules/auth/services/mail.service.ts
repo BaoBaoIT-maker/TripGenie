@@ -36,7 +36,9 @@ export class MailService {
       ? `[TripGenie] Mã OTP đặt lại mật khẩu: ${otp}`
       : `[TripGenie] Mã OTP xác thực tài khoản: ${otp}`;
 
-    const title = isReset ? 'Đặt Lại Mật Khẩu TripGenie' : 'Mã Xác Thực TripGenie';
+    const title = isReset
+      ? 'Đặt Lại Mật Khẩu TripGenie'
+      : 'Mã Xác Thực TripGenie';
     const message = isReset
       ? 'Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn tại <strong>TripGenie</strong>.'
       : 'Cảm ơn bạn đã đăng ký tài khoản tại <strong>TripGenie</strong> — Nền tảng Lập kế hoạch Du lịch Thông minh.';
@@ -86,7 +88,9 @@ export class MailService {
 
     try {
       if (!sender || sender.includes('mock_email')) {
-        this.logger.warn(`Mock email configured (${sender}) — OTP code: ${otp}`);
+        this.logger.warn(
+          `Mock email configured (${sender}) — OTP code: ${otp}`,
+        );
         // Return true in development to allow smooth testing unless testing failures
         return true;
       }
@@ -98,10 +102,15 @@ export class MailService {
         html: htmlContent,
       });
 
-      this.logger.log(`Email OTP sent successfully to ${toEmail} for ${purpose}`);
+      this.logger.log(
+        `Email OTP sent successfully to ${toEmail} for ${purpose}`,
+      );
       return true;
     } catch (error: any) {
-      this.logger.error(`Failed to send OTP email to ${toEmail}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to send OTP email to ${toEmail}: ${error.message}`,
+        error.stack,
+      );
       return false;
     }
   }
@@ -155,7 +164,9 @@ export class MailService {
 
     try {
       if (!sender || sender.includes('mock_email')) {
-        this.logger.warn(`Mock email configured (${sender}) — Verification URL: ${verificationUrl}`);
+        this.logger.warn(
+          `Mock email configured (${sender}) — Verification URL: ${verificationUrl}`,
+        );
         return true;
       }
 
@@ -166,10 +177,15 @@ export class MailService {
         html: htmlContent,
       });
 
-      this.logger.log(`Email verification link sent successfully to ${toEmail}`);
+      this.logger.log(
+        `Email verification link sent successfully to ${toEmail}`,
+      );
       return true;
     } catch (error: any) {
-      this.logger.error(`Failed to send verification email to ${toEmail}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to send verification email to ${toEmail}: ${error.message}`,
+        error.stack,
+      );
       return false;
     }
   }

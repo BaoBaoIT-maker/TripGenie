@@ -17,13 +17,21 @@ export class CopilotSummaryProcessor extends WorkerHost {
   }
 
   async process(job: Job<SummarizeJobData>): Promise<string | null> {
-    this.logger.log(`[BullMQ] Processing summary job #${job.id} for session ${job.data.sessionId}`);
+    this.logger.log(
+      `[BullMQ] Processing summary job #${job.id} for session ${job.data.sessionId}`,
+    );
     try {
-      const result = await this.copilotAgentService.summarizeSession(job.data.sessionId);
-      this.logger.log(`[BullMQ] Finished summary job #${job.id} for session ${job.data.sessionId}`);
+      const result = await this.copilotAgentService.summarizeSession(
+        job.data.sessionId,
+      );
+      this.logger.log(
+        `[BullMQ] Finished summary job #${job.id} for session ${job.data.sessionId}`,
+      );
       return result;
     } catch (err) {
-      this.logger.error(`[BullMQ] Failed summary job #${job.id}: ${(err as Error).message}`);
+      this.logger.error(
+        `[BullMQ] Failed summary job #${job.id}: ${(err as Error).message}`,
+      );
       throw err;
     }
   }

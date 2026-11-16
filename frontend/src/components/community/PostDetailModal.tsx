@@ -495,7 +495,7 @@ export function PostDetailModal({
       <div className="relative flex items-center justify-center px-6 py-4 border-b border-[#E2E8F0] bg-white shrink-0">
         <h2
           id="post-detail-modal-title"
-          className="text-[16px] font-black text-[#0F172A] tracking-tight text-center truncate max-w-[75%]"
+          className="text-[15px] font-bold text-slate-900 tracking-tight text-center truncate max-w-[75%]"
         >
           Bài viết của {post.author.fullName}
         </h2>
@@ -527,7 +527,7 @@ export function PostDetailModal({
                 <Link
                   href={profileHref}
                   onClick={onClose}
-                  className="text-[14px] font-black text-[#0F172A] hover:text-[#0194F3] transition-colors truncate"
+                  className="text-[14px] font-bold text-slate-900 hover:text-[#0194F3] transition-colors truncate"
                 >
                   {post.author.fullName}
                 </Link>
@@ -558,18 +558,19 @@ export function PostDetailModal({
 
         {/* Post Title, Caption & Hashtags */}
         <div className="space-y-2">
-          <h3 className="text-[17px] font-black text-[#020617] leading-[1.4] tracking-[-0.02em]">
+          <h3 className="text-[16px] font-bold text-slate-900 leading-snug tracking-tight">
             {post.title}
           </h3>
           {post.caption && (
-            <p className="text-[13px] text-[#334155] leading-[1.6] whitespace-pre-line">
+            <p className="text-[13.5px] text-slate-600 leading-relaxed whitespace-pre-line">
               {post.caption}
             </p>
           )}
 
+          {/* Hashtags (Clean inline links) */}
           {post.tags && post.tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {post.tags.map((tag, idx) => (
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-0.5">
+              {post.tags.map((tag) => (
                 <button
                   key={tag}
                   type="button"
@@ -577,11 +578,7 @@ export function PostDetailModal({
                     onSelectTag?.(tag);
                     onClose();
                   }}
-                  className={
-                    idx < 2
-                      ? "py-0.5 px-2 rounded-[6px] bg-[#F0F7FF] text-[#0194F3] text-[11px] font-bold hover:bg-[#BAE0FD]/50 transition-colors cursor-pointer"
-                      : "py-0.5 px-2 rounded-[6px] bg-[#F1F5F9] text-[#475569] text-[11px] font-semibold hover:bg-[#E2E8F0] transition-colors cursor-pointer"
-                  }
+                  className="text-xs font-semibold text-[#0194F3] hover:text-[#007FE3] hover:underline bg-transparent border-none p-0 cursor-pointer inline-flex items-center transition-colors"
                 >
                   {tag.startsWith("#") ? tag : `#${tag}`}
                 </button>
@@ -750,20 +747,20 @@ export function PostDetailModal({
           </div>
         )}
 
-        {/* Attached Itinerary Strip (Matching .itinerary-strip from community_redesign_demo.html) */}
+        {/* Attached Itinerary Strip */}
         {post.itinerary && (
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#F8FAFC] hover:bg-[#F1F5F9] border border-[#E2E8F0] rounded-[16px] py-3 px-4 transition-colors">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/90 hover:bg-slate-100/90 border border-slate-200/90 hover:border-slate-300 rounded-xl py-2.5 px-3.5 transition-colors">
             <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className="w-11 h-11 rounded-[12px] bg-[#0194F3] text-white flex items-center justify-center text-[18px] shrink-0 shadow-[0_2px_6px_rgba(1,148,243,0.25)]">
+              <div className="size-9 rounded-lg bg-[#0194F3] text-white flex items-center justify-center text-sm shrink-0 shadow-xs">
                 <i className="fa-solid fa-route" aria-hidden="true" />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-0.5">
-                  <span className="py-0.5 px-[7px] rounded-[6px] bg-[#F0F7FF] text-[#0194F3] font-extrabold text-[10px] uppercase tracking-[0.04em]">
+                  <span className="py-0.5 px-1.5 rounded-md bg-[#F0F7FF] text-[#0194F3] font-bold text-[10px] tracking-wide">
                     Lộ trình đính kèm
                   </span>
                   {durationLabel && (
-                    <span className="text-[11px] text-[#64748B] font-semibold">
+                    <span className="text-[11px] text-slate-500 font-medium">
                       • {durationLabel}
                     </span>
                   )}
@@ -771,11 +768,11 @@ export function PostDetailModal({
                 <Link
                   href={`/itineraries/${post.itinerary.id}`}
                   onClick={onClose}
-                  className="block text-[14px] font-extrabold text-[#0F172A] hover:text-[#0194F3] leading-[1.3] truncate transition-colors"
+                  className="block text-[13.5px] font-bold text-slate-900 hover:text-[#0194F3] leading-snug truncate transition-colors"
                 >
                   {post.itinerary.title}
                 </Link>
-                <div className="text-[11px] text-[#64748B] font-medium mt-0.5 truncate">
+                <div className="text-[11px] text-slate-500 font-medium mt-0.5 truncate">
                   {post.itinerary.totalPlaces} Điểm đến
                   {formattedEstimatedCost
                     ? ` • Dự trù ~${formattedEstimatedCost}/người`
@@ -791,7 +788,7 @@ export function PostDetailModal({
                   onClose();
                   onOpenClonePreview(post);
                 }}
-                className="bg-[#0194F3] hover:bg-[#007FE3] text-white py-2 px-4 text-[12px] font-bold shrink-0 rounded-[10px] inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors border-none"
+                className="h-8 px-3 text-xs font-semibold shrink-0 whitespace-nowrap rounded-lg inline-flex items-center justify-center gap-1.5 bg-[#0194F3] hover:bg-[#007FE3] active:scale-[0.98] text-white shadow-xs cursor-pointer transition-colors border-none"
               >
                 <i className="fa-regular fa-clone" aria-hidden="true" />
                 <span>Xem &amp; Nhân bản</span>
@@ -800,7 +797,7 @@ export function PostDetailModal({
               <Link
                 href={`/itineraries/${post.itinerary.id}`}
                 onClick={onClose}
-                className="bg-[#0194F3] hover:bg-[#007FE3] text-white py-2 px-4 text-[12px] font-bold shrink-0 rounded-[10px] inline-flex items-center justify-center gap-1.5 transition-colors"
+                className="h-8 px-3 text-xs font-semibold shrink-0 whitespace-nowrap rounded-lg inline-flex items-center justify-center gap-1.5 bg-[#0194F3] hover:bg-[#007FE3] active:scale-[0.98] text-white shadow-xs transition-colors"
               >
                 <span>Xem chi tiết</span>
               </Link>
@@ -975,7 +972,7 @@ export function PostDetailModal({
                 <Trash2 className="size-5" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-sm font-black text-[#0F172A]">
+                <h3 className="text-sm font-bold text-slate-900">
                   Xác nhận xóa bình luận?
                 </h3>
                 <p className="text-xs text-[#64748B] leading-relaxed">

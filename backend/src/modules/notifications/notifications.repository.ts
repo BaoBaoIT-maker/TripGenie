@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '@/database/prisma.service';
 import { Prisma } from '@prisma/client';
 import {
@@ -9,7 +13,8 @@ import {
 } from './interfaces/notifications-repository.interface';
 import { NOTIFICATIONS_CONSTANTS } from './notifications.constants';
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 @Injectable()
 export class NotificationsRepository implements INotificationsRepository {
@@ -38,7 +43,9 @@ export class NotificationsRepository implements INotificationsRepository {
     }
   }
 
-  private getVisibilityWhere(recipientId: string): Prisma.NotificationWhereInput {
+  private getVisibilityWhere(
+    recipientId: string,
+  ): Prisma.NotificationWhereInput {
     return {
       recipientId,
       OR: [
@@ -73,7 +80,9 @@ export class NotificationsRepository implements INotificationsRepository {
     }
 
     if (params.cursor) {
-      const { createdAt: cursorDate, id: cursorId } = this.decodeCursor(params.cursor);
+      const { createdAt: cursorDate, id: cursorId } = this.decodeCursor(
+        params.cursor,
+      );
       andConditions.push({
         OR: [
           { createdAt: { lt: cursorDate } },
@@ -127,17 +136,19 @@ export class NotificationsRepository implements INotificationsRepository {
       nextCursor = this.encodeCursor(last.createdAt, last.id);
     }
 
-    const mappedItems: NotificationItem[] = items.map((r: (typeof items)[number]) => ({
-      id: r.id,
-      type: r.type,
-      actor: r.actor,
-      post: r.post,
-      commentId: r.commentId,
-      itinerary: r.itinerary,
-      invitationId: r.invitationId,
-      createdAt: r.createdAt.toISOString(),
-      readAt: r.readAt ? r.readAt.toISOString() : null,
-    }));
+    const mappedItems: NotificationItem[] = items.map(
+      (r: (typeof items)[number]) => ({
+        id: r.id,
+        type: r.type,
+        actor: r.actor,
+        post: r.post,
+        commentId: r.commentId,
+        itinerary: r.itinerary,
+        invitationId: r.invitationId,
+        createdAt: r.createdAt.toISOString(),
+        readAt: r.readAt ? r.readAt.toISOString() : null,
+      }),
+    );
 
     return {
       items: mappedItems,

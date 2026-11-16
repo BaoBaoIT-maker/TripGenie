@@ -1,17 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import {
-  Sparkles,
-  X,
-  Star,
-  MapPin,
-  MessageSquare,
-  Check,
-  Loader2,
-  UtensilsCrossed,
-} from 'lucide-react';
+import { AppModalPortal } from '@/components/common/AppModalPortal';
 import { useActivityAlternatives } from '../../hooks/use-itinerary-planner';
+import { ModalCopilotAssist } from './ModalCopilotAssist';
 import type { ItineraryActivity, AlternativePlaceItem } from '@/types/itinerary';
 
 interface Props {
@@ -20,7 +12,10 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   onSelectAlternative: (newPlaceId: string) => Promise<void>;
-  onAskCopilot: (placeName: string) => void;
+  onAskCopilot: (promptOrPlaceName: string) => void;
+  canEdit?: boolean;
+  isMemberOrOwner?: boolean;
+  onProposeAlternative?: (newPlaceId: string) => Promise<void>;
 }
 
 export default function PlaceAlternativesModal({
@@ -30,171 +25,216 @@ export default function PlaceAlternativesModal({
   onClose,
   onSelectAlternative,
   onAskCopilot,
+  canEdit = true,
+  isMemberOrOwner = false,
+  onProposeAlternative,
 }: Props) {
-  const [swappingId, setSwappingId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const destinationId = activity?.id || activity?.placeId || null;
   const { data: alternatives, isLoading, error } = useActivityAlternatives(
     itineraryId,
-    isOpen ? destinationId : null
+    isOpen ? destinationId : null,
   );
 
-  if (!isOpen || !activity) return null;
-
-  const handleSelect = async (alt: AlternativePlaceItem) => {
+  const handleDirectSwap = async (alt: AlternativePlaceItem) => {
     try {
-      setSwappingId(alt.id);
+      setBusyId(alt.id);
       await onSelectAlternative(alt.id);
       onClose();
     } finally {
-      setSwappingId(null);
+      setBusyId(null);
+    }
+  };
+
+  const handlePropose = async (alt: AlternativePlaceItem) => {
+    if (!onProposeAlternative) return;
+    try {
+      setBusyId(`vote-${alt.id}`);
+      await onProposeAlternative(alt.id);
+      onClose();
+    } finally {
+      setBusyId(null);
     }
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-in fade-in duration-150"
-      onClick={onClose}
+    <AppModalPortal
+      open={isOpen && Boolean(activity)}
+      onClose={onClose}
+      ariaLabelledBy="place-alternatives-title"
+      maxWidthClass="max-w-lg"
+      dialogClassName="flex flex-col max-h-[86vh]"
+      disableClose={busyId !== null}
+      mobileBottomSheet
     >
-      <div
-        className="w-full max-w-lg rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
-          <div className="flex items-center gap-2.5">
-            <div className="size-9 rounded-xl bg-sky-100 text-[#0068B8] flex items-center justify-center shadow-xs">
-              <Sparkles className="size-4" />
+      {activity && (
+        <>
+          {/* Header */}
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/70 shrink-0">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="size-9 rounded-xl bg-[#F0F7FF] text-[#0194F3] flex items-center justify-center shrink-0">
+                <i className="fa-solid fa-right-left text-sm" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <h3 id="place-alternatives-title" className="text-sm font-bold text-slate-900 leading-tight">
+                  Đổi địa điểm tương đương
+                </h3>
+                <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                  Thay thế cho: <span className="font-semibold text-slate-700">{activity.placeName}</span>
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-slate-900 leading-tight">
-                Đổi địa điểm tương đương
-              </h3>
-              <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
-                Thay thế cho: <span className="font-semibold text-slate-700">{activity.placeName}</span>
-              </p>
-            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={busyId !== null}
+              aria-label="Đóng hộp thoại"
+              className="size-8 rounded-full text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={onClose}
-            className="size-8 rounded-full text-slate-400 hover:bg-slate-200/60 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
+          {/* Content list */}
+          <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-white text-xs">
+            {isLoading && (
+              <div className="py-12 flex flex-col items-center justify-center gap-2.5 text-slate-500">
+                <i className="fa-solid fa-circle-notch fa-spin text-xl text-[#0194F3]" aria-hidden="true" />
+                <p className="text-xs font-medium">Đang tìm các địa điểm tương đương trong khu vực...</p>
+              </div>
+            )}
 
-        {/* Content list */}
-        <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-white text-xs">
-          {isLoading && (
-            <div className="py-12 flex flex-col items-center justify-center gap-2.5 text-slate-500">
-              <Loader2 className="size-6 text-[#0194F3] animate-spin" />
-              <p className="text-xs font-medium">Đang tìm các địa điểm tương đương trong khu vực...</p>
-            </div>
-          )}
+            {!isLoading && error && (
+              <div className="py-8 text-center text-slate-500 space-y-2">
+                <i className="fa-solid fa-circle-exclamation text-xl text-rose-500" aria-hidden="true" />
+                <p className="text-xs font-medium">Không thể tải gợi ý thay thế. Vui lòng thử lại.</p>
+              </div>
+            )}
 
-          {!isLoading && error && (
-            <div className="py-8 text-center text-slate-500">
-              <p className="text-xs">Không thể tải gợi ý thay thế. Vui lòng thử lại.</p>
-            </div>
-          )}
+            {!isLoading && !error && alternatives && alternatives.length === 0 && (
+              <div className="py-8 text-center text-slate-500 space-y-2">
+                <i className="fa-solid fa-utensils text-2xl text-slate-300" aria-hidden="true" />
+                <p className="text-xs font-semibold text-slate-700">
+                  Chưa tìm thấy quán tương đương cùng loại trong phạm vi lân cận.
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Bạn có thể nhờ Genie Copilot tìm kiếm quán theo yêu cầu riêng bên dưới.
+                </p>
+              </div>
+            )}
 
-          {!isLoading && !error && alternatives && alternatives.length === 0 && (
-            <div className="py-8 text-center text-slate-500 space-y-2">
-              <UtensilsCrossed className="size-8 mx-auto text-slate-400" />
-              <p className="text-xs font-medium">
-                Chưa tìm thấy quán tương đương cùng loại trong phạm vi lân cận.
-              </p>
-              <p className="text-[11px] text-slate-400">
-                Bạn có thể nhờ Genie Copilot tìm kiếm quán theo yêu cầu riêng bên dưới.
-              </p>
-            </div>
-          )}
-
-          {!isLoading &&
-            alternatives?.map((alt) => (
-              <div
-                key={alt.id}
-                className="group p-3 rounded-xl border border-slate-200 hover:border-[#0194F3] hover:shadow-xs transition-all flex items-center gap-3 bg-white"
-              >
-                {/* Thumbnail */}
-                <div className="relative size-16 sm:size-18 rounded-lg overflow-hidden bg-slate-100 shrink-0">
-                  <img
-                    src={
-                      alt.imageUrl ||
-                      'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&auto=format&fit=crop&q=80'
-                    }
-                    alt={alt.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  {alt.distanceKm != null && (
-                    <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded-md bg-slate-900/80 backdrop-blur-xs text-[9px] font-bold text-white">
-                      {alt.distanceKm}km
-                    </span>
-                  )}
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0 space-y-1">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="px-1.5 py-0.5 rounded-sm bg-sky-50 text-[#0068B8] font-bold text-[10px]">
-                      {alt.categoryName}
-                    </span>
-                    <span className="inline-flex items-center gap-0.5 text-amber-500 font-bold text-[11px]">
-                      <Star className="size-3 fill-amber-400 text-amber-400" />
-                      <span>{alt.ratingAvg.toFixed(1)}</span>
-                    </span>
-                    <span className="text-[10px] text-slate-400">({alt.reviewCount})</span>
+            {!isLoading &&
+              alternatives?.map((alt) => (
+                <div
+                  key={alt.id}
+                  className="group p-3 rounded-xl border border-slate-200 hover:border-[#0194F3]/60 hover:bg-[#F5F9FF]/40 transition-colors flex items-center gap-3 bg-white"
+                >
+                  {/* Thumbnail */}
+                  <div className="relative size-16 rounded-lg overflow-hidden bg-slate-100 shrink-0 flex items-center justify-center">
+                    {alt.imageUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={alt.imageUrl}
+                        alt={alt.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <i className="fa-solid fa-location-dot text-slate-400 text-base" aria-hidden="true" />
+                    )}
+                    {alt.distanceKm != null && (
+                      <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-slate-900/80 text-[10px] font-bold text-white tabular-nums">
+                        {alt.distanceKm}km
+                      </span>
+                    )}
                   </div>
 
-                  <h4 className="text-xs font-bold text-slate-900 truncate group-hover:text-[#0068B8] transition-colors">
-                    {alt.name}
-                  </h4>
+                  {/* Info */}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="px-1.5 py-0.5 rounded bg-[#F0F7FF] text-[#0194F3] font-bold text-[10px]">
+                        {alt.categoryName}
+                      </span>
+                      {alt.ratingAvg > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-amber-600 font-bold text-[11px] tabular-nums">
+                          <i className="fa-solid fa-star text-[10px] text-amber-500" aria-hidden="true" />
+                          <span>{alt.ratingAvg.toFixed(1)}</span>
+                        </span>
+                      )}
+                      {alt.reviewCount > 0 && (
+                        <span className="text-[10px] text-slate-400 tabular-nums">
+                          ({alt.reviewCount})
+                        </span>
+                      )}
+                    </div>
 
-                  <p className="text-[11px] text-slate-500 truncate flex items-center gap-1">
-                    <MapPin className="size-3 text-slate-400 shrink-0" />
-                    <span className="truncate">{alt.address}</span>
-                  </p>
+                    <h4 className="text-xs font-bold text-[#10243A] truncate group-hover:text-[#0194F3] transition-colors">
+                      {alt.name}
+                    </h4>
+
+                    <p className="text-[11px] text-slate-500 truncate flex items-center gap-1">
+                      <i className="fa-solid fa-location-dot text-[10px] text-slate-400 shrink-0" aria-hidden="true" />
+                      <span className="truncate">{alt.address}</span>
+                    </p>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex flex-col gap-1.5 shrink-0">
+                    {canEdit && (
+                      <button
+                        type="button"
+                        disabled={busyId !== null}
+                        onClick={() => handleDirectSwap(alt)}
+                        className="h-8 px-3 rounded-lg bg-[#0194F3] hover:bg-[#007AD0] disabled:opacity-50 text-white font-bold text-xs transition-colors cursor-pointer inline-flex items-center justify-center gap-1"
+                      >
+                        {busyId === alt.id ? (
+                          <i className="fa-solid fa-circle-notch fa-spin text-[11px]" aria-hidden="true" />
+                        ) : (
+                          <i className="fa-solid fa-check text-[11px]" aria-hidden="true" />
+                        )}
+                        <span>Đổi ngay</span>
+                      </button>
+                    )}
+
+                    {isMemberOrOwner && onProposeAlternative && (
+                      <button
+                        type="button"
+                        disabled={busyId !== null}
+                        onClick={() => handlePropose(alt)}
+                        className={`h-8 px-2.5 rounded-lg font-semibold text-[11px] transition-colors cursor-pointer inline-flex items-center justify-center gap-1 disabled:opacity-50 ${
+                          canEdit
+                            ? 'border border-slate-200 bg-white hover:bg-[#F0F7FF] text-[#10243A] hover:text-[#0194F3]'
+                            : 'bg-[#0194F3] hover:bg-[#007AD0] text-white font-bold'
+                        }`}
+                      >
+                        {busyId === `vote-${alt.id}` ? (
+                          <i className="fa-solid fa-circle-notch fa-spin text-[11px]" aria-hidden="true" />
+                        ) : (
+                          <i className="fa-solid fa-check-to-slot text-[11px]" aria-hidden="true" />
+                        )}
+                        <span>{canEdit ? 'Mở vote' : 'Đề xuất đổi'}</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
+              ))}
+          </div>
 
-                {/* Action button */}
-                <button
-                  type="button"
-                  disabled={swappingId !== null}
-                  onClick={() => handleSelect(alt)}
-                  className="px-3 py-1.5 rounded-lg bg-[#0068B8] hover:bg-[#00569C] disabled:opacity-50 text-white font-bold text-xs transition-colors shrink-0 shadow-xs cursor-pointer inline-flex items-center gap-1"
-                >
-                  {swappingId === alt.id ? (
-                    <Loader2 className="size-3 animate-spin" />
-                  ) : (
-                    <Check className="size-3" />
-                  )}
-                  <span>Chọn</span>
-                </button>
-              </div>
-            ))}
-        </div>
-
-        {/* Footer / Copilot bridge */}
-        <div className="p-3.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-2">
-          <p className="text-[11px] text-slate-500 font-medium hidden sm:block">
-            Cần tìm quán theo gu riêng?
-          </p>
-
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onAskCopilot(activity.placeName);
-            }}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-400 text-[#0068B8] text-xs font-bold transition-all shadow-2xs cursor-pointer"
-          >
-            <MessageSquare className="size-3.5 text-[#0194F3]" />
-            <span>Nhờ Genie Copilot tìm theo yêu cầu...</span>
-          </button>
-        </div>
-      </div>
-    </div>
+          {/* Shared Copilot Assist Footer */}
+          <div className="p-4 border-t border-slate-100 bg-white shrink-0">
+            <ModalCopilotAssist
+              context="swap"
+              placeName={activity.placeName}
+              canEdit={canEdit}
+              onAskCopilot={(prompt) => {
+                onClose();
+                onAskCopilot(prompt);
+              }}
+            />
+          </div>
+        </>
+      )}
+    </AppModalPortal>
   );
 }

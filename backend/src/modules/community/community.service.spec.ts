@@ -161,7 +161,9 @@ describe('CommunityService', () => {
         groupId: 'san-may-nui-rung',
       });
 
-      expect(mockRepo.findGroupByIdOrSlug).toHaveBeenCalledWith('san-may-nui-rung');
+      expect(mockRepo.findGroupByIdOrSlug).toHaveBeenCalledWith(
+        'san-may-nui-rung',
+      );
       expect(mockRepo.createPost).toHaveBeenCalledWith(
         expect.objectContaining({
           groupId: 'group-san-may',
@@ -328,11 +330,16 @@ describe('CommunityService', () => {
         tags: ['#DuLich'],
       });
 
-      const res = await service.updatePost('owner-id', UserRole.USER, 'post-1', {
-        title: 'Tiêu đề đã sửa',
-        caption: '  Nội dung mới  ',
-        tags: ['DuLich'],
-      });
+      const res = await service.updatePost(
+        'owner-id',
+        UserRole.USER,
+        'post-1',
+        {
+          title: 'Tiêu đề đã sửa',
+          caption: '  Nội dung mới  ',
+          tags: ['DuLich'],
+        },
+      );
 
       expect(mockRepo.updatePost).toHaveBeenCalledWith(
         'post-1',
@@ -357,9 +364,14 @@ describe('CommunityService', () => {
         tags: [],
       });
 
-      const res = await service.updatePost('admin-id', UserRole.ADMIN, 'post-1', {
-        title: 'Admin điều chỉnh tiêu đề',
-      });
+      const res = await service.updatePost(
+        'admin-id',
+        UserRole.ADMIN,
+        'post-1',
+        {
+          title: 'Admin điều chỉnh tiêu đề',
+        },
+      );
 
       expect(mockRepo.updatePost).toHaveBeenCalledWith(
         'post-1',
@@ -401,14 +413,20 @@ describe('CommunityService', () => {
   describe('toggleLike', () => {
     it('should throw NotFoundException if post does not exist', async () => {
       mockRepo.findPostById.mockResolvedValue(null);
-      await expect(service.toggleLike('user-1', 'missing-post')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(
+        service.toggleLike('user-1', 'missing-post'),
+      ).rejects.toThrow(NotFoundException);
     });
 
     it('should toggle like atomically via repository', async () => {
-      mockRepo.findPostById.mockResolvedValue({ id: 'post-1', userId: 'user-2' });
-      mockRepo.togglePostLike.mockResolvedValue({ isLiked: true, likeCount: 15 });
+      mockRepo.findPostById.mockResolvedValue({
+        id: 'post-1',
+        userId: 'user-2',
+      });
+      mockRepo.togglePostLike.mockResolvedValue({
+        isLiked: true,
+        likeCount: 15,
+      });
 
       const res = await service.toggleLike('user-1', 'post-1');
       expect(res).toEqual({
@@ -501,7 +519,10 @@ describe('CommunityService', () => {
         UserRole.USER,
         'cmt-1',
       );
-      expect(mockRepo.softDeleteComment).toHaveBeenCalledWith('cmt-1', 'post-1');
+      expect(mockRepo.softDeleteComment).toHaveBeenCalledWith(
+        'cmt-1',
+        'post-1',
+      );
       expect(res.commentCount).toBe(4);
     });
 
@@ -563,7 +584,11 @@ describe('CommunityService', () => {
       mockRepo.findFeedPosts.mockResolvedValue({ items: [], nextCursor: null });
 
       await service.getFeed(
-        { sort: CommunitySortMode.TRENDING, limit: 10, groupId: 'san-may-nui-rung' },
+        {
+          sort: CommunitySortMode.TRENDING,
+          limit: 10,
+          groupId: 'san-may-nui-rung',
+        },
         'viewer-1',
       );
 

@@ -84,6 +84,7 @@ export function useUpdateMemberRole(itineraryId: string) {
     },
     onSuccess: (_, variables) => {
       toast.success(`Đã cập nhật quyền thành ${TRIP_COMPANIONS_CONFIG.ROLES[variables.role]}`);
+      queryClient.invalidateQueries({ queryKey: ['itineraries'] });
       queryClient.invalidateQueries({ queryKey: COMPANIONS_QUERY_KEYS.list(itineraryId) });
       queryClient.invalidateQueries({ queryKey: ['itineraries', 'detail', itineraryId] });
     },
@@ -96,6 +97,7 @@ export function useRemoveMember(itineraryId: string) {
     mutationFn: (userId: string) => tripCompanionService.removeMember(itineraryId, userId),
     onSuccess: () => {
       toast.success('Đã xóa thành viên khỏi chuyến đi');
+      queryClient.invalidateQueries({ queryKey: ['itineraries'] });
       queryClient.invalidateQueries({ queryKey: COMPANIONS_QUERY_KEYS.list(itineraryId) });
       queryClient.invalidateQueries({ queryKey: ['itineraries', 'detail', itineraryId] });
     },

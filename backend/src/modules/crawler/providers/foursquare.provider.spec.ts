@@ -35,8 +35,13 @@ describe('FoursquareProvider', () => {
       ],
     }).compile();
 
-    const unconfiguredProvider = unconfiguredModule.get<FoursquareProvider>(FoursquareProvider);
-    const result = await unconfiguredProvider.enrichPlace('Test Place', 16.0, 108.2);
+    const unconfiguredProvider =
+      unconfiguredModule.get<FoursquareProvider>(FoursquareProvider);
+    const result = await unconfiguredProvider.enrichPlace(
+      'Test Place',
+      16.0,
+      108.2,
+    );
 
     expect(result).toBeNull();
   });

@@ -15,7 +15,10 @@ import { Queue } from 'bullmq';
 import { CrawlJobService } from './services/crawl-job.service';
 import { TriggerRegionCrawlDto } from './dto/trigger-region-crawl.dto';
 import { TriggerEnrichmentDto } from './dto/trigger-enrichment.dto';
-import { TriggerCrawlResponseDto, CrawlJobStatusDto } from './dto/crawl-job-response.dto';
+import {
+  TriggerCrawlResponseDto,
+  CrawlJobStatusDto,
+} from './dto/crawl-job-response.dto';
 import { CrawlerQueueName } from '../../common/enums/crawler.enum';
 
 /** Minimal typed request interface — avoids `any` on req */

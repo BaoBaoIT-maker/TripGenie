@@ -41,7 +41,9 @@ export class NominatimService {
         displayName: item.display_name as string,
       };
     } catch (err: any) {
-      this.logger.warn(`Nominatim geocode failed for "${query}": ${err.message}`);
+      this.logger.warn(
+        `Nominatim geocode failed for "${query}": ${err.message}`,
+      );
       return null;
     }
   }
@@ -54,7 +56,9 @@ export class NominatimService {
       });
       return (res.data?.display_name as string) || null;
     } catch (err: any) {
-      this.logger.warn(`Nominatim reverse geocode failed for [${lat},${lng}]: ${err.message}`);
+      this.logger.warn(
+        `Nominatim reverse geocode failed for [${lat},${lng}]: ${err.message}`,
+      );
       return null;
     }
   }

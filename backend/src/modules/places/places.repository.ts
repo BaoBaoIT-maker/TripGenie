@@ -76,7 +76,10 @@ export class PlacesRepository implements IPlaceRepository {
     } = filters;
 
     const hasLocation = lat !== undefined && lng !== undefined;
-    const conditions: string[] = ["p.status = 'ACTIVE'", 'p.deleted_at IS NULL'];
+    const conditions: string[] = [
+      "p.status = 'ACTIVE'",
+      'p.deleted_at IS NULL',
+    ];
     const args: unknown[] = [];
     let paramIdx = 1;
 
@@ -115,7 +118,9 @@ export class PlacesRepository implements IPlaceRepository {
           conditions.push(predicate);
         } else {
           const tagIdx = paramIdx++;
-          conditions.push(`(p.tags @> ARRAY[$${tagIdx}]::text[] OR p.description ILIKE '%' || $${tagIdx} || '%')`);
+          conditions.push(
+            `(p.tags @> ARRAY[$${tagIdx}]::text[] OR p.description ILIKE '%' || $${tagIdx} || '%')`,
+          );
           args.push(slug);
         }
       }
@@ -190,9 +195,10 @@ export class PlacesRepository implements IPlaceRepository {
     const offsetIdx = paramIdx++;
     args.push(limit, offset);
 
-    const distanceSelect = hasLocation && locLngIdx && locLatIdx
-      ? `ST_Distance(p.location, ST_SetSRID(ST_MakePoint($${locLngIdx}, $${locLatIdx}), 4326), true) AS distance_meters`
-      : `NULL AS distance_meters`;
+    const distanceSelect =
+      hasLocation && locLngIdx && locLatIdx
+        ? `ST_Distance(p.location, ST_SetSRID(ST_MakePoint($${locLngIdx}, $${locLatIdx}), 4326), true) AS distance_meters`
+        : `NULL AS distance_meters`;
 
     const sql = `
       SELECT
@@ -244,7 +250,11 @@ export class PlacesRepository implements IPlaceRepository {
         rating_avg DESC
       LIMIT 1;
     `;
-    const placeRes = await this.prisma.$queryRawUnsafe<any[]>(placeSql, raw, norm);
+    const placeRes = await this.prisma.$queryRawUnsafe<any[]>(
+      placeSql,
+      raw,
+      norm,
+    );
     if (placeRes && placeRes.length > 0 && placeRes[0].lat && placeRes[0].lng) {
       return {
         lat: Number(placeRes[0].lat),
@@ -471,7 +481,10 @@ export class PlacesRepository implements IPlaceRepository {
     return this.prisma.$queryRawUnsafe<PlaceRow[]>(sql, ...args);
   }
 
-  async findPlacesWithoutEmbedding(limit: number = 50, areaId?: number): Promise<PlaceForEmbedding[]> {
+  async findPlacesWithoutEmbedding(
+    limit: number = 50,
+    areaId?: number,
+  ): Promise<PlaceForEmbedding[]> {
     return this.prisma.place.findMany({
       where: {
         status: 'ACTIVE',
@@ -479,10 +492,7 @@ export class PlacesRepository implements IPlaceRepository {
         embedding: null,
         ...(areaId !== undefined
           ? {
-              OR: [
-                { areaId },
-                { area: { parentId: areaId } },
-              ],
+              OR: [{ areaId }, { area: { parentId: areaId } }],
             }
           : {}),
       },
@@ -491,10 +501,7 @@ export class PlacesRepository implements IPlaceRepository {
         area: true,
       },
       take: limit,
-      orderBy: [
-        { imageCount: 'desc' },
-        { ratingAvg: 'desc' },
-      ],
+      orderBy: [{ imageCount: 'desc' }, { ratingAvg: 'desc' }],
     });
   }
 }

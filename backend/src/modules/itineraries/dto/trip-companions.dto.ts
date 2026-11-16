@@ -4,12 +4,16 @@ import { Transform } from 'class-transformer';
 export class InviteCompanionDto {
   @IsEmail({}, { message: 'Email người nhận không hợp lệ' })
   @IsNotEmpty({ message: 'Email không được để trống' })
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
   email: string;
 }
 
 export class UpdateMemberRoleDto {
-  @IsIn(['VIEWER', 'EDITOR'], { message: 'Quyền thành viên chỉ có thể là VIEWER hoặc EDITOR' })
+  @IsIn(['VIEWER', 'EDITOR'], {
+    message: 'Quyền thành viên chỉ có thể là VIEWER hoặc EDITOR',
+  })
   role: 'VIEWER' | 'EDITOR';
 }
 

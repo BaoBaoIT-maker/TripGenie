@@ -33,17 +33,29 @@ describe('DeduplicationService', () => {
   });
 
   it('should return existing placeId on exact source match', async () => {
-    crawlerRepo.findPlaceSourceByExternal.mockResolvedValue({ placeId: 'place-123' });
+    crawlerRepo.findPlaceSourceByExternal.mockResolvedValue({
+      placeId: 'place-123',
+    });
 
     const result = await service.findDuplicate({
-      externalId: 'ext1', provider: 'osm', name: 'Test',
-      nameNormalized: 'test', latitude: 10, longitude: 20,
-      address: null, description: null, categorySlug: 'nha-hang',
-      tags: [], sourceData: {},
+      externalId: 'ext1',
+      provider: 'osm',
+      name: 'Test',
+      nameNormalized: 'test',
+      latitude: 10,
+      longitude: 20,
+      address: null,
+      description: null,
+      categorySlug: 'nha-hang',
+      tags: [],
+      sourceData: {},
     });
 
     expect(result).toBe('place-123');
-    expect(crawlerRepo.findPlaceSourceByExternal).toHaveBeenCalledWith('osm', 'ext1');
+    expect(crawlerRepo.findPlaceSourceByExternal).toHaveBeenCalledWith(
+      'osm',
+      'ext1',
+    );
     expect(crawlerRepo.findNearbyPlaces).not.toHaveBeenCalled();
   });
 
@@ -54,10 +66,17 @@ describe('DeduplicationService', () => {
     ]);
 
     const result = await service.findDuplicate({
-      externalId: 'ext1', provider: 'osm', name: 'Test Place',
-      nameNormalized: 'test place', latitude: 10, longitude: 20,
-      address: null, description: null, categorySlug: 'nha-hang',
-      tags: [], sourceData: {},
+      externalId: 'ext1',
+      provider: 'osm',
+      name: 'Test Place',
+      nameNormalized: 'test place',
+      latitude: 10,
+      longitude: 20,
+      address: null,
+      description: null,
+      categorySlug: 'nha-hang',
+      tags: [],
+      sourceData: {},
     });
 
     expect(result).toBe('place-456');
@@ -71,10 +90,17 @@ describe('DeduplicationService', () => {
     ]);
 
     const result = await service.findDuplicate({
-      externalId: 'ext1', provider: 'osm', name: 'Test',
-      nameNormalized: 'test', latitude: 10, longitude: 20,
-      address: null, description: null, categorySlug: 'nha-hang',
-      tags: [], sourceData: {},
+      externalId: 'ext1',
+      provider: 'osm',
+      name: 'Test',
+      nameNormalized: 'test',
+      latitude: 10,
+      longitude: 20,
+      address: null,
+      description: null,
+      categorySlug: 'nha-hang',
+      tags: [],
+      sourceData: {},
     });
 
     expect(result).toBeNull();

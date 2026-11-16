@@ -4,6 +4,7 @@ import {
   PRICING_CONFIG,
   buildVexereBusUrl,
   checkTransitSafety,
+  resolveVexereBusPartner,
 } from '../../../../../config/pricing.config';
 import { TransitModeEnum } from '../../../dto/generate-itinerary.dto';
 import {
@@ -35,67 +36,29 @@ export class BusTransitStrategy implements ITransitStrategy {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private async resolveTerminals(
-    ctx: TransitStrategyContext,
-  ): Promise<{ originBus: TransitHubDto | null; destBus: TransitHubDto | null }> {
+  private async resolveTerminals(ctx: TransitStrategyContext): Promise<{
+    originBus: TransitHubDto | null;
+    destBus: TransitHubDto | null;
+  }> {
     const hubs =
       ctx.activeHubs ??
       (await this.prisma.transitHub.findMany({
         where: { isActive: true, hubType: 'BUS_TERMINAL' },
       }));
     return {
-      originBus: findNearestHub(hubs, 'BUS_TERMINAL', ctx.originCoords.lat, ctx.originCoords.lng),
-      destBus: findNearestHub(hubs, 'BUS_TERMINAL', ctx.destCoords.lat, ctx.destCoords.lng),
+      originBus: findNearestHub(
+        hubs,
+        'BUS_TERMINAL',
+        ctx.originCoords.lat,
+        ctx.originCoords.lng,
+      ),
+      destBus: findNearestHub(
+        hubs,
+        'BUS_TERMINAL',
+        ctx.destCoords.lat,
+        ctx.destCoords.lng,
+      ),
     };
-  }
-
-  private async findPartnerMapping(params: {
-    cityName: string;
-    areaId?: number;
-  }): Promise<{ slug: string; externalId: string } | null> {
-    const { cityName, areaId } = params;
-    const cleanTerm = (cityName || '')
-      .replace(/^(ga|bến xe|sân bay|trung tâm|tp\.|thành phố|tỉnh|huyện|quận)\s+/i, '')
-      .trim();
-
-    if (cleanTerm) {
-      try {
-        const rows = await this.prisma.$queryRaw<
-          Array<{ slug: string; external_id: string }>
-        >`
-          SELECT slug, external_id
-          FROM transit_partner_mappings
-          WHERE provider = 'VEXERE' AND hub_type = 'BUS'
-            AND (
-              unaccent(name) ILIKE '%' || unaccent(${cleanTerm}) || '%'
-              OR unaccent(slug) ILIKE '%' || unaccent(${cleanTerm}) || '%'
-              OR metadata->'aliases' ? LOWER(${cleanTerm})
-            )
-          LIMIT 1
-        `;
-        if (rows && rows.length > 0) {
-          return { slug: rows[0].slug, externalId: rows[0].external_id };
-        }
-      } catch {}
-    }
-
-    if (areaId) {
-      try {
-        const rows = await this.prisma.$queryRaw<
-          Array<{ slug: string; external_id: string }>
-        >`
-          SELECT slug, external_id
-          FROM transit_partner_mappings
-          WHERE provider = 'VEXERE' AND hub_type = 'BUS' AND area_id = ${areaId}
-          LIMIT 1
-        `;
-        if (rows && rows.length > 0) {
-          return { slug: rows[0].slug, externalId: rows[0].external_id };
-        }
-      } catch {}
-    }
-
-    return null;
   }
 
   summarize(res: IntercityTransitResult): TransitModeSummary {
@@ -103,7 +66,9 @@ export class BusTransitStrategy implements ITransitStrategy {
     return {
       mode: this.mode,
       title: 'Xe khách giường nằm',
-      durationText: res.isMultiModal ? `Xe + Tàu (~${durHours}h)` : `Giường nằm (~${durHours}h)`,
+      durationText: res.isMultiModal
+        ? `Xe + Tàu (~${durHours}h)`
+        : `Giường nằm (~${durHours}h)`,
       priceText: `Từ ~${formatVndCurrency(res.estimatedPriceOneWay)}/vé`,
       estimatedPriceOneWay: res.estimatedPriceOneWay,
       durationMinutes: res.durationMinutes,
@@ -111,7 +76,9 @@ export class BusTransitStrategy implements ITransitStrategy {
     };
   }
 
-  async calculate(ctx: TransitStrategyContext): Promise<IntercityTransitResult> {
+  async calculate(
+    ctx: TransitStrategyContext,
+  ): Promise<IntercityTransitResult> {
     const {
       originCity,
       destCity,
@@ -128,26 +95,29 @@ export class BusTransitStrategy implements ITransitStrategy {
     const D = PRICING_CONFIG.DEFAULTS;
     const { originBus, destBus } = await this.resolveTerminals(ctx);
 
-    const hasOriginBus = isDirectCityHub(originBus, originCoords.areaId, T.LOCAL_HUB_MAX_DISTANCE_KM);
-    const hasDestBus = !isIsland && isDirectCityHub(destBus, destCoords.areaId, T.LOCAL_HUB_MAX_DISTANCE_KM);
+    const hasOriginBus = isDirectCityHub(
+      originBus,
+      originCoords.areaId,
+      T.LOCAL_HUB_MAX_DISTANCE_KM,
+    );
+    const hasDestBus =
+      !isIsland &&
+      isDirectCityHub(destBus, destCoords.areaId, T.LOCAL_HUB_MAX_DISTANCE_KM);
     const ferryPortName = ctx.nearestFerryHub?.name || D.FERRY_PORT_NAME;
 
-    const originBusName = hasOriginBus && originBus ? originBus.name : `Bến xe tại ${originCity}`;
+    const originBusName =
+      hasOriginBus && originBus ? originBus.name : `Bến xe tại ${originCity}`;
     const destBusName =
       hasDestBus && destBus
         ? destBus.name
         : isIsland
-        ? ferryPortName
-        : `Bến xe tại ${destCity}`;
+          ? ferryPortName
+          : `Bến xe tại ${destCity}`;
 
-    const fromPartner = await this.findPartnerMapping({
-      cityName: originCity,
-      areaId: originCoords.areaId || originBus?.areaId,
-    });
-    const toPartner = await this.findPartnerMapping({
-      cityName: isIsland ? ferryPortName : destCity,
-      areaId: (isIsland ? ctx.nearestFerryHub?.areaId : destCoords.areaId) || destBus?.areaId,
-    });
+    const fromPartner = resolveVexereBusPartner(originCity);
+    const toPartner =
+      resolveVexereBusPartner(isIsland ? ferryPortName : destCity) ??
+      (isIsland ? resolveVexereBusPartner(destCity) : null);
     const vexereUrl = buildVexereBusUrl({
       fromSlug: fromPartner?.slug,
       toSlug: toPartner?.slug,
@@ -156,8 +126,12 @@ export class BusTransitStrategy implements ITransitStrategy {
       departDateVn: formatVnDate(departDate),
     });
 
-    const baseBusFare = Math.round(roadDistanceKm * PRICING_CONFIG.INTERCITY.SLEEPER_BUS_PER_KM);
-    const baseBusMinutes = Math.round((roadDistanceKm / speed.SLEEPER_BUS) * 60);
+    const baseBusFare = Math.round(
+      roadDistanceKm * PRICING_CONFIG.INTERCITY.SLEEPER_BUS_PER_KM,
+    );
+    const baseBusMinutes = Math.round(
+      (roadDistanceKm / speed.SLEEPER_BUS) * 60,
+    );
     let busPriceOneWay = baseBusFare;
     let busDurationMinutes = baseBusMinutes;
     let transferLeg: TransitTransferLeg | undefined;
@@ -193,7 +167,10 @@ export class BusTransitStrategy implements ITransitStrategy {
       ];
     }
 
-    const safetyAdvisory = checkTransitSafety(TransitModeEnum.SLEEPER_BUS, roadDistanceKm);
+    const safetyAdvisory = checkTransitSafety(
+      TransitModeEnum.SLEEPER_BUS,
+      roadDistanceKm,
+    );
 
     return {
       mode: this.mode,
@@ -223,5 +200,3 @@ export class BusTransitStrategy implements ITransitStrategy {
     };
   }
 }
-
-

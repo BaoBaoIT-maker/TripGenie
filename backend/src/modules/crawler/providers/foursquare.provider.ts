@@ -2,7 +2,10 @@ import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosInstance } from 'axios';
 import { ConfigService } from '@nestjs/config';
 import { BudgetLevel } from '@prisma/client';
-import { IEnrichmentProvider, EnrichedPlaceDetails } from '../interfaces/enrichment-provider.interface';
+import {
+  IEnrichmentProvider,
+  EnrichedPlaceDetails,
+} from '../interfaces/enrichment-provider.interface';
 
 @Injectable()
 export class FoursquareProvider implements IEnrichmentProvider {
@@ -19,9 +22,15 @@ export class FoursquareProvider implements IEnrichmentProvider {
     });
   }
 
-  async enrichPlace(name: string, lat: number, lng: number): Promise<EnrichedPlaceDetails | null> {
+  async enrichPlace(
+    name: string,
+    lat: number,
+    lng: number,
+  ): Promise<EnrichedPlaceDetails | null> {
     if (!this.apiKey) {
-      this.logger.debug('FOURSQUARE_API_KEY not configured — skipping Foursquare enrichment');
+      this.logger.debug(
+        'FOURSQUARE_API_KEY not configured — skipping Foursquare enrichment',
+      );
       return null;
     }
 
@@ -39,7 +48,9 @@ export class FoursquareProvider implements IEnrichmentProvider {
 
       const results = searchRes.data?.results;
       if (!results || results.length === 0) {
-        this.logger.debug(`No Foursquare match found for "${name}" at [${lat}, ${lng}]`);
+        this.logger.debug(
+          `No Foursquare match found for "${name}" at [${lat}, ${lng}]`,
+        );
         return null;
       }
 
@@ -74,8 +85,14 @@ export class FoursquareProvider implements IEnrichmentProvider {
     }
 
     // Convert Foursquare 0-10 rating to 0-5 scale
-    const ratingAvg = typeof data.rating === 'number' ? Number((data.rating / 2).toFixed(1)) : null;
-    const reviewCount = typeof data.stats?.total_ratings === 'number' ? data.stats.total_ratings : null;
+    const ratingAvg =
+      typeof data.rating === 'number'
+        ? Number((data.rating / 2).toFixed(1))
+        : null;
+    const reviewCount =
+      typeof data.stats?.total_ratings === 'number'
+        ? data.stats.total_ratings
+        : null;
     const budgetLevel = this.mapPriceToBudgetLevel(data.price);
 
     return {

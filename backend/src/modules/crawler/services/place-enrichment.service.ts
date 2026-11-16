@@ -1,7 +1,10 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { INJECT_TOKENS } from '../../../common/constants/inject-tokens';
 import { ICrawlerRepository } from '../interfaces/crawler-repository.interface';
-import { IEnrichmentProvider, EnrichedPlaceDetails } from '../interfaces/enrichment-provider.interface';
+import {
+  IEnrichmentProvider,
+  EnrichedPlaceDetails,
+} from '../interfaces/enrichment-provider.interface';
 
 @Injectable()
 export class PlaceEnrichmentService {
@@ -31,9 +34,17 @@ export class PlaceEnrichmentService {
   /**
    * Enriches a batch of unenriched places within a travel area.
    */
-  async enrichPlacesByArea(areaId: number, limit: number = 50): Promise<{ processed: number; enriched: number }> {
-    const places = await this.crawlerRepo.getUnenrichedPlacesByArea(areaId, limit);
-    this.logger.log(`Found ${places.length} unenriched places in area ${areaId}`);
+  async enrichPlacesByArea(
+    areaId: number,
+    limit: number = 50,
+  ): Promise<{ processed: number; enriched: number }> {
+    const places = await this.crawlerRepo.getUnenrichedPlacesByArea(
+      areaId,
+      limit,
+    );
+    this.logger.log(
+      `Found ${places.length} unenriched places in area ${areaId}`,
+    );
 
     let enrichedCount = 0;
     for (const place of places) {
@@ -49,7 +60,9 @@ export class PlaceEnrichmentService {
   // ---------------------------------------------------------------------------
 
   private async enrichSinglePlace(place: any): Promise<boolean> {
-    this.logger.log(`Enriching place "${place.name}" (${place.id}) with ${this.providers.length} provider(s)`);
+    this.logger.log(
+      `Enriching place "${place.name}" (${place.id}) with ${this.providers.length} provider(s)`,
+    );
 
     const updatePayload: Record<string, any> = {};
     const wikidataId = this.extractWikidataId(place);
@@ -69,29 +82,47 @@ export class PlaceEnrichmentService {
         if (!details) continue;
 
         // 1. Description (if missing)
-        if (details.description && !place.description && !updatePayload.description) {
+        if (
+          details.description &&
+          !place.description &&
+          !updatePayload.description
+        ) {
           updatePayload.description = details.description;
           modified = true;
         }
 
         // 2. Rating & Review Count (if missing or 0)
-        if (typeof details.ratingAvg === 'number' && (place.ratingAvg === 0 || place.ratingAvg === null)) {
+        if (
+          typeof details.ratingAvg === 'number' &&
+          (place.ratingAvg === 0 || place.ratingAvg === null)
+        ) {
           updatePayload.ratingAvg = details.ratingAvg;
           modified = true;
         }
-        if (typeof details.reviewCount === 'number' && !updatePayload.reviewCount) {
+        if (
+          typeof details.reviewCount === 'number' &&
+          !updatePayload.reviewCount
+        ) {
           updatePayload.reviewCount = details.reviewCount;
           modified = true;
         }
 
         // 3. Price Level (Enum BudgetLevel: LOW, MEDIUM, HIGH, LUXURY)
-        if (details.budgetLevel && !place.priceLevel && !updatePayload.priceLevel) {
+        if (
+          details.budgetLevel &&
+          !place.priceLevel &&
+          !updatePayload.priceLevel
+        ) {
           updatePayload.priceLevel = details.budgetLevel;
           modified = true;
         }
 
         // 4. Opening hours
-        if (details.openingHours && !place.openingHours && !updatePayload.openingHours) {
+        if (
+          details.openingHours &&
+          !place.openingHours &&
+          !updatePayload.openingHours
+        ) {
           updatePayload.openingHours = details.openingHours;
           modified = true;
         }
@@ -120,7 +151,9 @@ export class PlaceEnrichmentService {
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        this.logger.warn(`Provider "${provider.providerName}" failed for place "${place.name}": ${msg}`);
+        this.logger.warn(
+          `Provider "${provider.providerName}" failed for place "${place.name}": ${msg}`,
+        );
       }
     }
 
@@ -130,7 +163,9 @@ export class PlaceEnrichmentService {
     }
 
     if (modified) {
-      this.logger.log(`Successfully enriched "${place.name}" (Updated fields: ${Object.keys(updatePayload).join(', ')}, New images: ${totalNewImages})`);
+      this.logger.log(
+        `Successfully enriched "${place.name}" (Updated fields: ${Object.keys(updatePayload).join(', ')}, New images: ${totalNewImages})`,
+      );
       return true;
     }
 

@@ -23,7 +23,9 @@ export class CrawlProcessor extends WorkerHost {
 
   async process(job: Job<RegionCrawlJobData>): Promise<any> {
     const { jobId, areaId } = job.data;
-    this.logger.log(`[BullMQ] Starting process for job ${jobId} (Area: ${areaId}), Attempt ${job.attemptsMade + 1}/${job.opts.attempts}`);
+    this.logger.log(
+      `[BullMQ] Starting process for job ${jobId} (Area: ${areaId}), Attempt ${job.attemptsMade + 1}/${job.opts.attempts}`,
+    );
 
     await job.updateProgress(10);
     const result = await this.ingestionService.processArea(jobId, areaId);
@@ -34,7 +36,9 @@ export class CrawlProcessor extends WorkerHost {
 
   @OnWorkerEvent('completed')
   onCompleted(job: Job<RegionCrawlJobData>) {
-    this.logger.log(`[BullMQ] Crawl job ${job.data.jobId} completed successfully!`);
+    this.logger.log(
+      `[BullMQ] Crawl job ${job.data.jobId} completed successfully!`,
+    );
   }
 
   @OnWorkerEvent('failed')

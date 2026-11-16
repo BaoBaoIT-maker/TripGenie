@@ -117,7 +117,7 @@ export function CommunityLeftSidebar({
       {/* BLOCK 1: CHỦ ĐỀ & CẢM HỨNG (TOP CATEGORIES / COMMUNITY GROUPS) */}
       <div className="shrink-0 rounded-[20px] border border-[#E2E8F0] hover:border-[#CBD5E1] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-all flex flex-col gap-3.5">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-[11px] font-black tracking-[0.06em] uppercase text-[#0F172A]">
+          <h3 className="text-xs font-bold tracking-tight text-slate-900 flex items-center">
             <i
               className="fa-solid fa-layer-group mr-1.5 text-[#0194F3]"
               aria-hidden="true"
@@ -182,8 +182,8 @@ export function CommunityLeftSidebar({
                   />
                   <div className="min-w-0">
                     <div
-                      className={`text-[12px] font-extrabold truncate ${
-                        isSelected ? "text-[#007FE3]" : "text-[#0F172A]"
+                      className={`text-[12.5px] font-semibold truncate ${
+                        isSelected ? "text-[#007FE3]" : "text-slate-800"
                       }`}
                     >
                       {group.name}

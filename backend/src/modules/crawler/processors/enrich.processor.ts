@@ -19,10 +19,15 @@ export class EnrichProcessor extends WorkerHost {
 
   async process(job: Job<AreaEnrichJobData>): Promise<any> {
     const { areaId, limit } = job.data;
-    this.logger.log(`[BullMQ] Processing enrichment for Area ${areaId} (limit: ${limit || 50}), Attempt ${job.attemptsMade + 1}`);
+    this.logger.log(
+      `[BullMQ] Processing enrichment for Area ${areaId} (limit: ${limit || 50}), Attempt ${job.attemptsMade + 1}`,
+    );
 
     await job.updateProgress(10);
-    const result = await this.placeEnrichmentService.enrichPlacesByArea(areaId, limit || 50);
+    const result = await this.placeEnrichmentService.enrichPlacesByArea(
+      areaId,
+      limit || 50,
+    );
     await job.updateProgress(100);
 
     return result;
@@ -30,7 +35,9 @@ export class EnrichProcessor extends WorkerHost {
 
   @OnWorkerEvent('completed')
   onCompleted(job: Job<AreaEnrichJobData>) {
-    this.logger.log(`[BullMQ] Enrichment job for Area ${job.data.areaId} completed successfully!`);
+    this.logger.log(
+      `[BullMQ] Enrichment job for Area ${job.data.areaId} completed successfully!`,
+    );
   }
 
   @OnWorkerEvent('failed')

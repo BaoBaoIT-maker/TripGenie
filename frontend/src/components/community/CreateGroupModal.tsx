@@ -74,7 +74,7 @@ export function CreateGroupModal({ open, onClose }: CreateGroupModalProps) {
           <div>
             <h3
               id="create-group-modal-title"
-              className="text-sm font-black text-[#0F172A]"
+              className="text-sm font-bold text-slate-900"
             >
               Tạo Nhóm Cộng Đồng Mới
             </h3>

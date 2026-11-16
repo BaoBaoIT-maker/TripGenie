@@ -14,7 +14,10 @@ import { AuthGuard } from '@nestjs/passport';
 import { PlacesService } from './places.service';
 import { SearchPlacesDto } from './dto/search-places.dto';
 import { NearbyPlacesDto } from './dto/nearby-places.dto';
-import { SemanticSearchDto, SyncEmbeddingsDto } from './dto/semantic-search.dto';
+import {
+  SemanticSearchDto,
+  SyncEmbeddingsDto,
+} from './dto/semantic-search.dto';
 import { GeoJsonFeatureCollection } from '../geo/interfaces/geo.interface';
 import {
   PaginatedPlacesResponseDto,

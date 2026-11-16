@@ -18,18 +18,24 @@ export class AuthMailProcessor extends WorkerHost {
   }
 
   async process(job: Job<SendVerificationMailJobData>): Promise<boolean> {
-    this.logger.log(`[BullMQ] Processing verification email job #${job.id} for ${job.data.email}`);
+    this.logger.log(
+      `[BullMQ] Processing verification email job #${job.id} for ${job.data.email}`,
+    );
     const sent = await this.mailService.sendVerificationLinkEmail(
       job.data.email,
       job.data.verificationUrl,
     );
 
     if (!sent) {
-      this.logger.error(`[BullMQ] Failed to send verification email to ${job.data.email}`);
+      this.logger.error(
+        `[BullMQ] Failed to send verification email to ${job.data.email}`,
+      );
       throw new Error(`Failed to send verification email to ${job.data.email}`);
     }
 
-    this.logger.log(`[BullMQ] Successfully sent verification email to ${job.data.email}`);
+    this.logger.log(
+      `[BullMQ] Successfully sent verification email to ${job.data.email}`,
+    );
     return true;
   }
 }

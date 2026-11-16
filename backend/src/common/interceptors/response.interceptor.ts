@@ -9,15 +9,26 @@ import { map } from 'rxjs/operators';
 import { ApiResponse } from '../types';
 
 @Injectable()
-export class ResponseInterceptor<T> implements NestInterceptor<T, ApiResponse<T>> {
-  intercept(context: ExecutionContext, next: CallHandler): Observable<ApiResponse<T>> {
+export class ResponseInterceptor<T> implements NestInterceptor<
+  T,
+  ApiResponse<T>
+> {
+  intercept(
+    context: ExecutionContext,
+    next: CallHandler,
+  ): Observable<ApiResponse<T>> {
     const ctx = context.switchToHttp();
     const response = ctx.getResponse();
 
     return next.handle().pipe(
       map((data) => {
         // If data is already structured with message/data fields
-        if (data && typeof data === 'object' && 'data' in data && 'message' in data) {
+        if (
+          data &&
+          typeof data === 'object' &&
+          'data' in data &&
+          'message' in data
+        ) {
           return {
             statusCode: response.statusCode,
             success: true,

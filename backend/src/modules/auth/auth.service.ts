@@ -27,12 +27,16 @@ import {
   VerifyResetOtpDto,
   ResetPasswordDto,
 } from './dto';
-import { AuthTokens, AuthResponse, UserResponse } from './interfaces/auth.interface';
+import {
+  AuthTokens,
+  AuthResponse,
+  UserResponse,
+} from './interfaces/auth.interface';
 import { MailService } from './services/mail.service';
 import { OtpService } from './services/otp.service';
 import { PasswordResetService } from './services/password-reset.service';
 import { TokenBlacklistService } from './services/token-blacklist.service';
-import { User, AuthProvider } from '@prisma/client';
+import { User, AuthProvider, UserRole } from '@prisma/client';
 
 export interface RegisterResult {
   message: string;
@@ -88,10 +92,13 @@ export class AuthService {
    */
   async register(dto: RegisterDto): Promise<RegisterResult> {
     const normalizedEmail = dto.email.toLowerCase().trim();
-    const existingUser = await this.usersRepository.findByEmail(normalizedEmail);
+    const existingUser =
+      await this.usersRepository.findByEmail(normalizedEmail);
 
     if (existingUser && existingUser.isVerified) {
-      throw new ConflictException('Email này đã được sử dụng bởi một tài khoản khác');
+      throw new ConflictException(
+        'Email này đã được sử dụng bởi một tài khoản khác',
+      );
     }
 
     const registrationId = randomUUID();
@@ -117,12 +124,28 @@ export class AuthService {
     // ponytail: multi() pipelines all 3 writes in one round-trip and prevents partial state on process crash between awaits
     await this.redisClient
       .multi()
-      .set(tokenKey, JSON.stringify(draft), 'EX', AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS)
-      .set(regKey, JSON.stringify(draft), 'EX', AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS)
-      .set(cooldownKey, '1', 'EX', AUTH_CONSTANTS.EMAIL_VERIFICATION_COOLDOWN_SECONDS)
+      .set(
+        tokenKey,
+        JSON.stringify(draft),
+        'EX',
+        AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS,
+      )
+      .set(
+        regKey,
+        JSON.stringify(draft),
+        'EX',
+        AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS,
+      )
+      .set(
+        cooldownKey,
+        '1',
+        'EX',
+        AUTH_CONSTANTS.EMAIL_VERIFICATION_COOLDOWN_SECONDS,
+      )
       .exec();
 
-    const frontendUrl = this.configService.getOrThrow<string>('FRONTEND_BASE_URL');
+    const frontendUrl =
+      this.configService.getOrThrow<string>('FRONTEND_BASE_URL');
     const verificationUrl = `${frontendUrl}/verify-email?token=${rawToken}`;
 
     // Dispatch email job to BullMQ queue — returns in ~20ms, worker retries on failure
@@ -133,7 +156,8 @@ export class AuthService {
     );
 
     return {
-      message: 'Đăng ký thành công! Vui lòng kiểm tra hộp thư email của bạn để xác thực tài khoản.',
+      message:
+        'Đăng ký thành công! Vui lòng kiểm tra hộp thư email của bạn để xác thực tài khoản.',
       expiresIn: AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS,
       retryAfter: AUTH_CONSTANTS.EMAIL_VERIFICATION_COOLDOWN_SECONDS,
       registrationId,
@@ -172,11 +196,15 @@ export class AuthService {
       throw new BadRequestException('Dữ liệu xác thực không hợp lệ');
     }
 
-    await this.redisClient.del(`email_verification:reg:${draft.registrationId}`);
+    await this.redisClient.del(
+      `email_verification:reg:${draft.registrationId}`,
+    );
 
     let user = await this.usersRepository.findByEmail(draft.email);
     if (user && user.isVerified) {
-      throw new ConflictException('Email này đã được xác thực trước đó. Vui lòng đăng nhập.');
+      throw new ConflictException(
+        'Email này đã được xác thực trước đó. Vui lòng đăng nhập.',
+      );
     }
 
     if (user) {
@@ -277,12 +305,28 @@ export class AuthService {
     const tokenKey = `email_verification:token:${tokenHash}`;
     await this.redisClient
       .multi()
-      .set(tokenKey, JSON.stringify(draft), 'EX', AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS)
-      .set(regKey, JSON.stringify(draft), 'EX', AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS)
-      .set(cooldownKey, '1', 'EX', AUTH_CONSTANTS.EMAIL_VERIFICATION_COOLDOWN_SECONDS)
+      .set(
+        tokenKey,
+        JSON.stringify(draft),
+        'EX',
+        AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS,
+      )
+      .set(
+        regKey,
+        JSON.stringify(draft),
+        'EX',
+        AUTH_CONSTANTS.EMAIL_VERIFICATION_TTL_SECONDS,
+      )
+      .set(
+        cooldownKey,
+        '1',
+        'EX',
+        AUTH_CONSTANTS.EMAIL_VERIFICATION_COOLDOWN_SECONDS,
+      )
       .exec();
 
-    const frontendUrl = this.configService.getOrThrow<string>('FRONTEND_BASE_URL');
+    const frontendUrl =
+      this.configService.getOrThrow<string>('FRONTEND_BASE_URL');
     const verificationUrl = `${frontendUrl}/verify-email?token=${rawToken}`;
 
     // Dispatch email job to BullMQ queue
@@ -309,12 +353,19 @@ export class AuthService {
     const user = await this.usersRepository.findByIdentifier(trimmedIdentifier);
 
     if (!user || !user.passwordHash) {
-      throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không chính xác');
+      throw new UnauthorizedException(
+        'Tên đăng nhập hoặc mật khẩu không chính xác',
+      );
     }
 
-    const isPasswordValid = await bcrypt.compare(dto.password, user.passwordHash);
+    const isPasswordValid = await bcrypt.compare(
+      dto.password,
+      user.passwordHash,
+    );
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Tên đăng nhập hoặc mật khẩu không chính xác');
+      throw new UnauthorizedException(
+        'Tên đăng nhập hoặc mật khẩu không chính xác',
+      );
     }
 
     if (!user.isActive) {
@@ -325,7 +376,8 @@ export class AuthService {
       throw new ForbiddenException({
         statusCode: HttpStatus.FORBIDDEN,
         code: 'EMAIL_NOT_VERIFIED',
-        message: 'Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email để xác thực tài khoản.',
+        message:
+          'Tài khoản chưa được kích hoạt. Vui lòng kiểm tra email để xác thực tài khoản.',
       });
     }
 
@@ -398,7 +450,7 @@ export class AuthService {
           provider: oauthProfile.provider as AuthProvider,
           providerUserId: oauthProfile.providerUserId,
           canSignIn: true,
-          identityData: oauthProfile as any,
+          identityData: oauthProfile,
         });
       } else {
         user = await this.usersRepository.create({
@@ -414,13 +466,15 @@ export class AuthService {
           provider: oauthProfile.provider as AuthProvider,
           providerUserId: oauthProfile.providerUserId,
           canSignIn: true,
-          identityData: oauthProfile as any,
+          identityData: oauthProfile,
         });
       }
     }
 
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('Tài khoản đã bị vô hiệu hóa hoặc không tồn tại');
+      throw new UnauthorizedException(
+        'Tài khoản đã bị vô hiệu hóa hoặc không tồn tại',
+      );
     }
 
     const tokens = await this.generateTokens(user);
@@ -441,7 +495,10 @@ export class AuthService {
   }
 
   async resetPassword(dto: ResetPasswordDto): Promise<{ message: string }> {
-    return this.passwordResetService.resetPassword(dto.resetTicket, dto.password);
+    return this.passwordResetService.resetPassword(
+      dto.resetTicket,
+      dto.password,
+    );
   }
 
   async refreshTokens(refreshToken: string): Promise<AuthTokens> {
@@ -451,7 +508,9 @@ export class AuthService {
       });
 
       if (payload.jti) {
-        const isRevoked = await this.tokenBlacklistService.isBlacklisted(payload.jti);
+        const isRevoked = await this.tokenBlacklistService.isBlacklisted(
+          payload.jti,
+        );
         if (isRevoked) {
           throw new UnauthorizedException('Phiên đăng nhập đã bị thu hồi');
         }
@@ -459,13 +518,17 @@ export class AuthService {
 
       const user = await this.usersRepository.findById(payload.sub);
       if (!user || !user.isActive) {
-        throw new UnauthorizedException('Tài khoản không hợp lệ hoặc đã bị khóa');
+        throw new UnauthorizedException(
+          'Tài khoản không hợp lệ hoặc đã bị khóa',
+        );
       }
 
       const currentAuthVersion = user.authVersion ?? 0;
       const tokenAuthVersion = payload.authVersion ?? 0;
       if (tokenAuthVersion !== currentAuthVersion) {
-        throw new UnauthorizedException('Phiên làm việc đã hết hạn do thay đổi tài khoản');
+        throw new UnauthorizedException(
+          'Phiên làm việc đã hết hạn do thay đổi tài khoản',
+        );
       }
 
       return this.generateTokens(user);
@@ -473,11 +536,16 @@ export class AuthService {
       if (err instanceof UnauthorizedException) {
         throw err;
       }
-      throw new UnauthorizedException('Refresh token không hợp lệ hoặc đã hết hạn');
+      throw new UnauthorizedException(
+        'Refresh token không hợp lệ hoặc đã hết hạn',
+      );
     }
   }
 
-  async logout(options: { accessToken?: string; refreshToken?: string }): Promise<void> {
+  async logout(options: {
+    accessToken?: string;
+    refreshToken?: string;
+  }): Promise<void> {
     const tryRevoke = async (token?: string) => {
       if (!token) return;
       try {
@@ -507,14 +575,20 @@ export class AuthService {
         { ...basePayload, jti: randomUUID() },
         {
           secret: this.configService.getOrThrow<string>('JWT_SECRET'),
-          expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '1d') as any,
+          expiresIn: this.configService.get<string>(
+            'JWT_EXPIRES_IN',
+            '1d',
+          ) as any,
         },
       ),
       this.jwtService.signAsync(
         { ...basePayload, jti: randomUUID() },
         {
           secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
-          expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '7d') as any,
+          expiresIn: this.configService.get<string>(
+            'JWT_REFRESH_EXPIRES_IN',
+            '7d',
+          ) as any,
         },
       ),
     ]);
@@ -523,7 +597,8 @@ export class AuthService {
   }
 
   public async formatUserResponse(user: User): Promise<UserResponse> {
-    const userWithIdentities = await this.usersRepository.findUserWithIdentities(user.id);
+    const userWithIdentities =
+      await this.usersRepository.findUserWithIdentities(user.id);
     const identities = userWithIdentities?.identities || [];
 
     const authMethods: ('LOCAL' | 'GOOGLE')[] = [];
@@ -545,8 +620,12 @@ export class AuthService {
       email: user.email,
       fullName: user.fullName,
       avatarUrl: user.avatarUrl,
+      bio: user.bio,
       role: user.role,
       isVerified: user.isVerified,
+      isVerifiedCreator: Boolean(
+        user.isVerifiedCreator || user.role === UserRole.ADMIN,
+      ),
       authMethods,
       capabilities: {
         hasVerifiedEmail,

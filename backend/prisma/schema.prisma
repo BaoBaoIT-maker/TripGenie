@@ -298,7 +298,6 @@ model TravelArea {
   documents   KnowledgeDocument[]
   itineraries Itinerary[]
   transitHubs TransitHub[]
-  transitPartnerMappings TransitPartnerMapping[]
 
   @@map("travel_areas")
 }
@@ -317,25 +316,6 @@ model TransitHub {
   @@index([areaId])
   @@index([hubType])
   @@map("transit_hubs")
-}
-
-model TransitPartnerMapping {
-  id         Int         @id @default(autoincrement())
-  provider   String      @db.VarChar(50) // 'VEXERE', 'TRAVELOKA', 'DSVN'
-  hubType    String      @map("hub_type") @db.VarChar(50) // 'BUS', 'TRAIN', 'AIRPORT'
-  name       String      @db.VarChar(100)
-  slug       String      @db.VarChar(100)
-  externalId String      @map("external_id") @db.VarChar(50)
-  areaId     Int?        @map("area_id")
-  metadata   Json?       @default("{}")
-  createdAt  DateTime    @default(now()) @map("created_at")
-
-  area       TravelArea? @relation(fields: [areaId], references: [id], onDelete: SetNull)
-
-  @@unique([provider, hubType, slug])
-  @@index([provider, hubType])
-  @@index([areaId])
-  @@map("transit_partner_mappings")
 }
 
 model Category {
@@ -525,6 +505,7 @@ model Itinerary {
   isPublic      Boolean         @default(false) @map("is_public")
   clonedFromId  String?         @map("cloned_from_id") @db.Uuid
   totalPlaces   Int             @default(0) @map("total_places")
+  partySize     Int             @default(1) @map("party_size")
   deletedAt     DateTime?       @map("deleted_at") @db.Timestamptz
   createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
@@ -618,20 +599,23 @@ model TripInvitation {
 }
 
 model GroupPlaceProposal {
-  id            String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  tripGroupId   String         @map("trip_group_id") @db.Uuid
-  placeId       String         @map("place_id") @db.Uuid
-  proposedBy    String         @map("proposed_by") @db.Uuid
-  status        ProposalStatus @default(PENDING)
-  destinationId String?        @map("destination_id") @db.Uuid
-  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz
+  id                String         @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  tripGroupId       String         @map("trip_group_id") @db.Uuid
+  placeId           String         @map("place_id") @db.Uuid
+  proposedBy        String         @map("proposed_by") @db.Uuid
+  status            ProposalStatus @default(PENDING)
+  destinationId     String?        @map("destination_id") @db.Uuid
+  dayNumber         Int            @default(1) @map("day_number")
+  proposedStartTime String?        @map("proposed_start_time") @db.VarChar(5)
+  notes             String?        @db.Text
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz
 
   tripGroup TripGroup        @relation(fields: [tripGroupId], references: [id], onDelete: Cascade)
   place     Place            @relation(fields: [placeId], references: [id], onDelete: Cascade)
   proposer  User             @relation(fields: [proposedBy], references: [id], onDelete: Cascade)
   votes     GroupPlaceVote[]
 
-  @@unique([tripGroupId, placeId], map: "unique_group_place_proposal")
+  @@index([tripGroupId, placeId])
   @@index([tripGroupId, status])
   @@map("group_place_proposals")
 }

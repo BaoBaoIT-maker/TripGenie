@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TripGenie — Demo Wizard Lên Kế Hoạch Chuyến Đi (Chuẩn DESIGN.md & Anti-Slop)</title>
+  <!-- Tailwind CSS Play CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            primary: {
+              DEFAULT: '#0068B8',
+              hover: '#00569C',
+              foreground: '#FFFFFF',
+            },
+            secondary: {
+              DEFAULT: '#E6F2FF',
+              foreground: '#174A79',
+            },
+            accent: {
+              DEFAULT: '#D9EDFF',
+              foreground: '#123E68',
+            },
+            muted: {
+              DEFAULT: '#EDF3FA',
+              foreground: '#475569',
+            },
+            border: '#D5E2F0',
+            card: '#FFFFFF',
+            foreground: '#10243A',
+            brand: '#0194F3',
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-[#F5F9FF] font-sans antialiased text-[#10243A] min-h-screen p-4 sm:p-8 flex flex-col items-center justify-center">
+
+  <!-- BANNER KIỂM THỬ DEMO -->
+  <div class="max-w-2xl w-full mb-6 text-center space-y-2">
+    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary text-primary text-xs font-bold">
+      <span>Giao diện Wizard Tinh chỉnh</span>
+      <span class="size-1.5 rounded-full bg-primary"></span>
+      <span>Chuẩn DESIGN.md &amp; Anti-Slop</span>
+    </div>
+    <h1 class="text-2xl sm:text-3xl font-black text-foreground tracking-tight">
+      Lên kế hoạch chuyến đi
+    </h1>
+    <p class="text-sm text-muted-foreground">
+      Thanh lọc AI-slop, bỏ hiển thị thời gian thừa trong card phương tiện, tích hợp lộ trình di chuyển tinh gọn.
+    </p>
+    <div class="pt-2">
+      <button onclick="openModal()" class="px-5 py-2.5 rounded-xl bg-primary hover:bg-[#00569C] text-white text-xs font-bold shadow-sm transition-all cursor-pointer">
+        Mở Wizard Modal (Kiểm thử)
+      </button>
+    </div>
+  </div>
+
+  <!-- =========================================================================
+       COMMUNITY MODAL PORTAL (Khối Đảo Chunking - Max width 640px)
+       ========================================================================= -->
+  <div id="modalPortal" class="fixed inset-0 z-50 flex items-center justify-center bg-[#0F172A]/60 p-3 sm:p-4 transition-opacity duration-200" onclick="handleBackdropClick(event)">
+    <div id="modalContainer" class="w-full max-w-[640px] max-h-[92vh] sm:max-h-[88vh] bg-card rounded-2xl shadow-2xl border border-border flex flex-col overflow-hidden transform transition-transform duration-200 scale-100" onclick="event.stopPropagation()">
+
+      <!-- 1. MODAL HEADER -->
+      <div class="px-6 py-4 border-b border-border bg-card flex items-center justify-between shrink-0">
+        <div>
+          <h2 class="text-base font-black text-foreground tracking-tight">
+            Lên kế hoạch chuyến đi
+          </h2>
+          <p class="text-xs text-muted-foreground mt-0.5">
+            Tối ưu tuyến đường, phân bổ thời gian và gợi ý điểm đến phù hợp
+          </p>
+        </div>
+        <button type="button" onclick="closeModal()" class="size-8 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground flex items-center justify-center transition-colors cursor-pointer" title="Đóng">
+          <i data-lucide="x" class="size-4"></i>
+        </button>
+      </div>
+
+      <!-- 2. MODAL BODY -->
+      <div class="p-5 overflow-y-auto space-y-4 flex-1 text-foreground">
+
+        <!-- KHỐI ĐẢO 1: TUYẾN ĐƯỜNG & LỊCH TRÌNH -->
+        <div class="rounded-2xl bg-muted/40 border border-border p-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-primary">
+              Tuyến đường &amp; Lịch trình
+            </span>
+            <span id="durationBadge" class="text-xs font-bold text-primary bg-secondary px-2.5 py-0.5 rounded-full">
+              3 ngày 2 đêm
+            </span>
+          </div>
+
+          <!-- Thanh hành trình hợp nhất: Khởi hành ⇄ Điểm đến -->
+          <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 bg-card p-1.5 rounded-xl border border-border shadow-xs">
+            <div class="px-2.5 py-1">
+              <span class="block text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-0.5">Khởi hành</span>
+              <input id="originInput" type="text" value="TP. Hồ Chí Minh" placeholder="Điểm đi..." class="w-full bg-transparent text-xs sm:text-sm font-bold text-foreground focus:outline-none truncate">
+            </div>
+
+            <!-- Nút đảo chiều ⇄ -->
+            <button type="button" onclick="swapLocations()" class="size-7 rounded-full bg-secondary hover:bg-accent text-primary flex items-center justify-center text-xs transition-colors cursor-pointer shrink-0" title="Đổi chiều điểm đi / điểm đến">
+              <i data-lucide="arrow-right-left" class="size-3.5"></i>
+            </button>
+
+            <div class="px-2.5 py-1">
+              <span class="block text-[10px] font-bold uppercase text-muted-foreground tracking-wider mb-0.5">Điểm đến</span>
+              <input id="destInput" type="text" value="Đà Nẵng" placeholder="Điểm đến..." class="w-full bg-transparent text-xs sm:text-sm font-bold text-foreground focus:outline-none truncate">
+            </div>
+          </div>
+
+          <!-- Khoảng ngày đi -->
+          <div class="grid grid-cols-2 gap-2 bg-card p-2 rounded-xl border border-border shadow-xs text-xs">
+            <div>
+              <span class="block text-[10px] font-bold text-muted-foreground mb-0.5">Ngày bắt đầu</span>
+              <input id="startDate" type="date" value="2026-11-20" onchange="calcDuration()" class="w-full font-semibold text-foreground bg-transparent focus:outline-none cursor-pointer">
+            </div>
+            <div class="border-l border-border pl-2.5">
+              <span class="block text-[10px] font-bold text-muted-foreground mb-0.5">Ngày kết thúc</span>
+              <input id="endDate" type="date" value="2026-11-22" onchange="calcDuration()" class="w-full font-semibold text-foreground bg-transparent focus:outline-none cursor-pointer">
+            </div>
+          </div>
+        </div>
+
+        <!-- KHỐI ĐẢO 2: PHƯƠNG TIỆN LIÊN TỈNH & ĐƯA RƯỚC NỘI THÀNH -->
+        <div class="rounded-2xl bg-muted/40 border border-border p-4 space-y-3">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-primary">
+              Phương tiện di chuyển
+            </span>
+          </div>
+
+          <!-- 4 Card phương tiện liên tỉnh (Tối giản: Chỉ Icon + Tên, không rườm rà) -->
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <!-- Máy bay -->
+            <button type="button" onclick="selectTransit('FLIGHT')" id="transit-FLIGHT" class="transit-card p-3 rounded-xl border-2 border-primary bg-card text-primary ring-1 ring-primary/20 text-left transition-all cursor-pointer relative shadow-xs flex flex-col justify-between">
+              <div class="flex items-center justify-between">
+                <i data-lucide="plane" class="size-4 shrink-0 text-primary"></i>
+                <span class="size-4 rounded-full bg-primary text-white flex items-center justify-center text-[10px] check-icon">
+                  <i data-lucide="check" class="size-2.5"></i>
+                </span>
+              </div>
+              <div class="mt-2 text-xs font-bold">Máy bay</div>
+            </button>
+
+            <!-- Tàu hỏa -->
+            <button type="button" onclick="selectTransit('TRAIN')" id="transit-TRAIN" class="transit-card p-3 rounded-xl border border-border bg-card hover:border-slate-300 text-foreground text-left transition-all cursor-pointer relative shadow-xs flex flex-col justify-between">
+              <div class="flex items-center justify-between">
+                <i data-lucide="train-front" class="size-4 shrink-0 text-muted-foreground"></i>
+                <span class="size-4 rounded-full bg-primary text-white hidden items-center justify-center text-[10px] check-icon">
+                  <i data-lucide="check" class="size-2.5"></i>
+                </span>
+              </div>
+              <div class="mt-2 text-xs font-bold">Tàu hỏa</div>
+            </button>
+
+            <!-- Xe khách -->
+            <button type="button" onclick="selectTransit('SLEEPER_BUS')" id="transit-SLEEPER_BUS" class="transit-card p-3 rounded-xl border border-border bg-card hover:border-slate-300 text-foreground text-left transition-all cursor-pointer relative shadow-xs flex flex-col justify-between">
+              <div class="flex items-center justify-between">
+                <i data-lucide="bus" class="size-4 shrink-0 text-muted-foreground"></i>
+                <span class="size-4 rounded-full bg-primary text-white hidden items-center justify-center text-[10px] check-icon">
+                  <i data-lucide="check" class="size-2.5"></i>
+                </span>
+              </div>
+              <div class="mt-2 text-xs font-bold">Xe khách</div>
+            </button>
+
+            <!-- Xe cá nhân -->
+            <button type="button" onclick="selectTransit('PERSONAL_MOTORBIKE')" id="transit-PERSONAL_MOTORBIKE" class="transit-card p-3 rounded-xl border border-border bg-card hover:border-slate-300 text-foreground text-left transition-all cursor-pointer relative shadow-xs flex flex-col justify-between">
+              <div class="flex items-center justify-between">
+                <i data-lucide="car" class="size-4 shrink-0 text-muted-foreground"></i>
+                <span class="size-4 rounded-full bg-primary text-white hidden items-center justify-center text-[10px] check-icon">
+                  <i data-lucide="check" class="size-2.5"></i>
+                </span>
+              </div>
+              <div class="mt-2 text-xs font-bold">Xe cá nhân</div>
+            </button>
+          </div>
+
+          <!-- LỘ TRÌNH DI CHUYỂN DỰ KIẾN (Chuẩn DESIGN.md, Xóa Sạch AI Slop) -->
+          <div id="transitBreakdownBox" class="rounded-xl border border-border bg-card p-3 space-y-2 text-xs shadow-xs">
+            <div class="flex items-center justify-between font-bold text-foreground">
+              <div class="flex items-center gap-1.5" id="transitBreakdownTitle">
+                <i data-lucide="plane" class="size-3.5 text-primary shrink-0"></i>
+                <span>Chặng bay &amp; xe trung chuyển</span>
+              </div>
+              <div id="transitBreakdownMetrics" class="text-[11px] font-semibold text-muted-foreground">
+                ~950 km • ~1h 20m
+              </div>
+            </div>
+
+            <div id="transitBreakdownSteps" class="space-y-1.5 leading-relaxed font-medium">
+              <div class="flex items-start gap-2">
+                <span class="size-4 rounded-full bg-secondary text-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">1</span>
+                <p class="flex-1 text-foreground">Chặng bay: Sân bay Tân Sơn Nhất (SGN) → Sân bay Đà Nẵng (DAD) (~1h 20m, ~1.200.000 ₫/vé)</p>
+              </div>
+              <div class="flex items-start gap-2">
+                <span class="size-4 rounded-full bg-secondary text-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">2</span>
+                <p class="flex-1 text-foreground">Xe trung chuyển: Taxi / Buýt sân bay về trung tâm Đà Nẵng (~5 km, ~15 phút)</p>
+              </div>
+            </div>
+
+            <div id="transitBreakdownNotes" class="text-[11px] text-muted-foreground flex items-start gap-1.5 pt-1 border-t border-border/40">
+              <i data-lucide="info" class="size-3 text-muted-foreground shrink-0 mt-0.5"></i>
+              <span>Nên check-in online trước 24h để chọn chỗ ngồi thuận tiện</span>
+            </div>
+          </div>
+
+          <!-- Đi lại tại điểm đến & đưa rước -->
+          <div class="space-y-1.5 pt-1">
+            <span class="block text-xs font-bold text-muted-foreground">Đi lại tại điểm đến &amp; đưa rước</span>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+              <button type="button" onclick="selectIntracity('MOTORBIKE_RENTAL')" id="intra-MOTORBIKE_RENTAL" class="intra-btn p-2.5 rounded-xl border-2 border-primary bg-card text-primary ring-1 ring-primary/20 text-left font-semibold transition-all cursor-pointer">
+                <div class="text-xs font-bold">Thuê xe máy</div>
+                <div class="text-[11px] text-muted-foreground mt-0.5 font-normal">~150k – 180k/ngày</div>
+              </button>
+
+              <button type="button" onclick="selectIntracity('GRAB_BIKE')" id="intra-GRAB_BIKE" class="intra-btn p-2.5 rounded-xl border border-border bg-card hover:border-slate-300 text-foreground text-left transition-all cursor-pointer">
+                <div class="text-xs font-bold">Xe công nghệ (Grab/Be)</div>
+                <div class="text-[11px] text-muted-foreground mt-0.5 font-normal">Gọi chuyến linh hoạt</div>
+              </button>
+
+              <button type="button" onclick="selectIntracity('TAXI_CAR')" id="intra-TAXI_CAR" class="intra-btn p-2.5 rounded-xl border border-border bg-card hover:border-slate-300 text-foreground text-left transition-all cursor-pointer">
+                <div class="text-xs font-bold">Taxi / Xe du lịch</div>
+                <div class="text-[11px] text-muted-foreground mt-0.5 font-normal">Phù hợp gia đình &amp; nhóm</div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- KHỐI ĐẢO 3: NGÂN SÁCH & GU DU LỊCH (Lưới Grid 3×2 Cân Đối) -->
+        <div class="rounded-2xl bg-muted/40 border border-border p-4 space-y-3.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-primary">
+              Ngân sách &amp; Trải nghiệm
+            </span>
+            <span class="text-xs text-muted-foreground font-medium">
+              Cá nhân hóa
+            </span>
+          </div>
+
+          <!-- Segmented 3 nấc Ngân sách ngang -->
+          <div class="grid grid-cols-3 gap-1.5 p-1 bg-card rounded-xl border border-border text-xs font-semibold shadow-xs">
+            <button type="button" onclick="selectBudget('LOW')" id="budget-LOW" class="budget-btn py-2 px-2 rounded-lg text-muted-foreground hover:text-foreground text-center transition-all cursor-pointer">
+              <div class="font-bold">Tiết kiệm</div>
+              <div class="text-[10px] opacity-80 mt-0.5">~400k/ngày</div>
+            </button>
+
+            <button type="button" onclick="selectBudget('MEDIUM')" id="budget-MEDIUM" class="budget-btn py-2 px-2 rounded-lg bg-secondary text-primary font-bold shadow-xs text-center transition-all cursor-pointer">
+              <div class="font-bold">Tiêu chuẩn</div>
+              <div class="text-[10px] opacity-80 mt-0.5">~1.000k/ngày</div>
+            </button>
+
+            <button type="button" onclick="selectBudget('HIGH')" id="budget-HIGH" class="budget-btn py-2 px-2 rounded-lg text-muted-foreground hover:text-foreground text-center transition-all cursor-pointer">
+              <div class="font-bold">Sang trọng</div>
+              <div class="text-[10px] opacity-80 mt-0.5">~2.500k/ngày</div>
+            </button>
+          </div>
+
+          <!-- Lưới 3 cột × 2 hàng cân đối 100% -->
+          <div class="space-y-1.5">
+            <span class="block text-xs font-bold text-muted-foreground">
+              Phong cách trải nghiệm (Chọn nhiều)
+            </span>
+            <div class="grid grid-cols-3 gap-2 text-xs">
+              <button type="button" onclick="toggleStyle(this)" class="style-tag py-2 px-2 rounded-xl border-2 border-primary bg-secondary text-primary font-bold shadow-xs text-center transition-all truncate cursor-pointer">
+                Ẩm thực đặc sản
+              </button>
+              <button type="button" onclick="toggleStyle(this)" class="style-tag py-2 px-2 rounded-xl border-2 border-primary bg-secondary text-primary font-bold shadow-xs text-center transition-all truncate cursor-pointer">
+                Cafe &amp; Check-in
+              </button>
+              <button type="button" onclick="toggleStyle(this)" class="style-tag py-2 px-2 rounded-xl border-2 border-primary bg-secondary text-primary font-bold shadow-xs text-center transition-all truncate cursor-pointer">
+                Văn hóa &amp; Lịch sử
+              </button>
+              <button type="button" onclick="toggleStyle(this)" class="style-tag py-2 px-2 rounded-xl border border-border bg-card text-muted-foreground font-medium hover:border-slate-300 hover:text-foreground text-center transition-all truncate cursor-pointer">
+                Nghỉ dưỡng &amp; Biển
+              </button>
+              <button type="button" onclick="toggleStyle(this)" class="style-tag py-2 px-2 rounded-xl border border-border bg-card text-muted-foreground font-medium hover:border-slate-300 hover:text-foreground text-center transition-all truncate cursor-pointer">
+                Chữa lành &amp; Chill
+              </button>
+              <button type="button" onclick="toggleStyle(this)" class="style-tag py-2 px-2 rounded-xl border border-border bg-card text-muted-foreground font-medium hover:border-slate-300 hover:text-foreground text-center transition-all truncate cursor-pointer">
+                Khám phá bản địa
+              </button>
+            </div>
+          </div>
+
+          <!-- Yêu cầu riêng -->
+          <div class="space-y-1">
+            <input type="text" placeholder="Yêu cầu riêng (VD: Thích hải sản tươi sống, đoàn có trẻ nhỏ...)" class="w-full rounded-xl border border-border bg-card px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary">
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 3. MODAL FOOTER -->
+      <div class="px-6 py-4 border-t border-border bg-card flex items-center justify-between shrink-0">
+        <span class="text-xs text-muted-foreground">
+          Có thể tùy chỉnh chi tiết từng điểm sau khi tạo
+        </span>
+
+        <div class="flex items-center gap-2.5">
+          <button type="button" onclick="closeModal()" class="px-4 py-2 rounded-xl border border-border hover:bg-muted text-xs font-bold text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+            Hủy
+          </button>
+
+          <button type="button" onclick="simulateSubmit()" class="px-6 py-2 rounded-xl bg-primary hover:bg-[#00569C] text-white text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center gap-2">
+            <span>Tạo lịch trình</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT STATE ENGINE -->
+  <script>
+    const TRANSIT_DATA = {
+      FLIGHT: {
+        title: 'Chặng bay & xe trung chuyển',
+        icon: 'plane',
+        metrics: '~950 km • ~1h 20m',
+        steps: [
+          'Chặng bay: Sân bay Tân Sơn Nhất (SGN) → Sân bay Đà Nẵng (DAD) (~1h 20m, ~1.200.000 ₫/vé)',
+          'Xe trung chuyển: Taxi / Buýt sân bay về trung tâm Đà Nẵng (~5 km, ~15 phút)'
+        ],
+        notes: 'Nên check-in online trước 24h để chọn chỗ ngồi thuận tiện',
+        isWarning: false
+      },
+      TRAIN: {
+        title: 'Tuyến tàu hỏa & ga đến',
+        icon: 'train-front',
+        metrics: '~950 km • ~16 tiếng',
+        steps: [
+          'Tuyến tàu: Ga Sài Gòn → Ga Đà Nẵng (~16 tiếng, ~650.000 ₫/vé)',
+          'Xe trung chuyển: Đón Taxi / Xe công nghệ về khách sạn trung tâm'
+        ],
+        notes: 'Chặng qua đèo Hải Vân cảnh quan rất đẹp, nên chọn ghế bên phải tàu',
+        isWarning: false
+      },
+      SLEEPER_BUS: {
+        title: 'Chặng xe khách liên tỉnh',
+        icon: 'bus',
+        metrics: '~950 km • ~18 tiếng',
+        steps: [
+          'Chặng xe: Bến xe Miền Đông → Bến xe Trung tâm Đà Nẵng (~18 tiếng, ~450.000 ₫/vé)',
+          'Xe trung chuyển: Nhà xe hỗ trợ xe trung chuyển về nội thành'
+        ],
+        notes: 'Nên đặt trước giường tầng dưới nếu dễ say xe',
+        isWarning: false
+      },
+      PERSONAL_MOTORBIKE: {
+        title: 'Lộ trình phượt đường bộ (TP. HCM → Đà Nẵng)',
+        icon: 'car',
+        metrics: '~950 km • ~19 tiếng',
+        steps: [],
+        warningText: 'Cự ly ~950 km mất hơn 19 tiếng lái xe liên tục. Bạn nên cân nhắc lựa chọn Xe khách giường nằm hoặc Máy bay để đảm bảo an toàn và sức khỏe.',
+        notes: 'Nếu bắt buộc đi đường bộ, hãy chia nhỏ hành trình nghỉ đêm tại Nha Trang hoặc Quy Nhơn',
+        isWarning: true
+      }
+    };
+
+    function openModal() {
+      const portal = document.getElementById('modalPortal');
+      portal.classList.remove('opacity-0', 'pointer-events-none');
+      portal.classList.add('opacity-100');
+    }
+
+    function closeModal() {
+      const portal = document.getElementById('modalPortal');
+      portal.classList.add('opacity-0', 'pointer-events-none');
+      portal.classList.remove('opacity-100');
+    }
+
+    function handleBackdropClick(e) {
+      if (e.target === document.getElementById('modalPortal')) {
+        closeModal();
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeModal();
+    });
+
+    function swapLocations() {
+      const origin = document.getElementById('originInput');
+      const dest = document.getElementById('destInput');
+      const temp = origin.value;
+      origin.value = dest.value;
+      dest.value = temp;
+    }
+
+    function calcDuration() {
+      const start = new Date(document.getElementById('startDate').value);
+      const end = new Date(document.getElementById('endDate').value);
+      if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end >= start) {
+        const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24)) + 1;
+        const nights = Math.max(0, diffDays - 1);
+        document.getElementById('durationBadge').innerText = `${diffDays} ngày ${nights} đêm`;
+      }
+    }
+
+    function selectTransit(mode) {
+      document.querySelectorAll('.transit-card').forEach(btn => {
+        btn.classList.remove('border-2', 'border-primary', 'text-primary', 'ring-1', 'ring-primary/20');
+        btn.classList.add('border-border', 'text-foreground');
+        btn.querySelector('.check-icon').classList.add('hidden');
+        btn.querySelector('.check-icon').classList.remove('flex');
+        const iconEl = btn.querySelector('[data-lucide]');
+        if (iconEl) {
+          iconEl.classList.remove('text-primary');
+          iconEl.classList.add('text-muted-foreground');
+        }
+      });
+
+      const selected = document.getElementById(`transit-${mode}`);
+      if (selected) {
+        selected.classList.remove('border-border', 'text-foreground');
+        selected.classList.add('border-2', 'border-primary', 'text-primary', 'ring-1', 'ring-primary/20');
+        selected.querySelector('.check-icon').classList.remove('hidden');
+        selected.querySelector('.check-icon').classList.add('flex');
+        const iconEl = selected.querySelector('[data-lucide]');
+        if (iconEl) {
+          iconEl.classList.remove('text-muted-foreground');
+          iconEl.classList.add('text-primary');
+        }
+      }
+
+      // Update Breakdown Card below
+      const data = TRANSIT_DATA[mode];
+      const titleEl = document.getElementById('transitBreakdownTitle');
+      const metricsEl = document.getElementById('transitBreakdownMetrics');
+      const stepsEl = document.getElementById('transitBreakdownSteps');
+      const notesEl = document.getElementById('transitBreakdownNotes');
+
+      titleEl.innerHTML = `<i data-lucide="${data.icon}" class="size-3.5 text-primary shrink-0"></i><span>${data.title}</span>`;
+      metricsEl.innerText = data.metrics;
+
+      if (data.isWarning) {
+        stepsEl.innerHTML = `
+          <div class="rounded-lg border border-amber-200 bg-amber-50/70 p-2.5 space-y-1 text-xs">
+            <div class="flex items-center gap-1.5 font-bold text-amber-900">
+              <i data-lucide="alert-triangle" class="size-3.5 text-amber-600 shrink-0"></i>
+              <span>Lưu ý cự ly đường dài</span>
+            </div>
+            <p class="text-amber-800 leading-relaxed font-medium">${data.warningText}</p>
+          </div>
+        `;
+      } else {
+        stepsEl.innerHTML = data.steps.map((s, idx) => `
+          <div class="flex items-start gap-2">
+            <span class="size-4 rounded-full bg-secondary text-primary text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5">${idx + 1}</span>
+            <p class="flex-1 text-foreground">${s}</p>
+          </div>
+        `).join('');
+      }
+
+      notesEl.innerHTML = `<i data-lucide="info" class="size-3 text-muted-foreground shrink-0 mt-0.5"></i><span>${data.notes}</span>`;
+      lucide.createIcons();
+    }
+
+    function selectIntracity(mode) {
+      document.querySelectorAll('.intra-btn').forEach(btn => {
+        btn.classList.remove('border-2', 'border-primary', 'text-primary', 'ring-1', 'ring-primary/20');
+        btn.classList.add('border-border', 'text-foreground');
+      });
+
+      const selected = document.getElementById(`intra-${mode}`);
+      if (selected) {
+        selected.classList.remove('border-border', 'text-foreground');
+        selected.classList.add('border-2', 'border-primary', 'text-primary', 'ring-1', 'ring-primary/20');
+      }
+    }
+
+    function selectBudget(level) {
+      document.querySelectorAll('.budget-btn').forEach(btn => {
+        btn.classList.remove('bg-secondary', 'text-primary', 'font-bold', 'shadow-xs');
+        btn.classList.add('text-muted-foreground');
+      });
+
+      const selected = document.getElementById(`budget-${level}`);
+      if (selected) {
+        selected.classList.remove('text-muted-foreground');
+        selected.classList.add('bg-secondary', 'text-primary', 'font-bold', 'shadow-xs');
+      }
+    }
+
+    function toggleStyle(btn) {
+      const isSelected = btn.classList.contains('border-primary');
+      if (isSelected) {
+        btn.classList.remove('border-2', 'border-primary', 'bg-secondary', 'text-primary', 'font-bold', 'shadow-xs');
+        btn.classList.add('border', 'border-border', 'bg-card', 'text-muted-foreground', 'font-medium');
+      } else {
+        btn.classList.remove('border', 'border-border', 'bg-card', 'text-muted-foreground', 'font-medium');
+        btn.classList.add('border-2', 'border-primary', 'bg-secondary', 'text-primary', 'font-bold', 'shadow-xs');
+      }
+    }
+
+    function simulateSubmit() {
+      alert('Tạo lịch trình thành công! Đang chuyển hướng sang trang chi tiết...');
+    }
+
+    // Initialize Lucide icons on start
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>

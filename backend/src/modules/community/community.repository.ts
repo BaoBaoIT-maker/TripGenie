@@ -64,7 +64,9 @@ export class CommunityRepository implements ICommunityRepository {
     } satisfies Prisma.CommunityPostInclude;
   }
 
-  private async syncGroupPostCounts(tx: Prisma.TransactionClient): Promise<void> {
+  private async syncGroupPostCounts(
+    tx: Prisma.TransactionClient,
+  ): Promise<void> {
     await tx.$executeRaw`
       UPDATE community_groups cg
       SET post_count = CASE
@@ -87,7 +89,11 @@ export class CommunityRepository implements ICommunityRepository {
         deletedAt: null,
       },
       select: GROUP_SUMMARY_SELECT,
-      orderBy: [{ isDefault: 'desc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
+      orderBy: [
+        { isDefault: 'desc' },
+        { sortOrder: 'asc' },
+        { createdAt: 'asc' },
+      ],
     });
 
     return rows.map((r) => mapGroupSummary(r));
@@ -168,7 +174,8 @@ export class CommunityRepository implements ICommunityRepository {
         const postCount = g._count._all ?? 0;
         const totalLikesReceived = g._sum.likeCount ?? 0;
         const totalClonesReceived = g._sum.cloneCount ?? 0;
-        const score = totalClonesReceived * 3 + totalLikesReceived + postCount * 5;
+        const score =
+          totalClonesReceived * 3 + totalLikesReceived + postCount * 5;
         return {
           userId: g.userId,
           postCount,
@@ -203,7 +210,10 @@ export class CommunityRepository implements ICommunityRepository {
 
     const userMap = new Map(users.map((u) => [u.id, u]));
     const itinCountMap = new Map(
-      publicItinerariesByCreator.map((it) => [it.creatorId, it._count._all ?? 0]),
+      publicItinerariesByCreator.map((it) => [
+        it.creatorId,
+        it._count._all ?? 0,
+      ]),
     );
 
     const results: TopCreatorSummary[] = [];
@@ -268,7 +278,9 @@ export class CommunityRepository implements ICommunityRepository {
   }
 
   // ponytail: unnest(p.tags) scan runs O(N_tags) with ILIKE. Upgrade to a GIN index on tags or dedicated community_tags table if feed volume > 100k posts.
-  private async findMatchingTagsCaseInsensitive(term: string): Promise<string[]> {
+  private async findMatchingTagsCaseInsensitive(
+    term: string,
+  ): Promise<string[]> {
     const clean = term.replace(/^#/, '').trim();
     if (!clean) return [];
 
@@ -349,7 +361,14 @@ export class CommunityRepository implements ICommunityRepository {
             OR: [
               { fullName: { contains: q, mode: 'insensitive' } },
               ...(cleanHandle
-                ? [{ username: { contains: cleanHandle, mode: 'insensitive' as const } }]
+                ? [
+                    {
+                      username: {
+                        contains: cleanHandle,
+                        mode: 'insensitive' as const,
+                      },
+                    },
+                  ]
                 : []),
             ],
           },
@@ -362,7 +381,9 @@ export class CommunityRepository implements ICommunityRepository {
             OR: [
               { destination: { contains: q, mode: 'insensitive' } },
               { title: { contains: q, mode: 'insensitive' } },
-              { area: { is: { nameVi: { contains: q, mode: 'insensitive' } } } },
+              {
+                area: { is: { nameVi: { contains: q, mode: 'insensitive' } } },
+              },
             ],
           },
         },
@@ -370,9 +391,10 @@ export class CommunityRepository implements ICommunityRepository {
     ];
   }
 
-  private async buildFeedWhere(
-    params: FindFeedParams,
-  ): Promise<{ where: Prisma.CommunityPostWhereInput; matchedCreators?: MatchedCreatorSummary[] }> {
+  private async buildFeedWhere(params: FindFeedParams): Promise<{
+    where: Prisma.CommunityPostWhereInput;
+    matchedCreators?: MatchedCreatorSummary[];
+  }> {
     const where: Prisma.CommunityPostWhereInput = {
       deletedAt: null,
       moderationStatus: PostModerationStatus.APPROVED,
@@ -451,7 +473,10 @@ export class CommunityRepository implements ICommunityRepository {
     };
   }
 
-  async findPostById(postId: string, viewerId?: string): Promise<CommunityPostView | null> {
+  async findPostById(
+    postId: string,
+    viewerId?: string,
+  ): Promise<CommunityPostView | null> {
     const row = await this.prisma.communityPost.findFirst({
       where: { id: postId, deletedAt: null },
       include: this.buildPostInclude(viewerId),
@@ -757,7 +782,11 @@ export class CommunityRepository implements ICommunityRepository {
     let parent: CommunityCommentView | null = null;
     if (comment.parentId) {
       const parentRow = await this.prisma.postComment.findFirst({
-        where: { id: commentId === comment.parentId ? undefined : comment.parentId, postId, deletedAt: null },
+        where: {
+          id: commentId === comment.parentId ? undefined : comment.parentId,
+          postId,
+          deletedAt: null,
+        },
         include: {
           user: { select: AUTHOR_SELECT },
         },
@@ -782,7 +811,9 @@ export class CommunityRepository implements ICommunityRepository {
         select: { id: true, userId: true },
       });
       if (!post) {
-        throw new NotFoundException('Không tìm thấy bài viết hoặc bài viết đã bị xóa');
+        throw new NotFoundException(
+          'Không tìm thấy bài viết hoặc bài viết đã bị xóa',
+        );
       }
 
       let effectiveParentId: string | null = null;
@@ -805,7 +836,9 @@ export class CommunityRepository implements ICommunityRepository {
         });
 
         if (!targetComment) {
-          throw new NotFoundException('Không tìm thấy bình luận gốc để trả lời');
+          throw new NotFoundException(
+            'Không tìm thấy bình luận gốc để trả lời',
+          );
         }
 
         effectiveParentId = targetComment.parentId || targetComment.id;

@@ -3,21 +3,14 @@
 import * as React from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
-import { Bookmark, User, LogOut } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from "@/components/ui/dropdown-menu";
 import { MobileNavSheet } from "@/components/common/MobileNavSheet";
+import { UserAccountMenu } from "@/components/common/UserAccountMenu";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { cn } from "@/lib/utils";
-import { DEFAULT_AVATAR } from "@/config/avatars";
 
 const NAV_LINKS = [
   { href: "/explore", label: "Khám phá" },
@@ -25,18 +18,9 @@ const NAV_LINKS = [
   { href: "/community", label: "Cộng đồng" },
 ];
 
-function getUserInitials(fullName?: string | null): string {
-  if (!fullName) return "TG";
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
-
 export function Navbar() {
   const pathname = usePathname();
-  const router = useRouter();
-  const { user, logout } = useAuth();
-  const userInitials = getUserInitials(user?.fullName);
+  const { user } = useAuth();
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/80 bg-white/90 backdrop-blur-md transition-all shadow-2xs">
@@ -49,6 +33,7 @@ export function Navbar() {
               alt="TripGenie Logo"
               width={48}
               height={48}
+              style={{ width: "auto", height: "auto" }}
               className="h-10 sm:h-11 w-auto object-contain drop-shadow-xs transition-transform group-hover:scale-105"
               priority
             />
@@ -104,44 +89,7 @@ export function Navbar() {
               <NotificationBell />
 
               {/* Avatar người dùng dạng Dropdown Menu */}
-              <DropdownMenu>
-                <DropdownMenuTrigger
-                  className="outline-none group ml-0.5 sm:ml-1 rounded-full cursor-pointer focus-visible:ring-2 focus-visible:ring-[#0194F3]/40"
-                  aria-label="Tài khoản cá nhân"
-                >
-                  <Avatar className="size-9 sm:size-9.5 border-2 border-slate-200 transition-all group-hover:border-[#0194F3] group-hover:scale-105 shadow-xs">
-                    <AvatarImage
-                      src={user?.avatarUrl || DEFAULT_AVATAR}
-                      alt={user?.fullName || "Avatar"}
-                    />
-                    <AvatarFallback className="text-xs font-bold bg-slate-100 text-slate-800">
-                      {userInitials}
-                    </AvatarFallback>
-                  </Avatar>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  side="bottom"
-                  sideOffset={8}
-                  className="w-44 p-1 shadow-lg border border-slate-200/90 rounded-xl bg-white"
-                >
-                  <DropdownMenuItem
-                    onClick={() => router.push("/profile")}
-                    className="group cursor-pointer rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:!bg-sky-50 hover:!text-[#0194F3] focus:!bg-sky-50 focus:!text-[#0194F3] data-[highlighted]:!bg-sky-50 data-[highlighted]:!text-[#0194F3] transition-colors flex items-center gap-2.5"
-                  >
-                    <User className="size-4 text-slate-500 group-hover:!text-[#0194F3] group-focus:!text-[#0194F3] group-data-[highlighted]:!text-[#0194F3] transition-colors" />
-                    <span>Hồ sơ cá nhân</span>
-                  </DropdownMenuItem>
-
-                  <DropdownMenuItem
-                    onClick={() => logout()}
-                    className="group cursor-pointer rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:!bg-sky-50 hover:!text-[#0194F3] focus:!bg-sky-50 focus:!text-[#0194F3] data-[highlighted]:!bg-sky-50 data-[highlighted]:!text-[#0194F3] transition-colors flex items-center gap-2.5"
-                  >
-                    <LogOut className="size-4 text-slate-500 group-hover:!text-[#0194F3] group-focus:!text-[#0194F3] group-data-[highlighted]:!text-[#0194F3] transition-colors" />
-                    <span>Đăng xuất</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <UserAccountMenu variant="default" />
 
               {/* Mobile Navigation Drawer Trigger */}
               <MobileNavSheet triggerVariant="light" />
@@ -150,13 +98,13 @@ export function Navbar() {
             <div className="flex items-center gap-2 sm:gap-3">
               <Link
                 href="/login"
-                className="hidden sm:inline-flex px-4 py-2 text-sm font-bold text-slate-700 hover:text-[#0194F3] transition-colors cursor-pointer"
+                className="hidden sm:inline-flex px-4 py-2 text-sm font-bold text-slate-700 hover:text-primary transition-colors cursor-pointer"
               >
                 Đăng nhập
               </Link>
               <Link
                 href="/register"
-                className="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-[#0194F3] hover:bg-[#0073D1] text-white transition-all shadow-md shadow-blue-500/20 cursor-pointer"
+                className="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-[#0194F3] hover:bg-[#0084DE] text-white transition-all shadow-md shadow-blue-500/20 active:scale-[0.98] cursor-pointer"
               >
                 Bắt đầu miễn phí
               </Link>

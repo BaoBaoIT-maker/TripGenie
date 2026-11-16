@@ -82,7 +82,9 @@ describe('AdvisorService & AdvisorToolsService (Unit + Integration)', () => {
         user: {
           findFirst: jest.fn().mockResolvedValue({ id: MOCK_USER_ID }),
         },
-        $transaction: jest.fn().mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops)),
+        $transaction: jest
+          .fn()
+          .mockImplementation((ops: Promise<unknown>[]) => Promise.all(ops)),
       };
 
       mockKnowledgeService = {
@@ -282,7 +284,9 @@ describe('AdvisorService & AdvisorToolsService (Unit + Integration)', () => {
       expect(mockKnowledgeRepo.findAreaIdBySlug).toHaveBeenCalledTimes(1);
       // Score-Gap Filter must retain only the high-confidence chunk (0.7842) and drop the noisy 0.291 chunk
       const secondCallContents = httpPostSpy.mock.calls[1][1].contents;
-      const toolRespChunks = secondCallContents[secondCallContents.length - 1].parts[0].functionResponse.response.chunks;
+      const toolRespChunks =
+        secondCallContents[secondCallContents.length - 1].parts[0]
+          .functionResponse.response.chunks;
       expect(toolRespChunks).toHaveLength(1);
       expect(toolRespChunks[0]).toMatchObject({
         documentTitle: 'Cẩm nang Du lịch Đà Nẵng - Hội An',
@@ -413,9 +417,9 @@ describe('AdvisorService & AdvisorToolsService (Unit + Integration)', () => {
         'Khách thích ăn hải sản bình dân tại Đà Nẵng.',
       );
       // Verify CopilotAgentService.enqueueSessionSummarization was triggered when messageCount + 2 >= 10
-      expect(
-        mockCopilotAgent.enqueueSessionSummarization,
-      ).toHaveBeenCalledWith(MOCK_SESSION_ID);
+      expect(mockCopilotAgent.enqueueSessionSummarization).toHaveBeenCalledWith(
+        MOCK_SESSION_ID,
+      );
       expect(result.places).toHaveLength(1);
       expect(result.places[0].id).toBe(PLACE_ID);
     });
@@ -551,7 +555,10 @@ describe('AdvisorService & AdvisorToolsService (Unit + Integration)', () => {
       );
 
       expect(outcome.toolResponsePayload.status).toBe('SUCCESS');
-      const chunks = outcome.toolResponsePayload.chunks as Array<{ documentTitle: string; similarityScore: number }>;
+      const chunks = outcome.toolResponsePayload.chunks as Array<{
+        documentTitle: string;
+        similarityScore: number;
+      }>;
       expect(chunks.length).toBeGreaterThan(0);
       expect(chunks[0].documentTitle).toContain('TripGenie');
       expect(chunks[0].similarityScore).toBeGreaterThan(0.5);
@@ -568,9 +575,13 @@ describe('AdvisorService & AdvisorToolsService (Unit + Integration)', () => {
       );
 
       expect(outcome.toolResponsePayload.status).toBe('SUCCESS');
-      const chunks = outcome.toolResponsePayload.chunks as Array<{ documentTitle: string }>;
+      const chunks = outcome.toolResponsePayload.chunks as Array<{
+        documentTitle: string;
+      }>;
       expect(chunks.length).toBeGreaterThan(0);
-      expect(chunks.some((ch) => ch.documentTitle.includes('Đà Nẵng'))).toBe(true);
+      expect(chunks.some((ch) => ch.documentTitle.includes('Đà Nẵng'))).toBe(
+        true,
+      );
     }, 25000);
 
     it('8. [Integration] search_places & get_place_detail execute against live PostGIS places table', async () => {

@@ -53,7 +53,7 @@ export function CheckinStoriesSection({
       className={`shrink-0 min-w-0 w-full rounded-[20px] border border-[#E2E8F0] hover:border-[#CBD5E1] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-colors flex flex-col gap-3 ${className}`}
     >
       <div className="flex items-center justify-between">
-        <h3 className="text-[11px] font-black tracking-[0.06em] uppercase text-[#0F172A]">
+        <h3 className="text-xs font-bold tracking-tight text-slate-900 flex items-center">
           <i
             className="fa-solid fa-camera-retro text-[#10B981] mr-1.5"
             aria-hidden="true"
@@ -191,7 +191,7 @@ export function TopCreatorsSection({
       className={`shrink-0 min-w-0 w-full rounded-[20px] border border-[#E2E8F0] hover:border-[#CBD5E1] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-colors flex flex-col gap-3.5 ${className}`}
     >
       <div className="flex items-center justify-between">
-        <h3 className="text-[11px] font-black tracking-[0.06em] uppercase text-[#0F172A]">
+        <h3 className="text-xs font-bold tracking-tight text-slate-900 flex items-center">
           <i
             className="fa-solid fa-award text-[#F59E0B] mr-1.5"
             aria-hidden="true"
@@ -238,7 +238,7 @@ export function TopCreatorsSection({
                   className="size-9 rounded-full object-cover shrink-0 border border-[#E2E8F0]"
                 />
                 <div className="min-w-0">
-                  <div className="flex items-center gap-1 text-[12px] font-extrabold text-[#0F172A] group-hover/cr:text-[#0194F3] transition-colors truncate">
+                  <div className="flex items-center gap-1 text-[12.5px] font-semibold text-slate-900 group-hover/cr:text-[#0194F3] transition-colors truncate">
                     <span className="truncate">{authorFullName}</span>
                     {authorVerified && (
                       <i
@@ -288,7 +288,7 @@ export function CommunityRightSidebar({
       {/* BLOCK 1: LỘ TRÌNH ĐƯỢC NHÂN BẢN NHIỀU NHẤT */}
       <div className="shrink-0 rounded-[20px] border border-[#E2E8F0] hover:border-[#CBD5E1] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] transition-colors flex flex-col gap-3.5">
         <div className="flex items-center justify-between gap-2">
-          <h3 className="text-[11px] font-black tracking-[0.06em] uppercase text-[#0F172A]">
+          <h3 className="text-xs font-bold tracking-tight text-slate-900 flex items-center">
             <i
               className="fa-solid fa-fire text-[#F97316] mr-1.5"
               aria-hidden="true"
@@ -354,7 +354,7 @@ export function CommunityRightSidebar({
                   </span>
                 </div>
 
-                <h4 className="text-[13px] font-black text-[#0F172A] group-hover/hot:text-[#0194F3] leading-[1.35] line-clamp-2 transition-colors">
+                <h4 className="text-[13px] font-bold text-slate-900 group-hover/hot:text-[#0194F3] leading-[1.35] line-clamp-2 transition-colors">
                   {itinerary?.title || post.title}
                 </h4>
 

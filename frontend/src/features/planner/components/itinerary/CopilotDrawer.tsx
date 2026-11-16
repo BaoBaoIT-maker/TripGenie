@@ -1,24 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import {
-  Bot,
-  Sparkles,
-  Send,
-  X,
-  Check,
-  Loader2,
-  ArrowRight,
-  MapPin,
-  UtensilsCrossed,
-  RotateCcw,
-  Star,
-  Compass,
-  Calendar,
-  Sparkle,
-  Plus,
-  ArrowLeftRight,
-} from 'lucide-react';
+import { TripGenieMark } from '@/components/common/TripGenieMark';
+import { placeService } from '@/services/place.service';
 import { CopilotProposal, ItineraryDay } from '@/types/itinerary';
 
 export interface CopilotMessageItem {
@@ -52,6 +36,18 @@ interface PlaceRecommendation {
   description?: string;
 }
 
+interface PlaceResolvedInfo {
+  id?: string;
+  imageUrl?: string;
+  categoryLabel?: string;
+  address?: string;
+  latitude?: number;
+  longitude?: number;
+  rating?: number;
+}
+
+const PLACE_INFO_CACHE = new Map<string, PlaceResolvedInfo>();
+
 /**
  * Extract structured place suggestions from AI messages formatted like:
  * 1. **Tên địa điểm** - Mô tả...
@@ -83,18 +79,12 @@ function parsePlaceRecommendations(text: string): PlaceRecommendation[] {
 }
 
 /**
- * Rich formatted message text parser that cleans markdown artifacts:
- * - Parses **[Action]** or [Action] into aesthetic button badges
- * - Parses **Place Name** into clickable interactive chips that locate on the map
- * - Renders clean paragraphs without raw markdown asterisks or brackets
+ * Clean formatted message text parser that removes markdown artifacts:
+ * - Parses **[Action]** or [Action] into aesthetic subtle badges
+ * - Renders **Bold Text** as clean semantic <strong> without intrusive pill chips or deep links
+ * - Keeps conversational reading fluid and free of visual clutter
  */
-function FormattedMessageText({
-  text,
-  onLocatePlace,
-}: {
-  text: string;
-  onLocatePlace?: (placeName: string) => void;
-}) {
+function FormattedMessageText({ text }: { text: string }) {
   const lines = text.split('\n');
 
   return (
@@ -135,39 +125,17 @@ function FormattedMessageText({
                 key={tokenKey++}
                 className="inline-flex items-center gap-1 mx-1 px-2 py-0.5 rounded-lg bg-sky-100/90 text-sky-950 font-bold text-[11px] border border-sky-200/80 shadow-2xs select-none"
               >
-                <Check className="size-3 text-[#0068B8] inline" />
+                <i className="fa-solid fa-check text-[10px] text-[#0194F3]" aria-hidden="true" />
                 <span>{btnText}</span>
               </span>
             );
           } else if (boldText) {
             const cleanBold = boldText.trim();
-            const isPlaceCandidate =
-              cleanBold.length >= 4 &&
-              !cleanBold.toLowerCase().includes('lưu ý') &&
-              !cleanBold.toLowerCase().includes('tóm tắt') &&
-              !cleanBold.toLowerCase().includes('quy tắc') &&
-              !cleanBold.toLowerCase().includes('áp dụng');
-
-            if (isPlaceCandidate && onLocatePlace) {
-              tokens.push(
-                <button
-                  type="button"
-                  key={tokenKey++}
-                  onClick={() => onLocatePlace(cleanBold)}
-                  className="inline-flex items-center gap-1 mx-0.5 px-1.5 py-0.5 rounded-md bg-sky-50 hover:bg-sky-100 text-sky-900 hover:text-sky-900 font-bold transition-all cursor-pointer border border-sky-200/70 text-[11px] sm:text-xs"
-                  title={`Bấm để xem "${cleanBold}" trên bản đồ`}
-                >
-                  <MapPin className="size-3 text-[#0194F3] inline shrink-0" />
-                  <span>{cleanBold}</span>
-                </button>
-              );
-            } else {
-              tokens.push(
-                <strong key={tokenKey++} className="font-bold text-slate-900">
-                  {cleanBold}
-                </strong>
-              );
-            }
+            tokens.push(
+              <strong key={tokenKey++} className="font-semibold text-slate-900">
+                {cleanBold}
+              </strong>
+            );
           }
 
           remaining = remaining.slice(match.index + fullMatch.length);
@@ -175,6 +143,359 @@ function FormattedMessageText({
 
         return <p key={lIdx}>{tokens}</p>;
       })}
+    </div>
+  );
+}
+
+interface CopilotRecommendationCardProps {
+  rec: PlaceRecommendation;
+  recIdx: number;
+  msgIndex: number;
+  activeActionMenu: { msgIndex: number; recIndex: number; type: 'add' | 'swap' } | null;
+  onToggleActionMenu: (menu: { msgIndex: number; recIndex: number; type: 'add' | 'swap' } | null) => void;
+  days?: ItineraryDay[];
+  existingActivities: Array<{
+    dayNumber: number;
+    placeId?: string;
+    placeName: string;
+    startTime?: string | null;
+    categoryName?: string | null;
+    imageUrl?: string | null;
+  }>;
+  isPending: boolean;
+  onLocatePlaceOnMap?: (target: LocatePlaceTarget) => void;
+  onSendAction: (text: string) => void;
+}
+
+/**
+ * Interactive Recommendation Card with visual thumbnail, rich meta, and harmonized actions.
+ * Complies with TripGenie DESIGN.md & antislop guidelines.
+ */
+function CopilotRecommendationCard({
+  rec,
+  recIdx,
+  msgIndex,
+  activeActionMenu,
+  onToggleActionMenu,
+  days,
+  existingActivities,
+  isPending,
+  onLocatePlaceOnMap,
+  onSendAction,
+}: CopilotRecommendationCardProps) {
+  const isAddOpen =
+    activeActionMenu?.msgIndex === msgIndex &&
+    activeActionMenu?.recIndex === recIdx &&
+    activeActionMenu?.type === 'add';
+
+  const isSwapOpen =
+    activeActionMenu?.msgIndex === msgIndex &&
+    activeActionMenu?.recIndex === recIdx &&
+    activeActionMenu?.type === 'swap';
+
+  const matchedActivity = useMemo(() => {
+    const clean = rec.name.toLowerCase().trim();
+    return existingActivities.find(
+      (a) => a.placeName.toLowerCase().includes(clean) || clean.includes(a.placeName.toLowerCase())
+    );
+  }, [existingActivities, rec.name]);
+
+  const [resolvedInfo, setResolvedInfo] = useState<PlaceResolvedInfo | null>(() => {
+    if (matchedActivity?.imageUrl) {
+      return {
+        id: matchedActivity.placeId,
+        imageUrl: matchedActivity.imageUrl,
+        categoryLabel: matchedActivity.categoryName || undefined,
+      };
+    }
+    return PLACE_INFO_CACHE.get(rec.name.toLowerCase().trim()) || null;
+  });
+
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    const cacheKey = rec.name.toLowerCase().trim();
+    if (resolvedInfo?.imageUrl || PLACE_INFO_CACHE.has(cacheKey)) {
+      if (!resolvedInfo && PLACE_INFO_CACHE.has(cacheKey)) {
+        setResolvedInfo(PLACE_INFO_CACHE.get(cacheKey) || null);
+      }
+      return;
+    }
+
+    let active = true;
+    placeService
+      .searchPlaces({ keyword: rec.name, limit: 1 })
+      .then((res) => {
+        if (!active) return;
+        const first = res.places?.[0];
+        if (first) {
+          const info: PlaceResolvedInfo = {
+            id: first.id,
+            imageUrl: first.coverImage || first.images?.[0] || '',
+            categoryLabel: first.categoryLabel || undefined,
+            address: first.address,
+            latitude: first.latitude,
+            longitude: first.longitude,
+            rating: first.rating,
+          };
+          PLACE_INFO_CACHE.set(cacheKey, info);
+          setResolvedInfo(info);
+        }
+      })
+      .catch(() => {
+        // Fallback remains active gracefully
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [rec.name, resolvedInfo]);
+
+  return (
+    <div
+      className={`group p-3 rounded-2xl border transition-all flex flex-col gap-2.5 shadow-2xs ${
+        isAddOpen || isSwapOpen
+          ? 'bg-sky-50/30 border-sky-300 ring-1 ring-sky-200'
+          : 'bg-white border-slate-200/90 hover:border-sky-300 hover:shadow-xs'
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        {/* Place Thumbnail */}
+        <div className="relative size-14 sm:size-16 rounded-xl overflow-hidden shrink-0 bg-slate-100 border border-slate-200/80">
+          {resolvedInfo?.imageUrl && !imgError ? (
+            <img
+              src={resolvedInfo.imageUrl}
+              alt={rec.name}
+              loading="lazy"
+              decoding="async"
+              onError={() => setImgError(true)}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+            />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-sky-50/60 text-slate-400">
+              <i className="fa-solid fa-location-dot text-base text-[#0194F3]/70" aria-hidden="true" />
+            </div>
+          )}
+          {/* Index Badge */}
+          <span className="absolute top-1 left-1 size-5 rounded-md bg-[#10243A]/80 backdrop-blur-xs text-white text-[10px] font-bold flex items-center justify-center">
+            {recIdx + 1}
+          </span>
+        </div>
+
+        {/* Place Information & Action Toolbar */}
+        <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch">
+          <div className="space-y-1">
+            <div className="flex items-start justify-between gap-1.5">
+              <h4 className="text-xs sm:text-[13px] font-semibold text-slate-900 group-hover:text-[#0194F3] transition-colors leading-snug truncate">
+                {rec.name}
+              </h4>
+              {resolvedInfo?.categoryLabel && (
+                <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+                  {resolvedInfo.categoryLabel}
+                </span>
+              )}
+            </div>
+
+            {rec.description && (
+              <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
+                {rec.description}
+              </p>
+            )}
+          </div>
+
+          {/* Harmonized Action Toolbar */}
+          <div className="flex items-center gap-1.5 pt-2 flex-wrap sm:flex-nowrap justify-end sm:justify-start">
+            {onLocatePlaceOnMap && (
+              <button
+                type="button"
+                onClick={() =>
+                  onLocatePlaceOnMap({
+                    id: resolvedInfo?.id,
+                    name: rec.name,
+                    latitude: resolvedInfo?.latitude,
+                    longitude: resolvedInfo?.longitude,
+                    address: resolvedInfo?.address,
+                    rating: resolvedInfo?.rating,
+                    categoryName: resolvedInfo?.categoryLabel,
+                    imageUrl: resolvedInfo?.imageUrl,
+                  })
+                }
+                className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors shadow-2xs flex items-center gap-1 cursor-pointer"
+                title="Xem vị trí trên bản đồ"
+              >
+                <i className="fa-solid fa-location-dot text-[10px] text-[#0194F3]" aria-hidden="true" />
+                <span>Bản đồ</span>
+              </button>
+            )}
+
+            {/* [+ Thêm] Button - Refined TripGenie Style */}
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => {
+                onToggleActionMenu(isAddOpen ? null : { msgIndex, recIndex: recIdx, type: 'add' });
+              }}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-50 ${
+                isAddOpen
+                  ? 'bg-[#0194F3] text-white border border-[#0194F3] ring-2 ring-sky-200'
+                  : 'bg-sky-50 hover:bg-sky-100/90 border border-sky-200/90 text-sky-800'
+              }`}
+              title="Thêm địa điểm này vào lịch trình"
+            >
+              <i className={`fa-solid fa-plus text-[10px] ${isAddOpen ? 'text-white' : 'text-[#0194F3]'}`} aria-hidden="true" />
+              <span>Thêm</span>
+            </button>
+
+            {/* [⇄ Đổi] Button */}
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => {
+                onToggleActionMenu(isSwapOpen ? null : { msgIndex, recIndex: recIdx, type: 'swap' });
+              }}
+              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-50 border ${
+                isSwapOpen
+                  ? 'bg-sky-50 border-[#0194F3] text-sky-950 ring-2 ring-sky-200'
+                  : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:text-slate-900'
+              }`}
+              title="Đổi một địa điểm có sẵn thành điểm này"
+            >
+              <i className="fa-solid fa-right-left text-[10px] text-slate-400" aria-hidden="true" />
+              <span>Đổi</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Subpanel for [+ Thêm] */}
+      {isAddOpen && (
+        <div className="pt-2.5 border-t border-sky-200/70 space-y-2 animate-in fade-in duration-150">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-slate-900 flex items-center gap-1.5">
+              <i className="fa-regular fa-calendar-plus text-xs text-[#0194F3]" aria-hidden="true" />
+              <span>Chọn ngày thêm vào lịch trình:</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => onToggleActionMenu(null)}
+              aria-label="Đóng chọn ngày"
+              className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+            >
+              <i className="fa-solid fa-xmark text-xs" aria-hidden="true" />
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {days && days.length > 0 ? (
+              days.map((d) => (
+                <button
+                  key={d.dayNumber}
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => {
+                    onSendAction(`Thêm ${rec.name} vào Ngày ${d.dayNumber}`);
+                    onToggleActionMenu(null);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-white hover:bg-[#F0F7FF] hover:border-[#0194F3]/50 border border-slate-200 text-slate-700 hover:text-[#0194F3] font-medium text-xs transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <i className="fa-regular fa-calendar text-[10px] text-[#0194F3]" aria-hidden="true" />
+                  <span>Ngày {d.dayNumber}</span>
+                </button>
+              ))
+            ) : (
+              <button
+                type="button"
+                disabled={isPending}
+                onClick={() => {
+                  onSendAction(`Thêm ${rec.name} vào Ngày 1`);
+                  onToggleActionMenu(null);
+                }}
+                className="px-3 py-1.5 rounded-lg bg-white hover:bg-[#F0F7FF] hover:border-[#0194F3]/50 border border-slate-200 text-slate-700 hover:text-[#0194F3] font-medium text-xs transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+              >
+                <i className="fa-regular fa-calendar text-[10px] text-[#0194F3]" aria-hidden="true" />
+                <span>Ngày 1</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              disabled={isPending}
+              onClick={() => {
+                onSendAction(`Thêm ${rec.name} vào ngày phù hợp trong lịch trình`);
+                onToggleActionMenu(null);
+              }}
+              className="px-3 py-1.5 rounded-lg bg-[#F0F7FF] hover:bg-sky-100 border border-[#D0E7FF] text-[#0068B8] font-semibold text-xs transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+            >
+              <i className="fa-solid fa-wand-magic-sparkles text-[10px] text-[#0194F3]" aria-hidden="true" />
+              <span>Tự động chọn ngày</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Subpanel for [⇄ Đổi] */}
+      {isSwapOpen && (
+        <div className="pt-2.5 border-t border-sky-200/70 space-y-2 animate-in fade-in duration-150">
+          <div className="flex items-center justify-between text-xs">
+            <span className="font-semibold text-slate-900 flex items-center gap-1.5">
+              <i className="fa-solid fa-right-left text-xs text-[#0194F3]" aria-hidden="true" />
+              <span>Chọn điểm bạn muốn thay thế:</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => onToggleActionMenu(null)}
+              aria-label="Đóng chọn điểm thay thế"
+              className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+            >
+              <i className="fa-solid fa-xmark text-xs" aria-hidden="true" />
+            </button>
+          </div>
+
+          {existingActivities.length > 0 && (
+            <div className="max-h-40 overflow-y-auto space-y-1 pr-0.5">
+              {existingActivities.map((act) => (
+                <button
+                  key={`${act.dayNumber}-${act.placeId || act.placeName}`}
+                  type="button"
+                  disabled={isPending}
+                  onClick={() => {
+                    onSendAction(`Đổi ${act.placeName} thành ${rec.name}`);
+                    onToggleActionMenu(null);
+                  }}
+                  className="w-full text-left p-2 rounded-xl bg-white hover:bg-[#F0F7FF] hover:border-[#0194F3]/40 border border-slate-200 transition-colors flex items-center justify-between text-xs group cursor-pointer"
+                >
+                  <div className="min-w-0 pr-2">
+                    <span className="text-[10px] text-[#0194F3] font-semibold block">
+                      Ngày {act.dayNumber}
+                      {act.startTime ? ` • ${act.startTime}` : ''}
+                      {act.categoryName ? ` • ${act.categoryName}` : ''}
+                    </span>
+                    <span className="font-medium text-slate-800 truncate block group-hover:text-slate-900">
+                      {act.placeName}
+                    </span>
+                  </div>
+                  <span className="text-xs font-medium text-[#0194F3] bg-sky-50 group-hover:bg-[#0194F3] group-hover:text-white px-2 py-0.5 rounded-md border border-sky-200/80 shrink-0 transition-colors">
+                    Thay điểm này
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => {
+              onSendAction(`Đổi một địa điểm tương đương trong lịch trình thành ${rec.name}`);
+              onToggleActionMenu(null);
+            }}
+            className="w-full text-center py-2 px-3 rounded-xl bg-slate-50 hover:bg-[#F0F7FF] hover:text-[#0194F3] text-slate-700 font-medium text-xs transition-colors cursor-pointer border border-slate-200 hover:border-[#0194F3]/30 flex items-center justify-center gap-1.5"
+          >
+            <i className="fa-solid fa-wand-magic-sparkles text-xs text-[#0194F3]" aria-hidden="true" />
+            <span>Nhờ AI tự chọn điểm phù hợp để đổi</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -195,6 +516,7 @@ interface CopilotDrawerProps {
   prefilledInput?: string;
   onClearPrefilledInput?: () => void;
   onLocatePlaceOnMap?: (target: LocatePlaceTarget) => void;
+  canEdit?: boolean;
 }
 
 export default function CopilotDrawer({
@@ -213,6 +535,7 @@ export default function CopilotDrawer({
   prefilledInput,
   onClearPrefilledInput,
   onLocatePlaceOnMap,
+  canEdit = true,
 }: CopilotDrawerProps) {
   const [inputValue, setInputValue] = useState('');
   const [activeActionMenu, setActiveActionMenu] = useState<{
@@ -299,24 +622,17 @@ export default function CopilotDrawer({
       {/* =========================================================================
           MESSENGER APP HEADER (Avatar, Status Dot, Controls)
           ========================================================================= */}
-      <div className="px-4 py-3.5 border-b border-slate-200/80 flex items-center justify-between bg-white/95 backdrop-blur-md shadow-2xs">
+      <div className="px-4 py-3.5 border-b border-slate-200/80 flex items-center justify-between bg-white">
         <div className="flex items-center gap-3">
-          <div className="relative size-10 rounded-full bg-gradient-to-tr from-[#0194F3] via-sky-500 to-blue-600 text-white flex items-center justify-center shadow-md shadow-blue-500/20 shrink-0 border-2 border-white">
-            <Bot className="size-5" />
-            <span className="absolute bottom-0 right-0 size-3 rounded-full bg-emerald-500 border-2 border-white shadow-xs" />
+          <div className="flex size-10 items-center justify-center rounded-xl border border-slate-200 bg-[#F5F9FF] shrink-0">
+            <TripGenieMark className="size-7" />
           </div>
           <div>
-            <div className="flex items-center gap-1.5">
-              <h3 className="text-sm font-bold text-slate-900 leading-tight">
-                Genie Copilot
-              </h3>
-              <span className="inline-flex items-center px-1.5 py-0.2 rounded-full bg-sky-100 text-sky-900 text-[10px] font-extrabold tracking-wide">
-                AI
-              </span>
-            </div>
-            <p className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1 mt-0.5">
-              <span className="size-1.5 rounded-full bg-emerald-500 animate-ping inline-block" />
-              <span>Trực tuyến • Sẵn sàng hỗ trợ</span>
+            <h3 className="text-sm font-bold text-[#10243A] leading-tight">
+              Genie Copilot
+            </h3>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              Trợ lý tối ưu lịch trình thực tế
             </p>
           </div>
         </div>
@@ -326,20 +642,22 @@ export default function CopilotDrawer({
             <button
               type="button"
               onClick={onResetSession}
-              className="size-8 rounded-full text-slate-400 hover:text-[#0068B8] hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+              aria-label="Làm mới phiên trò chuyện"
+              className="size-8 rounded-full text-slate-400 hover:text-[#0194F3] hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
               title="Làm mới phiên trò chuyện"
             >
-              <RotateCcw className="size-4" />
+              <i className="fa-solid fa-rotate-left text-xs" aria-hidden="true" />
             </button>
           )}
 
           <button
             type="button"
             onClick={onClose}
+            aria-label="Đóng khung chat"
             className="size-8 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
             title="Đóng khung chat"
           >
-            <X className="size-4" />
+            <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -351,8 +669,8 @@ export default function CopilotDrawer({
         ref={chatScrollRef}
         className="flex-1 p-4 sm:p-5 overflow-y-auto space-y-4 text-xs sm:text-[13px]"
         style={{
-          backgroundColor: '#f1f5f9',
-          backgroundImage: 'radial-gradient(rgba(148, 163, 184, 0.25) 1.2px, transparent 1.2px)',
+          backgroundColor: '#F8FAFC',
+          backgroundImage: 'radial-gradient(rgba(148, 163, 184, 0.15) 1px, transparent 1px)',
           backgroundSize: '16px 16px',
         }}
       >
@@ -366,36 +684,33 @@ export default function CopilotDrawer({
                 {/* Speech Bubble Container with Avatar for AI */}
                 <div className={`flex items-start gap-2 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
                   {!isUser && (
-                    <div className="size-7 rounded-full bg-gradient-to-tr from-[#0068B8] to-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs mt-0.5 border border-white">
-                      <Bot className="size-3.5" />
+                    <div className="size-7 rounded-full bg-[#0194F3] text-white flex items-center justify-center shrink-0 shadow-2xs mt-0.5 border border-white">
+                      <i className="fa-solid fa-compass text-xs" aria-hidden="true" />
                     </div>
                   )}
 
                   <div
                     className={`p-3.5 sm:p-4 leading-relaxed transition-all ${
                       isUser
-                        ? 'bg-gradient-to-r from-[#0068B8] to-[#0194F3] text-white font-medium rounded-2xl rounded-tr-xs shadow-xs'
-                        : 'bg-white/95 backdrop-blur-sm border border-slate-200/90 text-slate-850 rounded-2xl rounded-tl-xs shadow-xs'
+                        ? 'bg-[#0194F3] text-white font-medium rounded-2xl rounded-tr-xs shadow-xs'
+                        : 'bg-white border border-slate-200/90 text-[#10243A] rounded-2xl rounded-tl-xs shadow-xs'
                     }`}
                   >
                     {/* Tool Execution Tag */}
                     {msg.appliedTool && (
                       <div className="mb-2">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-sky-50 text-sky-900 font-bold text-[11px] border border-sky-200/80 shadow-2xs">
-                          <Sparkles className="size-3 text-[#0194F3]" />
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-[#F0F7FF] text-[#10243A] font-semibold text-[11px] border border-[#D0E7FF]">
+                          <i className="fa-solid fa-check text-[10px] text-[#0194F3]" aria-hidden="true" />
                           <span>{msg.appliedTool.resultMessage}</span>
                         </span>
                       </div>
                     )}
 
-                    {/* Clean Formatted Message Text (No raw asterisks or brackets) */}
+                    {/* Clean Formatted Message Text (No raw asterisks or deep links) */}
                     {isUser ? (
                       <p className="whitespace-pre-wrap">{msg.text}</p>
                     ) : (
-                      <FormattedMessageText
-                        text={msg.text}
-                        onLocatePlace={(name) => onLocatePlaceOnMap?.({ name })}
-                      />
+                      <FormattedMessageText text={msg.text} />
                     )}
                   </div>
                 </div>
@@ -406,271 +721,60 @@ export default function CopilotDrawer({
                     <span>Bạn</span>
                   ) : (
                     <>
-                      <Sparkles className="size-2.5 text-[#0194F3]" />
+                      <i className="fa-solid fa-compass text-[9px] text-[#0194F3]" aria-hidden="true" />
                       <span>Genie Copilot</span>
                     </>
                   )}
                 </div>
 
                 {/* =====================================================================
-                    GENERATIVE UI: INTERACTIVE PLACE RECOMMENDATION CARDS (Mindtrip Style)
-                    With 1-Click Map Locate, [+ Thêm vào ngày], and [⇄ Đổi điểm] Actions
+                    GENERATIVE UI: INTERACTIVE PLACE RECOMMENDATION CARDS
+                    With Visual Thumbnail, 1-Click Map Locate, [+ Thêm], and [⇄ Đổi]
                     ===================================================================== */}
                 {recommendations.length > 0 && (
-                  <div className="ml-9 p-3 bg-white/95 border border-slate-200/90 rounded-2xl shadow-xs space-y-2.5 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 px-0.5">
-                      <span className="flex items-center gap-1.5 text-sky-900">
-                        <Sparkles className="size-3 text-[#0194F3]" />
+                  <div className="ml-9 p-3 bg-white border border-slate-200/90 rounded-2xl shadow-xs space-y-2.5 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between text-xs font-semibold text-slate-700 px-0.5">
+                      <span className="flex items-center gap-1.5 text-slate-900">
+                        <i className="fa-solid fa-location-dot text-xs text-[#0194F3]" aria-hidden="true" />
                         <span>Gợi ý địa điểm:</span>
                       </span>
-                      <span className="text-[10px] text-slate-400 font-semibold">
+                      <span className="text-[11px] text-slate-400 font-medium tabular-nums">
                         {recommendations.length} địa điểm
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-2 pt-0.5">
-                      {recommendations.map((rec, recIdx) => {
-                        const isAddOpen =
-                          activeActionMenu?.msgIndex === i &&
-                          activeActionMenu?.recIndex === recIdx &&
-                          activeActionMenu?.type === 'add';
-                        const isSwapOpen =
-                          activeActionMenu?.msgIndex === i &&
-                          activeActionMenu?.recIndex === recIdx &&
-                          activeActionMenu?.type === 'swap';
-
-                        return (
-                          <div
-                            key={recIdx}
-                            className={`group p-2.5 rounded-xl border transition-all flex flex-col gap-2 shadow-2xs ${
-                              isAddOpen || isSwapOpen
-                                ? 'bg-sky-50/20 border-sky-300'
-                                : 'bg-slate-50/60 border-slate-200/80 hover:bg-sky-50/40 hover:border-sky-300'
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-2.5">
-                              <div className="space-y-1 min-w-0">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="size-5 rounded-md bg-sky-100 text-sky-900 text-[10px] font-bold flex items-center justify-center shrink-0">
-                                    {recIdx + 1}
-                                  </span>
-                                  <h4 className="text-xs font-bold text-slate-900 group-hover:text-sky-950 truncate">
-                                    {rec.name}
-                                  </h4>
-                                </div>
-                                {rec.description && (
-                                  <p className="text-[11px] text-slate-500 line-clamp-2 pl-6">
-                                    {rec.description}
-                                  </p>
-                                )}
-                              </div>
-
-                              <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
-                                {onLocatePlaceOnMap && (
-                                  <button
-                                    type="button"
-                                    onClick={() => onLocatePlaceOnMap({ name: rec.name })}
-                                    className="px-2 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-semibold transition-all shadow-2xs flex items-center gap-1 cursor-pointer"
-                                    title="Xem vị trí trên bản đồ"
-                                  >
-                                    <MapPin className="size-3 text-[#0194F3]" />
-                                    <span className="hidden sm:inline">Bản đồ</span>
-                                  </button>
-                                )}
-
-                                {/* [+ Thêm] Button */}
-                                <button
-                                  type="button"
-                                  disabled={isPending}
-                                  onClick={() => {
-                                    setActiveActionMenu((prev) =>
-                                      prev?.msgIndex === i &&
-                                      prev?.recIndex === recIdx &&
-                                      prev?.type === 'add'
-                                        ? null
-                                        : { msgIndex: i, recIndex: recIdx, type: 'add' }
-                                    );
-                                  }}
-                                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50 ${
-                                    isAddOpen
-                                      ? 'bg-[#00569C] text-white ring-2 ring-sky-300'
-                                      : 'bg-[#0068B8] hover:bg-[#00569C] text-white'
-                                  }`}
-                                  title="Thêm địa điểm này vào lịch trình"
-                                >
-                                  <Plus className="size-3" />
-                                  <span>Thêm</span>
-                                </button>
-
-                                {/* [⇄ Đổi] Button */}
-                                <button
-                                  type="button"
-                                  disabled={isPending}
-                                  onClick={() => {
-                                    setActiveActionMenu((prev) =>
-                                      prev?.msgIndex === i &&
-                                      prev?.recIndex === recIdx &&
-                                      prev?.type === 'swap'
-                                        ? null
-                                        : { msgIndex: i, recIndex: recIdx, type: 'swap' }
-                                    );
-                                  }}
-                                  className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition-all shadow-xs flex items-center gap-1 cursor-pointer disabled:opacity-50 border ${
-                                    isSwapOpen
-                                      ? 'bg-sky-50 border-[#0194F3] text-sky-950 ring-2 ring-sky-300'
-                                      : 'bg-white hover:bg-sky-50/70 border-slate-200 hover:border-sky-300 text-slate-700 hover:text-sky-950'
-                                  }`}
-                                  title="Đổi một địa điểm có sẵn thành điểm này"
-                                >
-                                  <ArrowLeftRight className="size-3 text-slate-500" />
-                                  <span>Đổi</span>
-                                </button>
-                              </div>
-                            </div>
-
-                            {/* Subpanel for [+ Thêm] */}
-                            {isAddOpen && (
-                              <div className="mt-1 pt-2 border-t border-sky-200/60 space-y-2 animate-in fade-in duration-150">
-                                <div className="flex items-center justify-between text-[11px]">
-                                  <span className="font-bold text-sky-950 flex items-center gap-1">
-                                    <Plus className="size-3 text-[#0194F3]" />
-                                    <span>Thêm vào ngày nào trong lịch trình?</span>
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setActiveActionMenu(null)}
-                                    className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
-                                  >
-                                    <X className="size-3" />
-                                  </button>
-                                </div>
-
-                                <div className="flex flex-wrap gap-1.5">
-                                  {days && days.length > 0 ? (
-                                    days.map((d) => (
-                                      <button
-                                        key={d.dayNumber}
-                                        type="button"
-                                        disabled={isPending}
-                                        onClick={() => {
-                                          handleSend(`Thêm ${rec.name} vào Ngày ${d.dayNumber}`);
-                                          setActiveActionMenu(null);
-                                        }}
-                                        className="px-2.5 py-1 rounded-lg bg-[#0068B8] hover:bg-[#00569C] text-white font-bold text-[11px] transition-all shadow-2xs cursor-pointer flex items-center gap-1"
-                                      >
-                                        <span>Ngày {d.dayNumber}</span>
-                                      </button>
-                                    ))
-                                  ) : (
-                                    <button
-                                      type="button"
-                                      disabled={isPending}
-                                      onClick={() => {
-                                        handleSend(`Thêm ${rec.name} vào Ngày 1`);
-                                        setActiveActionMenu(null);
-                                      }}
-                                      className="px-2.5 py-1 rounded-lg bg-[#0068B8] hover:bg-[#00569C] text-white font-bold text-[11px] transition-all shadow-2xs cursor-pointer flex items-center gap-1"
-                                    >
-                                      <span>Ngày 1</span>
-                                    </button>
-                                  )}
-
-                                  <button
-                                    type="button"
-                                    disabled={isPending}
-                                    onClick={() => {
-                                      handleSend(`Thêm ${rec.name} vào ngày phù hợp trong lịch trình`);
-                                      setActiveActionMenu(null);
-                                    }}
-                                    className="px-2.5 py-1 rounded-lg bg-white hover:bg-sky-50 border border-slate-200 hover:border-sky-300 text-slate-700 hover:text-sky-950 font-semibold text-[11px] transition-all shadow-2xs cursor-pointer flex items-center gap-1"
-                                  >
-                                    <Sparkles className="size-3 text-[#0194F3]" />
-                                    <span>Tự động chọn ngày</span>
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-
-                            {/* Subpanel for [⇄ Đổi] */}
-                            {isSwapOpen && (
-                              <div className="mt-1 pt-2 border-t border-sky-200/60 space-y-2 animate-in fade-in duration-150">
-                                <div className="flex items-center justify-between text-[11px]">
-                                  <span className="font-bold text-sky-950 flex items-center gap-1">
-                                    <ArrowLeftRight className="size-3 text-[#0194F3]" />
-                                    <span>Chọn điểm bạn muốn thay thế:</span>
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setActiveActionMenu(null)}
-                                    className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
-                                  >
-                                    <X className="size-3" />
-                                  </button>
-                                </div>
-
-                                {existingActivities.length > 0 && (
-                                  <div className="max-h-36 overflow-y-auto space-y-1 pr-0.5">
-                                    {existingActivities.map((act) => (
-                                      <button
-                                        key={`${act.dayNumber}-${act.placeId || act.placeName}`}
-                                        type="button"
-                                        disabled={isPending}
-                                        onClick={() => {
-                                          handleSend(`Đổi ${act.placeName} thành ${rec.name}`);
-                                          setActiveActionMenu(null);
-                                        }}
-                                        className="w-full text-left p-1.5 rounded-lg bg-white hover:bg-sky-50 hover:border-sky-300 border border-slate-200 transition-all flex items-center justify-between text-[11px] group cursor-pointer"
-                                      >
-                                        <div className="min-w-0 pr-2">
-                                          <span className="text-[10px] text-sky-900 font-bold block">
-                                            Ngày {act.dayNumber}
-                                            {act.startTime ? ` • ${act.startTime}` : ''}
-                                            {act.categoryName ? ` • ${act.categoryName}` : ''}
-                                          </span>
-                                          <span className="font-semibold text-slate-800 truncate block group-hover:text-sky-950">
-                                            {act.placeName}
-                                          </span>
-                                        </div>
-                                        <span className="text-[10px] font-bold text-[#0068B8] bg-sky-50 px-2 py-0.5 rounded border border-sky-200 shrink-0">
-                                          Thay điểm này
-                                        </span>
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
-
-                                <button
-                                  type="button"
-                                  disabled={isPending}
-                                  onClick={() => {
-                                    handleSend(`Đổi một địa điểm tương đương trong lịch trình thành ${rec.name}`);
-                                    setActiveActionMenu(null);
-                                  }}
-                                  className="w-full text-center py-1.5 px-2 rounded-lg bg-slate-100 hover:bg-sky-50 hover:text-sky-900 text-slate-700 font-semibold text-[11px] transition-all cursor-pointer border border-transparent hover:border-sky-200"
-                                >
-                                  Nhờ AI tự chọn điểm phù hợp để đổi
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                    <div className="grid grid-cols-1 gap-2.5 pt-0.5">
+                      {recommendations.map((rec, recIdx) => (
+                        <CopilotRecommendationCard
+                          key={recIdx}
+                          rec={rec}
+                          recIdx={recIdx}
+                          msgIndex={i}
+                          activeActionMenu={activeActionMenu}
+                          onToggleActionMenu={setActiveActionMenu}
+                          days={days}
+                          existingActivities={existingActivities}
+                          isPending={isPending}
+                          onLocatePlaceOnMap={onLocatePlaceOnMap}
+                          onSendAction={handleSend}
+                        />
+                      ))}
                     </div>
                   </div>
                 )}
 
                 {/* =====================================================================
                     SMART PROPOSAL DIFF CARD (Before -> After Comparison)
-                    With Interactive Map Locating Buttons
+                    Clean editorial system style (No AI slop gradients)
                     ===================================================================== */}
                 {msg.proposal && (
-                  <div className="ml-9 p-3.5 sm:p-4 rounded-2xl bg-gradient-to-br from-sky-50/95 via-blue-50/60 to-indigo-50/50 border-2 border-sky-300 text-slate-800 space-y-3 shadow-sm animate-in zoom-in-95 duration-200">
-                    <div className="flex items-center justify-between border-b border-sky-200/60 pb-2">
-                      <div className="flex items-center gap-1.5 text-sky-950 font-extrabold text-xs">
-                        <Sparkles className="size-3.5 text-[#0194F3]" />
+                  <div className="ml-9 p-3.5 sm:p-4 rounded-2xl bg-white border border-sky-200/90 text-slate-800 space-y-3 shadow-xs animate-in zoom-in-95 duration-200">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <div className="flex items-center gap-1.5 text-slate-900 font-semibold text-xs">
+                        <i className="fa-solid fa-compass text-xs text-[#0194F3]" aria-hidden="true" />
                         <span>{msg.proposal.title}</span>
                       </div>
-                      <span className="px-2 py-0.5 rounded-full bg-sky-100/90 text-sky-900 text-[10px] font-bold">
+                      <span className="px-2 py-0.5 rounded-full bg-[#F0F7FF] text-[#0194F3] border border-[#D0E7FF] text-[10px] font-semibold">
                         Chờ xác nhận
                       </span>
                     </div>
@@ -690,7 +794,7 @@ export default function CopilotDrawer({
                               });
                             }
                           }}
-                          className="bg-white/90 p-2.5 rounded-xl border border-rose-200/60 flex items-start justify-between gap-2 cursor-pointer hover:bg-rose-50/60 transition-colors group"
+                          className="bg-slate-50/80 p-2.5 rounded-xl border border-rose-200/70 flex items-start justify-between gap-2 cursor-pointer hover:bg-rose-50/50 transition-colors group"
                           title="Bấm để xem địa điểm cũ trên bản đồ"
                         >
                           <div className="min-w-0">
@@ -701,29 +805,29 @@ export default function CopilotDrawer({
                               {msg.proposal.fromPlaceName}
                             </span>
                           </div>
-                          <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 text-[10px] font-bold shrink-0 flex items-center gap-1">
-                            <MapPin className="size-2.5 text-rose-500" />
+                          <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 text-[10px] font-semibold shrink-0 flex items-center gap-1">
+                            <i className="fa-solid fa-location-dot text-[9px] text-rose-500" aria-hidden="true" />
                             Cũ
                           </span>
                         </div>
 
                         {/* Arrow Separator */}
                         <div className="flex justify-center -my-1">
-                          <div className="size-6 rounded-full bg-sky-100 text-[#0068B8] flex items-center justify-center shadow-xs">
-                            <ArrowRight className="size-3 rotate-90" />
+                          <div className="size-6 rounded-full bg-[#F0F7FF] border border-[#D0E7FF] text-[#0194F3] flex items-center justify-center shadow-2xs">
+                            <i className="fa-solid fa-arrow-down text-[10px]" aria-hidden="true" />
                           </div>
                         </div>
 
                         {/* New Proposed Place */}
-                        <div className="bg-white/95 p-3 rounded-xl border-2 border-sky-400 shadow-xs space-y-2">
+                        <div className="bg-[#F8FAFC] p-3 rounded-xl border border-sky-300 shadow-2xs space-y-2">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] font-extrabold text-[#0068B8] uppercase tracking-wider flex items-center gap-1">
-                              <Sparkles className="size-3 text-[#0194F3]" />
+                            <span className="text-[10px] font-semibold text-[#0194F3] uppercase tracking-wider flex items-center gap-1">
+                              <i className="fa-solid fa-right-left text-[10px] text-[#0194F3]" aria-hidden="true" />
                               Đề xuất đổi sang
                             </span>
                             {msg.proposal.toPlaceRating && (
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 font-bold text-[11px] border border-amber-200/70">
-                                <Star className="size-2.5 fill-amber-500 text-amber-500" />
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 font-semibold text-[11px] border border-amber-200/70 tabular-nums">
+                                <i className="fa-solid fa-star text-[9px] text-amber-500" aria-hidden="true" />
                                 <span>{msg.proposal.toPlaceRating.toFixed(1)}</span>
                               </span>
                             )}
@@ -735,7 +839,7 @@ export default function CopilotDrawer({
                             </p>
                             {msg.proposal.toPlaceAddress && (
                               <p className="text-[11px] text-slate-500 flex items-center gap-1 truncate pt-0.5">
-                                <MapPin className="size-3 text-slate-400 shrink-0" />
+                                <i className="fa-solid fa-location-dot text-[10px] text-slate-400 shrink-0" aria-hidden="true" />
                                 <span className="truncate">{msg.proposal.toPlaceAddress}</span>
                               </p>
                             )}
@@ -757,70 +861,85 @@ export default function CopilotDrawer({
                                   imageUrl: msg.proposal?.toPlaceImageUrl,
                                 });
                               }}
-                              className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-sky-50 hover:bg-sky-100 text-sky-900 text-[11px] font-bold border border-sky-200/80 transition-colors cursor-pointer"
+                              className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-950 text-xs font-medium border border-slate-200/90 transition-colors cursor-pointer shadow-2xs"
                             >
-                              <MapPin className="size-3 text-[#0194F3]" />
+                              <i className="fa-solid fa-location-dot text-[10px] text-[#0194F3]" aria-hidden="true" />
                               <span>Xem địa điểm này trên bản đồ</span>
                             </button>
                           )}
                         </div>
                       </div>
                     ) : msg.proposal.swapDays ? (
-                      <div className="bg-white/90 p-3 rounded-xl border border-sky-200 text-xs text-sky-900 font-bold flex items-center justify-between shadow-2xs">
+                      <div className="bg-white p-3 rounded-xl border border-sky-200 text-xs text-sky-900 font-semibold flex items-center justify-between shadow-2xs">
                         <span className="text-slate-600 font-medium">Hoán đổi lịch trình:</span>
-                        <span className="px-2.5 py-1 rounded-lg bg-sky-100 text-sky-950 font-extrabold">
+                        <span className="px-2.5 py-1 rounded-lg bg-[#F0F7FF] text-[#0194F3] border border-[#D0E7FF] font-semibold tabular-nums">
                           Ngày {msg.proposal.swapDays.dayA} ⇄ Ngày {msg.proposal.swapDays.dayB}
                         </span>
                       </div>
                     ) : (
-                      <p className="text-[11px] bg-white/90 p-2.5 rounded-xl border border-sky-200 text-slate-700">
+                      <p className="text-[11px] bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-slate-700 leading-relaxed">
                         {msg.proposal.description}
                       </p>
                     )}
 
                     {/* Proposal Action Buttons */}
                     {(!msg.proposalStatus || msg.proposalStatus === 'PENDING') && (
-                      <div className="flex items-center gap-2 pt-1">
-                        <button
-                          type="button"
-                          disabled={applyingProposalId !== null}
-                          onClick={() => onConfirmProposal(i, msg.proposal!)}
-                          className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#0068B8] hover:bg-[#00569C] disabled:opacity-50 text-white font-bold text-xs shadow-xs transition-all cursor-pointer min-h-[40px]"
-                        >
-                          {applyingProposalId === msg.proposal.id ? (
-                            <>
-                              <Loader2 className="size-3.5 animate-spin" />
-                              <span>Đang cập nhật lịch trình...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Check className="size-3.5" />
-                              <span>Áp dụng vào lịch trình</span>
-                            </>
-                          )}
-                        </button>
+                      canEdit ? (
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            disabled={applyingProposalId !== null}
+                            onClick={() => onConfirmProposal(i, msg.proposal!)}
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] disabled:opacity-50 text-white font-semibold text-xs shadow-xs transition-colors cursor-pointer min-h-[40px]"
+                          >
+                            {applyingProposalId === msg.proposal.id ? (
+                              <>
+                                <i className="fa-solid fa-circle-notch fa-spin text-xs" aria-hidden="true" />
+                                <span>Đang cập nhật lịch trình...</span>
+                              </>
+                            ) : (
+                              <>
+                                <i className="fa-solid fa-check text-xs" aria-hidden="true" />
+                                <span>Áp dụng vào lịch trình</span>
+                              </>
+                            )}
+                          </button>
 
-                        <button
-                          type="button"
-                          disabled={applyingProposalId !== null}
-                          onClick={() => onRejectProposal(i)}
-                          className="px-3 py-2.5 rounded-xl border border-slate-300 hover:bg-white text-slate-700 font-semibold text-xs transition-colors cursor-pointer min-h-[40px]"
-                        >
-                          Bỏ qua
-                        </button>
-                      </div>
+                          <button
+                            type="button"
+                            disabled={applyingProposalId !== null}
+                            onClick={() => onRejectProposal(i)}
+                            className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs transition-colors cursor-pointer min-h-[40px]"
+                          >
+                            Bỏ qua
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-2 pt-1 text-[11px] text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2">
+                          <span>
+                            Bạn đang ở quyền xem. Hãy tạo đề xuất trong tab <strong>Bình chọn</strong> để cả nhóm cùng góp ý.
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => onRejectProposal(i)}
+                            className="shrink-0 text-slate-500 hover:text-slate-700 font-semibold cursor-pointer"
+                          >
+                            Ẩn
+                          </button>
+                        </div>
+                      )
                     )}
 
                     {msg.proposalStatus === 'APPLIED' && (
-                      <div className="flex items-center gap-1.5 text-[11px] text-emerald-800 font-bold bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-200">
-                        <Check className="size-3.5 text-emerald-600" />
+                      <div className="flex items-center gap-1.5 text-[11px] text-emerald-800 font-semibold bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-200">
+                        <i className="fa-solid fa-check text-xs text-emerald-600" aria-hidden="true" />
                         <span>Đã áp dụng và cập nhật vào lịch trình</span>
                       </div>
                     )}
 
                     {msg.proposalStatus === 'REJECTED' && (
                       <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium bg-slate-100 px-3 py-2 rounded-xl">
-                        <X className="size-3.5" />
+                        <i className="fa-solid fa-xmark text-xs" aria-hidden="true" />
                         <span>Đã bỏ qua đề xuất (Giữ nguyên lịch trình)</span>
                       </div>
                     )}
@@ -833,10 +952,10 @@ export default function CopilotDrawer({
                     <button
                       type="button"
                       onClick={() => onOpenWizard(msg.action!.destination)}
-                      className="w-full inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-[#0068B8] via-[#0194F3] to-blue-600 hover:opacity-95 text-white text-xs font-bold shadow-md transition-all cursor-pointer"
+                      className="w-full inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
                     >
-                      <Sparkles className="size-3.5 animate-spin text-amber-300" />
-                      <span>🚀 Mở tạo lịch trình {msg.action.destination}</span>
+                      <i className="fa-solid fa-plane-departure text-xs" aria-hidden="true" />
+                      <span>Mở tạo lịch trình {msg.action.destination}</span>
                     </button>
                   </div>
                 )}
@@ -849,12 +968,12 @@ export default function CopilotDrawer({
         {isPending && (
           <div className="flex justify-start">
             <div className="flex items-start gap-2">
-              <div className="size-7 rounded-full bg-gradient-to-tr from-[#0068B8] to-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs mt-0.5 border border-white">
-                <Bot className="size-3.5" />
+              <div className="size-7 rounded-full bg-[#0194F3] text-white flex items-center justify-center shrink-0 shadow-2xs mt-0.5 border border-white">
+                <i className="fa-solid fa-compass text-xs" aria-hidden="true" />
               </div>
               <div className="p-3.5 rounded-2xl rounded-tl-xs bg-white border border-slate-200 text-slate-600 shadow-xs flex items-center gap-2 text-xs">
-                <Loader2 className="size-3.5 animate-spin text-[#0194F3]" />
-                <span>Genie đang suy nghĩ & tìm kiếm địa điểm...</span>
+                <i className="fa-solid fa-circle-notch fa-spin text-xs text-[#0194F3]" aria-hidden="true" />
+                <span>Genie đang suy nghĩ &amp; tìm kiếm địa điểm...</span>
               </div>
             </div>
           </div>
@@ -869,36 +988,36 @@ export default function CopilotDrawer({
           type="button"
           disabled={isPending}
           onClick={() => handleSend('Đổi điểm trưa Ngày 1 sang quán ăn đặc sản')}
-          className="whitespace-nowrap px-3 py-1.5 bg-slate-100 hover:bg-sky-50 hover:text-sky-900 hover:border-sky-200 border border-transparent text-slate-700 text-[11px] font-semibold rounded-full transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 shrink-0"
+          className="whitespace-nowrap px-3 py-1.5 bg-slate-50 hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#0194F3]/30 border border-slate-200/80 text-slate-700 text-xs font-medium rounded-full transition-colors cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 shrink-0"
         >
-          <UtensilsCrossed className="size-3 text-amber-600" />
+          <i className="fa-solid fa-utensils text-[10px] text-amber-500" aria-hidden="true" />
           <span>Đổi trưa sang đặc sản</span>
         </button>
         <button
           type="button"
           disabled={isPending}
           onClick={() => handleSend('Gợi ý cho tôi quán cafe đẹp ngắm cảnh gần đây')}
-          className="whitespace-nowrap px-3 py-1.5 bg-slate-100 hover:bg-sky-50 hover:text-sky-900 hover:border-sky-200 border border-transparent text-slate-700 text-[11px] font-semibold rounded-full transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 shrink-0"
+          className="whitespace-nowrap px-3 py-1.5 bg-slate-50 hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#0194F3]/30 border border-slate-200/80 text-slate-700 text-xs font-medium rounded-full transition-colors cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 shrink-0"
         >
-          <Sparkle className="size-3 text-indigo-600" />
+          <i className="fa-solid fa-mug-hot text-[10px] text-[#0194F3]" aria-hidden="true" />
           <span>Gợi ý cafe đẹp</span>
         </button>
         <button
           type="button"
           disabled={isPending}
           onClick={() => handleSend('Hoán đổi lịch trình Ngày 1 và Ngày 2 cho nhau')}
-          className="whitespace-nowrap px-3 py-1.5 bg-slate-100 hover:bg-sky-50 hover:text-sky-900 hover:border-sky-200 border border-transparent text-slate-700 text-[11px] font-semibold rounded-full transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 shrink-0"
+          className="whitespace-nowrap px-3 py-1.5 bg-slate-50 hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#0194F3]/30 border border-slate-200/80 text-slate-700 text-xs font-medium rounded-full transition-colors cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 shrink-0"
         >
-          <Calendar className="size-3 text-[#0194F3]" />
-          <span>Đổi Ngày 1 & Ngày 2</span>
+          <i className="fa-regular fa-calendar text-[10px] text-[#0194F3]" aria-hidden="true" />
+          <span>Đổi Ngày 1 &amp; Ngày 2</span>
         </button>
         <button
           type="button"
           disabled={isPending}
           onClick={() => handleSend('Tôi muốn đổi chuyến đi sang Phú Quốc')}
-          className="whitespace-nowrap px-3 py-1.5 bg-slate-100 hover:bg-sky-50 hover:text-sky-900 hover:border-sky-200 border border-transparent text-slate-700 text-[11px] font-semibold rounded-full transition-all cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 shrink-0"
+          className="whitespace-nowrap px-3 py-1.5 bg-slate-50 hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#0194F3]/30 border border-slate-200/80 text-slate-700 text-xs font-medium rounded-full transition-colors cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 shrink-0"
         >
-          <Compass className="size-3 text-emerald-600" />
+          <i className="fa-solid fa-compass text-[10px] text-emerald-600" aria-hidden="true" />
           <span>Đổi sang Phú Quốc</span>
         </button>
       </div>
@@ -906,8 +1025,8 @@ export default function CopilotDrawer({
       {/* =========================================================================
           MESSENGER-STYLE FLOATING CAPSULE INPUT BAR
           ========================================================================= */}
-      <div className="p-3 sm:p-3.5 border-t border-slate-200/80 bg-white/95 backdrop-blur-md">
-        <div className="relative flex items-end gap-2 p-1.5 pl-3 rounded-2xl border border-slate-300/80 bg-slate-50 focus-within:bg-white focus-within:border-[#0194F3] focus-within:ring-2 focus-within:ring-[#0194F3]/20 transition-all shadow-xs">
+      <div className="p-3 sm:p-3.5 border-t border-slate-200/80 bg-white">
+        <div className="relative flex items-end gap-2 p-1.5 pl-3 rounded-2xl border border-slate-200 bg-[#F8FAFC] focus-within:bg-white focus-within:border-[#0194F3] focus-within:ring-2 focus-within:ring-[#0194F3]/20 transition-all shadow-2xs">
           <textarea
             ref={textareaRef}
             rows={1}
@@ -916,26 +1035,30 @@ export default function CopilotDrawer({
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder={isPending ? 'Genie đang suy nghĩ & xử lý...' : 'Nhắn cho Genie Copilot (Shift+Enter để xuống dòng)...'}
-            className="flex-1 bg-transparent resize-none max-h-32 py-1.5 text-xs sm:text-[13px] text-slate-800 placeholder-slate-400 focus:outline-none disabled:opacity-50 leading-relaxed"
+            className="flex-1 bg-transparent resize-none max-h-32 py-1.5 text-xs sm:text-[13px] text-slate-800 placeholder-slate-400 focus:outline-none disabled:opacity-50 leading-relaxed font-sans"
           />
 
           <button
             type="button"
             disabled={isPending || !inputValue.trim()}
             onClick={() => handleSend()}
-            className="size-9 rounded-xl bg-gradient-to-tr from-[#0068B8] to-[#0194F3] hover:from-[#00569C] hover:to-[#0073D1] disabled:opacity-30 disabled:from-slate-400 disabled:to-slate-400 text-white flex items-center justify-center transition-all cursor-pointer shrink-0 shadow-sm disabled:cursor-not-allowed active:scale-95"
+            aria-label="Gửi tin nhắn"
+            className="size-9 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] disabled:opacity-30 disabled:bg-slate-300 text-white flex items-center justify-center transition-all cursor-pointer shrink-0 shadow-xs disabled:cursor-not-allowed active:scale-95"
             title="Gửi tin nhắn"
           >
             {isPending ? (
-              <Loader2 className="size-4 animate-spin" />
+              <i className="fa-solid fa-circle-notch fa-spin text-sm" aria-hidden="true" />
             ) : (
-              <Send className="size-4" />
+              <i className="fa-solid fa-paper-plane text-xs" aria-hidden="true" />
             )}
           </button>
         </div>
         <div className="flex items-center justify-between text-[10px] text-slate-400 px-1 mt-1.5">
           <span>Nhấn Enter để gửi • Shift + Enter xuống dòng</span>
-          <span>Genie AI đồng hành</span>
+          <span className="flex items-center gap-1">
+            <i className="fa-solid fa-wand-magic-sparkles text-[9px] text-[#0194F3]" aria-hidden="true" />
+            <span>Genie AI đồng hành</span>
+          </span>
         </div>
       </div>
     </div>

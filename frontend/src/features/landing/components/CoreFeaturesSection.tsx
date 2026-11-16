@@ -18,12 +18,12 @@ export function CoreFeaturesSection() {
   return (
     <section
       id="timeline"
-      className="relative py-24 sm:py-32 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#F0F7FF] via-[#F8FAFC] to-[#F1F5F9] border-y border-slate-200/80 overflow-hidden"
+      className="relative py-14 sm:py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-[#F0F7FF] via-[#F8FAFC] to-[#F1F5F9] border-y border-slate-200/80 overflow-hidden"
     >
       {/* Subtle Topographic Contour Map Watermark (Vector SVG siêu nhẹ, 0% lag, tạo chất du lịch) */}
       <div className="absolute inset-0 pointer-events-none opacity-[0.035] bg-[radial-gradient(#0194F3_1px,transparent_1px)] [background-size:24px_24px]"></div>
 
-      <div className="relative z-10 max-w-7xl mx-auto w-full space-y-28 sm:space-y-36">
+      <div className="relative z-10 max-w-7xl mx-auto w-full space-y-16 sm:space-y-20">
         {/* Section Title & Intro */}
         <div className="text-center max-w-3xl mx-auto space-y-4">
           <span className="inline-flex items-center px-4 py-1.5 rounded-full bg-blue-50 text-[#0194F3] border border-blue-200/80 text-xs font-bold uppercase tracking-wider">

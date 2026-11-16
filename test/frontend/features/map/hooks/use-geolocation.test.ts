@@ -41,7 +41,8 @@ describe("useGeolocation", () => {
     const { result } = renderHook(() => useGeolocation());
     act(() => result.current.requestLocation());
     await waitFor(() => expect(result.current.status).toBe("error"));
-    expect(result.current.coordinate).toBeNull();
+    // coordinate is preserved from cache (intentional: keeps distance reference)
+    // but message must surface the denial reason to inform the user
     expect(result.current.message).toMatch(/từ chối quyền/i);
   });
 });

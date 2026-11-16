@@ -11,7 +11,8 @@ describe('AuthController', () => {
   beforeEach(async () => {
     mockAuthService = {
       register: jest.fn().mockResolvedValue({
-        message: 'Đăng ký thành công. Vui lòng kiểm tra email để kích hoạt tài khoản.',
+        message:
+          'Đăng ký thành công. Vui lòng kiểm tra email để kích hoạt tài khoản.',
         expiresIn: 1800,
         retryAfter: 60,
         registrationId: 'reg-uuid-1',
@@ -30,12 +31,22 @@ describe('AuthController', () => {
         tokens: { accessToken: 'a', refreshToken: 'r' },
       }),
       handleOAuthCallback: jest.fn(),
-      refreshTokens: jest.fn().mockResolvedValue({ accessToken: 'a', refreshToken: 'r' }),
-      forgotPassword: jest.fn().mockResolvedValue({ message: 'OTP sent if exists' }),
-      verifyResetOtp: jest.fn().mockResolvedValue({ resetTicket: 'ticket', expiresIn: 300 }),
-      resetPassword: jest.fn().mockResolvedValue({ message: 'Password reset successful' }),
+      refreshTokens: jest
+        .fn()
+        .mockResolvedValue({ accessToken: 'a', refreshToken: 'r' }),
+      forgotPassword: jest
+        .fn()
+        .mockResolvedValue({ message: 'OTP sent if exists' }),
+      verifyResetOtp: jest
+        .fn()
+        .mockResolvedValue({ resetTicket: 'ticket', expiresIn: 300 }),
+      resetPassword: jest
+        .fn()
+        .mockResolvedValue({ message: 'Password reset successful' }),
       logout: jest.fn().mockResolvedValue(undefined),
-      getProfile: jest.fn().mockResolvedValue({ id: '1', email: 'traveler1@example.com' }),
+      getProfile: jest
+        .fn()
+        .mockResolvedValue({ id: '1', email: 'traveler1@example.com' }),
       checkRegistrationStatus: jest.fn().mockResolvedValue({ verified: false }),
     };
 
@@ -61,7 +72,11 @@ describe('AuthController', () => {
 
   describe('register', () => {
     it('nên gọi AuthService.register và không setAuthCookies', async () => {
-      const dto = { email: 'traveler1@example.com', password: 'Password123!', fullName: 'Test' };
+      const dto = {
+        email: 'traveler1@example.com',
+        password: 'Password123!',
+        fullName: 'Test',
+      };
       const res = await controller.register(dto);
       expect(mockAuthService.register).toHaveBeenCalledWith(dto);
       expect(res.registrationId).toBe('reg-uuid-1');
@@ -83,14 +98,19 @@ describe('AuthController', () => {
     it('nên gọi AuthService.resendVerificationEmail', async () => {
       const dto = { registrationId: 'reg-uuid-1' };
       const res = await controller.resendVerificationEmail(dto);
-      expect(mockAuthService.resendVerificationEmail).toHaveBeenCalledWith('reg-uuid-1');
+      expect(mockAuthService.resendVerificationEmail).toHaveBeenCalledWith(
+        'reg-uuid-1',
+      );
       expect(res.expiresIn).toBe(1800);
     });
   });
 
   describe('login', () => {
     it('nên gọi AuthService.login và setAuthCookies', async () => {
-      const dto = { identifier: 'traveler1@example.com', password: 'Password123!' };
+      const dto = {
+        identifier: 'traveler1@example.com',
+        password: 'Password123!',
+      };
       const mockRes: any = { cookie: jest.fn() };
       const res = await controller.login(dto, mockRes);
       expect(mockAuthService.login).toHaveBeenCalledWith(dto);
@@ -113,8 +133,12 @@ describe('AuthController', () => {
         accessToken: 'acc-token',
         refreshToken: 'ref-token',
       });
-      expect(mockRes.clearCookie).toHaveBeenCalledWith('accessToken', { path: '/' });
-      expect(mockRes.clearCookie).toHaveBeenCalledWith('refreshToken', { path: '/' });
+      expect(mockRes.clearCookie).toHaveBeenCalledWith('accessToken', {
+        path: '/',
+      });
+      expect(mockRes.clearCookie).toHaveBeenCalledWith('refreshToken', {
+        path: '/',
+      });
       expect(res.message).toBe('Đăng xuất thành công');
     });
   });

@@ -1,7 +1,12 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { ConflictException, UnauthorizedException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  ConflictException,
+  UnauthorizedException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { getQueueToken } from '@nestjs/bullmq';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
@@ -40,7 +45,10 @@ describe('AuthService', () => {
     mockJwtService = {
       signAsync: jest.fn().mockResolvedValue('mock_token'),
       verify: jest.fn(),
-      decode: jest.fn().mockReturnValue({ jti: 'mock_jti', exp: Math.floor(Date.now() / 1000) + 3600 }),
+      decode: jest.fn().mockReturnValue({
+        jti: 'mock_jti',
+        exp: Math.floor(Date.now() / 1000) + 3600,
+      }),
     };
 
     mockConfigService = {
@@ -48,7 +56,8 @@ describe('AuthService', () => {
         if (key === 'JWT_SECRET') return 'secret';
         if (key === 'JWT_REFRESH_SECRET') return 'refresh_secret';
         if (key === 'GOOGLE_CLIENT_ID') return 'google_id';
-        if (key === 'GOOGLE_CALLBACK_URL') return 'http://localhost:3000/api/v1/auth/google/callback';
+        if (key === 'GOOGLE_CALLBACK_URL')
+          return 'http://localhost:3000/api/v1/auth/google/callback';
         return defaultValue;
       }),
       getOrThrow: jest.fn().mockImplementation((key: string) => {
@@ -113,13 +122,17 @@ describe('AuthService', () => {
         return count;
       }),
       ttl: jest.fn().mockResolvedValue(-1),
-      eval: jest.fn().mockImplementation(async (_script: string, _numKeys: number, key: string) => {
-        const val = redisStore.get(key) || null;
-        if (val) {
-          redisStore.delete(key);
-        }
-        return val;
-      }),
+      eval: jest
+        .fn()
+        .mockImplementation(
+          async (_script: string, _numKeys: number, key: string) => {
+            const val = redisStore.get(key) || null;
+            if (val) {
+              redisStore.delete(key);
+            }
+            return val;
+          },
+        ),
       multi: jest.fn().mockReturnValue(mockPipeline),
     };
 
@@ -132,9 +145,15 @@ describe('AuthService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
-        { provide: INJECT_TOKENS.USER_REPOSITORY, useValue: mockUsersRepository },
+        {
+          provide: INJECT_TOKENS.USER_REPOSITORY,
+          useValue: mockUsersRepository,
+        },
         { provide: 'REDIS_CLIENT', useValue: mockRedisClient },
-        { provide: getQueueToken(AUTH_CONSTANTS.MAIL_QUEUE), useValue: mockMailQueue },
+        {
+          provide: getQueueToken(AUTH_CONSTANTS.MAIL_QUEUE),
+          useValue: mockMailQueue,
+        },
         { provide: JwtService, useValue: mockJwtService },
         { provide: ConfigService, useValue: mockConfigService },
         { provide: MailService, useValue: mockMailService },
@@ -219,7 +238,9 @@ describe('AuthService', () => {
 
   describe('verifyEmail', () => {
     it('nên từ chối nếu token không hợp lệ hoặc đã hết hạn', async () => {
-      await expect(authService.verifyEmail('invalid-token')).rejects.toThrow(BadRequestException);
+      await expect(authService.verifyEmail('invalid-token')).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('nên tạo tài khoản và cấp phiên khi token hợp lệ', async () => {
@@ -407,7 +428,10 @@ describe('AuthService', () => {
       });
 
       expect(mockUsersRepository.create).toHaveBeenCalledWith(
-        expect.objectContaining({ email: 'newgoogle@gmail.com', isVerified: true }),
+        expect.objectContaining({
+          email: 'newgoogle@gmail.com',
+          isVerified: true,
+        }),
       );
       expect(mockUsersRepository.createIdentity).toHaveBeenCalledWith(
         expect.objectContaining({ canSignIn: true }),

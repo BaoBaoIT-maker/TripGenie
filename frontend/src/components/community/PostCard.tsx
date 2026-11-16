@@ -326,7 +326,7 @@ function PostCardComponent({
             <div className="flex items-center gap-1.5 flex-wrap">
               <Link
                 href={profileHref}
-                className="text-[14px] font-black text-[#020617] hover:text-[#0194F3] transition-colors truncate"
+                className="text-[14px] font-bold text-slate-900 hover:text-[#0194F3] transition-colors truncate"
               >
                 {post.author.fullName}
               </Link>
@@ -446,35 +446,29 @@ function PostCardComponent({
       <div className="px-5 pb-3.5 flex flex-col gap-2">
         <h2
           onClick={handleTriggerDetail}
-          className="text-[17px] font-black text-[#020617] leading-[1.4] tracking-[-0.02em] cursor-pointer hover:text-[#0194F3] transition-colors"
+          className="text-[16px] font-bold text-slate-900 leading-snug tracking-tight cursor-pointer hover:text-[#0194F3] transition-colors"
         >
           {post.title}
         </h2>
         {post.caption && (
-          <p className="text-[13px] text-[#475569] leading-[1.6] font-normal whitespace-pre-line">
+          <p className="text-[13.5px] text-slate-600 leading-relaxed font-normal whitespace-pre-line">
             {post.caption}
           </p>
         )}
 
-        {/* Hashtags */}
+        {/* Hashtags (Clean inline links) */}
         {post.tags && post.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {post.tags.map((tag, idx) => {
-              const isPrimaryTag = idx < 2;
-              const badgeClass = isPrimaryTag
-                ? "py-0.5 px-2 rounded-[6px] bg-[#F0F7FF] text-[#0194F3] text-[11px] font-bold hover:bg-[#BAE0FD]/50 transition-colors cursor-pointer"
-                : "py-0.5 px-2 rounded-[6px] bg-[#F1F5F9] text-[#475569] text-[11px] font-semibold hover:bg-[#E2E8F0] transition-colors cursor-pointer";
-              return (
-                <button
-                  key={tag}
-                  type="button"
-                  onClick={() => onSelectTag && onSelectTag(tag)}
-                  className={badgeClass}
-                >
-                  {tag.startsWith("#") ? tag : `#${tag}`}
-                </button>
-              );
-            })}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-0.5">
+            {post.tags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => onSelectTag && onSelectTag(tag)}
+                className="text-xs font-semibold text-[#0194F3] hover:text-[#007FE3] hover:underline bg-transparent border-none p-0 cursor-pointer inline-flex items-center transition-colors"
+              >
+                {tag.startsWith("#") ? tag : `#${tag}`}
+              </button>
+            ))}
           </div>
         )}
       </div>
@@ -579,29 +573,29 @@ function PostCardComponent({
 
       {/* ATTACHED ITINERARY CARD (.itinerary-strip - USP #1 TripGenie) */}
       {post.itinerary && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#F8FAFC] hover:bg-[#F1F5F9] border border-[#E2E8F0] hover:border-[#CBD5E1] rounded-[16px] py-3 px-4 mx-5 mt-1 mb-4 transition-colors">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/90 hover:bg-slate-100/90 border border-slate-200/90 hover:border-slate-300 rounded-xl py-2.5 px-3.5 mx-5 mt-1 mb-4 transition-colors">
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className="w-11 h-11 rounded-[12px] bg-[#0194F3] text-white flex items-center justify-center text-[20px] shrink-0 shadow-[0_2px_6px_rgba(1,148,243,0.25)]">
+            <div className="size-9 rounded-lg bg-[#0194F3] text-white flex items-center justify-center text-sm shrink-0 shadow-xs">
               <i className="fa-solid fa-route" aria-hidden="true" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 mb-0.5">
-                <span className="py-0.5 px-[7px] rounded-[6px] bg-[#F0F7FF] text-[#0194F3] font-extrabold text-[10px] uppercase tracking-[0.04em]">
+                <span className="py-0.5 px-1.5 rounded-md bg-[#F0F7FF] text-[#0194F3] font-bold text-[10px] tracking-wide">
                   Lộ trình đính kèm
                 </span>
                 {durationLabel && (
-                  <span className="text-[11px] text-[#64748B] font-semibold">
+                  <span className="text-[11px] text-slate-500 font-medium">
                     • {durationLabel}
                   </span>
                 )}
               </div>
               <Link
                 href={`/itineraries/${post.itinerary.id}`}
-                className="block text-[14px] font-extrabold text-[#0F172A] hover:text-[#0194F3] m-0 leading-[1.3] truncate transition-colors"
+                className="block text-[13.5px] font-bold text-slate-900 hover:text-[#0194F3] m-0 leading-snug truncate transition-colors"
               >
                 {post.itinerary.title}
               </Link>
-              <div className="text-[11px] text-[#64748B] font-medium mt-0.5 truncate">
+              <div className="text-[11px] text-slate-500 font-medium mt-0.5 truncate">
                 {post.itinerary.totalPlaces} Điểm đến
                 {formattedEstimatedCost
                   ? ` • Dự trù ~${formattedEstimatedCost}/người`
@@ -613,7 +607,7 @@ function PostCardComponent({
           <button
             type="button"
             onClick={handleTriggerClonePreview}
-            className="bg-[#0194F3] hover:bg-[#007FE3] active:scale-[0.97] text-white py-[9px] px-4 text-[12px] font-bold shrink-0 whitespace-nowrap rounded-[10px] inline-flex items-center justify-center gap-1.5 shadow-[0_2px_6px_rgba(1,148,243,0.25)] cursor-pointer transition-colors border-none"
+            className="h-8 px-3 text-xs font-semibold shrink-0 whitespace-nowrap rounded-lg inline-flex items-center justify-center gap-1.5 bg-[#0194F3] hover:bg-[#007FE3] active:scale-[0.98] text-white shadow-xs cursor-pointer transition-colors border-none"
           >
             <i className="fa-regular fa-clone" aria-hidden="true" />
             <span>Nhân bản lịch trình</span>
@@ -655,9 +649,9 @@ function PostCardComponent({
 
           {/* Cloned Count Badge */}
           {(post.itinerary || post.cloneCount > 0) && (
-            <div className="flex items-center gap-1.5 text-[#0194F3] font-extrabold bg-[#F0F7FF] py-1 px-2.5 rounded-full">
+            <div className="flex items-center gap-1.5 text-[#0194F3] font-semibold text-xs bg-[#F0F7FF] py-1 px-2.5 rounded-full">
               <i
-                className="fa-solid fa-share-from-square text-[12px]"
+                className="fa-solid fa-share-from-square text-[11px]"
                 aria-hidden="true"
               />
               <span>{post.cloneCount} lượt nhân bản</span>
@@ -737,7 +731,7 @@ function PostCardComponent({
               <div className="space-y-1.5 flex-1 min-w-0">
                 <h3
                   id="confirm-delete-title"
-                  className="text-[15px] font-black text-[#0F172A]"
+                  className="text-[15px] font-bold text-slate-900"
                 >
                   Xác nhận xóa bài viết?
                 </h3>

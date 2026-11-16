@@ -22,7 +22,7 @@ describe("HomeSearchForm", () => {
 
     expect(screen.getByLabelText(/Bạn muốn khám phá gì/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Khám phá địa điểm/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Tạo lịch trình AI/i })).toHaveAttribute("href", "/planner/new?mode=ai");
+    expect(screen.getByRole("link", { name: /Tạo lịch trình AI/i })).toHaveAttribute("href", "/planner");
     expect(screen.getByRole("link", { name: /Khám phá trên bản đồ/i })).toHaveAttribute("href", "/explore?view=split");
   });
 

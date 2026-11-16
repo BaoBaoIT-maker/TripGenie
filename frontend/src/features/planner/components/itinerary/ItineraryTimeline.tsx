@@ -1,40 +1,36 @@
 'use client';
 
-import { useState } from 'react';
-
-import {
-  Star,
-  Sparkles,
-  Trash2,
-  Plus,
-  Lightbulb,
-  Plane,
-  TrainFront,
-  Bus,
-  Car,
-  Bike,
-  Ticket,
-  MapPin,
-  ExternalLink,
-  Banknote,
-  UtensilsCrossed,
-  Check,
-  Footprints,
-  ArrowLeftRight,
-  Loader2,
-  X,
-} from 'lucide-react';
-import type { ItineraryDay, IntercityTransit, ItineraryActivity, TransitMode } from '@/types/itinerary';
+import { memo, useEffect, useState } from 'react';
+import { AppModalPortal } from '@/components/common/AppModalPortal';
+import { useItineraryHoverStore } from '../../stores/itinerary-hover-store';
+import { WEATHER_THEMES, getDayWeatherAdvice } from '../../constants/climate.constants';
 import {
   TRANSIT_UI_CONFIG,
   cleanHubName,
-  formatClockMinutes,
   formatDuration,
   formatVnd,
   isDiningActivity,
 } from '../../model/itinerary-format';
 import { getDayColor } from '@/features/map/types';
 import TransitRouteBreakdown from './TransitRouteBreakdown';
+import { WeatherIcon } from './WeatherIcon';
+import type {
+  DayWeather,
+  IntercityTransit,
+  ItineraryActivity,
+  ItineraryDay,
+  MoveDirection,
+  TransitMode,
+  TripWeatherResponse,
+  WeatherCondition,
+} from '@/types/itinerary';
+
+const WEATHER_ICON_COLOR: Record<WeatherCondition, string> = {
+  SUNNY: 'text-amber-500',
+  MILD: 'text-[#0194F3]',
+  RAINY: 'text-sky-600',
+  COLD: 'text-indigo-500',
+};
 
 interface Props {
   days: ItineraryDay[];
@@ -46,10 +42,105 @@ interface Props {
   onSelectPlace?: (placeId: string) => void;
   onHoverPlace?: (placeId: string | null) => void;
   onSwapPlace?: (placeId: string, activity?: ItineraryActivity) => void;
-  onDeletePlace?: (placeId: string) => void;
+  onDeletePlace?: (placeId: string, activity?: ItineraryActivity) => void;
   onAddPlace?: (dayNumber: number) => void;
   onChangeTransitMode?: (newMode: TransitMode) => Promise<void> | void;
   isUpdatingTransitMode?: boolean;
+  // Enhanced workspace v2 props (optional for standalone consumers/tests)
+  weatherData?: TripWeatherResponse | null;
+  isCollapsibleDays?: boolean;
+  isMemberOrOwner?: boolean;
+  onEditStop?: (activity: ItineraryActivity) => void;
+  onMoveStop?: (destinationId: string, direction: MoveDirection) => Promise<void> | void;
+  movingStopId?: string | null;
+  onProposeSwap?: (placeId: string, activity?: ItineraryActivity) => void;
+  onProposeNewForDay?: (dayNumber: number) => void;
+  pendingProposalCountByStop?: Record<string, number>;
+  onOpenVotingTab?: () => void;
+}
+
+const TRANSIT_MODE_OPTIONS: ReadonlyArray<{
+  mode: TransitMode;
+  title: string;
+  desc: string;
+  iconClass: string;
+}> = [
+  {
+    mode: 'FLIGHT',
+    title: 'Máy bay',
+    desc: 'Nhanh nhất cho cự ly xa, đặt qua Google Flights & Traveloka',
+    iconClass: 'fa-solid fa-plane',
+  },
+  {
+    mode: 'TRAIN',
+    title: 'Tàu hỏa (Đường sắt)',
+    desc: 'Trải nghiệm ngắm cảnh, an toàn, đặt qua ĐSVN & VeXeRe',
+    iconClass: 'fa-solid fa-train',
+  },
+  {
+    mode: 'SLEEPER_BUS',
+    title: 'Xe khách giường nằm',
+    desc: 'Tiết kiệm chi phí, chạy ban đêm, đặt qua VeXeRe & Traveloka',
+    iconClass: 'fa-solid fa-bus',
+  },
+  {
+    mode: 'PERSONAL_CAR',
+    title: 'Ô tô cá nhân / Thuê xe',
+    desc: 'Chủ động hành trình, phù hợp đi cùng gia đình, nhóm bạn',
+    iconClass: 'fa-solid fa-car',
+  },
+  {
+    mode: 'PERSONAL_MOTORBIKE',
+    title: 'Xe máy phượt',
+    desc: 'Tự do trải nghiệm cung đường đèo ven biển, tiết kiệm tối đa',
+    iconClass: 'fa-solid fa-motorcycle',
+  },
+];
+
+function getTransitVisualMeta(transit: IntercityTransit) {
+  switch (transit.mode) {
+    case 'FLIGHT':
+      return {
+        iconClass: 'fa-solid fa-plane',
+        label: 'Máy bay',
+        summary: `~${formatDuration(
+          Math.max(
+            TRANSIT_UI_CONFIG.FLIGHT_MIN_DURATION_MINUTES,
+            transit.durationMinutes || TRANSIT_UI_CONFIG.FLIGHT_DEFAULT_DURATION_MINUTES,
+          ),
+        )}`,
+      };
+    case 'TRAIN':
+      return {
+        iconClass: 'fa-solid fa-train',
+        label: 'Tàu hỏa',
+        summary: `~${Math.round(transit.distanceKm)} km · ~${Math.max(1, Math.round(transit.durationMinutes / 60))} giờ`,
+      };
+    case 'SLEEPER_BUS':
+      return {
+        iconClass: 'fa-solid fa-bus',
+        label: 'Xe khách',
+        summary: `~${Math.round(transit.distanceKm)} km · ~${Math.max(1, Math.round(transit.durationMinutes / 60))} giờ`,
+      };
+    case 'PERSONAL_CAR':
+      return {
+        iconClass: 'fa-solid fa-car',
+        label: 'Ô tô',
+        summary: `~${Math.round(transit.distanceKm)} km`,
+      };
+    case 'PERSONAL_MOTORBIKE':
+      return {
+        iconClass: 'fa-solid fa-motorcycle',
+        label: 'Xe máy',
+        summary: `~${Math.round(transit.distanceKm)} km`,
+      };
+    default:
+      return {
+        iconClass: 'fa-solid fa-route',
+        label: 'Di chuyển liên tỉnh',
+        summary: `~${Math.round(transit.distanceKm)} km`,
+      };
+  }
 }
 
 function numberStops(days: ItineraryDay[]) {
@@ -71,106 +162,50 @@ function formatDayFullDate(isoString: string | null | undefined, dayIndex: numbe
   }
 }
 
-function getTransitModeConfig(transit: IntercityTransit) {
-  switch (transit.mode) {
-    case 'FLIGHT': {
-      const dur = Math.max(
-        TRANSIT_UI_CONFIG.FLIGHT_MIN_DURATION_MINUTES,
-        transit.durationMinutes || TRANSIT_UI_CONFIG.FLIGHT_DEFAULT_DURATION_MINUTES,
-      );
-      const departClock = formatClockMinutes(TRANSIT_UI_CONFIG.FLIGHT_DEPART_MINUTES);
-      const arriveClock = formatClockMinutes(TRANSIT_UI_CONFIG.FLIGHT_DEPART_MINUTES + dur);
-      const durLabel = formatDuration(dur);
-      return {
-        icon: <Plane className="size-4 text-sky-600 shrink-0" aria-hidden="true" />,
-        title: transit.isMultiModal
-          ? 'Chặng bay & Trung chuyển kết nối'
-          : 'Chặng bay: Hàng không liên tỉnh',
-        departLabel: `Khởi hành ~${departClock}`,
-        arriveLabel: `${transit.isMultiModal ? 'Đến nơi' : 'Hạ cánh'} ~${arriveClock}`,
-        distanceSummary: `${transit.isMultiModal ? 'Tổng hành trình' : 'Chặng bay'} ~${durLabel}`,
-      };
-    }
-    case 'TRAIN':
-      return {
-        icon: <TrainFront className="size-4 text-amber-600 shrink-0" aria-hidden="true" />,
-        title: 'Chặng tàu: Đường sắt Bắc - Nam',
-        departLabel: `Khởi hành ${TRANSIT_UI_CONFIG.TRAIN_DEPART_TIME}`,
-        arriveLabel: `Đến ga ~${TRANSIT_UI_CONFIG.TRAIN_ARRIVE_TIME}`,
-        distanceSummary: `Tàu hỏa đường sắt ~${transit.distanceKm} km (~${Math.round(transit.durationMinutes / 60)} tiếng)`,
-      };
-    case 'SLEEPER_BUS':
-      return {
-        icon: <Bus className="size-4 text-emerald-600 shrink-0" aria-hidden="true" />,
-        title: 'Chặng đi: Xe khách đường dài',
-        departLabel: `Khởi hành ${TRANSIT_UI_CONFIG.BUS_DEPART_TIME}`,
-        arriveLabel: `Đến bến ~${TRANSIT_UI_CONFIG.BUS_ARRIVE_TIME}`,
-        distanceSummary: `Xe khách giường nằm ~${transit.distanceKm} km (~${Math.round(transit.durationMinutes / 60)} tiếng)`,
-      };
-    case 'PERSONAL_CAR':
-      return {
-        icon: <Car className="size-4 text-indigo-600 shrink-0" aria-hidden="true" />,
-        title: 'Chặng đi: Ô tô cá nhân',
-        departLabel: 'Khởi hành linh hoạt',
-        arriveLabel: 'Đến nơi dự kiến',
-        distanceSummary: `Ô tô tự lái ~${transit.distanceKm} km (~${Math.round(transit.durationMinutes / 60)} tiếng)`,
-      };
-    case 'PERSONAL_MOTORBIKE':
-      return {
-        icon: <Bike className="size-4 text-[#0194F3] shrink-0" aria-hidden="true" />,
-        title: 'Chặng đi: Phượt xe máy',
-        departLabel: `Khởi hành sáng sớm (~${TRANSIT_UI_CONFIG.MOTORBIKE_DEPART_TIME})`,
-        arriveLabel: 'Đến nơi dự kiến',
-        distanceSummary: `Phượt xe máy ~${transit.distanceKm} km (~${Math.round(transit.durationMinutes / 60)} tiếng)`,
-      };
-    default:
-      return {
-        icon: <Car className="size-4 text-slate-600 shrink-0" aria-hidden="true" />,
-        title: 'Chặng đi: Di chuyển liên tỉnh',
-        departLabel: 'Khởi hành',
-        arriveLabel: 'Đến nơi',
-        distanceSummary: `Cự ly ~${transit.distanceKm} km`,
-      };
-  }
-}
+function formatStopCostText(act: ItineraryActivity): {
+  desktopPrefix?: string;
+  main: string;
+  desktopSuffix?: string;
+  title?: string;
+} | null {
+  const isFree =
+    act.estimatedCost === 0 ||
+    (act.priceRange?.min === 0 && (act.priceRange?.max === 0 || act.priceRange?.max == null));
 
-const TRANSIT_MODE_OPTIONS: Array<{
-  mode: TransitMode;
-  title: string;
-  desc: string;
-  icon: (className?: string) => React.ReactNode;
-}> = [
-  {
-    mode: 'FLIGHT',
-    title: 'Máy bay',
-    desc: 'Nhanh nhất cho cự ly xa, đặt qua Google Flights & Traveloka',
-    icon: (c) => <Plane className={c || 'size-4 text-sky-600'} aria-hidden="true" />,
-  },
-  {
-    mode: 'TRAIN',
-    title: 'Tàu hỏa (Đường sắt)',
-    desc: 'Trải nghiệm ngắm cảnh, an toàn, đặt qua ĐSVN & VeXeRe',
-    icon: (c) => <TrainFront className={c || 'size-4 text-amber-600'} aria-hidden="true" />,
-  },
-  {
-    mode: 'SLEEPER_BUS',
-    title: 'Xe khách giường nằm',
-    desc: 'Tiết kiệm chi phí, chạy ban đêm, đặt qua VeXeRe & Traveloka',
-    icon: (c) => <Bus className={c || 'size-4 text-emerald-600'} aria-hidden="true" />,
-  },
-  {
-    mode: 'PERSONAL_CAR',
-    title: 'Ô tô cá nhân / Thuê xe',
-    desc: 'Chủ động hành trình, phù hợp đi cùng gia đình, nhóm bạn',
-    icon: (c) => <Car className={c || 'size-4 text-indigo-600'} aria-hidden="true" />,
-  },
-  {
-    mode: 'PERSONAL_MOTORBIKE',
-    title: 'Xe máy phượt',
-    desc: 'Tự do trải nghiệm cung đường đèo ven biển, tiết kiệm tối đa',
-    icon: (c) => <Bike className={c || 'size-4 text-[#0194F3]'} aria-hidden="true" />,
-  },
-];
+  if (isFree) {
+    return {
+      main: 'Miễn phí',
+      desktopSuffix: ' vé',
+      title: 'Địa điểm tham quan mở cửa tự do, không thu phí vé vào cổng',
+    };
+  }
+
+  const isDining = isDiningActivity(act.categoryName, act.placeName);
+  if (isDining) {
+    const hasCost = act.estimatedCost != null && act.estimatedCost > 0;
+    const rangeTooltip =
+      act.priceRange?.min != null && act.priceRange?.max != null && act.priceRange.max > 0
+        ? `Giá tham khảo: ${formatVnd(act.priceRange.min)} – ${formatVnd(act.priceRange.max)}`
+        : 'Chi phí ước tính một suất ăn';
+    return hasCost
+      ? {
+          main: `~${formatVnd(act.estimatedCost!)}`,
+          desktopSuffix: '/người',
+          title: rangeTooltip,
+        }
+      : { main: 'Theo thực đơn', title: rangeTooltip };
+  }
+
+  if (act.estimatedCost != null && act.estimatedCost > 0) {
+    const rangeTooltip =
+      act.priceRange?.min != null && act.priceRange?.max != null && act.priceRange.max > act.priceRange.min
+        ? `Giá vé niêm yết: ${formatVnd(act.priceRange.min)} – ${formatVnd(act.priceRange.max)}`
+        : 'Giá vé tham quan tiêu chuẩn';
+    return { desktopPrefix: 'Vé ', main: `~${formatVnd(act.estimatedCost)}`, title: rangeTooltip };
+  }
+
+  return null;
+}
 
 function renderIntracityTransitConnector(act: ItineraryActivity) {
   if (act.distanceToNextKm != null && act.distanceToNextKm > 0) {
@@ -185,13 +220,12 @@ function renderIntracityTransitConnector(act: ItineraryActivity) {
             IC.MIN_BIKE_MINUTES,
             Math.round(((km * IC.ROAD_DETOUR_FACTOR) / IC.BIKE_SPEED_KMH) * 60) + IC.BIKE_BUFFER_MINUTES,
           ));
-
     const durationText = formatDuration(minutes);
 
     if (mode === 'WALK') {
       return (
-        <span className="text-[11px] text-emerald-700 dark:text-emerald-300 font-medium bg-emerald-50/80 dark:bg-emerald-950/40 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800/60 inline-flex items-center gap-1.5 shadow-2xs">
-          <Footprints className="size-3 text-emerald-600 dark:text-emerald-400 shrink-0" aria-hidden="true" />
+        <span className="text-[11px] text-slate-600 font-medium inline-flex items-center gap-1.5 tabular-nums">
+          <i className="fa-solid fa-person-walking text-emerald-600 text-xs" aria-hidden="true" />
           <span>~{durationText} đi bộ ({km} km)</span>
         </span>
       );
@@ -199,106 +233,141 @@ function renderIntracityTransitConnector(act: ItineraryActivity) {
 
     if (mode === 'CAR') {
       return (
-        <span className="text-[11px] text-sky-700 dark:text-sky-300 font-medium bg-sky-50/80 dark:bg-sky-950/40 px-3 py-1 rounded-full border border-sky-200 dark:border-sky-800/60 inline-flex items-center gap-1.5 shadow-2xs">
-          <Car className="size-3 text-sky-600 dark:text-sky-400 shrink-0" aria-hidden="true" />
+        <span className="text-[11px] text-slate-600 font-medium inline-flex items-center gap-1.5 tabular-nums">
+          <i className="fa-solid fa-car text-[#0194F3] text-xs" aria-hidden="true" />
           <span>~{durationText} ô tô / taxi ({km} km)</span>
         </span>
       );
     }
 
     return (
-      <span className="text-[11px] text-amber-700 dark:text-amber-300 font-medium bg-amber-50/80 dark:bg-amber-950/40 px-3 py-1 rounded-full border border-amber-200 dark:border-amber-800/60 inline-flex items-center gap-1.5 shadow-2xs">
-        <Bike className="size-3 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden="true" />
+      <span className="text-[11px] text-slate-600 font-medium inline-flex items-center gap-1.5 tabular-nums">
+        <i className="fa-solid fa-motorcycle text-slate-500 text-xs" aria-hidden="true" />
         <span>~{durationText} xe máy ({km} km)</span>
       </span>
     );
   }
 
   return (
-    <span className="text-[11px] text-slate-500 font-medium bg-slate-50 dark:bg-slate-900/60 px-3 py-1 rounded-full border border-slate-200/80 dark:border-slate-800 inline-flex items-center gap-1.5 shadow-2xs">
-      <Bike className="size-3 text-slate-400 shrink-0" aria-hidden="true" />
+    <span className="text-[11px] text-slate-400 font-medium inline-flex items-center gap-1.5">
+      <i className="fa-solid fa-route text-[10px]" aria-hidden="true" />
       <span>Di chuyển đến điểm tiếp theo</span>
     </span>
   );
 }
 
-function renderActivityPriceBadge(act: ItineraryActivity) {
-  const isFree =
-    act.estimatedCost === 0 ||
-    (act.priceRange?.min === 0 && (act.priceRange?.max === 0 || act.priceRange?.max == null));
+function renderTransitDeepLinks(transit: IntercityTransit) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 pt-2">
+      {transit.mode === 'FLIGHT' && (
+        <>
+          {transit.deepLinks?.googleFlights && (
+            <a
+              href={transit.deepLinks.googleFlights}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-[#F0F7FF] px-3 py-1.5 text-xs font-semibold text-[#10243A] hover:text-[#0194F3] transition-colors"
+            >
+              <i className="fa-solid fa-ticket text-xs" aria-hidden="true" />
+              <span>Google Flights</span>
+              <i className="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-60" aria-hidden="true" />
+            </a>
+          )}
+          {transit.deepLinks?.traveloka && (
+            <a
+              href={transit.deepLinks.traveloka}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#D0E7FF] bg-[#F5F9FF] hover:bg-[#F0F7FF] px-3 py-1.5 text-xs font-semibold text-[#0194F3] transition-colors"
+            >
+              <i className="fa-solid fa-plane text-xs" aria-hidden="true" />
+              <span>Đặt vé Traveloka</span>
+              <i className="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-60" aria-hidden="true" />
+            </a>
+          )}
+        </>
+      )}
 
-  const isDining = isDiningActivity(act.categoryName, act.placeName);
+      {transit.mode === 'TRAIN' && (
+        <>
+          {transit.deepLinks?.vexereTrain && (
+            <a
+              href={transit.deepLinks.vexereTrain}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#D0E7FF] bg-[#F5F9FF] hover:bg-[#F0F7FF] px-3 py-1.5 text-xs font-semibold text-[#0194F3] transition-colors"
+            >
+              <i className="fa-solid fa-ticket text-xs" aria-hidden="true" />
+              <span>Vé tàu VeXeRe</span>
+              <i className="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-60" aria-hidden="true" />
+            </a>
+          )}
+          {transit.deepLinks?.dsvn && (
+            <a
+              href={transit.deepLinks.dsvn}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-[#F0F7FF] px-3 py-1.5 text-xs font-semibold text-[#10243A] transition-colors"
+            >
+              <i className="fa-solid fa-train text-xs" aria-hidden="true" />
+              <span>Cổng ĐSVN</span>
+              <i className="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-60" aria-hidden="true" />
+            </a>
+          )}
+        </>
+      )}
 
+      {transit.mode === 'SLEEPER_BUS' && (
+        <>
+          {transit.deepLinks?.vexere && (
+            <a
+              href={transit.deepLinks.vexere}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[#D0E7FF] bg-[#F5F9FF] hover:bg-[#F0F7FF] px-3 py-1.5 text-xs font-semibold text-[#0194F3] transition-colors"
+            >
+              <i className="fa-solid fa-bus text-xs" aria-hidden="true" />
+              <span>Vé xe VeXeRe</span>
+              <i className="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-60" aria-hidden="true" />
+            </a>
+          )}
+          {transit.deepLinks?.traveloka && (
+            <a
+              href={transit.deepLinks.traveloka}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-[#F0F7FF] px-3 py-1.5 text-xs font-semibold text-[#10243A] transition-colors"
+            >
+              <i className="fa-solid fa-bus text-xs" aria-hidden="true" />
+              <span>Vé xe Traveloka</span>
+              <i className="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-60" aria-hidden="true" />
+            </a>
+          )}
+        </>
+      )}
 
-  if (isFree) {
-    return (
-      <span
-        title="Địa điểm tham quan mở cửa tự do, không thu phí vé vào cổng"
-        className="text-[10px] font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800/60 inline-flex items-center gap-1 shadow-2xs"
-      >
-        <Ticket className="size-3 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
-        <span>Miễn phí vé</span>
-      </span>
-    );
-  }
-
-  if (isDining) {
-    const costText =
-      act.estimatedCost != null && act.estimatedCost > 0
-        ? `~${formatVnd(act.estimatedCost)}/người`
-        : 'Theo thực đơn';
-    const rangeTooltip =
-      act.priceRange?.min != null && act.priceRange?.max != null && act.priceRange.max > 0
-        ? `Thực đơn cào được: ${formatVnd(act.priceRange.min)} – ${formatVnd(act.priceRange.max)}`
-        : 'Chi phí ước tính một suất ăn';
-
-    return (
-      <span
-        title={rangeTooltip}
-        className="text-[10px] font-bold text-amber-700 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300 px-2 py-0.5 rounded-md border border-amber-200 dark:border-amber-800/60 inline-flex items-center gap-1 shadow-2xs"
-      >
-        <UtensilsCrossed className="size-3 text-amber-600 dark:text-amber-400" aria-hidden="true" />
-        <span>{costText}</span>
-      </span>
-    );
-  }
-
-  // Attraction with ticket
-  if (act.estimatedCost != null && act.estimatedCost > 0) {
-    const rangeTooltip =
-      act.priceRange?.min != null && act.priceRange?.max != null && act.priceRange.max > act.priceRange.min
-        ? `Giá vé niêm yết: ${formatVnd(act.priceRange.min)} – ${formatVnd(act.priceRange.max)}`
-        : 'Giá vé tham quan tiêu chuẩn';
-
-    return (
-      <span
-        title={rangeTooltip}
-        className="text-[10px] font-bold text-rose-700 bg-rose-50 dark:bg-rose-950/40 dark:text-rose-300 px-2 py-0.5 rounded-md border border-rose-200 dark:border-rose-800/60 inline-flex items-center gap-1 shadow-2xs"
-      >
-        <Ticket className="size-3 text-rose-600 dark:text-rose-400" aria-hidden="true" />
-        <span>Vé: ~{formatVnd(act.estimatedCost)}</span>
-      </span>
-    );
-  }
-
-  if (act.priceLevel) {
-    return (
-      <span className="text-[10px] font-bold text-slate-700 bg-slate-50 dark:bg-slate-900/60 dark:text-slate-300 px-1.5 py-0.5 rounded-md border border-slate-200/80 dark:border-slate-800 inline-flex items-center gap-1">
-        <Banknote className="size-3 text-slate-500" aria-hidden="true" />
-        <span>{act.priceLevel === 'LOW' ? 'Tiết kiệm' : act.priceLevel === 'HIGH' ? 'Cao cấp' : 'Tiêu chuẩn'}</span>
-      </span>
-    );
-  }
-
-  return null;
+      {(transit.mode === 'PERSONAL_CAR' || transit.mode === 'PERSONAL_MOTORBIKE') &&
+        transit.deepLinks?.googleMaps && (
+          <a
+            href={transit.deepLinks.googleMaps}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-[#F0F7FF] px-3 py-1.5 text-xs font-semibold text-[#10243A] transition-colors"
+          >
+            <i className="fa-solid fa-map-location-dot text-xs text-[#0194F3]" aria-hidden="true" />
+            <span>Xem lộ trình Google Maps</span>
+            <i className="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-60" aria-hidden="true" />
+          </a>
+        )}
+    </div>
+  );
 }
 
-export default function ItineraryTimeline({
+const ItineraryTimeline = memo(function ItineraryTimeline({
   days,
   transit,
   destination,
   startDate,
-  endDate,
   selectedPlaceId,
   onSelectPlace,
   onHoverPlace,
@@ -307,12 +376,60 @@ export default function ItineraryTimeline({
   onAddPlace,
   onChangeTransitMode,
   isUpdatingTransitMode,
+  weatherData,
+  isCollapsibleDays = false,
+  isMemberOrOwner = false,
+  onEditStop,
+  onMoveStop,
+  movingStopId = null,
+  onProposeSwap,
+  onProposeNewForDay,
+  pendingProposalCountByStop,
+  onOpenVotingTab,
 }: Props) {
   const numbered = numberStops(days);
-  const modeConfig = transit ? getTransitModeConfig(transit) : null;
+  const setStoreHoveredPlaceId = useItineraryHoverStore((s) => s.setHoveredPlaceId);
+  const handleHoverPlace = onHoverPlace ?? setStoreHoveredPlaceId;
+
+  const [isTransitDetailsOpen, setIsTransitDetailsOpen] = useState(false);
   const [isEditTransitOpen, setIsEditTransitOpen] = useState(false);
   const [selectedTransitMode, setSelectedTransitMode] = useState<TransitMode>(transit?.mode || 'FLIGHT');
+  const [expandedWeatherGuidanceDay, setExpandedWeatherGuidanceDay] = useState<number | null>(null);
+  const [collapsedDays, setCollapsedDays] = useState<Record<number, boolean>>({});
+  const [openStopMenuKey, setOpenStopMenuKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!openStopMenuKey) return;
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('[data-stop-menu-root]')) return;
+      setOpenStopMenuKey(null);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setOpenStopMenuKey(null);
+      }
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [openStopMenuKey]);
+
   const targetCityName = destination || transit?.destName || '';
+  const transitVisual = transit ? getTransitVisualMeta(transit) : null;
+  const isLongMotorbikeWarning =
+    transit?.mode === 'PERSONAL_MOTORBIKE' &&
+    transit.distanceKm > TRANSIT_UI_CONFIG.MOTORBIKE_SAFETY_LIMIT_KM;
+
+  const weatherByDay = new Map<number, DayWeather>();
+  if (weatherData?.days) {
+    for (const dw of weatherData.days) {
+      weatherByDay.set(dw.dayNumber, dw);
+    }
+  }
 
   const handleConfirmChangeTransit = async () => {
     if (!onChangeTransitMode || !selectedTransitMode || selectedTransitMode === transit?.mode) {
@@ -323,475 +440,883 @@ export default function ItineraryTimeline({
     setIsEditTransitOpen(false);
   };
 
+  const toggleDayCollapsed = (dayNumber: number) => {
+    setCollapsedDays((prev) => ({ ...prev, [dayNumber]: !prev[dayNumber] }));
+  };
+
   return (
-    <div className="space-y-6">
-      {/* ─────────────────────────────────────────────────────────────────
-          INTERCITY TRANSIT CARD (Database-driven deep links)
-          ───────────────────────────────────────────────────────────────── */}
-      {transit && modeConfig && (
-        <div className="bg-card text-card-foreground rounded-2xl border border-border p-5 space-y-3.5 shadow-xs">
-          <div className="flex items-center justify-between text-xs flex-wrap gap-2">
-            <span className="font-bold text-foreground uppercase tracking-wider text-[11px] flex items-center gap-2">
-              {modeConfig.icon}
-              <span>{modeConfig.title}</span>
-            </span>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-muted-foreground bg-muted/60 px-2.5 py-1 rounded-full border border-border/60">
-                Ước tính: ~{formatVnd(transit.estimatedPriceRoundTrip)} / vé khứ hồi
-              </span>
+    <div className="space-y-5">
+      {/* Compact Intercity Transit Strip */}
+      {transit && transitVisual && (
+        <section
+          aria-label="Thông tin di chuyển liên tỉnh"
+          className={`rounded-2xl border bg-white overflow-hidden transition-colors ${
+            isLongMotorbikeWarning ? 'border-amber-300' : 'border-slate-200'
+          }`}
+        >
+          <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <div className="size-8 rounded-xl bg-[#F0F7FF] text-[#0194F3] flex items-center justify-center shrink-0">
+                <i className={`${transitVisual.iconClass} text-xs`} aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-1.5 font-bold text-[#10243A]">
+                  <span>{transitVisual.label}:</span>
+                  <span className="truncate">
+                    {cleanHubName(transit.originHub?.name || transit.originName)} →{' '}
+                    {cleanHubName(transit.destHub?.name || transit.destName)}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-500 tabular-nums">
+                  {transitVisual.summary}
+                  {' · '}
+                  Khứ hồi ~{formatVnd(transit.estimatedPriceRoundTrip)}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                aria-expanded={isTransitDetailsOpen}
+                onClick={() => setIsTransitDetailsOpen((v) => !v)}
+                className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-[11px] font-semibold text-slate-700 inline-flex items-center gap-1 cursor-pointer"
+              >
+                <span>{isTransitDetailsOpen ? 'Thu gọn' : 'Chi tiết chặng'}</span>
+                <i
+                  className={`fa-solid fa-chevron-down text-[9px] transition-transform ${
+                    isTransitDetailsOpen ? 'rotate-180' : ''
+                  }`}
+                  aria-hidden="true"
+                />
+              </button>
+
               {onChangeTransitMode && (
                 <button
                   type="button"
+                  disabled={isUpdatingTransitMode}
                   onClick={() => {
                     setSelectedTransitMode(transit.mode);
                     setIsEditTransitOpen(true);
                   }}
-                  disabled={isUpdatingTransitMode}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-sky-200 bg-sky-50 dark:border-sky-200 dark:bg-sky-950/40 text-[#0068B8] dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/50 font-semibold transition-colors cursor-pointer text-[11px] shadow-2xs"
+                  className="h-8 px-2.5 rounded-lg border border-[#D0E7FF] bg-[#F5F9FF] hover:bg-[#F0F7FF] text-[11px] font-bold text-[#0194F3] inline-flex items-center gap-1 cursor-pointer disabled:opacity-50"
                 >
                   {isUpdatingTransitMode ? (
-                    <>
-                      <Loader2 className="size-3 animate-spin text-[#0194F3] dark:text-sky-400" aria-hidden="true" />
-                      <span>Đang đổi...</span>
-                    </>
+                    <i className="fa-solid fa-circle-notch fa-spin text-[10px]" aria-hidden="true" />
                   ) : (
-                    <>
-                      <ArrowLeftRight className="size-3 text-[#0194F3] dark:text-sky-400" aria-hidden="true" />
-                      <span>Sửa phương tiện</span>
-                    </>
+                    <i className="fa-solid fa-right-left text-[10px]" aria-hidden="true" />
                   )}
+                  <span>Sửa phương tiện</span>
                 </button>
               )}
             </div>
           </div>
 
-          <div className="flex items-center justify-between py-1 text-xs">
-            <div>
-              <div className="text-sm font-bold text-foreground">
-                {cleanHubName(transit.originHub?.name || transit.originName)}
-              </div>
-              <div className="text-[11px] text-muted-foreground">
-                {modeConfig.departLabel}
-              </div>
+          {isLongMotorbikeWarning && (
+            <div className="px-4 py-2 bg-amber-50 border-t border-amber-200 text-[11px] text-amber-800 font-medium flex items-center gap-2">
+              <i className="fa-solid fa-triangle-exclamation text-amber-500 shrink-0" aria-hidden="true" />
+              <span>
+                Cự ly trên {TRANSIT_UI_CONFIG.MOTORBIKE_SAFETY_LIMIT_KM} km — cân nhắc máy bay, tàu hỏa hoặc xe khách để đảm bảo sức khỏe.
+              </span>
             </div>
+          )}
 
-            <div className="flex-1 px-4 text-center">
-              <div className="text-[11px] text-primary font-semibold">
-                {modeConfig.distanceSummary}
-                {transit.details?.carriers ? ` • ${transit.details.carriers}` : ''}
-              </div>
-              <div className="w-full h-px bg-border my-1" />
-              <div className="text-[11px] text-muted-foreground">
-                {transit.destHub
-                  ? `Trung chuyển về trung tâm ${targetCityName}${transit.destHub.distanceKm ? ` (~${transit.destHub.distanceKm}km)` : ''}`
-                  : `Đến trung tâm ${targetCityName}`}
-              </div>
+          {isTransitDetailsOpen && (
+            <div className="px-4 pb-4 pt-2 border-t border-slate-100 space-y-2 bg-slate-50/40">
+              <TransitRouteBreakdown transit={transit} destCity={targetCityName} />
+              {renderTransitDeepLinks(transit)}
             </div>
-
-            <div className="text-right">
-              <div className="text-sm font-bold text-foreground">
-                {cleanHubName(transit.destHub?.name || transit.destName)}
-              </div>
-              <div className="text-[11px] text-muted-foreground">
-                {modeConfig.arriveLabel}
-              </div>
-            </div>
-          </div>
-
-          {/* Full Route & Transfer Breakdown (Multi-Modal + Local Airport/Station Transfer + Safety Alerts) */}
-          <TransitRouteBreakdown transit={transit} destCity={targetCityName} />
-
-          {/* Mode-Specific Booking & Routing Buttons (No Emojis, Clean UI/UX) */}
-          <div className="pt-2.5 border-t border-border/80 flex items-center justify-between text-xs flex-wrap gap-2">
-            <span className="text-muted-foreground text-[11px]">Giá biến động theo ngày di chuyển thực tế</span>
-            <div className="flex items-center gap-2 flex-wrap">
-              {transit.mode === 'FLIGHT' && (
-                <>
-                  {transit.deepLinks?.googleFlights && (
-                    <a
-                      href={transit.deepLinks.googleFlights}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label="Đặt vé qua Google Flights"
-                      className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-background hover:bg-muted/70 px-3 py-1.5 text-foreground font-semibold transition-colors cursor-pointer text-xs shadow-2xs"
-                    >
-                      <Ticket className="size-3.5 text-muted-foreground" aria-hidden="true" />
-                      <span>Đặt vé Google Flights</span>
-                      <ExternalLink className="size-3 opacity-60" aria-hidden="true" />
-                    </a>
-                  )}
-                  {transit.deepLinks?.traveloka && (
-                    <a
-                      href={transit.deepLinks.traveloka}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label="Đặt vé máy bay qua Traveloka"
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-sky-50 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/40 px-3 py-1.5 font-semibold transition-colors cursor-pointer text-xs shadow-2xs"
-                    >
-                      <Plane className="size-3.5 text-sky-600 dark:text-sky-400" aria-hidden="true" />
-                      <span>Đặt vé Traveloka</span>
-                      <ExternalLink className="size-3 opacity-60" aria-hidden="true" />
-                    </a>
-                  )}
-                </>
-              )}
-
-              {transit.mode === 'TRAIN' && (
-                <>
-                  {transit.deepLinks?.vexereTrain && (
-                    <a
-                      href={transit.deepLinks.vexereTrain}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label="Đặt vé tàu hỏa qua VeXeRe"
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-sky-50 text-sky-900 dark:bg-sky-950/40 dark:text-sky-300 border border-sky-200 dark:border-sky-200 hover:bg-sky-100 dark:hover:bg-sky-900/50 px-3 py-1.5 font-semibold transition-colors cursor-pointer text-xs shadow-2xs"
-                    >
-                      <Ticket className="size-3.5 text-[#0194F3] dark:text-sky-400" aria-hidden="true" />
-                      <span>Vé tàu VeXeRe</span>
-                      <ExternalLink className="size-3 opacity-60" aria-hidden="true" />
-                    </a>
-                  )}
-                  {transit.deepLinks?.dsvn && (
-                    <a
-                      href={transit.deepLinks.dsvn}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label="Cổng đặt vé chính thức ĐSVN"
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 text-rose-800 dark:bg-rose-950/40 dark:text-rose-300 border border-rose-200 dark:border-rose-800 hover:bg-rose-100 dark:hover:bg-rose-900/40 px-3 py-1.5 font-semibold transition-colors cursor-pointer text-xs shadow-2xs"
-                    >
-                      <TrainFront className="size-3.5 text-rose-600 dark:text-rose-400" aria-hidden="true" />
-                      <span>Cổng ĐSVN (dsvn.vn)</span>
-                      <ExternalLink className="size-3 opacity-60" aria-hidden="true" />
-                    </a>
-                  )}
-                </>
-              )}
-
-              {transit.mode === 'SLEEPER_BUS' && (
-                <>
-                  {transit.deepLinks?.vexere && (
-                    <a
-                      href={transit.deepLinks.vexere}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label="Đặt vé xe khách qua VeXeRe"
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-sky-50 text-sky-900 dark:bg-sky-950/40 dark:text-sky-300 border border-sky-200 dark:border-sky-200 hover:bg-sky-100 dark:hover:bg-sky-900/50 px-3 py-1.5 font-semibold transition-colors cursor-pointer text-xs shadow-2xs"
-                    >
-                      <Bus className="size-3.5 text-[#0194F3] dark:text-sky-400" aria-hidden="true" />
-                      <span>Đặt vé VeXeRe</span>
-                      <ExternalLink className="size-3 opacity-60" aria-hidden="true" />
-                    </a>
-                  )}
-                  {transit.deepLinks?.traveloka && (
-                    <a
-                      href={transit.deepLinks.traveloka}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label="Đặt vé xe khách qua Traveloka"
-                      className="inline-flex items-center gap-1.5 rounded-lg bg-sky-50 text-sky-800 dark:bg-sky-950/40 dark:text-sky-300 border border-sky-200 dark:border-sky-800 hover:bg-sky-100 dark:hover:bg-sky-900/40 px-3 py-1.5 font-semibold transition-colors cursor-pointer text-xs shadow-2xs"
-                    >
-                      <Bus className="size-3.5 text-sky-600 dark:text-sky-400" aria-hidden="true" />
-                      <span>Vé xe Traveloka</span>
-                      <ExternalLink className="size-3 opacity-60" aria-hidden="true" />
-                    </a>
-                  )}
-                </>
-              )}
-
-              {(transit.mode === 'PERSONAL_CAR' || transit.mode === 'PERSONAL_MOTORBIKE') && (
-                transit.deepLinks?.googleMaps && (
-                  <a
-                    href={transit.deepLinks.googleMaps}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="Xem lộ trình trên Google Maps"
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 px-3 py-1.5 font-semibold transition-colors cursor-pointer text-xs shadow-2xs"
-                  >
-                    <MapPin className="size-3.5 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
-                    <span>Xem lộ trình Google Maps</span>
-                    <ExternalLink className="size-3 opacity-60" aria-hidden="true" />
-                  </a>
-                )
-              )}
-            </div>
-          </div>
-        </div>
+          )}
+        </section>
       )}
 
-      {/* Modal Dialog for Changing Transit Mode */}
-      {isEditTransitOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-card text-card-foreground rounded-2xl border border-border p-5 shadow-2xl max-w-md w-full space-y-4 animate-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center gap-2">
-                <div className="size-8 rounded-xl bg-sky-100 text-[#0068B8] dark:bg-sky-950/40 dark:text-sky-300 flex items-center justify-center">
-                  <ArrowLeftRight className="size-4" aria-hidden="true" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-foreground">Sửa phương tiện di chuyển</h3>
-                  <p className="text-[11px] text-muted-foreground">Chọn phương tiện cho chặng hành trình liên tỉnh</p>
-                </div>
+      {/* Modal for Changing Transit Mode */}
+      <AppModalPortal
+        open={isEditTransitOpen}
+        onClose={() => setIsEditTransitOpen(false)}
+        ariaLabelledBy="edit-transit-mode-title"
+        maxWidthClass="max-w-md"
+        disableClose={Boolean(isUpdatingTransitMode)}
+        mobileBottomSheet
+      >
+        <div className="p-5 space-y-4">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="size-8 rounded-xl bg-[#F0F7FF] text-[#0194F3] flex items-center justify-center">
+                <i className="fa-solid fa-right-left text-xs" aria-hidden="true" />
               </div>
-              <button
-                type="button"
-                onClick={() => setIsEditTransitOpen(false)}
-                className="size-7 rounded-lg hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-              >
-                <X className="size-4" aria-hidden="true" />
-              </button>
+              <div>
+                <h3 id="edit-transit-mode-title" className="text-sm font-bold text-[#10243A]">
+                  Sửa phương tiện di chuyển
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Chọn phương tiện cho chặng hành trình liên tỉnh
+                </p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setIsEditTransitOpen(false)}
+              aria-label="Đóng hộp thoại"
+              className="size-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+            >
+              <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
+            </button>
+          </div>
 
-            <div className="space-y-2">
-              {TRANSIT_MODE_OPTIONS.map((opt) => {
-                const isSelected = selectedTransitMode === opt.mode;
-                return (
-                  <button
-                    key={opt.mode}
-                    type="button"
-                    onClick={() => setSelectedTransitMode(opt.mode)}
-                    className={`w-full p-3 rounded-xl border text-left transition-all flex items-start gap-3 cursor-pointer ${
-                      isSelected
-                        ? 'border-[#0194F3] bg-sky-50/70 dark:bg-sky-950/40 shadow-xs ring-1 ring-[#0194F3]/20'
-                        : 'border-border hover:bg-muted/60'
-                    }`}
-                  >
-                    <div className="mt-0.5 p-1.5 rounded-lg bg-background border border-border/80 shrink-0">
-                      {opt.icon()}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <span className={`text-xs font-bold ${isSelected ? 'text-sky-950 dark:text-sky-900' : 'text-foreground'}`}>
-                          {opt.title}
+          <div className="space-y-2">
+            {TRANSIT_MODE_OPTIONS.map((opt) => {
+              const isSelected = selectedTransitMode === opt.mode;
+              return (
+                <button
+                  key={opt.mode}
+                  type="button"
+                  onClick={() => setSelectedTransitMode(opt.mode)}
+                  className={`w-full p-3 rounded-xl border text-left transition-colors flex items-start gap-3 cursor-pointer ${
+                    isSelected
+                      ? 'border-[#0194F3] bg-[#F5F9FF]'
+                      : 'border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="mt-0.5 size-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[#0194F3] shrink-0">
+                    <i className={`${opt.iconClass} text-xs`} aria-hidden="true" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-[#10243A]">{opt.title}</span>
+                      {isSelected && (
+                        <span className="size-4 rounded-full bg-[#0194F3] text-white flex items-center justify-center">
+                          <i className="fa-solid fa-check text-[9px]" aria-hidden="true" />
                         </span>
-                        {isSelected && (
-                          <span className="size-4 rounded-full bg-[#0068B8] text-white flex items-center justify-center">
-                            <Check className="size-2.5" />
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                        {opt.desc}
-                      </p>
+                      )}
                     </div>
-                  </button>
-                );
-              })}
-            </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{opt.desc}</p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
 
-            <div className="pt-3 border-t border-border flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setIsEditTransitOpen(false)}
-                disabled={isUpdatingTransitMode}
-                className="px-3.5 py-1.5 rounded-xl border border-border bg-background hover:bg-muted text-foreground text-xs font-semibold transition-colors cursor-pointer"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmChangeTransit}
-                disabled={isUpdatingTransitMode || selectedTransitMode === transit?.mode}
-                className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-[#0068B8] hover:bg-[#00569C] text-white text-xs font-bold shadow-xs transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isUpdatingTransitMode ? (
-                  <>
-                    <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                    <span>Đang cập nhật...</span>
-                  </>
-                ) : (
-                  <span>Xác nhận đổi</span>
-                )}
-              </button>
-            </div>
+          <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setIsEditTransitOpen(false)}
+              disabled={isUpdatingTransitMode}
+              className="h-9 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmChangeTransit}
+              disabled={isUpdatingTransitMode || selectedTransitMode === transit?.mode}
+              className="h-9 px-4 rounded-xl bg-[#0194F3] hover:bg-[#007AD0] text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              {isUpdatingTransitMode ? (
+                <>
+                  <i className="fa-solid fa-circle-notch fa-spin text-xs" aria-hidden="true" />
+                  <span>Đang cập nhật...</span>
+                </>
+              ) : (
+                <span>Xác nhận đổi</span>
+              )}
+            </button>
           </div>
         </div>
-      )}
+      </AppModalPortal>
 
-      {/* ─────────────────────────────────────────────────────────────────
-          SCHEDULE BY DAY (Matches Figma Prompt Screen 2 Item 6)
-          ───────────────────────────────────────────────────────────────── */}
+      {/* Daily Itinerary Schedule */}
       {numbered.map((day, dIdx) => {
         const dayColor = getDayColor(day.dayNumber);
+        const dayWeather = weatherByDay.get(day.dayNumber);
+        const weatherTheme = dayWeather ? WEATHER_THEMES[dayWeather.condition] : null;
+        const isWeatherGuidanceOpen = expandedWeatherGuidanceDay === day.dayNumber;
+        const isCollapsed = isCollapsibleDays && Boolean(collapsedDays[day.dayNumber]);
+
+        const isRainAlert = dayWeather?.condition === 'RAINY';
+
         return (
-          <div key={day.dayNumber} className="space-y-4">
-            {/* Day Section Header */}
-            <div className="flex items-center justify-between pt-2">
-              <div className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                <span className="size-2.5 rounded-full shrink-0 shadow-xs" style={{ backgroundColor: dayColor }} />
-                <span>
-                  Ngày {day.dayNumber}: {formatDayFullDate(startDate, dIdx)}
-                </span>
+          <section key={day.dayNumber} aria-label={`Lịch trình Ngày ${day.dayNumber}`} className="space-y-3">
+            {/* Day Header + Option A Weather Pill (Stacks vertically on mobile < 640px so long titles never squeeze) */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 border-b border-slate-200/80 pt-1">
+              <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 sm:flex-1">
+                {isCollapsibleDays ? (
+                  <button
+                    type="button"
+                    aria-expanded={!isCollapsed}
+                    aria-label={`${isCollapsed ? 'Mở rộng' : 'Thu gọn'} Ngày ${day.dayNumber}`}
+                    onClick={() => toggleDayCollapsed(day.dayNumber)}
+                    className="size-11 -ml-2 sm:size-7 sm:ml-0 flex items-center justify-center shrink-0 cursor-pointer group/collapse"
+                  >
+                    <span
+                      className="size-7 rounded-lg text-white text-xs font-bold flex items-center justify-center tabular-nums group-hover/collapse:opacity-90"
+                      style={{ backgroundColor: dayColor }}
+                    >
+                      {day.dayNumber}
+                    </span>
+                  </button>
+                ) : (
+                  <span
+                    className="size-7 rounded-lg text-white text-xs font-bold flex items-center justify-center tabular-nums shrink-0"
+                    style={{ backgroundColor: dayColor }}
+                  >
+                    {day.dayNumber}
+                  </span>
+                )}
+
+                <div className="min-w-0">
+                  {isCollapsibleDays ? (
+                    <button
+                      type="button"
+                      aria-expanded={!isCollapsed}
+                      onClick={() => toggleDayCollapsed(day.dayNumber)}
+                      className="text-left inline-flex items-center gap-1.5 text-sm sm:text-base font-bold text-slate-900 hover:text-[#0194F3] leading-snug cursor-pointer transition-colors max-w-full tracking-tight"
+                    >
+                      <span className="break-words">
+                        Ngày {day.dayNumber}
+                        {day.theme && day.theme.trim().toLowerCase() !== `ngày ${day.dayNumber}`.toLowerCase()
+                          ? `: ${day.theme}`
+                          : ''}
+                      </span>
+                      <i
+                        className={`fa-solid fa-chevron-down text-[10px] text-slate-400 shrink-0 transition-transform ${
+                          isCollapsed ? '-rotate-90' : ''
+                        }`}
+                        aria-hidden="true"
+                      />
+                    </button>
+                  ) : (
+                    <h2 className="text-sm sm:text-base font-bold text-slate-900 leading-snug break-words tracking-tight">
+                      Ngày {day.dayNumber}
+                      {day.theme && day.theme.trim().toLowerCase() !== `ngày ${day.dayNumber}`.toLowerCase()
+                        ? `: ${day.theme}`
+                        : ''}
+                    </h2>
+                  )}
+                  <p className="text-xs text-slate-500 tabular-nums font-medium">
+                    {formatDayFullDate(startDate, dIdx)} · {day.activities.length} điểm dừng
+                  </p>
+                </div>
               </div>
-              <div
-                className="text-xs font-bold px-2.5 py-0.5 rounded-full border shadow-2xs"
-                style={{
-                  color: dayColor,
-                  backgroundColor: `${dayColor}15`,
-                  borderColor: `${dayColor}40`,
-                }}
-              >
-                {day.activities.length} điểm dừng
-              </div>
+
+              {/* Option A Per-Day Weather Pill */}
+              {dayWeather && weatherTheme && (
+                <button
+                  type="button"
+                  aria-expanded={isWeatherGuidanceOpen}
+                  onClick={() =>
+                    setExpandedWeatherGuidanceDay((curr) =>
+                      curr === day.dayNumber ? null : day.dayNumber,
+                    )
+                  }
+                  className="self-start sm:self-auto max-w-full inline-flex items-center gap-1.5 px-2.5 min-h-[40px] sm:min-h-[32px] py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/90 text-xs text-slate-700 transition-colors cursor-pointer shrink-0 tabular-nums"
+                  title="Nhấn để xem gợi ý thời tiết ngày này"
+                >
+                  <WeatherIcon
+                    condition={dayWeather.condition}
+                    weatherCode={dayWeather.weatherCode}
+                    size={16}
+                    className="w-4 h-4 object-contain shrink-0"
+                  />
+                  <span className="font-semibold text-slate-900">
+                    {Math.round(dayWeather.tempMinC)}°–{Math.round(dayWeather.tempMaxC)}°C
+                  </span>
+                  <span className="text-slate-300" aria-hidden="true">
+                    ·
+                  </span>
+                  <span className={isRainAlert ? 'text-sky-700 font-semibold' : 'text-slate-600'}>
+                    {dayWeather.labelVi}
+                  </span>
+                  {dayWeather.source === 'SEASONAL_AVERAGE' && (
+                    <span className="text-[11px] text-slate-500">(Theo mùa)</span>
+                  )}
+                  <i
+                    className={`fa-solid ${
+                      isWeatherGuidanceOpen ? 'fa-chevron-up' : 'fa-chevron-down'
+                    } text-[10px] text-slate-400 ml-0.5`}
+                    aria-hidden="true"
+                  />
+                </button>
+              )}
             </div>
 
-            {day.activities.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-6 text-center text-xs text-slate-500">
-                Chưa có dữ liệu địa điểm cho ngày này.
-              </div>
-            ) : (
-              day.activities.map((act, idx) => {
-                const isLast = idx === day.activities.length - 1;
-                const imageUrl =
-                  act.imageUrl ||
-                  'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?auto=format&fit=crop&w=400&q=80';
+            {isWeatherGuidanceOpen && dayWeather && weatherTheme && (() => {
+              const dayAdvice = getDayWeatherAdvice(dayWeather);
+              return (
+                <div
+                  className={`rounded-2xl p-3.5 text-xs border space-y-2.5 transition-all ${
+                    dayAdvice.isHighRain
+                      ? 'bg-sky-50/70 border-sky-200/80 text-sky-950'
+                      : dayAdvice.isHeatOrHighUv
+                      ? 'bg-amber-50/60 border-amber-200/80 text-amber-950'
+                      : dayAdvice.isCold
+                      ? 'bg-indigo-50/60 border-indigo-200/80 text-indigo-950'
+                      : 'bg-slate-50/80 border-slate-200/90 text-slate-800'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="inline-flex items-center gap-2">
+                      <WeatherIcon
+                        condition={dayWeather.condition}
+                        weatherCode={dayWeather.weatherCode}
+                        size={18}
+                        className="w-4.5 h-4.5 object-contain shrink-0"
+                      />
+                      <span className="font-bold text-slate-900">
+                        {dayWeather.labelVi}
+                      </span>
+                      <span className="text-slate-400">·</span>
+                      <span className="font-semibold text-slate-700">
+                        {Math.round(dayWeather.tempMinC)}°–{Math.round(dayWeather.tempMaxC)}°C
+                      </span>
+                    </div>
 
-                const isSelected = act.placeId === selectedPlaceId;
-
-                return (
-                  <div key={act.placeId + idx} className="space-y-3">
-                    {/* Destination Card matching Figma Prompt */}
-                    <div
-                      id={`itinerary-activity-${act.placeId}`}
-                      onClick={() => onSelectPlace?.(act.placeId)}
-                      onMouseEnter={() => onHoverPlace?.(act.placeId)}
-                      onMouseLeave={() => onHoverPlace?.(null)}
-                      className={`bg-white rounded-2xl border transition-all p-4 flex flex-col sm:flex-row gap-4 group cursor-pointer ${
-                        isSelected
-                          ? 'ring-2 shadow-md'
-                          : 'border-slate-200/90 hover:shadow-xs'
-                      }`}
-                      style={isSelected ? { borderColor: dayColor, boxShadow: `0 0 0 2px ${dayColor}33` } : {}}
-                    >
-                      {/* Left: Thumbnail with Number badge */}
-                      <div className="relative size-20 sm:size-24 rounded-xl overflow-hidden bg-slate-100 shrink-0">
-                        <img
-                          src={imageUrl}
-                          alt={act.placeName}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {dayWeather.precipitationProbabilityMax != null && (
                         <span
-                          className="absolute top-1.5 left-1.5 size-6 rounded-full text-white font-bold text-xs flex items-center justify-center shadow-xs"
-                          style={{ backgroundColor: dayColor }}
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                            dayAdvice.isHighRain
+                              ? 'bg-sky-100/80 text-sky-800 border-sky-300/80'
+                              : 'bg-white/90 text-slate-600 border-slate-200/80'
+                          }`}
                         >
-                          {act.stopNumber}
+                          <i className="fa-solid fa-cloud-showers-heavy text-[10px]" aria-hidden="true" />
+                          <span>Mưa {dayWeather.precipitationProbabilityMax}%</span>
                         </span>
-                      </div>
+                      )}
 
-                    {/* Middle: Details */}
-                    <div className="flex-1 space-y-1.5 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-[11px] font-bold text-[#0068B8] bg-sky-50 px-2 py-0.5 rounded-md border border-sky-200/60">
-                              {act.startTime || '08:30'} – {act.endTime || '10:00'} (
-                              {act.durationMinutes || 90} phút)
-                            </span>
-                            <span className="text-[11px] font-medium text-slate-500">
-                              {act.categoryName || 'Tham quan'}
-                            </span>
-                            {renderActivityPriceBadge(act)}
-                          </div>
-                          <h3 className="text-sm font-bold text-slate-900 mt-1 truncate">
-                            {act.placeName}
-                          </h3>
-                        </div>
-
-                        {/* Action Buttons: [Đổi điểm] [Xóa] */}
-                        {(Boolean(onSwapPlace) || Boolean(onDeletePlace)) && (
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            {onSwapPlace && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onSwapPlace(act.placeId, act);
-                                }}
-                                title="Đổi điểm tham quan hoặc quán ăn khác"
-                                className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white hover:bg-sky-50 hover:border-[#0194F3] hover:text-[#0068B8] px-2.5 py-1 text-[11px] font-bold text-slate-700 transition-all cursor-pointer shadow-2xs"
-                              >
-                                <Sparkles className="size-3 text-[#0194F3]" aria-hidden="true" />
-                                <span>Đổi điểm</span>
-                              </button>
-                            )}
-                            {onDeletePlace && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onDeletePlace(act.placeId);
-                                }}
-                                title="Xóa điểm này khỏi lịch trình"
-                                className="size-7 rounded-lg border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-300 hover:text-rose-600 text-slate-400 flex items-center justify-center transition-all cursor-pointer shadow-2xs"
-                              >
-                                <Trash2 className="size-3.5" aria-hidden="true" />
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Dynamic Rating & Reviews & Hours */}
-                      <div className="flex items-center gap-3 text-[11px] flex-wrap">
-                        <div className="flex items-center gap-1 text-amber-500 font-bold">
-                          <Star className="size-3.5 fill-amber-400 text-amber-400" aria-hidden="true" />
-                          <span>{(act.ratingAvg || 4.7).toFixed(1)}</span>
-                          <span className="text-slate-400 font-normal">
-                            ({act.reviewCount && act.reviewCount > 999 ? `${(act.reviewCount / 1000).toFixed(1)}k` : act.reviewCount || 120} đánh giá)
-                          </span>
-                        </div>
-                        <span className="text-slate-300">•</span>
-                        <span className="text-emerald-700 font-medium text-[11px] inline-flex items-center gap-1">
-                          <Check className="size-3 text-emerald-600" aria-hidden="true" />
-                          <span>Đang mở cửa</span>
+                      {dayWeather.uvIndexMax != null && dayWeather.uvIndexMax > 0 && (
+                        <span
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${
+                            dayAdvice.isHeatOrHighUv
+                              ? 'bg-amber-100/80 text-amber-900 border-amber-300/80'
+                              : 'bg-white/90 text-slate-600 border-slate-200/80'
+                          }`}
+                        >
+                          <i className="fa-solid fa-sun text-[10px]" aria-hidden="true" />
+                          <span>UV {dayWeather.uvIndexMax}</span>
                         </span>
-                      </div>
+                      )}
 
-                      {/* AI Tip Callout Box */}
-                      <div className="rounded-xl bg-amber-50/70 border border-amber-200/60 p-2 text-[11px] text-slate-700 flex items-start gap-1.5 leading-relaxed">
-                        <Lightbulb className="size-3.5 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
-                        <span>
-                          <strong>Mẹo AI:</strong>{' '}
-                          {act.notes ||
-                            'Nên ghé mua vé tham quan quần thể di sản để vào thăm các công trình kiến trúc cổ kính.'}
+                      {dayWeather.source === 'SEASONAL_AVERAGE' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-white/90 text-slate-500 border border-slate-200/80">
+                          <i className="fa-regular fa-calendar text-[10px]" aria-hidden="true" />
+                          <span>Khí hậu mùa</span>
                         </span>
-                      </div>
-
-                      {act.address && (
-                        <div className="text-[11px] text-slate-400 truncate flex items-center gap-1">
-                          <MapPin className="size-3 text-slate-400 shrink-0" aria-hidden="true" />
-                          <span className="truncate">{act.address}</span>
-                        </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Discrete Transit Connector between stops */}
-                  {!isLast && (
-                    <div className="pl-8 border-l-2 border-dashed border-sky-300 ml-5 py-1">
-                      {renderIntracityTransitConnector(act)}
-                    </div>
-                  )}
+                  <p className="text-xs text-slate-600 leading-relaxed flex items-start gap-2 pt-1 border-t border-slate-200/50">
+                    <i className="fa-regular fa-lightbulb text-amber-500 text-xs shrink-0 mt-0.5" aria-hidden="true" />
+                    <span>{dayAdvice.advice}</span>
+                  </p>
                 </div>
               );
-            })
-          )}
+            })()}
 
-          {/* Add Stop Button for this Day */}
-          {onAddPlace && (
-            <div className="pt-1">
+            {isCollapsed ? (
               <button
                 type="button"
-                onClick={() => onAddPlace(day.dayNumber)}
-                className="w-full py-2.5 rounded-xl border border-dashed border-slate-300 hover:border-[#0194F3] hover:bg-sky-50/40 text-slate-600 hover:text-[#0068B8] text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                onClick={() => toggleDayCollapsed(day.dayNumber)}
+                className="w-full py-2.5 rounded-xl border border-slate-200/80 bg-white text-xs font-semibold text-slate-600 hover:text-[#0194F3] hover:border-[#0194F3]/30 transition-colors cursor-pointer"
               >
-                <Plus className="size-4" />
-                <span>Thêm địa điểm vào Ngày {day.dayNumber}</span>
+                Đang thu gọn {day.activities.length} điểm dừng · Bấm để mở lại
               </button>
-            </div>
-          )}
-        </div>
-      );
-    })}
+            ) : (
+              <>
+                {day.activities.length === 0 ? (
+                  <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center space-y-2.5">
+                    <div className="size-10 rounded-xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
+                      <i className="fa-regular fa-calendar-plus text-base" aria-hidden="true" />
+                    </div>
+                    <h3 className="text-sm font-semibold text-slate-900">
+                      Ngày {day.dayNumber} chưa có điểm dừng
+                    </h3>
+                    <p className="text-xs text-slate-500 max-w-xs mx-auto">
+                      Chọn địa điểm tham quan hoặc quán ăn phù hợp cho ngày này.
+                    </p>
+                    {(Boolean(onAddPlace) || Boolean(isMemberOrOwner && onProposeNewForDay)) && (
+                      <div className="pt-1 flex flex-wrap items-center justify-center gap-2">
+                        {onAddPlace && (
+                          <button
+                            type="button"
+                            onClick={() => onAddPlace(day.dayNumber)}
+                            className="min-h-[40px] px-4 rounded-xl bg-[#0194F3] hover:bg-[#007FE3] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <i className="fa-solid fa-plus" aria-hidden="true" />
+                            <span>Thêm địa điểm vào Ngày {day.dayNumber}</span>
+                          </button>
+                        )}
+                        {!onAddPlace && isMemberOrOwner && onProposeNewForDay && (
+                          <button
+                            type="button"
+                            onClick={() => onProposeNewForDay(day.dayNumber)}
+                            className="min-h-[40px] px-4 rounded-xl bg-[#0194F3] hover:bg-[#007FE3] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <i className="fa-solid fa-check-to-slot" aria-hidden="true" />
+                            <span>Đề xuất địa điểm cho Ngày {day.dayNumber}</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {day.activities.map((act, idx) => {
+                      const isFirst = idx === 0;
+                      const isLast = idx === day.activities.length - 1;
+                      const isLastMultiStop = day.activities.length > 1 && isLast;
+                      const imageUrl = act.thumbnailUrl || act.imageUrl || null;
+                      const isSelected = act.placeId === selectedPlaceId;
+                      const costInfo = formatStopCostText(act);
+                      const stopVotesCount = act.id ? (pendingProposalCountByStop?.[act.id] ?? 0) : 0;
+                      const isMoving = Boolean(act.id && movingStopId === act.id);
+                      const stopKey = act.id || `${day.dayNumber}-${act.placeId}-${idx}`;
+                      const menuOpen = openStopMenuKey === stopKey;
+
+                      const canEditCard =
+                        Boolean(onEditStop) ||
+                        Boolean(onSwapPlace) ||
+                        Boolean(onDeletePlace) ||
+                        Boolean(onMoveStop && act.id);
+                      const hasOverflowItems =
+                        Boolean(onMoveStop && act.id) ||
+                        Boolean(onDeletePlace) ||
+                        Boolean(isMemberOrOwner && onProposeSwap);
+                      const hasBottomActionBar =
+                        canEditCard || Boolean(isMemberOrOwner && onProposeSwap);
+                      const hasOpeningBadge = Boolean(
+                        act.openingStatus &&
+                          (act.openingStatus.label || act.openingStatus.state !== 'UNKNOWN'),
+                      );
+
+                      return (
+                        <div key={stopKey}>
+                          {/* Stop Card Matched to Demo v2.3 */}
+                          <article
+                            id={`itinerary-activity-${act.placeId}`}
+                            onClick={() => onSelectPlace?.(act.placeId)}
+                            onMouseEnter={() => handleHoverPlace(act.placeId)}
+                            onMouseLeave={() => handleHoverPlace(null)}
+                            className={`group bg-white rounded-2xl border p-3.5 sm:p-4 transition-colors cursor-pointer space-y-2.5 ${
+                              isSelected
+                                ? 'border-[#0194F3] ring-2 ring-[#0194F3]/15 shadow-sm'
+                                : 'border-slate-200/80 shadow-[0_2px_12px_-2px_rgba(15,23,42,0.04),0_1px_3px_0_rgba(15,23,42,0.03)] hover:border-slate-300'
+                            }`}
+                            style={
+                              isSelected
+                                ? { borderColor: dayColor, boxShadow: `0 0 0 2px ${dayColor}26` }
+                                : undefined
+                            }
+                          >
+                            {/* Top Row: Thumbnail (72px / 84px) + Time/Category/Cost + Title + Facts */}
+                            <div className="flex items-start gap-3 sm:gap-3.5">
+                              <div className="relative size-[72px] sm:size-[84px] rounded-xl overflow-hidden bg-slate-100 shrink-0 flex items-center justify-center">
+                                {imageUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={imageUrl}
+                                    alt={act.placeName}
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <i className="fa-solid fa-location-dot text-slate-400 text-lg" aria-hidden="true" />
+                                )}
+                                <span
+                                  className="absolute top-1.5 left-1.5 size-5 rounded-md text-white text-[11px] font-bold flex items-center justify-center shadow-xs tabular-nums"
+                                  style={{ backgroundColor: dayColor }}
+                                >
+                                  {act.stopNumber}
+                                </span>
+                              </div>
+
+                              <div className="flex-1 min-w-0 space-y-1.5">
+                                <div className="flex items-center justify-between gap-2 text-xs">
+                                  <div className="flex items-center gap-1.5 min-w-0 truncate">
+                                    <span className="inline-flex items-center gap-1 font-semibold text-slate-600 tabular-nums shrink-0">
+                                      <i
+                                        className="fa-regular fa-clock text-[10px] text-[#0194F3]"
+                                        aria-hidden="true"
+                                      />
+                                      <span>
+                                        {act.startTime || '08:30'} – {act.endTime || '10:00'}
+                                      </span>
+                                    </span>
+                                    <span className="text-slate-300 shrink-0" aria-hidden="true">
+                                      ·
+                                    </span>
+                                    <span className="text-slate-500 truncate">
+                                      {act.categoryName || 'Tham quan'}
+                                    </span>
+                                  </div>
+
+                                  {costInfo && (
+                                    <span
+                                      title={costInfo.title}
+                                      className={`shrink-0 tabular-nums ${
+                                        act.estimatedCost === 0
+                                          ? 'font-medium text-emerald-700'
+                                          : 'font-semibold text-slate-800'
+                                      }`}
+                                    >
+                                      {costInfo.desktopPrefix && (
+                                        <span className="hidden sm:inline">{costInfo.desktopPrefix}</span>
+                                      )}
+                                      <span>{costInfo.main}</span>
+                                      {costInfo.desktopSuffix && (
+                                        <span className="hidden sm:inline">{costInfo.desktopSuffix}</span>
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
+
+                                <h3 className="text-[14.5px] sm:text-[15px] font-semibold text-slate-900 leading-snug group-hover:text-[#0194F3] transition-colors break-words">
+                                  {act.placeName}
+                                </h3>
+
+                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
+                                  {act.ratingAvg != null && act.ratingAvg > 0 ? (
+                                    <span className="inline-flex items-center gap-1 font-medium text-slate-700 tabular-nums">
+                                      <i className="fa-solid fa-star text-amber-400 text-[10px]" aria-hidden="true" />
+                                      <span>{act.ratingAvg.toFixed(1)}</span>
+                                      {act.reviewCount != null && act.reviewCount > 0 && (
+                                        <span className="text-slate-500 font-normal">
+                                          ({act.reviewCount > 999 ? `${(act.reviewCount / 1000).toFixed(1)}k` : act.reviewCount})
+                                        </span>
+                                      )}
+                                    </span>
+                                  ) : (
+                                    <span className="text-slate-500">Chưa có đánh giá</span>
+                                  )}
+
+                                  {act.address && (
+                                    <>
+                                      <span className="text-slate-300" aria-hidden="true">
+                                        ·
+                                      </span>
+                                      <span className="inline-flex items-center gap-1 min-w-0 max-w-full">
+                                        <i
+                                          className="fa-solid fa-location-dot text-[10px] text-slate-400 shrink-0"
+                                          aria-hidden="true"
+                                        />
+                                        <span className="truncate">{act.address}</span>
+                                      </span>
+                                    </>
+                                  )}
+
+                                  {hasOpeningBadge && act.openingStatus && (
+                                    <>
+                                      <span className="text-slate-300" aria-hidden="true">
+                                        ·
+                                      </span>
+                                      <span
+                                        className={`inline-flex items-center gap-1 font-medium ${
+                                          act.openingStatus.state === 'OPEN'
+                                            ? 'text-emerald-700'
+                                            : act.openingStatus.state === 'CLOSED'
+                                              ? 'text-rose-700'
+                                              : 'text-slate-500'
+                                        }`}
+                                      >
+                                        <i
+                                          className={`text-[10px] ${
+                                            act.openingStatus.state === 'OPEN'
+                                              ? 'fa-solid fa-circle-check text-emerald-600'
+                                              : 'fa-regular fa-clock'
+                                          }`}
+                                          aria-hidden="true"
+                                        />
+                                        <span>
+                                          {act.openingStatus.label ||
+                                            (act.openingStatus.state === 'OPEN'
+                                              ? 'Đang mở cửa'
+                                              : 'Ngoài giờ mở cửa')}
+                                        </span>
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Lower Content + Bottom Action Bar (sm:pl-[98px] aligns under Info column on Desktop, Full-Width on Mobile) */}
+                            {(act.notes || hasBottomActionBar) && (
+                              <div className="sm:pl-[98px] space-y-2">
+                                {act.notes && (
+                                  <p className="text-xs text-slate-600 leading-relaxed pl-2.5 border-l-2 border-[#0194F3]/35 break-words">
+                                    {act.notes}
+                                  </p>
+                                )}
+
+                                {hasBottomActionBar && (
+                                  <div
+                                    className="pt-0.5 flex flex-wrap items-center gap-1.5 sm:gap-1 relative"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {canEditCard ? (
+                                      <>
+                                        {onEditStop && (
+                                          <button
+                                            type="button"
+                                            onClick={() => onEditStop(act)}
+                                            className="min-h-[44px] sm:min-h-[34px] px-3 sm:px-2.5 rounded-xl sm:rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-100 hover:text-slate-900 inline-flex items-center gap-1.5 transition-colors cursor-pointer bg-slate-50/70 sm:bg-transparent whitespace-nowrap"
+                                          >
+                                            <i
+                                              className="fa-regular fa-pen-to-square text-[11px]"
+                                              aria-hidden="true"
+                                            />
+                                            <span>Sửa giờ</span>
+                                          </button>
+                                        )}
+
+                                        {onSwapPlace && (
+                                          <button
+                                            type="button"
+                                            onClick={() => onSwapPlace(act.placeId, act)}
+                                            title="Đổi điểm tham quan hoặc quán ăn khác"
+                                            className="min-h-[44px] sm:min-h-[34px] px-3 sm:px-2.5 rounded-xl sm:rounded-lg text-xs font-semibold text-slate-700 hover:bg-[#F0F7FF] hover:text-[#0194F3] inline-flex items-center gap-1.5 transition-colors cursor-pointer bg-slate-50/70 sm:bg-transparent whitespace-nowrap"
+                                          >
+                                            <i
+                                              className="fa-solid fa-right-left text-[11px]"
+                                              aria-hidden="true"
+                                            />
+                                            <span>Đổi điểm</span>
+                                          </button>
+                                        )}
+
+                                        {isMemberOrOwner && onProposeSwap && (
+                                          <button
+                                            type="button"
+                                            onClick={() => onProposeSwap(act.placeId, act)}
+                                            className="hidden sm:inline-flex min-h-[34px] px-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-[#F0F7FF] hover:text-[#0194F3] items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+                                          >
+                                            <i
+                                              className="fa-solid fa-check-to-slot text-[11px]"
+                                              aria-hidden="true"
+                                            />
+                                            <span>Mở vote</span>
+                                          </button>
+                                        )}
+
+                                        {hasOverflowItems && (
+                                          <div className="relative ml-auto" data-stop-menu-root>
+                                            <button
+                                              type="button"
+                                              aria-expanded={menuOpen}
+                                              aria-haspopup="menu"
+                                              aria-label={`Thêm tùy chọn cho ${act.placeName}`}
+                                              onClick={() =>
+                                                setOpenStopMenuKey((curr) =>
+                                                  curr === stopKey ? null : stopKey,
+                                                )
+                                              }
+                                              className="size-11 sm:size-8 rounded-xl sm:rounded-lg text-slate-500 sm:text-slate-400 hover:bg-slate-100 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+                                            >
+                                              <i className="fa-solid fa-ellipsis text-xs" aria-hidden="true" />
+                                            </button>
+
+                                            {menuOpen && (
+                                              <div
+                                                role="menu"
+                                                className={`absolute right-0 ${
+                                                  isLastMultiStop
+                                                    ? 'bottom-full mb-1.5'
+                                                    : 'top-full mt-1.5'
+                                                } w-52 sm:w-44 bg-white rounded-2xl border border-slate-200 shadow-xl py-1.5 z-40`}
+                                              >
+                                                {isMemberOrOwner && onProposeSwap && (
+                                                  <button
+                                                    type="button"
+                                                    role="menuitem"
+                                                    onClick={() => {
+                                                      setOpenStopMenuKey(null);
+                                                      onProposeSwap(act.placeId, act);
+                                                    }}
+                                                    className="sm:hidden w-full text-left px-3.5 min-h-[44px] text-xs font-semibold text-[#0194F3] hover:bg-[#F0F7FF] flex items-center gap-2.5 cursor-pointer"
+                                                  >
+                                                    <i
+                                                      className="fa-solid fa-check-to-slot text-[11px]"
+                                                      aria-hidden="true"
+                                                    />
+                                                    <span>Mở bình chọn nhóm</span>
+                                                  </button>
+                                                )}
+
+                                                {onMoveStop && act.id && !isFirst && (
+                                                  <button
+                                                    type="button"
+                                                    role="menuitem"
+                                                    disabled={isMoving}
+                                                    onClick={() => {
+                                                      setOpenStopMenuKey(null);
+                                                      onMoveStop(act.id!, 'UP');
+                                                    }}
+                                                    className="w-full text-left px-3.5 min-h-[44px] sm:min-h-[36px] text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer disabled:opacity-40"
+                                                  >
+                                                    <i
+                                                      className="fa-solid fa-arrow-up text-[11px] text-slate-400"
+                                                      aria-hidden="true"
+                                                    />
+                                                    <span>Đưa lên trước</span>
+                                                  </button>
+                                                )}
+
+                                                {onMoveStop && act.id && !isLast && (
+                                                  <button
+                                                    type="button"
+                                                    role="menuitem"
+                                                    disabled={isMoving}
+                                                    onClick={() => {
+                                                      setOpenStopMenuKey(null);
+                                                      onMoveStop(act.id!, 'DOWN');
+                                                    }}
+                                                    className="w-full text-left px-3.5 min-h-[44px] sm:min-h-[36px] text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 cursor-pointer disabled:opacity-40"
+                                                  >
+                                                    <i
+                                                      className="fa-solid fa-arrow-down text-[11px] text-slate-400"
+                                                      aria-hidden="true"
+                                                    />
+                                                    <span>Đẩy xuống sau</span>
+                                                  </button>
+                                                )}
+
+                                                {onDeletePlace && (
+                                                  <button
+                                                    type="button"
+                                                    role="menuitem"
+                                                    title="Xóa điểm này khỏi lịch trình"
+                                                    onClick={() => {
+                                                      setOpenStopMenuKey(null);
+                                                      onDeletePlace(act.placeId, act);
+                                                    }}
+                                                    className="w-full text-left px-3.5 min-h-[44px] sm:min-h-[36px] text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
+                                                  >
+                                                    <i
+                                                      className="fa-regular fa-trash-can text-[11px]"
+                                                      aria-hidden="true"
+                                                    />
+                                                    <span>Xóa điểm dừng</span>
+                                                  </button>
+                                                )}
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                      </>
+                                    ) : (
+                                      isMemberOrOwner &&
+                                      onProposeSwap && (
+                                        <button
+                                          type="button"
+                                          onClick={() => onProposeSwap(act.placeId, act)}
+                                          className="min-h-[44px] sm:min-h-[34px] px-3.5 sm:px-2.5 rounded-xl sm:rounded-lg text-xs font-semibold text-[#0194F3] bg-[#F0F7FF]/70 hover:bg-[#E0EFFF]/70 inline-flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap"
+                                        >
+                                          <i
+                                            className="fa-solid fa-right-left text-[11px]"
+                                            aria-hidden="true"
+                                          />
+                                          <span>Đề xuất đổi điểm</span>
+                                        </button>
+                                      )
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Inline Vote Trigger */}
+                            {stopVotesCount > 0 && (
+                              <div className="sm:pl-[98px]">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onOpenVotingTab?.();
+                                  }}
+                                  className="w-full min-h-[44px] sm:min-h-0 px-3 py-2 rounded-xl bg-[#F0F7FF]/70 hover:bg-[#E0EFFF]/60 border border-[#BAE0FD]/70 flex flex-wrap sm:flex-nowrap items-center justify-between gap-2 text-xs transition-colors cursor-pointer"
+                                >
+                                  <span className="inline-flex items-center gap-2 text-slate-700 text-left min-w-0">
+                                    <i
+                                      className="fa-solid fa-check-to-slot text-[#0194F3] shrink-0"
+                                      aria-hidden="true"
+                                    />
+                                    <span className="min-w-0">
+                                      Đang có <strong className="text-slate-900">{stopVotesCount} đề xuất thay thế</strong> cần ý kiến nhóm
+                                    </span>
+                                  </span>
+                                  <span className="font-semibold text-[#0194F3] inline-flex items-center gap-1 shrink-0 whitespace-nowrap ml-auto">
+                                    <span>Bình chọn</span>
+                                    <i className="fa-solid fa-chevron-right text-[10px]" aria-hidden="true" />
+                                  </span>
+                                </button>
+                              </div>
+                            )}
+                          </article>
+
+                          {/* Discrete Transit Connector */}
+                          {!isLast && (
+                            <div className="flex items-center gap-2.5 pl-9 py-1">
+                              <span className="w-px h-4 bg-slate-300 shrink-0" aria-hidden="true" />
+                              {renderIntracityTransitConnector(act)}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Per-Day Action Buttons (Direct Add vs Propose for Voting when day already has stops) */}
+                {day.activities.length > 0 &&
+                  (Boolean(onAddPlace) || Boolean(isMemberOrOwner && onProposeNewForDay)) && (
+                  <div
+                    className={
+                      Boolean(onAddPlace) && Boolean(isMemberOrOwner && onProposeNewForDay)
+                        ? 'grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1'
+                        : 'pt-1'
+                    }
+                  >
+                    {onAddPlace && (
+                      <button
+                        type="button"
+                        onClick={() => onAddPlace(day.dayNumber)}
+                        className="w-full min-h-[42px] rounded-2xl border border-dashed border-slate-300 bg-white/70 hover:bg-[#F0F7FF]/50 hover:border-[#0194F3]/60 text-slate-600 hover:text-[#0194F3] text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                      >
+                        <i className="fa-solid fa-plus text-[11px]" aria-hidden="true" />
+                        <span>Thêm địa điểm vào Ngày {day.dayNumber}</span>
+                      </button>
+                    )}
+
+                    {isMemberOrOwner && onProposeNewForDay && (
+                      <button
+                        type="button"
+                        onClick={() => onProposeNewForDay(day.dayNumber)}
+                        className={`w-full min-h-[42px] rounded-2xl border border-dashed text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+                          onAddPlace
+                            ? 'border-slate-200 bg-white/70 hover:bg-slate-100 text-slate-600'
+                            : 'border-[#0194F3]/50 bg-[#F0F7FF]/40 hover:bg-[#F0F7FF] text-[#0194F3]'
+                        }`}
+                      >
+                        <i className="fa-solid fa-check-to-slot text-[11px] text-[#0194F3]" aria-hidden="true" />
+                        <span>
+                          {onAddPlace
+                            ? 'Đề xuất để nhóm vote'
+                            : `Đề xuất địa điểm vào Ngày ${day.dayNumber} để nhóm bình chọn`}
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        );
+      })}
     </div>
   );
-}
+});
+
+export default ItineraryTimeline;

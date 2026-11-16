@@ -58,7 +58,13 @@ async function bootstrap() {
     origin: allowedOrigins,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Accept', 'Authorization', 'Cookie', 'X-Requested-With'],
+    allowedHeaders: [
+      'Content-Type',
+      'Accept',
+      'Authorization',
+      'Cookie',
+      'X-Requested-With',
+    ],
   });
 
   // Global Pipes & Interceptors & Filters
@@ -74,10 +80,15 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new AllExceptionsFilter());
-  app.useGlobalInterceptors(new LoggingInterceptor(), new ResponseInterceptor());
+  app.useGlobalInterceptors(
+    new LoggingInterceptor(),
+    new ResponseInterceptor(),
+  );
 
   await app.listen(port);
-  logger.log(`🚀 TripGenie Backend server running on: http://localhost:${port}/api/v1`);
+  logger.log(
+    `🚀 TripGenie Backend server running on: http://localhost:${port}/api/v1`,
+  );
 }
 
 bootstrap();

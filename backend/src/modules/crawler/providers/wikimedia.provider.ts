@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosInstance } from 'axios';
-import { IEnrichmentProvider, EnrichedPlaceDetails } from '../interfaces/enrichment-provider.interface';
+import {
+  IEnrichmentProvider,
+  EnrichedPlaceDetails,
+} from '../interfaces/enrichment-provider.interface';
 
 @Injectable()
 export class WikimediaProvider implements IEnrichmentProvider {
@@ -12,7 +15,8 @@ export class WikimediaProvider implements IEnrichmentProvider {
     this.httpClient = axios.create({
       timeout: 8_000,
       headers: {
-        'User-Agent': 'TripGenieBot/1.0 (https://tripgenie.app; contact@tripgenie.app)',
+        'User-Agent':
+          'TripGenieBot/1.0 (https://tripgenie.app; contact@tripgenie.app)',
       },
     });
   }
@@ -66,7 +70,10 @@ export class WikimediaProvider implements IEnrichmentProvider {
       );
       const data = response.data;
 
-      if (!data || data.type === 'https://mediawiki.org/wiki/HyperSwitch/errors/not_found') {
+      if (
+        !data ||
+        data.type === 'https://mediawiki.org/wiki/HyperSwitch/errors/not_found'
+      ) {
         return null;
       }
 

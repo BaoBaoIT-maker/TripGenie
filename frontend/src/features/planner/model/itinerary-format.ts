@@ -73,3 +73,32 @@ export function isDiningActivity(categoryName?: string | null, placeName?: strin
   );
 }
 
+/**
+ * Formats a date string (ISO 8601, YYYY-MM-DD, or DD/MM/YYYY) into Vietnamese DD/MM/YYYY format.
+ * Strips any ISO timestamp suffix (e.g. 2026-10-28T00:00:00.000Z -> 28/10/2026).
+ */
+export function formatDateVi(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr.trim();
+  const parts = cleanDate.split(/[-/]/);
+  if (parts.length === 3) {
+    if (parts[0].length === 4) {
+      return `${parts[2].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[0]}`;
+    }
+    if (parts[2].length === 4) {
+      return `${parts[0].padStart(2, '0')}/${parts[1].padStart(2, '0')}/${parts[2]}`;
+    }
+  }
+  return cleanDate;
+}
+
+/**
+ * Formats start and end dates into a readable range (e.g. "28/10/2026 – 30/10/2026" or "28/10/2026").
+ */
+export function formatTripDates(start?: string | null, end?: string | null): string {
+  if (!start) return 'Chưa định ngày';
+  const startVi = formatDateVi(start);
+  const endVi = formatDateVi(end);
+  if (!endVi || startVi === endVi) return startVi;
+  return `${startVi} – ${endVi}`;
+}

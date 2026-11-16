@@ -1,17 +1,6 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import {
-  Plane,
-  TrainFront,
-  Bus,
-  Car,
-  AlertTriangle,
-  ShieldAlert,
-  Lightbulb,
-  Layers,
-  Ship,
-} from 'lucide-react';
 import type { IntercityTransit, TransitMode } from '@/types/itinerary';
 import {
   TRANSIT_UI_CONFIG,
@@ -25,11 +14,6 @@ export { cleanHubName };
 interface DirectModeTheme {
   icon: ReactNode;
   title: string;
-  noteLabel: string;
-  containerClass: string;
-  headerClass: string;
-  badgeClass: string;
-  noteBoxClass: string;
   buildFallbackSteps: (ctx: {
     transit: IntercityTransit;
     cleanOrigin: string;
@@ -42,14 +26,8 @@ interface DirectModeTheme {
 
 const DIRECT_MODE_THEMES: Record<Exclude<TransitMode, 'PERSONAL_MOTORBIKE'>, DirectModeTheme> = {
   FLIGHT: {
-    icon: <Plane className="size-3.5 text-[#0194F3] dark:text-sky-400 shrink-0" aria-hidden="true" />,
-    title: 'LỘ TRÌNH HÀNG KHÔNG & XE TRUNG CHUYỂN SÂN BAY:',
-    noteLabel: 'Gợi ý trung chuyển',
-    containerClass:
-      'border-sky-200 bg-sky-50/50 dark:border-sky-200/50 dark:bg-sky-950/40',
-    headerClass: 'text-sky-950 dark:text-sky-900',
-    badgeClass: 'bg-[#0068B8] text-white',
-    noteBoxClass: 'border-sky-200/80 dark:border-sky-200/50',
+    icon: <i className="fa-solid fa-plane text-[#0194F3] text-sm shrink-0" aria-hidden="true" />,
+    title: 'Chặng bay & xe trung chuyển',
     buildFallbackSteps: ({ transit, cleanOrigin, cleanDest, durMinutes, priceOneWay }) => {
       const transferKm =
         transit.destHub?.distanceKm || TRANSIT_UI_CONFIG.DEFAULT_AIRPORT_TRANSFER_KM;
@@ -58,52 +36,32 @@ const DIRECT_MODE_THEMES: Record<Exclude<TransitMode, 'PERSONAL_MOTORBIKE'>, Dir
         Math.round(transferKm * TRANSIT_UI_CONFIG.LOCAL_TRANSFER_MINS_PER_KM),
       );
       return [
-        `Khởi hành từ ${cleanHubName(transit.originHub?.name || cleanOrigin)} ──> ${cleanHubName(transit.destHub?.name || cleanDest)} (~${formatDuration(durMinutes)}, ~${formatVnd(priceOneWay)}/vé)`,
-        `Trung chuyển sân bay: Xe buýt sân bay / Taxi từ ${cleanHubName(transit.destHub?.name || 'sân bay')} về trung tâm ${cleanDest} (~${transferKm}km, ~${transferMins} phút)`,
+        `Chặng bay: ${cleanHubName(transit.originHub?.name || cleanOrigin)} → ${cleanHubName(transit.destHub?.name || cleanDest)} (~${formatDuration(durMinutes)}, ~${formatVnd(priceOneWay)}/vé)`,
+        `Xe trung chuyển: Taxi / Buýt sân bay về trung tâm ${cleanDest} (~${transferKm} km, ~${transferMins} phút)`,
       ];
     },
   },
   SLEEPER_BUS: {
-    icon: <Bus className="size-3.5 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden="true" />,
-    title: 'CHI TIẾT CHẶNG XE KHÁCH & TRUNG CHUYỂN VỀ TRUNG TÂM:',
-    noteLabel: 'Gợi ý',
-    containerClass:
-      'border-amber-200 bg-amber-50/50 dark:border-amber-900/50 dark:bg-amber-950/20',
-    headerClass: 'text-amber-900 dark:text-amber-200',
-    badgeClass: 'bg-amber-600 text-white',
-    noteBoxClass: 'border-amber-200/80 dark:border-amber-800/50',
+    icon: <i className="fa-solid fa-bus text-amber-600 text-sm shrink-0" aria-hidden="true" />,
+    title: 'Chặng xe khách liên tỉnh',
     buildFallbackSteps: ({ transit, cleanOrigin, cleanDest, durHours, priceOneWay }) => [
-      `Đón xe tại ${cleanHubName(transit.originHub?.name || `Bến xe tại ${cleanOrigin}`)} ──> ${cleanHubName(transit.destHub?.name || `Bến xe tại ${cleanDest}`)} (~${durHours} tiếng, ~${formatVnd(priceOneWay)}/vé)`,
-      `Xe trung chuyển nhà xe hoặc Taxi đưa đón về trung tâm ${cleanDest}.`,
+      `Chặng xe: ${cleanHubName(transit.originHub?.name || `Bến xe ${cleanOrigin}`)} → ${cleanHubName(transit.destHub?.name || `Bến xe ${cleanDest}`)} (~${durHours} tiếng, ~${formatVnd(priceOneWay)}/vé)`,
+      `Xe trung chuyển: Nhà xe hoặc Taxi đưa đón về trung tâm ${cleanDest}`,
     ],
   },
   TRAIN: {
-    icon: (
-      <TrainFront className="size-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" aria-hidden="true" />
-    ),
-    title: 'CHI TIẾT TUYẾN ĐƯỜNG SẮT & TRUNG CHUYỂN VỀ TRUNG TÂM:',
-    noteLabel: 'Gợi ý',
-    containerClass:
-      'border-indigo-200 bg-indigo-50/50 dark:border-indigo-900/50 dark:bg-indigo-950/20',
-    headerClass: 'text-indigo-900 dark:text-indigo-200',
-    badgeClass: 'bg-indigo-600 text-white',
-    noteBoxClass: 'border-indigo-200/80 dark:border-indigo-800/50',
+    icon: <i className="fa-solid fa-train text-[#0194F3] text-sm shrink-0" aria-hidden="true" />,
+    title: 'Tuyến tàu hỏa & ga đến',
     buildFallbackSteps: ({ transit, cleanOrigin, cleanDest, durHours, priceOneWay }) => [
-      `Tuyến tàu: ${cleanHubName(transit.originHub?.name || `Ga ${cleanOrigin}`)} ──> ${cleanHubName(transit.destHub?.name || `Ga ${cleanDest}`)} (~${durHours} tiếng, ~${formatVnd(priceOneWay)}/vé)`,
-      `Đón Taxi / Grab từ nhà ga về khách sạn trung tâm ${cleanDest}.`,
+      `Tuyến tàu: ${cleanHubName(transit.originHub?.name || `Ga ${cleanOrigin}`)} → ${cleanHubName(transit.destHub?.name || `Ga ${cleanDest}`)} (~${durHours} tiếng, ~${formatVnd(priceOneWay)}/vé)`,
+      `Xe trung chuyển: Taxi / Xe ôm công nghệ từ ga về trung tâm ${cleanDest}`,
     ],
   },
   PERSONAL_CAR: {
-    icon: <Car className="size-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" aria-hidden="true" />,
-    title: 'LỘ TRÌNH Ô TÔ CÁ NHÂN / TỰ LÁI:',
-    noteLabel: 'Chi tiết chi phí',
-    containerClass:
-      'border-indigo-200 bg-indigo-50/50 dark:border-indigo-900/50 dark:bg-indigo-950/20',
-    headerClass: 'text-indigo-900 dark:text-indigo-200',
-    badgeClass: 'bg-indigo-600 text-white',
-    noteBoxClass: 'border-indigo-200/80 dark:border-indigo-800/50',
+    icon: <i className="fa-solid fa-car text-[#0194F3] text-sm shrink-0" aria-hidden="true" />,
+    title: 'Lộ trình ô tô tự lái',
     buildFallbackSteps: ({ cleanOrigin, cleanDest, durHours, transit }) => [
-      `Lộ trình cao tốc / quốc lộ từ ${cleanOrigin} ──> trung tâm ${cleanDest} (~${transit.distanceKm}km, ~${durHours} tiếng lái xe)`,
+      `Lộ trình cao tốc / quốc lộ: ${cleanOrigin} → trung tâm ${cleanDest} (~${transit.distanceKm} km, ~${durHours} tiếng)`,
     ],
   },
 };
@@ -131,60 +89,60 @@ export default function TransitRouteBreakdown({
   if (transit.isMultiModal) {
     const isFerry = transit.transferLeg?.type === 'FERRY';
     return (
-      <div className="rounded-xl border border-indigo-200 bg-indigo-50/70 dark:border-indigo-900/60 dark:bg-indigo-950/30 p-3.5 space-y-2.5 text-xs shadow-2xs">
-        <div className="flex items-center justify-between font-bold text-indigo-950 dark:text-indigo-200 flex-wrap gap-2">
+      <div className="rounded-xl border border-[#D0E7FF] bg-[#F0F7FF] p-3.5 space-y-2.5 text-xs shadow-2xs">
+        <div className="flex items-center justify-between font-bold text-[#10243A] flex-wrap gap-2">
           <span className="flex items-center gap-1.5">
-            <Layers className="size-4 text-indigo-600 dark:text-indigo-400 shrink-0" aria-hidden="true" />
-            <span>LỘ TRÌNH NỐI CHẶNG &amp; TRUNG CHUYỂN THÔNG MINH:</span>
+            <i className="fa-solid fa-route text-[#0194F3] text-sm shrink-0" aria-hidden="true" />
+            <span>Lộ trình nối chặng liên tỉnh</span>
           </span>
           {transit.transferLeg && (
-            <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 border border-indigo-300 dark:border-indigo-700 inline-flex items-center gap-1">
+            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#E1EFFF] text-[#0194F3] inline-flex items-center gap-1.5 border border-[#D0E7FF]">
               {isFerry ? (
-                <Ship className="size-3 shrink-0" aria-hidden="true" />
+                <i className="fa-solid fa-ship text-[11px] shrink-0" aria-hidden="true" />
               ) : (
-                <Bus className="size-3 shrink-0" aria-hidden="true" />
+                <i className="fa-solid fa-bus text-[11px] shrink-0" aria-hidden="true" />
               )}
-              <span>{isFerry ? 'Tàu cao tốc vượt biển' : 'Xe trung chuyển kết nối'}</span>
+              <span>{isFerry ? 'Tàu cao tốc' : 'Xe trung chuyển'}</span>
             </span>
           )}
         </div>
 
         {routeSteps.length > 0 && (
-          <div className="space-y-1.5 text-foreground/90 leading-relaxed font-medium">
+          <div className="space-y-1.5 text-slate-700 leading-relaxed font-medium">
             {routeSteps.map((step, idx) => (
               <div key={idx} className="flex items-start gap-2">
-                <span className="size-4 rounded-full bg-indigo-600 text-white text-[9px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                <span className="size-4 rounded-full bg-white text-[#0194F3] border border-[#D0E7FF] text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
                   {idx + 1}
                 </span>
-                <p className="flex-1">{cleanHubName(step)}</p>
+                <p className="flex-1 text-slate-800 font-semibold">{cleanHubName(step)}</p>
               </div>
             ))}
           </div>
         )}
 
         {transit.transferLeg && (
-          <div className="rounded-lg bg-card border border-indigo-200/80 dark:border-indigo-800/60 p-2.5 text-xs flex items-center justify-between gap-2 shadow-2xs">
+          <div className="rounded-lg bg-white border border-[#D0E7FF] p-2.5 text-xs flex items-center justify-between gap-2 shadow-2xs">
             <div className="flex items-center gap-2 min-w-0">
               {isFerry ? (
-                <Ship className="size-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" aria-hidden="true" />
+                <i className="fa-solid fa-ship text-[#0194F3] text-xs shrink-0" aria-hidden="true" />
               ) : (
-                <Bus className="size-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" aria-hidden="true" />
+                <i className="fa-solid fa-bus text-[#0194F3] text-xs shrink-0" aria-hidden="true" />
               )}
-              <span className="font-bold text-foreground truncate">
-                Chặng nối: {cleanHubName(transit.transferLeg.title)}
+              <span className="font-bold text-[#10243A] truncate">
+                {cleanHubName(transit.transferLeg.title)}
               </span>
             </div>
-            <span className="font-bold text-indigo-700 dark:text-indigo-300 shrink-0">
+            <span className="font-bold text-[#0194F3] shrink-0">
               ~{formatVnd(transit.transferLeg.estimatedPrice)}
             </span>
           </div>
         )}
 
         {transit.details?.notes && (
-          <div className="bg-card/90 rounded-lg border border-indigo-200/60 dark:border-indigo-800/50 p-2.5 text-[11px] text-indigo-950 dark:text-indigo-200 flex items-start gap-2 shadow-2xs">
-            <Lightbulb className="size-3.5 text-amber-500 shrink-0 mt-0.5" aria-hidden="true" />
+          <div className="rounded-lg bg-white/90 border border-[#D0E7FF] p-2.5 text-xs text-slate-700 flex items-start gap-2 shadow-2xs">
+            <i className="fa-solid fa-circle-info text-[#0194F3] text-sm shrink-0 mt-0.5" aria-hidden="true" />
             <span>
-              <strong>Gợi ý kinh nghiệm:</strong> {cleanHubName(transit.details.notes)}
+              <strong className="text-[#10243A]">Lưu ý:</strong> {cleanHubName(transit.details.notes)}
             </span>
           </div>
         )}
@@ -206,57 +164,73 @@ export default function TransitRouteBreakdown({
 
     return (
       <div
-        className={`rounded-xl border p-3.5 space-y-2.5 text-xs shadow-2xs ${
+        className={`rounded-xl border p-3.5 space-y-2 text-xs shadow-2xs ${
           isOverLimit
-            ? 'border-rose-300 bg-rose-50/80 text-rose-950 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-200'
-            : 'border-amber-300 bg-amber-50/80 text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200'
+            ? 'border-amber-200 bg-amber-50/90'
+            : 'border-[#D0E7FF] bg-[#F0F7FF]'
         }`}
       >
-        <div className="font-bold flex items-center gap-1.5">
-          {isOverLimit ? (
-            <>
-              <ShieldAlert className="size-4 text-rose-600 dark:text-rose-400 shrink-0" aria-hidden="true" />
-              <span>CẢNH BÁO AN TOÀN PHƯỢT XE MÁY ({cleanOrigin} ──&gt; {cleanDest}):</span>
-            </>
-          ) : (
-            <>
-              <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400 shrink-0" aria-hidden="true" />
-              <span>LỘ TRÌNH PHƯỢT XE MÁY &amp; LƯU Ý AN TOÀN ({cleanOrigin} ──&gt; {cleanDest}):</span>
-            </>
+        <div className="flex items-center justify-between font-bold">
+          <div className="flex items-center gap-1.5">
+            {isOverLimit ? (
+              <i className="fa-solid fa-triangle-exclamation text-amber-500 text-sm shrink-0" aria-hidden="true" />
+            ) : (
+              <i className="fa-solid fa-car text-[#0194F3] text-sm shrink-0" aria-hidden="true" />
+            )}
+            <span className={isOverLimit ? 'text-amber-950 font-bold' : 'text-[#10243A] font-bold'}>
+              {isOverLimit ? 'Lưu ý cự ly phượt đường bộ' : `Lộ trình phượt đường bộ (${cleanOrigin} → ${cleanDest})`}
+            </span>
+          </div>
+          {distKm > 0 && (
+            <span className={`text-xs font-semibold ${isOverLimit ? 'text-amber-800' : 'text-slate-600'}`}>
+              ~{distKm} km • ~{durHours} tiếng
+            </span>
           )}
         </div>
 
         {isOverLimit ? (
-          <div className="space-y-1.5 leading-relaxed font-medium">
-            <p className="font-bold text-rose-800 dark:text-rose-300">
-              CỰ LY QUÁ XA CHO XE MÁY (~{distKm} km, mất hơn {durHours} tiếng lái xe liên tục):
-            </p>
-            <p>
-              Quãng đường {distKm} km bằng xe máy dễ gây kiệt sức và mất an toàn giao thông. Bạn nên ưu tiên chọn{' '}
-              <strong>Xe khách giường nằm</strong> hoặc <strong>Máy bay</strong> để bảo đảm sức khỏe cho chuyến đi!
+          <div className="space-y-1.5 text-xs">
+            <p className="text-amber-900 leading-relaxed font-medium">
+              Cự ly ~{distKm} km mất hơn {durHours} tiếng lái xe liên tục. Bạn nên cân nhắc lựa chọn <strong>Xe khách giường nằm</strong> hoặc <strong>Máy bay</strong> để đảm bảo an toàn và sức khỏe.
             </p>
           </div>
         ) : (
-          <div className="space-y-1.5 leading-relaxed font-medium">
+          <div className="space-y-1.5 text-slate-700 leading-relaxed font-medium">
             {(routeSteps.length > 0
               ? routeSteps
               : [
-                  `Cung đường phượt xe máy: Từ ${cleanOrigin} ──> ${cleanDest} (~${distKm} km, dự kiến ~${durHours} tiếng lái xe).`,
-                  `Chi phí xăng xe ước tính: ~${formatVnd(priceOneWay)} (khoảng ${fuelLiters} lít xăng RON95).`,
+                  `Cung đường: ${cleanOrigin} → ${cleanDest} (~${distKm} km, ~${durHours} tiếng)`,
+                  `Nhiên liệu ước tính: ~${formatVnd(priceOneWay)} (~${fuelLiters} lít xăng)`,
                 ]
             ).map((step, idx) => (
-              <p key={idx}>
-                {idx + 1}. {step}
-              </p>
+              <div key={idx} className="flex items-start gap-2">
+                <span className="size-4 rounded-full bg-white text-[#0194F3] border border-[#D0E7FF] text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                  {idx + 1}
+                </span>
+                <p className="flex-1 text-slate-800 font-semibold">{step}</p>
+              </div>
             ))}
           </div>
         )}
 
         {transit.details?.notes && (
-          <div className="bg-card/90 rounded-lg border border-amber-200/80 dark:border-amber-800/50 p-2.5 text-[11px] flex items-start gap-2 shadow-2xs">
-            <Lightbulb className="size-3.5 text-amber-600 shrink-0 mt-0.5" aria-hidden="true" />
+          <div
+            className={`rounded-lg border p-2.5 text-xs flex items-start gap-2 shadow-2xs ${
+              isOverLimit
+                ? 'bg-white/90 border-amber-200/80 text-amber-950'
+                : 'bg-white/90 border-[#D0E7FF] text-slate-700'
+            }`}
+          >
+            <i
+              className={`text-sm shrink-0 mt-0.5 ${
+                isOverLimit
+                  ? 'fa-solid fa-triangle-exclamation text-amber-500'
+                  : 'fa-solid fa-circle-info text-[#0194F3]'
+              }`}
+              aria-hidden="true"
+            />
             <span>
-              <strong>Khuyến nghị:</strong> {transit.details.notes}
+              <strong className="font-bold">Khuyến nghị:</strong> {transit.details.notes}
             </span>
           </div>
         )}
@@ -279,34 +253,38 @@ export default function TransitRouteBreakdown({
         });
 
   return (
-    <div className={`rounded-xl border p-3.5 space-y-2.5 text-xs shadow-2xs ${theme.containerClass}`}>
-      <div className={`font-bold flex items-center gap-1.5 ${theme.headerClass}`}>
-        {theme.icon}
-        <span>{theme.title}</span>
+    <div className="rounded-xl border border-[#D0E7FF] bg-[#F0F7FF] p-3.5 space-y-2.5 text-xs shadow-2xs">
+      <div className="flex items-center justify-between font-semibold text-slate-900">
+        <div className="flex items-center gap-1.5">
+          {theme.icon}
+          <span className="font-semibold text-slate-900">{theme.title}</span>
+        </div>
+        <div className="text-xs font-semibold text-slate-600">
+          {distKm > 0 && `~${distKm} km`}
+          {distKm > 0 && durMinutes > 0 && ' • '}
+          {durMinutes > 0 && `~${formatDuration(durMinutes)}`}
+        </div>
       </div>
-      <div className="space-y-1.5 text-foreground/90 leading-relaxed font-medium">
+
+      <div className="space-y-1.5 leading-relaxed font-medium">
         {stepsToRender.map((step, idx) => (
           <div key={idx} className="flex items-start gap-2">
-            <span
-              className={`size-4 rounded-full text-[9px] font-bold flex items-center justify-center shrink-0 mt-0.5 ${theme.badgeClass}`}
-            >
+            <span className="size-4 rounded-full bg-white text-[#0194F3] border border-[#D0E7FF] text-[10px] font-bold flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
               {idx + 1}
             </span>
-            <p className="flex-1">{cleanHubName(step)}</p>
+            <p className="flex-1 text-slate-700 font-medium">{cleanHubName(step)}</p>
           </div>
         ))}
       </div>
+
       {transit.details?.notes && (
-        <div
-          className={`bg-card rounded-lg border p-2.5 text-[11px] text-foreground/85 flex items-start gap-2 shadow-2xs ${theme.noteBoxClass}`}
-        >
-          <Lightbulb className="size-3.5 text-amber-500 shrink-0 mt-0.5" aria-hidden="true" />
+        <div className="rounded-lg bg-white/90 border border-[#D0E7FF] p-2.5 text-xs text-slate-700 flex items-start gap-2 shadow-2xs">
+          <i className="fa-solid fa-circle-info text-[#0194F3] text-sm shrink-0 mt-0.5" aria-hidden="true" />
           <span>
-            <strong>{theme.noteLabel}:</strong> {cleanHubName(transit.details.notes)}
+            <strong className="text-[#10243A]">Lưu ý:</strong> {cleanHubName(transit.details.notes)}
           </span>
         </div>
       )}
     </div>
   );
 }
-

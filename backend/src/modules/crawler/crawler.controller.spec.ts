@@ -24,7 +24,10 @@ describe('CrawlerController', () => {
       controllers: [CrawlerController],
       providers: [
         { provide: CrawlJobService, useValue: crawlJobService },
-        { provide: getQueueToken(CrawlerQueueName.ENRICH), useValue: enrichQueue },
+        {
+          provide: getQueueToken(CrawlerQueueName.ENRICH),
+          useValue: enrichQueue,
+        },
       ],
     }).compile();
 
@@ -35,7 +38,11 @@ describe('CrawlerController', () => {
 
   describe('POST /crawler/trigger', () => {
     it('should return TriggerCrawlResponseDto on success', async () => {
-      const mockResult = { message: 'Crawl job started successfully', jobId: 'job-1', area: 'Da Nang' };
+      const mockResult = {
+        message: 'Crawl job started successfully',
+        jobId: 'job-1',
+        area: 'Da Nang',
+      };
       crawlJobService.triggerRegionCrawl.mockResolvedValue(mockResult);
 
       const result = await controller.triggerCrawl(
@@ -44,20 +51,31 @@ describe('CrawlerController', () => {
       );
 
       expect(result).toEqual(mockResult);
-      expect(crawlJobService.triggerRegionCrawl).toHaveBeenCalledWith({ areaId: 1 }, 'user-1');
+      expect(crawlJobService.triggerRegionCrawl).toHaveBeenCalledWith(
+        { areaId: 1 },
+        'user-1',
+      );
     });
 
     it('should propagate NotFoundException when area not found', async () => {
-      crawlJobService.triggerRegionCrawl.mockRejectedValue(new NotFoundException('Area not found'));
+      crawlJobService.triggerRegionCrawl.mockRejectedValue(
+        new NotFoundException('Area not found'),
+      );
       await expect(
-        controller.triggerCrawl({ areaId: 999 }, { user: { id: 'user-1', role: 'ADMIN' } }),
+        controller.triggerCrawl(
+          { areaId: 999 },
+          { user: { id: 'user-1', role: 'ADMIN' } },
+        ),
       ).rejects.toThrow(NotFoundException);
     });
   });
 
   describe('POST /crawler/enrich', () => {
     it('should push enrichment job to BullMQ queue and return jobId', async () => {
-      const result = await controller.triggerEnrichment({ areaId: 1, limit: 10 });
+      const result = await controller.triggerEnrichment({
+        areaId: 1,
+        limit: 10,
+      });
 
       expect(result).toEqual({
         message: 'Enrichment job queued for area 1',
@@ -73,7 +91,12 @@ describe('CrawlerController', () => {
 
   describe('GET /crawler/jobs/:id', () => {
     it('should return CrawlJobStatusDto on success', async () => {
-      const mockJob = { id: 'job-1', status: 'COMPLETED', processedItems: 100, insertedCount: 80 };
+      const mockJob = {
+        id: 'job-1',
+        status: 'COMPLETED',
+        processedItems: 100,
+        insertedCount: 80,
+      };
       crawlJobService.getJobStatus.mockResolvedValue(mockJob);
 
       const result = await controller.getJobStatus('job-1');
@@ -83,8 +106,12 @@ describe('CrawlerController', () => {
     });
 
     it('should propagate NotFoundException when job not found', async () => {
-      crawlJobService.getJobStatus.mockRejectedValue(new NotFoundException('Job not found'));
-      await expect(controller.getJobStatus('invalid-id')).rejects.toThrow(NotFoundException);
+      crawlJobService.getJobStatus.mockRejectedValue(
+        new NotFoundException('Job not found'),
+      );
+      await expect(controller.getJobStatus('invalid-id')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

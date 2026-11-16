@@ -3,7 +3,10 @@ import { PrismaService } from '../../../database/prisma.service';
 import { PRICING_CONFIG } from '../../../config/pricing.config';
 import { INJECT_TOKENS } from '../../../common/constants/inject-tokens';
 import { normalizeVietnamese } from '../../../common/utils/string.util';
-import { BudgetLevelEnum, TransitModeEnum } from '../dto/generate-itinerary.dto';
+import {
+  BudgetLevelEnum,
+  TransitModeEnum,
+} from '../dto/generate-itinerary.dto';
 import {
   IntercityTransitResult,
   TransitHubDto,
@@ -79,7 +82,9 @@ export class TransitService {
    * 2. Query transit_hubs via travel_areas when bbox is null
    * 3. Query transit_hubs directly
    */
-  async resolveCityLocation(cityName: string): Promise<{ lat: number; lng: number; areaId?: number }> {
+  async resolveCityLocation(
+    cityName: string,
+  ): Promise<{ lat: number; lng: number; areaId?: number }> {
     const fallback = PRICING_CONFIG.DEFAULTS.FALLBACK_COORDS;
     if (!cityName) return fallback;
     const raw = cityName.trim();
@@ -106,7 +111,11 @@ export class TransitService {
           LIMIT 1
         `;
         if (areas && areas.length > 0 && areas[0].lat && areas[0].lng) {
-          return { lat: Number(areas[0].lat), lng: Number(areas[0].lng), areaId: areas[0].area_id };
+          return {
+            lat: Number(areas[0].lat),
+            lng: Number(areas[0].lng),
+            areaId: areas[0].area_id,
+          };
         }
       } catch {}
 
@@ -126,7 +135,11 @@ export class TransitService {
           LIMIT 1
         `;
         if (areaHub && areaHub.length > 0 && areaHub[0].lat && areaHub[0].lng) {
-          return { lat: Number(areaHub[0].lat), lng: Number(areaHub[0].lng), areaId: areaHub[0].area_id };
+          return {
+            lat: Number(areaHub[0].lat),
+            lng: Number(areaHub[0].lng),
+            areaId: areaHub[0].area_id,
+          };
         }
       } catch {}
 
@@ -141,7 +154,11 @@ export class TransitService {
           LIMIT 1
         `;
         if (hubs && hubs.length > 0 && hubs[0].latitude) {
-          return { lat: Number(hubs[0].latitude), lng: Number(hubs[0].longitude), areaId: hubs[0].area_id };
+          return {
+            lat: Number(hubs[0].latitude),
+            lng: Number(hubs[0].longitude),
+            areaId: hubs[0].area_id,
+          };
         }
       } catch {}
     }
@@ -171,7 +188,12 @@ export class TransitService {
             where: { isActive: true, hubType: 'FERRY_TERMINAL' },
           });
       for (const hub of ferryHubs) {
-        const dist = this.computeHaversineDistance(destLat, destLng, hub.latitude, hub.longitude);
+        const dist = this.computeHaversineDistance(
+          destLat,
+          destLng,
+          hub.latitude,
+          hub.longitude,
+        );
         if (dist <= PRICING_CONFIG.INTERCITY.TRANSFER.ISLAND_PORT_DISTANCE_KM) {
           return true;
         }
@@ -196,7 +218,8 @@ export class TransitService {
     departDate: string;
     returnDate?: string;
   }): Promise<IntercityTransitResult> {
-    const { originCity, destCity, departDate, returnDate, budgetLevel } = params;
+    const { originCity, destCity, departDate, returnDate, budgetLevel } =
+      params;
 
     const [resolvedOrigin, resolvedDest, activeHubs] = await Promise.all([
       this.resolveCityLocation(originCity),
@@ -206,12 +229,20 @@ export class TransitService {
 
     const originCoords =
       params.originLat && params.originLng
-        ? { lat: params.originLat, lng: params.originLng, areaId: resolvedOrigin.areaId }
+        ? {
+            lat: params.originLat,
+            lng: params.originLng,
+            areaId: resolvedOrigin.areaId,
+          }
         : resolvedOrigin;
 
     const destCoords =
       params.destLat && params.destLng
-        ? { lat: params.destLat, lng: params.destLng, areaId: resolvedDest.areaId }
+        ? {
+            lat: params.destLat,
+            lng: params.destLng,
+            areaId: resolvedDest.areaId,
+          }
         : resolvedDest;
 
     const roadDistanceKm = this.computeRoadDistance(
@@ -221,8 +252,18 @@ export class TransitService {
       destCoords.lng,
     );
 
-    const isIsland = await this.isIslandDestination(destCity, destCoords.lat, destCoords.lng, activeHubs);
-    const nearestFerryHub = findNearestHub(activeHubs, 'FERRY_TERMINAL', destCoords.lat, destCoords.lng);
+    const isIsland = await this.isIslandDestination(
+      destCity,
+      destCoords.lat,
+      destCoords.lng,
+      activeHubs,
+    );
+    const nearestFerryHub = findNearestHub(
+      activeHubs,
+      'FERRY_TERMINAL',
+      destCoords.lat,
+      destCoords.lng,
+    );
 
     const context: TransitStrategyContext = {
       originCity,
@@ -244,7 +285,9 @@ export class TransitService {
         ? TransitModeEnum.FLIGHT
         : TransitModeEnum.SLEEPER_BUS);
 
-    const strategy = this.strategies.get(requestedMode) || this.strategies.get(TransitModeEnum.SLEEPER_BUS)!;
+    const strategy =
+      this.strategies.get(requestedMode) ||
+      this.strategies.get(TransitModeEnum.SLEEPER_BUS)!;
     const result = await strategy.calculate(context);
 
     // Open-Closed summary generation: each strategy produces its own TransitModeSummary
@@ -267,4 +310,3 @@ export class TransitService {
     return result;
   }
 }
-

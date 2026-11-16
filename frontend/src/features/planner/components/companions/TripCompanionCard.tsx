@@ -1,9 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Users, Plus, Crown } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
 import { useTripCompanions } from '../../hooks/use-trip-companions';
 import { TRIP_COMPANIONS_CONFIG } from '../../config/trip-companions.config';
 import { InviteTripCompanionDialog } from './InviteTripCompanionDialog';
@@ -27,7 +25,6 @@ export function TripCompanionCard({
 
   const { data, isLoading } = useTripCompanions(itineraryId, isMemberOrOwner);
 
-  // If user is a public guest / stranger, don't show companion management
   if (!isMemberOrOwner) return null;
 
   const members = data?.members || [];
@@ -36,12 +33,14 @@ export function TripCompanionCard({
 
   return (
     <>
-      <div className="rounded-2xl border border-border/80 bg-card p-5 shadow-xs space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white p-5 space-y-4">
         {/* Title */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Users className="size-4 text-primary" />
-            <h3 className="text-sm font-bold font-heading text-foreground">
+          <div className="flex items-center gap-2.5">
+            <div className="size-8 rounded-xl bg-[#F0F7FF] text-[#0194F3] flex items-center justify-center shrink-0">
+              <i className="fa-solid fa-users text-xs" aria-hidden="true" />
+            </div>
+            <h3 className="text-sm font-semibold text-slate-900 tabular-nums">
               Bạn đồng hành ({members.length})
             </h3>
           </div>
@@ -49,7 +48,7 @@ export function TripCompanionCard({
           <button
             type="button"
             onClick={() => setIsPanelOpen(true)}
-            className="text-xs font-semibold text-primary hover:underline cursor-pointer"
+            className="text-xs font-bold text-[#0194F3] hover:underline cursor-pointer"
           >
             Quản lý
           </button>
@@ -59,44 +58,42 @@ export function TripCompanionCard({
         <div className="flex items-center gap-2 pt-1">
           {isLoading ? (
             <div className="flex items-center gap-2">
-              <div className="size-10 rounded-full bg-muted animate-pulse" />
-              <div className="size-10 rounded-full bg-muted animate-pulse" />
+              <div className="size-10 rounded-full bg-slate-100 animate-pulse" />
+              <div className="size-10 rounded-full bg-slate-100 animate-pulse" />
             </div>
           ) : (
-            <div className="flex items-center -space-x-2.5 overflow-hidden py-1">
+            <div className="flex items-center -space-x-2.5 py-1">
               {previewMembers.map((member) => (
                 <div
                   key={member.userId}
-                  title={`${member.fullName} (${
-                    member.role === 'OWNER'
-                      ? 'Chủ chuyến đi'
-                      : member.role === 'EDITOR'
-                        ? 'Chỉnh sửa'
-                        : 'Chỉ xem'
-                  })`}
-                  className="relative group transition-transform hover:scale-105 hover:z-10"
+                  title={`${member.fullName} (${TRIP_COMPANIONS_CONFIG.ROLES[member.role]})`}
+                  className="relative"
                 >
-                  <Avatar className="size-10 border-2 border-card shadow-xs ring-1 ring-border/40 shrink-0">
+                  <Avatar className="size-10 border-2 border-white ring-1 ring-slate-200 shrink-0">
                     <AvatarImage src={member.avatarUrl || undefined} alt={member.fullName} />
-                    <AvatarFallback className="text-xs font-bold bg-primary text-primary-foreground">
+                    <AvatarFallback className="text-xs font-bold bg-[#10243A] text-white">
                       {member.fullName.slice(0, 2).toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
                   {member.role === 'OWNER' && (
-                    <div className="absolute -top-1 -right-1 size-4 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-xs">
-                      <Crown className="size-2.5" />
+                    <div
+                      title={TRIP_COMPANIONS_CONFIG.ROLES.OWNER}
+                      className="absolute -top-1 -right-1 size-4 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-xs"
+                    >
+                      <i className="fa-solid fa-crown text-[8px]" aria-hidden="true" />
                     </div>
                   )}
                 </div>
               ))}
 
               {remainingCount > 0 && (
-                <div
+                <button
+                  type="button"
                   onClick={() => setIsPanelOpen(true)}
-                  className="size-10 rounded-full bg-muted border-2 border-card flex items-center justify-center text-xs font-bold text-muted-foreground shadow-xs cursor-pointer hover:bg-muted/80 transition-colors"
+                  className="size-10 rounded-full bg-slate-100 border-2 border-white flex items-center justify-center text-xs font-bold text-slate-600 cursor-pointer hover:bg-slate-200 transition-colors tabular-nums"
                 >
                   +{remainingCount}
-                </div>
+                </button>
               )}
 
               {canManageMembers && (
@@ -105,9 +102,9 @@ export function TripCompanionCard({
                   onClick={() => setIsInviteDialogOpen(true)}
                   title="Mời bạn đồng hành"
                   aria-label="Mời bạn đồng hành"
-                  className="size-10 rounded-full border-2 border-dashed border-border hover:border-primary hover:text-primary text-muted-foreground flex items-center justify-center transition-colors cursor-pointer ml-3 shrink-0"
+                  className="size-10 rounded-full border-2 border-dashed border-slate-300 hover:border-[#0194F3] hover:text-[#0194F3] text-slate-400 flex items-center justify-center transition-colors cursor-pointer ml-4 shrink-0"
                 >
-                  <Plus className="size-4" />
+                  <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -115,32 +112,31 @@ export function TripCompanionCard({
         </div>
 
         {/* Description */}
-        <p className="text-xs text-muted-foreground leading-relaxed">
+        <p className="text-xs text-slate-500 leading-relaxed">
           {canManageMembers
-            ? 'Mời bạn bè cùng lên kế hoạch và chỉnh sửa lịch trình chuyến đi.'
-            : 'Đang cùng lên kế hoạch cho chuyến đi du lịch này.'}
+            ? 'Mời bạn bè tham gia chuyến đi để cùng xem lịch trình, đóng góp ý kiến và bình chọn điểm dừng.'
+            : 'Cùng các thành viên thảo luận và bình chọn điểm đến cho chuyến đi.'}
         </p>
 
         {/* Action Button */}
         {canManageMembers ? (
-          <Button
+          <button
             type="button"
             onClick={() => setIsInviteDialogOpen(true)}
-            className="w-full h-10 rounded-xl text-xs font-semibold gap-1.5 cursor-pointer shadow-xs bg-primary text-primary-foreground hover:bg-primary/90"
+            className="w-full h-10 rounded-xl bg-[#0194F3] hover:bg-[#007AD0] text-white text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
           >
-            <Plus className="size-4" />
+            <i className="fa-solid fa-user-plus text-xs" aria-hidden="true" />
             <span>Mời bạn cùng đi</span>
-          </Button>
+          </button>
         ) : (
-          <Button
+          <button
             type="button"
-            variant="outline"
             onClick={() => setIsPanelOpen(true)}
-            className="w-full h-10 rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
+            className="w-full h-10 rounded-xl border border-slate-200 bg-white hover:bg-[#F0F7FF] text-[#10243A] hover:text-[#0194F3] text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
           >
-            <Users className="size-4 text-primary" />
-            <span>Xem bạn đồng hành</span>
-          </Button>
+            <i className="fa-solid fa-users text-xs text-[#0194F3]" aria-hidden="true" />
+            <span>Xem danh sách thành viên</span>
+          </button>
         )}
       </div>
 

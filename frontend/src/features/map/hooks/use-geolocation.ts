@@ -118,7 +118,9 @@ export function useGeolocation() {
           toast.error(reason);
         }
         setState((prev) => ({
-          status: prev.coordinate ? "success" : "error",
+          // Always surface the error so the user knows the explicit request failed,
+          // even if a cached coordinate is preserved for distance-reference.
+          status: "error",
           coordinate: prev.coordinate,
           message: reason,
         }));

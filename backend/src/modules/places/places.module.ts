@@ -30,4 +30,3 @@ import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
   ],
 })
 export class PlacesModule {}
-

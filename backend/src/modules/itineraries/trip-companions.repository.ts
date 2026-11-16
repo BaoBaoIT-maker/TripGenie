@@ -59,8 +59,14 @@ export class TripCompanionsRepository {
     });
   }
 
-  private async generateUniqueInviteCode(tx: Prisma.TransactionClient): Promise<string> {
-    for (let i = 0; i < TRIP_COMPANIONS_CONSTANTS.MAX_INVITE_CODE_RETRIES; i++) {
+  private async generateUniqueInviteCode(
+    tx: Prisma.TransactionClient,
+  ): Promise<string> {
+    for (
+      let i = 0;
+      i < TRIP_COMPANIONS_CONSTANTS.MAX_INVITE_CODE_RETRIES;
+      i++
+    ) {
       const code = crypto
         .randomBytes(TRIP_COMPANIONS_CONSTANTS.INVITE_CODE_BYTES)
         .toString('hex')
@@ -72,6 +78,58 @@ export class TripCompanionsRepository {
       if (!existing) return code;
     }
     return crypto.randomUUID().slice(0, 12).toUpperCase();
+  }
+
+  /**
+   * Ensure a TripGroup and OWNER membership exist for the itinerary within a transaction.
+   */
+  async ensureTripGroup(
+    tx: Prisma.TransactionClient,
+    itineraryId: string,
+    ownerId: string,
+  ): Promise<{ id: string; maxMembers: number }> {
+    let tripGroup = await tx.tripGroup.findUnique({
+      where: { itineraryId },
+      select: { id: true, maxMembers: true },
+    });
+
+    if (!tripGroup) {
+      const inviteCode = await this.generateUniqueInviteCode(tx);
+      tripGroup = await tx.tripGroup.create({
+        data: {
+          itineraryId,
+          name: TRIP_COMPANIONS_CONSTANTS.DEFAULT_GROUP_NAME,
+          inviteCode,
+          members: {
+            create: {
+              userId: ownerId,
+              role: 'OWNER',
+            },
+          },
+        },
+        select: { id: true, maxMembers: true },
+      });
+    } else {
+      const ownerMember = await tx.groupMember.findUnique({
+        where: {
+          tripGroupId_userId: {
+            tripGroupId: tripGroup.id,
+            userId: ownerId,
+          },
+        },
+      });
+      if (!ownerMember) {
+        await tx.groupMember.create({
+          data: {
+            tripGroupId: tripGroup.id,
+            userId: ownerId,
+            role: 'OWNER',
+          },
+        });
+      }
+    }
+
+    return tripGroup;
   }
 
   async createInvitation(
@@ -91,55 +149,19 @@ export class TripCompanionsRepository {
       }
 
       if (itinerary.creatorId !== inviterId) {
-        throw new ForbiddenException('Chỉ chủ sở hữu lịch trình mới có quyền mời bạn đồng hành.');
+        throw new ForbiddenException(
+          'Chỉ chủ sở hữu lịch trình mới có quyền mời bạn đồng hành.',
+        );
       }
 
       if (inviterId === inviteeId) {
-        throw new BadRequestException('Bạn không thể tự gửi lời mời cho chính mình.');
+        throw new BadRequestException(
+          'Bạn không thể tự gửi lời mời cho chính mình.',
+        );
       }
 
       // 2. Ensure TripGroup exists with inviter as OWNER
-      let tripGroup = await tx.tripGroup.findUnique({
-        where: { itineraryId },
-        select: { id: true, maxMembers: true },
-      });
-
-      if (!tripGroup) {
-        const inviteCode = await this.generateUniqueInviteCode(tx);
-        tripGroup = await tx.tripGroup.create({
-          data: {
-            itineraryId,
-            name: 'Nhóm đồng hành',
-            inviteCode,
-            members: {
-              create: {
-                userId: inviterId,
-                role: 'OWNER',
-              },
-            },
-          },
-          select: { id: true, maxMembers: true },
-        });
-      } else {
-        // Ensure owner is a group member
-        const ownerMember = await tx.groupMember.findUnique({
-          where: {
-            tripGroupId_userId: {
-              tripGroupId: tripGroup.id,
-              userId: inviterId,
-            },
-          },
-        });
-        if (!ownerMember) {
-          await tx.groupMember.create({
-            data: {
-              tripGroupId: tripGroup.id,
-              userId: inviterId,
-              role: 'OWNER',
-            },
-          });
-        }
-      }
+      const tripGroup = await this.ensureTripGroup(tx, itineraryId, inviterId);
 
       // 3. Check if invitee is already a member
       const existingMember = await tx.groupMember.findUnique({
@@ -152,7 +174,9 @@ export class TripCompanionsRepository {
       });
 
       if (existingMember) {
-        throw new BadRequestException('Thành viên này đã tham gia chuyến đi rồi.');
+        throw new BadRequestException(
+          'Thành viên này đã tham gia chuyến đi rồi.',
+        );
       }
 
       // 4. Check / Expire old invitations
@@ -180,7 +204,8 @@ export class TripCompanionsRepository {
 
       // 5. Create new Invitation with TTL
       const expiresAt = new Date(
-        now.getTime() + TRIP_COMPANIONS_CONSTANTS.INVITATION_TTL_DAYS * 24 * 60 * 60 * 1000,
+        now.getTime() +
+          TRIP_COMPANIONS_CONSTANTS.INVITATION_TTL_DAYS * 24 * 60 * 60 * 1000,
       );
 
       const invitation = await tx.tripInvitation.create({
@@ -211,17 +236,24 @@ export class TripCompanionsRepository {
     });
   }
 
-  async listCompanions(itineraryId: string, viewerId: string): Promise<CompanionsListResponseDto> {
+  async listCompanions(
+    itineraryId: string,
+    viewerId: string,
+  ): Promise<CompanionsListResponseDto> {
     const itinerary = await this.findItineraryHeader(itineraryId);
     if (!itinerary) {
       throw new NotFoundException('Không tìm thấy lịch trình.');
     }
 
     const isOwner = itinerary.creatorId === viewerId;
-    const isMember = Boolean(itinerary.tripGroup?.members.some((m) => m.userId === viewerId));
+    const isMember = Boolean(
+      itinerary.tripGroup?.members.some((m) => m.userId === viewerId),
+    );
 
     if (!isOwner && !isMember) {
-      throw new ForbiddenException('Bạn không có quyền xem danh sách bạn đồng hành của lịch trình này.');
+      throw new ForbiddenException(
+        'Bạn không có quyền xem danh sách bạn đồng hành của lịch trình này.',
+      );
     }
 
     if (!itinerary.tripGroup) {
@@ -259,7 +291,7 @@ export class TripCompanionsRepository {
       userId: gm.user.id,
       fullName: gm.user.fullName,
       avatarUrl: gm.user.avatarUrl,
-      role: gm.role as 'OWNER' | 'EDITOR' | 'VIEWER',
+      role: gm.role,
     }));
 
     // Ensure owner is first in the list
@@ -331,7 +363,9 @@ export class TripCompanionsRepository {
     });
 
     if (!inv || !inv.tripGroup.itinerary || inv.tripGroup.itinerary.deletedAt) {
-      throw new NotFoundException('Không tìm thấy lời mời hoặc chuyến đi đã bị xóa.');
+      throw new NotFoundException(
+        'Không tìm thấy lời mời hoặc chuyến đi đã bị xóa.',
+      );
     }
 
     // Only inviter or invitee can view invitation details
@@ -356,8 +390,10 @@ export class TripCompanionsRepository {
         id: inv.tripGroup.itinerary.id,
         title: inv.tripGroup.itinerary.title,
         destination: inv.tripGroup.itinerary.destination,
-        startDate: inv.tripGroup.itinerary.startDate?.toISOString().slice(0, 10) ?? null,
-        endDate: inv.tripGroup.itinerary.endDate?.toISOString().slice(0, 10) ?? null,
+        startDate:
+          inv.tripGroup.itinerary.startDate?.toISOString().slice(0, 10) ?? null,
+        endDate:
+          inv.tripGroup.itinerary.endDate?.toISOString().slice(0, 10) ?? null,
         coverPhoto: stored.coverPhoto || stored.coverImage || null,
       },
       inviter: {
@@ -378,18 +414,28 @@ export class TripCompanionsRepository {
         include: {
           tripGroup: {
             include: {
-              itinerary: { select: { id: true, creatorId: true, deletedAt: true } },
+              itinerary: {
+                select: { id: true, creatorId: true, deletedAt: true },
+              },
             },
           },
         },
       });
 
-      if (!inv || !inv.tripGroup.itinerary || inv.tripGroup.itinerary.deletedAt) {
-        throw new NotFoundException('Không tìm thấy lời mời hoặc chuyến đi đã bị xóa.');
+      if (
+        !inv ||
+        !inv.tripGroup.itinerary ||
+        inv.tripGroup.itinerary.deletedAt
+      ) {
+        throw new NotFoundException(
+          'Không tìm thấy lời mời hoặc chuyến đi đã bị xóa.',
+        );
       }
 
       if (inv.inviteeId !== inviteeId) {
-        throw new ForbiddenException('Bạn không phải là người nhận của lời mời này.');
+        throw new ForbiddenException(
+          'Bạn không phải là người nhận của lời mời này.',
+        );
       }
 
       // Check idempotent accept
@@ -408,7 +454,9 @@ export class TripCompanionsRepository {
             role: 'VIEWER',
           };
         }
-        throw new BadRequestException('Bạn đã từng rời hoặc bị xóa khỏi nhóm chuyến đi này.');
+        throw new BadRequestException(
+          'Bạn đã từng rời hoặc bị xóa khỏi nhóm chuyến đi này.',
+        );
       }
 
       const now = new Date();
@@ -419,7 +467,9 @@ export class TripCompanionsRepository {
             data: { status: 'EXPIRED' },
           });
         }
-        throw new BadRequestException('Lời mời đã hết hạn hoặc không còn hiệu lực.');
+        throw new BadRequestException(
+          'Lời mời đã hết hạn hoặc không còn hiệu lực.',
+        );
       }
 
       // Check maxMembers capacity
@@ -428,7 +478,9 @@ export class TripCompanionsRepository {
       });
 
       if (currentMemberCount >= inv.tripGroup.maxMembers) {
-        throw new BadRequestException('Chuyến đi đã đạt số lượng thành viên tối đa.');
+        throw new BadRequestException(
+          'Chuyến đi đã đạt số lượng thành viên tối đa.',
+        );
       }
 
       // Update invitation
@@ -484,18 +536,26 @@ export class TripCompanionsRepository {
         include: {
           tripGroup: {
             include: {
-              itinerary: { select: { id: true, creatorId: true, deletedAt: true } },
+              itinerary: {
+                select: { id: true, creatorId: true, deletedAt: true },
+              },
             },
           },
         },
       });
 
-      if (!inv || !inv.tripGroup.itinerary || inv.tripGroup.itinerary.deletedAt) {
+      if (
+        !inv ||
+        !inv.tripGroup.itinerary ||
+        inv.tripGroup.itinerary.deletedAt
+      ) {
         throw new NotFoundException('Không tìm thấy lời mời.');
       }
 
       if (inv.inviteeId !== inviteeId) {
-        throw new ForbiddenException('Bạn không phải là người nhận của lời mời này.');
+        throw new ForbiddenException(
+          'Bạn không phải là người nhận của lời mời này.',
+        );
       }
 
       if (inv.status === 'DECLINED') {
@@ -503,7 +563,9 @@ export class TripCompanionsRepository {
       }
 
       if (inv.status !== 'PENDING') {
-        throw new BadRequestException('Lời mời không ở trạng thái chờ phản hồi.');
+        throw new BadRequestException(
+          'Lời mời không ở trạng thái chờ phản hồi.',
+        );
       }
 
       const now = new Date();
@@ -550,7 +612,9 @@ export class TripCompanionsRepository {
       }
 
       if (inv.tripGroup.itinerary.creatorId !== ownerId) {
-        throw new ForbiddenException('Chỉ chủ sở hữu chuyến đi mới có quyền thu hồi lời mời.');
+        throw new ForbiddenException(
+          'Chỉ chủ sở hữu chuyến đi mới có quyền thu hồi lời mời.',
+        );
       }
 
       if (inv.status === 'REVOKED') {
@@ -558,7 +622,9 @@ export class TripCompanionsRepository {
       }
 
       if (inv.status !== 'PENDING') {
-        throw new BadRequestException('Chỉ có thể thu hồi lời mời đang chờ phản hồi.');
+        throw new BadRequestException(
+          'Chỉ có thể thu hồi lời mời đang chờ phản hồi.',
+        );
       }
 
       const now = new Date();
@@ -588,15 +654,23 @@ export class TripCompanionsRepository {
     return this.prisma.$transaction(async (tx) => {
       const itinerary = await tx.itinerary.findUnique({
         where: { id: itineraryId },
-        select: { id: true, creatorId: true, tripGroup: { select: { id: true } } },
+        select: {
+          id: true,
+          creatorId: true,
+          tripGroup: { select: { id: true } },
+        },
       });
 
       if (!itinerary) throw new NotFoundException('Không tìm thấy lịch trình.');
       if (itinerary.creatorId !== ownerId) {
-        throw new ForbiddenException('Chỉ chủ sở hữu mới có quyền phân quyền thành viên.');
+        throw new ForbiddenException(
+          'Chỉ chủ sở hữu mới có quyền phân quyền thành viên.',
+        );
       }
       if (itinerary.creatorId === targetUserId) {
-        throw new BadRequestException('Không thể thay đổi quyền của chủ sở hữu chuyến đi.');
+        throw new BadRequestException(
+          'Không thể thay đổi quyền của chủ sở hữu chuyến đi.',
+        );
       }
       if (!itinerary.tripGroup) {
         throw new NotFoundException('Nhóm chuyến đi chưa được khởi tạo.');
@@ -637,15 +711,23 @@ export class TripCompanionsRepository {
     return this.prisma.$transaction(async (tx) => {
       const itinerary = await tx.itinerary.findUnique({
         where: { id: itineraryId },
-        select: { id: true, creatorId: true, tripGroup: { select: { id: true } } },
+        select: {
+          id: true,
+          creatorId: true,
+          tripGroup: { select: { id: true } },
+        },
       });
 
       if (!itinerary) throw new NotFoundException('Không tìm thấy lịch trình.');
       if (itinerary.creatorId !== ownerId) {
-        throw new ForbiddenException('Chỉ chủ sở hữu mới có quyền xóa thành viên.');
+        throw new ForbiddenException(
+          'Chỉ chủ sở hữu mới có quyền xóa thành viên.',
+        );
       }
       if (itinerary.creatorId === targetUserId) {
-        throw new BadRequestException('Không thể xóa chủ sở hữu khỏi chuyến đi.');
+        throw new BadRequestException(
+          'Không thể xóa chủ sở hữu khỏi chuyến đi.',
+        );
       }
       if (!itinerary.tripGroup) {
         throw new NotFoundException('Nhóm chuyến đi chưa được khởi tạo.');
@@ -669,12 +751,18 @@ export class TripCompanionsRepository {
     return this.prisma.$transaction(async (tx) => {
       const itinerary = await tx.itinerary.findUnique({
         where: { id: itineraryId },
-        select: { id: true, creatorId: true, tripGroup: { select: { id: true } } },
+        select: {
+          id: true,
+          creatorId: true,
+          tripGroup: { select: { id: true } },
+        },
       });
 
       if (!itinerary) throw new NotFoundException('Không tìm thấy lịch trình.');
       if (itinerary.creatorId === userId) {
-        throw new BadRequestException('Chủ sở hữu không thể rời khỏi chuyến đi.');
+        throw new BadRequestException(
+          'Chủ sở hữu không thể rời khỏi chuyến đi.',
+        );
       }
       if (!itinerary.tripGroup) {
         throw new NotFoundException('Nhóm chuyến đi chưa được khởi tạo.');

@@ -7,8 +7,14 @@ import { ConfigService } from '@nestjs/config';
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
   constructor(private readonly configService: ConfigService) {
     super({
-      clientID: configService.get<string>('GOOGLE_CLIENT_ID', 'dummy_client_id'),
-      clientSecret: configService.get<string>('GOOGLE_CLIENT_SECRET', 'dummy_client_secret'),
+      clientID: configService.get<string>(
+        'GOOGLE_CLIENT_ID',
+        'dummy_client_id',
+      ),
+      clientSecret: configService.get<string>(
+        'GOOGLE_CLIENT_SECRET',
+        'dummy_client_secret',
+      ),
       callbackURL: configService.get<string>(
         'GOOGLE_CALLBACK_URL',
         'http://localhost:3000/api/v1/auth/google/callback',
@@ -35,14 +41,18 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
 
     if (!email) {
       return done(
-        new UnauthorizedException('Không tìm thấy địa chỉ email từ tài khoản Google'),
+        new UnauthorizedException(
+          'Không tìm thấy địa chỉ email từ tài khoản Google',
+        ),
         undefined,
       );
     }
 
     if (!isEmailVerified) {
       return done(
-        new UnauthorizedException('Địa chỉ email từ tài khoản Google chưa được xác minh'),
+        new UnauthorizedException(
+          'Địa chỉ email từ tài khoản Google chưa được xác minh',
+        ),
         undefined,
       );
     }

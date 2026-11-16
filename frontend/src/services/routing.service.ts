@@ -174,11 +174,20 @@ export function estimateDurationMinutes(
 }
 
 /**
- * In-memory LRU route cache to prevent redundant OSRM network requests
- * when switching between day tabs or switching to "All days" view.
+ * In-memory LRU route cache + in-flight deduplication to prevent redundant OSRM
+ * requests when switching between day tabs or loading multi-day routes concurrently.
  */
 const routeCache = new Map<string, RouteResult>();
+const inFlightRoutes = new Map<string, Promise<RouteResult>>();
 const MAX_ROUTE_CACHE_SIZE = 100;
+
+function setBoundedRouteCache(key: string, value: RouteResult): void {
+  if (routeCache.size >= MAX_ROUTE_CACHE_SIZE) {
+    const oldestKey = routeCache.keys().next().value;
+    if (oldestKey) routeCache.delete(oldestKey);
+  }
+  routeCache.set(key, value);
+}
 
 /**
  * Gọi API OSRM để lấy tuyến đường nhiều chặng (GeoJSON) theo phương tiện
@@ -200,86 +209,124 @@ export async function fetchMultiStopRoute(
     .join(";");
 
   const cacheKey = `${profile}:${coordsString}`;
-  if (routeCache.has(cacheKey)) {
-    return routeCache.get(cacheKey)!;
+  const cached = routeCache.get(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const existingFlight = inFlightRoutes.get(cacheKey);
+  if (existingFlight) {
+    return existingFlight;
   }
 
   const url = `https://router.project-osrm.org/route/v1/${profile}/${coordsString}?overview=full&geometries=geojson`;
 
-  try {
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { Accept: "application/json" },
-      signal: AbortSignal.timeout(7000), // Timeout sau 7 giây
-    });
+  const requestPromise = (async (): Promise<RouteResult> => {
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: AbortSignal.timeout(7000), // Timeout sau 7 giây
+      });
 
-    if (!res.ok) {
-      throw new Error(`OSRM responded with status ${res.status}`);
+      if (!res.ok) {
+        throw new Error(`OSRM responded with status ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data.code !== "Ok" || !data.routes || data.routes.length === 0) {
+        throw new Error("No route found from OSRM");
+      }
+
+      const primaryRoute = data.routes[0];
+      const distanceKm = primaryRoute.distance / 1000;
+      const durationMinutes = computeRealisticDurationMinutes(distanceKm, mode);
+      const legs = primaryRoute.legs?.map((leg: { distance: number }) => ({
+        distanceKm: leg.distance / 1000,
+        durationMinutes: computeRealisticDurationMinutes(leg.distance / 1000, mode),
+      }));
+
+      const result: RouteResult = {
+        distanceKm,
+        durationMinutes,
+        geometry: primaryRoute.geometry as GeoJSON.LineString,
+        mode,
+        origin: points[0],
+        destination: points[points.length - 1],
+        waypoints: points,
+        legs,
+      };
+
+      setBoundedRouteCache(cacheKey, result);
+      return result;
+    } catch (err) {
+      console.warn("OSRM routing unavailable or timed out, generating geometric fallback route:", err);
+
+      let totalEstimatedKm = 0;
+      for (let i = 0; i < points.length - 1; i++) {
+        const segKm = calculateDirectDistanceKm(points[i], points[i + 1]) * 1.25;
+        totalEstimatedKm += segKm;
+      }
+      const durationMin = computeRealisticDurationMinutes(totalEstimatedKm, mode);
+
+      const fallbackResult: RouteResult = {
+        distanceKm: totalEstimatedKm,
+        durationMinutes: durationMin,
+        geometry: {
+          type: "LineString",
+          coordinates: points.map((p) => [p.longitude, p.latitude]),
+        },
+        mode,
+        origin: points[0],
+        destination: points[points.length - 1],
+        waypoints: points,
+        fallback: true,
+      };
+
+      // Fallback geometry is intentionally NOT cached: a transient OSRM outage must not pin straight lines for the session.
+      return fallbackResult;
+    } finally {
+      inFlightRoutes.delete(cacheKey);
     }
+  })();
 
-    const data = await res.json();
-    if (data.code !== "Ok" || !data.routes || data.routes.length === 0) {
-      throw new Error("No route found from OSRM");
-    }
+  inFlightRoutes.set(cacheKey, requestPromise);
+  return requestPromise;
+}
 
-    const primaryRoute = data.routes[0];
-    const distanceKm = primaryRoute.distance / 1000;
-    const durationMinutes = computeRealisticDurationMinutes(distanceKm, mode);
-    const legs = primaryRoute.legs?.map((leg: { distance: number }) => ({
-      distanceKm: leg.distance / 1000,
-      durationMinutes: computeRealisticDurationMinutes(leg.distance / 1000, mode),
-    }));
+/**
+ * Fetches OSRM road polylines for all days concurrently via Promise.all
+ * instead of awaiting each day sequentially.
+ */
+export async function fetchDailyRouteSegments<T extends { dayNumber: number; points: Coordinate[] }>(
+  days: T[],
+  mode: RouteVehicleMode = "motorcycle"
+): Promise<Array<{ dayNumber: number; coordinates: [number, number][] }>> {
+  return Promise.all(
+    days.map(async (day) => {
+      if (day.points.length < 2) {
+        return {
+          dayNumber: day.dayNumber,
+          coordinates: day.points.map((p) => [p.longitude, p.latitude] as [number, number]),
+        };
+      }
 
-    const result: RouteResult = {
-      distanceKm,
-      durationMinutes,
-      geometry: primaryRoute.geometry as GeoJSON.LineString,
-      mode,
-      origin: points[0],
-      destination: points[points.length - 1],
-      waypoints: points,
-      legs,
-    };
+      try {
+        const res = await fetchMultiStopRoute(day.points, mode);
+        const coords = res.geometry?.coordinates as [number, number][] | undefined;
+        if (coords && coords.length >= 2) {
+          return { dayNumber: day.dayNumber, coordinates: coords };
+        }
+      } catch {
+        // Fallback to direct coordinates below
+      }
 
-    if (routeCache.size >= MAX_ROUTE_CACHE_SIZE) {
-      const oldestKey = routeCache.keys().next().value;
-      if (oldestKey) routeCache.delete(oldestKey);
-    }
-    routeCache.set(cacheKey, result);
-
-    return result;
-  } catch (err) {
-    console.warn("OSRM routing unavailable or timed out, generating geometric fallback route:", err);
-
-    let totalEstimatedKm = 0;
-    for (let i = 0; i < points.length - 1; i++) {
-      const segKm = calculateDirectDistanceKm(points[i], points[i + 1]) * 1.25;
-      totalEstimatedKm += segKm;
-    }
-    const durationMin = computeRealisticDurationMinutes(totalEstimatedKm, mode);
-
-    const fallbackResult: RouteResult = {
-      distanceKm: totalEstimatedKm,
-      durationMinutes: durationMin,
-      geometry: {
-        type: "LineString",
-        coordinates: points.map((p) => [p.longitude, p.latitude]),
-      },
-      mode,
-      origin: points[0],
-      destination: points[points.length - 1],
-      waypoints: points,
-      fallback: true,
-    };
-
-    if (routeCache.size >= MAX_ROUTE_CACHE_SIZE) {
-      const oldestKey = routeCache.keys().next().value;
-      if (oldestKey) routeCache.delete(oldestKey);
-    }
-    routeCache.set(cacheKey, fallbackResult);
-
-    return fallbackResult;
-  }
+      return {
+        dayNumber: day.dayNumber,
+        coordinates: day.points.map((p) => [p.longitude, p.latitude] as [number, number]),
+      };
+    })
+  );
 }
 
 /**

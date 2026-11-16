@@ -2,17 +2,7 @@
 
 import * as React from 'react';
 import { Dialog } from '@base-ui/react/dialog';
-import {
-  BookOpen,
-  Compass,
-  Loader2,
-  RotateCcw,
-  Send,
-  ShieldAlert,
-  Users,
-  Utensils,
-  X,
-} from 'lucide-react';
+import { TripGenieMark } from '@/components/common/TripGenieMark';
 import {
   ADVISOR_UI_CONSTANTS,
   AdvisorMessageItem,
@@ -34,10 +24,10 @@ const QUICK_PROMPT_ICONS: Record<
   AdvisorQuickPromptItem['category'],
   React.ReactNode
 > = {
-  guide: <BookOpen className="h-4 w-4 text-primary" aria-hidden="true" />,
-  place: <Utensils className="h-4 w-4 text-primary" aria-hidden="true" />,
-  safety: <ShieldAlert className="h-4 w-4 text-primary" aria-hidden="true" />,
-  platform: <Users className="h-4 w-4 text-primary" aria-hidden="true" />,
+  guide: <i className="fa-solid fa-book-open text-sm text-primary" aria-hidden="true" />,
+  place: <i className="fa-solid fa-utensils text-sm text-primary" aria-hidden="true" />,
+  safety: <i className="fa-solid fa-shield-halved text-sm text-primary" aria-hidden="true" />,
+  platform: <i className="fa-solid fa-users text-sm text-primary" aria-hidden="true" />,
 };
 
 export function AdvisorDrawer({
@@ -108,25 +98,25 @@ export function AdvisorDrawer({
   return (
     <Dialog.Root open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <Dialog.Portal>
-        {/* Mobile Backdrop */}
-        <Dialog.Backdrop className="dialog-backdrop-subtle fixed inset-0 z-50 bg-black/40 backdrop-blur-xs md:hidden" />
+        {/* Scrim Backdrop */}
+        <Dialog.Backdrop className="dialog-backdrop-subtle fixed inset-0 z-50 bg-slate-950/35" />
 
-        {/* Drawer Popup with Controlled Exit Animation */}
+        {/* Right Slide-over Drawer (Clean Editorial solid surface) */}
         <Dialog.Popup
           aria-label={ADVISOR_UI_CONSTANTS.HEADER_TITLE}
-          className="advisor-drawer-popup fixed inset-0 z-50 flex flex-col bg-card text-card-foreground md:inset-auto md:bottom-24 md:right-6 md:h-[650px] md:max-h-[calc(100dvh-7rem)] md:w-[420px] md:rounded-2xl md:border md:border-border md:bg-card/95 md:shadow-2xl md:backdrop-blur-md outline-none"
+          className="advisor-drawer-popup fixed inset-y-0 right-0 z-50 flex h-full w-full flex-col border-l border-border bg-card text-card-foreground shadow-2xl outline-none sm:w-[440px] md:w-[460px]"
         >
           {/* Header */}
-          <header className="flex shrink-0 items-center justify-between border-b border-primary/20 bg-primary px-4 py-3 text-primary-foreground md:rounded-t-2xl">
+          <header className="flex shrink-0 items-center justify-between border-b border-border bg-card px-4 py-3.5">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-foreground/15">
-                <Compass className="h-5 w-5 text-primary-foreground" aria-hidden="true" />
+              <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-border bg-background">
+                <TripGenieMark className="size-7" />
               </div>
-              <div>
-                <Dialog.Title className="text-sm font-bold tracking-tight text-primary-foreground">
+              <div className="min-w-0">
+                <Dialog.Title className="truncate text-sm font-bold tracking-tight text-foreground">
                   {ADVISOR_UI_CONSTANTS.HEADER_TITLE}
                 </Dialog.Title>
-                <Dialog.Description className="text-xs text-primary-foreground/85">
+                <Dialog.Description className="truncate text-xs font-medium text-muted-foreground">
                   {ADVISOR_UI_CONSTANTS.HEADER_SUBTITLE}
                 </Dialog.Description>
               </div>
@@ -139,17 +129,17 @@ export function AdvisorDrawer({
                   onClick={onNewSession}
                   aria-label="Bắt đầu cuộc trò chuyện mới"
                   title="Cuộc trò chuyện mới"
-                  className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-xl text-primary-foreground/85 transition-colors motion-reduce:transition-none hover:bg-primary-foreground/15 hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground"
+                  className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-xl text-muted-foreground transition-colors motion-reduce:transition-none hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                  <i className="fa-solid fa-rotate-left text-sm" aria-hidden="true" />
                 </button>
               )}
               <Dialog.Close
                 aria-label="Đóng cửa sổ tư vấn AI"
                 title="Đóng (Esc)"
-                className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-xl text-primary-foreground/85 transition-colors motion-reduce:transition-none hover:bg-primary-foreground/15 hover:text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground"
+                className="flex min-h-[44px] min-w-[44px] cursor-pointer items-center justify-center rounded-xl text-muted-foreground transition-colors motion-reduce:transition-none hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <X className="h-5 w-5" aria-hidden="true" />
+                <i className="fa-solid fa-xmark text-base" aria-hidden="true" />
               </Dialog.Close>
             </div>
           </header>
@@ -157,12 +147,12 @@ export function AdvisorDrawer({
           {/* Scrollable Message Stream */}
           <div
             aria-live="polite"
-            className="flex-1 overflow-y-auto bg-muted/40 px-4 py-4 space-y-4"
+            className="custom-scroll flex-1 space-y-4 overflow-y-auto bg-background px-4 py-4"
           >
             {isRestoring ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-muted-foreground">
-                <Loader2
-                  className="h-6 w-6 animate-spin motion-reduce:animate-none text-primary"
+              <div className="flex h-full flex-col items-center justify-center gap-2.5 text-muted-foreground">
+                <i
+                  className="fa-solid fa-circle-notch fa-spin text-xl text-primary"
                   aria-hidden="true"
                 />
                 <span className="text-xs font-medium">
@@ -170,23 +160,22 @@ export function AdvisorDrawer({
                 </span>
               </div>
             ) : messages.length === 0 ? (
-              <div className="flex h-full flex-col justify-center gap-4 py-6">
-                <div className="text-center space-y-1.5 px-2">
-                  <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                    <Compass className="h-6 w-6" aria-hidden="true" />
+              <div className="flex h-full flex-col justify-center gap-5 py-6">
+                <div className="space-y-2 px-2 text-center">
+                  <div className="mx-auto inline-flex size-14 items-center justify-center rounded-2xl border border-border bg-card shadow-2xs">
+                    <TripGenieMark className="size-9" />
                   </div>
-                  <h3 className="text-sm font-bold text-foreground">
-                    Chào bạn! Mình có thể giúp gì cho bạn?
+                  <h3 className="text-base font-bold tracking-tight text-foreground">
+                    {ADVISOR_UI_CONSTANTS.WELCOME_TITLE}
                   </h3>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Hỏi mình về lịch trình, điểm check-in hot, ẩm thực bản địa hay
-                    kinh nghiệm du lịch thực tế tại Việt Nam.
+                  <p className="text-xs leading-relaxed text-muted-foreground">
+                    {ADVISOR_UI_CONSTANTS.WELCOME_DESCRIPTION}
                   </p>
                 </div>
 
-                <div className="space-y-1.5 pt-2">
-                  <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-1">
-                    Gợi ý câu hỏi nhanh:
+                <div className="space-y-2 pt-1">
+                  <p className="px-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Gợi ý câu hỏi nhanh
                   </p>
                   <div className="grid gap-2">
                     {ADVISOR_UI_CONSTANTS.QUICK_PROMPTS.map((prompt) => (
@@ -194,9 +183,9 @@ export function AdvisorDrawer({
                         key={prompt.id}
                         type="button"
                         onClick={() => onSendMessage(prompt.prompt)}
-                        className="flex items-center gap-2.5 rounded-xl border border-border/80 bg-card p-2.5 text-left text-xs text-foreground transition-all motion-reduce:transition-none hover:border-primary/40 hover:bg-primary/5 hover:text-primary cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        className="flex min-h-[44px] cursor-pointer items-center gap-3 rounded-xl border border-border bg-card px-3 py-2.5 text-left text-xs font-semibold text-foreground transition-colors motion-reduce:transition-none hover:border-primary/50 hover:bg-secondary/60 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <span className="shrink-0">
+                        <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-secondary">
                           {QUICK_PROMPT_ICONS[prompt.category]}
                         </span>
                         <span className="flex-1 line-clamp-2">
@@ -210,12 +199,16 @@ export function AdvisorDrawer({
             ) : (
               <>
                 {messages.map((item) => (
-                  <AdvisorMessageBubble key={item.id} message={item} />
+                  <AdvisorMessageBubble
+                    key={item.id}
+                    message={item}
+                    onNavigate={onClose}
+                  />
                 ))}
                 {isLoading && (
-                  <div className="flex items-center gap-2 rounded-2xl bg-card border border-border/80 px-4 py-3 text-xs text-muted-foreground max-w-[85%] shadow-xs">
-                    <Loader2
-                      className="h-4 w-4 animate-spin motion-reduce:animate-none text-primary"
+                  <div className="flex max-w-[85%] items-center gap-2.5 rounded-2xl border border-border bg-card px-4 py-3 text-xs font-medium text-muted-foreground shadow-2xs">
+                    <i
+                      className="fa-solid fa-circle-notch fa-spin text-sm text-primary"
                       aria-hidden="true"
                     />
                     <span>Genie đang soạn câu trả lời cho bạn...</span>
@@ -227,7 +220,7 @@ export function AdvisorDrawer({
           </div>
 
           {/* Footer Input Area */}
-          <footer className="border-t border-border bg-card p-3 md:rounded-b-2xl">
+          <footer className="border-t border-border bg-card px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
             <form onSubmit={handleSubmit} className="flex items-end gap-2">
               <div className="relative flex-1">
                 <textarea
@@ -238,8 +231,9 @@ export function AdvisorDrawer({
                   placeholder="Hỏi về địa điểm, cẩm nang, giá vé..."
                   rows={1}
                   disabled={isLoading}
+                  spellCheck={false}
                   aria-label="Nhập câu hỏi cho trợ lý du lịch"
-                  className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground transition-colors motion-reduce:transition-none focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                  className="w-full resize-none rounded-xl border border-border bg-background px-3.5 py-2.5 text-base text-foreground placeholder:text-muted-foreground transition-colors motion-reduce:transition-none focus:border-primary focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-50 sm:text-sm"
                   style={{
                     maxHeight: `${ADVISOR_UI_CONSTANTS.MAX_TEXTAREA_HEIGHT_PX}px`,
                   }}
@@ -250,12 +244,15 @@ export function AdvisorDrawer({
                 type="submit"
                 disabled={!inputText.trim() || isLoading}
                 aria-label="Gửi tin nhắn"
-                className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-primary text-primary-foreground transition-all motion-reduce:transition-none hover:bg-primary/90 active:scale-95 disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                className="flex size-11 shrink-0 cursor-pointer items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs transition-all motion-reduce:transition-none hover:bg-primary-hover active:scale-95 disabled:pointer-events-none disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+                  <i
+                    className="fa-solid fa-circle-notch fa-spin text-sm"
+                    aria-hidden="true"
+                  />
                 ) : (
-                  <Send className="h-4 w-4" />
+                  <i className="fa-solid fa-paper-plane text-sm" aria-hidden="true" />
                 )}
               </button>
             </form>

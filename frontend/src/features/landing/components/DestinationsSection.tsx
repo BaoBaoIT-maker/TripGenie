@@ -1,251 +1,215 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { SEASONAL_DESTINATIONS } from "../config/seasonal-destinations.config";
 
 export function DestinationsSection() {
   const trackRef = useRef<HTMLDivElement>(null);
+  // Mặc định chọn thẻ số 2 (chính giữa trong 5 thẻ: Mã Pí Lèng) làm tâm điểm
+  const [activeIndex, setActiveIndex] = useState(2);
 
-  const scrollTrack = (direction: number) => {
-    if (!trackRef.current) return;
-    trackRef.current.scrollBy({ left: direction * 360, behavior: "smooth" });
+  // Cập nhật trạng thái cuộn trên di động (Mobile snap)
+  const updateScrollState = useCallback(() => {
+    const track = trackRef.current;
+    if (!track) return;
+
+    // Chỉ tính index tự động theo scroll trên màn hình nhỏ (khi không có hover của chuột)
+    if (window.innerWidth < 768) {
+      const { scrollLeft, clientWidth } = track;
+      const trackCenter = scrollLeft + clientWidth / 2;
+      const cards = Array.from(track.children) as HTMLElement[];
+
+      let closestIndex = 0;
+      let minDistance = Infinity;
+
+      cards.forEach((card, idx) => {
+        const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+        const distance = Math.abs(trackCenter - cardCenter);
+        if (distance < minDistance) {
+          minDistance = distance;
+          closestIndex = idx;
+        }
+      });
+
+      setActiveIndex(closestIndex);
+    }
+  }, []);
+
+  useEffect(() => {
+    const track = trackRef.current;
+    if (!track) return;
+
+    track.addEventListener("scroll", updateScrollState, { passive: true });
+    return () => {
+      track.removeEventListener("scroll", updateScrollState);
+    };
+  }, [updateScrollState]);
+
+  // Cuộn thẻ vào tâm màn hình khi chạm vào trên di động
+  const scrollToCard = (index: number) => {
+    const track = trackRef.current;
+    if (!track) return;
+
+    const cards = track.children;
+    if (cards[index]) {
+      (cards[index] as HTMLElement).scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+        inline: "center",
+      });
+    }
   };
 
   return (
     <section
       id="destinations"
-      className="py-16 sm:py-20 bg-slate-50 border-b border-slate-200/80 overflow-hidden"
+      className="relative py-12 sm:py-16 bg-gradient-to-b from-[#F5F9FF] via-[#F0F7FF] to-[#F8FAFC] border-b border-slate-200/60 overflow-hidden"
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-          <div className="space-y-1.5 max-w-2xl">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#0194F3]">
-              Khám Phá Mùa Đẹp Nhất
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-black text-slate-950 tracking-tight">
-              Những vùng đất đáng đi nhất năm nay
-            </h2>
-            <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
-              Tuyển chọn các điểm đến có thời tiết lý tưởng, ẩm thực đặc sắc và đã có sẵn lộ trình mẫu chuẩn gu.
-            </p>
-          </div>
+      {/* Subtle Topographic Mesh Watermark */}
+      <div className="absolute inset-0 pointer-events-none opacity-[0.035] bg-[radial-gradient(#0194F3_1px,transparent_1px)] [background-size:24px_24px]" />
 
-          {/* Controls */}
-          <div className="flex items-center gap-3">
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8 sm:space-y-10">
+        {/* Section Header — Google Arts & Culture Editorial Style */}
+        <div className="text-center space-y-2 max-w-4xl mx-auto">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight">
+            Những điểm đến đáng trải nghiệm
+          </h2>
+          <div>
             <Link
               href="/explore"
-              className="text-xs font-bold text-slate-800 hover:text-[#0194F3] underline underline-offset-4 mr-2"
+              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-medium text-slate-500 hover:text-[#0194F3] transition-colors group"
             >
-              Xem tất cả 28 tỉnh thành →
+              <span>Xem bản đồ 34 tỉnh thành</span>
+              <i className="fa-solid fa-arrow-right text-xs group-hover:translate-x-0.5 transition-transform" />
             </Link>
-            <button
-              type="button"
-              onClick={() => scrollTrack(-1)}
-              aria-label="Lùi lại"
-              className="size-11 rounded-full border border-slate-300 bg-white hover:bg-slate-100 flex items-center justify-center text-slate-700 shadow-xs transition-colors cursor-pointer active:scale-95"
-            >
-              <svg
-                className="size-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2.5"
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollTrack(1)}
-              aria-label="Tiếp theo"
-              className="size-11 rounded-full border border-slate-300 bg-white hover:bg-slate-100 flex items-center justify-center text-slate-700 shadow-xs transition-colors cursor-pointer active:scale-95"
-            >
-              <svg
-                className="size-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2.5"
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </button>
           </div>
         </div>
 
-        {/* Horizontal Cards Track */}
-        <div
-          ref={trackRef}
-          id="cardsTrack"
-          className="flex gap-6 overflow-x-auto scroll-smooth snap-x snap-mandatory no-scrollbar pb-4 pt-1"
-        >
-          {/* Card 1: Đà Nẵng */}
-          <article className="group shrink-0 w-[300px] sm:w-[340px] bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden snap-start flex flex-col justify-between">
-            <div className="relative h-64 overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=800&auto=format&fit=crop&q=80"
-                alt="Đà Nẵng"
-                className="w-full h-full object-cover card-img"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-              <span className="absolute top-4 left-4 px-3 py-1 rounded-full bg-white/95 text-[11px] font-bold text-slate-900 shadow-xs">
-                Biển &amp; Di sản
-              </span>
-              <span className="absolute top-4 right-4 px-2.5 py-1 rounded-lg bg-[#0194F3] text-white text-xs font-bold">
-                3N2Đ Mẫu
-              </span>
-              <div className="absolute bottom-4 left-4 right-4 text-white">
-                <span className="text-xs font-medium text-blue-200">Miền Trung Việt Nam</span>
-                <h3 className="text-2xl font-bold">Đà Nẵng — Hội An</h3>
-              </div>
-            </div>
-            <div className="p-5 space-y-3">
-              <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
-                Bán đảo Sơn Trà hoang sơ, biển Mỹ Khê trong xanh và phố cổ Hội An rực rỡ đèn lồng lung linh.
-              </p>
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-slate-500">Chi phí ước tính:</span>
-                <strong className="font-bold text-slate-900">~2.800.000 đ</strong>
-              </div>
-            </div>
-          </article>
+        {/* Center Stage Overlapping Card Deck Track */}
+        <div className="relative py-4">
+          <div
+            ref={trackRef}
+            id="seasonalCardsTrack"
+            onMouseLeave={() => setActiveIndex(2)}
+            className="flex items-center md:justify-center overflow-x-auto md:overflow-visible scroll-smooth snap-x snap-mandatory touch-pan-x no-scrollbar py-8 px-6 sm:px-12 md:px-0"
+          >
+            {SEASONAL_DESTINATIONS.map((item, index) => {
+              const distance = Math.abs(index - activeIndex);
+              const isActive = index === activeIndex;
 
-          {/* Card 2: Phú Quốc */}
-          <article className="group shrink-0 w-[300px] sm:w-[340px] bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden snap-start flex flex-col justify-between">
-            <div className="relative h-64 overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=800&auto=format&fit=crop&q=80"
-                alt="Phú Quốc"
-                className="w-full h-full object-cover card-img"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-              <span className="absolute top-4 left-4 px-3 py-1 rounded-full bg-white/95 text-[11px] font-bold text-slate-900 shadow-xs">
-                Đảo ngọc nhiệt đới
-              </span>
-              <span className="absolute top-4 right-4 px-2.5 py-1 rounded-lg bg-[#0194F3] text-white text-xs font-bold">
-                4N3Đ Mẫu
-              </span>
-              <div className="absolute bottom-4 left-4 right-4 text-white">
-                <span className="text-xs font-medium text-blue-200">Kiên Giang</span>
-                <h3 className="text-2xl font-bold">Đảo Ngọc Phú Quốc</h3>
-              </div>
-            </div>
-            <div className="p-5 space-y-3">
-              <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
-                Hoàng hôn Bãi Sao màu mật ong, lặn ngắm san hô Hòn Móng Tay và thưởng thức gỏi cá trích tại làng chài.
-              </p>
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-slate-500">Chi phí ước tính:</span>
-                <strong className="font-bold text-slate-900">~3.900.000 đ</strong>
-              </div>
-            </div>
-          </article>
+              // z-index: Thẻ active/hover luôn cao nhất (30), các thẻ xa dần lùi về sau
+              const zIndex = 30 - distance * 5;
 
-          {/* Card 3: Sa Pa */}
-          <article className="group shrink-0 w-[300px] sm:w-[340px] bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden snap-start flex flex-col justify-between">
-            <div className="relative h-64 overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80"
-                alt="Sa Pa"
-                className="w-full h-full object-cover card-img"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-              <span className="absolute top-4 left-4 px-3 py-1 rounded-full bg-white/95 text-[11px] font-bold text-slate-900 shadow-xs">
-                Chữa lành &amp; Mây núi
-              </span>
-              <span className="absolute top-4 right-4 px-2.5 py-1 rounded-lg bg-[#0194F3] text-white text-xs font-bold">
-                3N2Đ Mẫu
-              </span>
-              <div className="absolute bottom-4 left-4 right-4 text-white">
-                <span className="text-xs font-medium text-blue-200">Lào Cai</span>
-                <h3 className="text-2xl font-bold">Sa Pa Mây Ngàn</h3>
-              </div>
-            </div>
-            <div className="p-5 space-y-3">
-              <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
-                Săn biển mây đèo Ô Quy Hồ, dạo bản Tả Van giữa thung lũng ruộng bậc thang và thưởng thức thắng cố nóng hổi.
-              </p>
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-slate-500">Chi phí ước tính:</span>
-                <strong className="font-bold text-slate-900">~2.400.000 đ</strong>
-              </div>
-            </div>
-          </article>
+              // Scale & TranslateY mượt mà theo chuẩn Google Arts & Culture
+              const scale =
+                distance === 0
+                  ? "scale-100 md:scale-105"
+                  : distance === 1
+                  ? "scale-95 md:scale-92 lg:scale-94"
+                  : "scale-90 md:scale-86 lg:scale-88";
 
-          {/* Card 4: Hà Nội */}
-          <article className="group shrink-0 w-[300px] sm:w-[340px] bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden snap-start flex flex-col justify-between">
-            <div className="relative h-64 overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="https://images.unsplash.com/photo-1509023464722-18d996393ca8?w=800&auto=format&fit=crop&q=80"
-                alt="Hà Nội"
-                className="w-full h-full object-cover card-img"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-              <span className="absolute top-4 left-4 px-3 py-1 rounded-full bg-white/95 text-[11px] font-bold text-slate-900 shadow-xs">
-                Ngàn năm văn hiến
-              </span>
-              <span className="absolute top-4 right-4 px-2.5 py-1 rounded-lg bg-[#0194F3] text-white text-xs font-bold">
-                2N1Đ Mẫu
-              </span>
-              <div className="absolute bottom-4 left-4 right-4 text-white">
-                <span className="text-xs font-medium text-blue-200">Thủ đô</span>
-                <h3 className="text-2xl font-bold">Hà Nội 36 Phố Phường</h3>
-              </div>
-            </div>
-            <div className="p-5 space-y-3">
-              <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
-                Cafe trứng Giảng ấm nồng, dạo mát quanh Hồ Gươm mùa lá vàng và thưởng thức bún chả que tre nướng than hoa.
-              </p>
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-slate-500">Chi phí ước tính:</span>
-                <strong className="font-bold text-slate-900">~1.500.000 đ</strong>
-              </div>
-            </div>
-          </article>
+              const translateY =
+                distance === 0
+                  ? "-translate-y-2 md:-translate-y-4"
+                  : "translate-y-0";
 
-          {/* Card 5: Ninh Bình */}
-          <article className="group shrink-0 w-[300px] sm:w-[340px] bg-white rounded-3xl border border-slate-200/90 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden snap-start flex flex-col justify-between">
-            <div className="relative h-64 overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="https://images.unsplash.com/photo-1528127269322-539801943592?w=800&auto=format&fit=crop&q=80"
-                alt="Ninh Bình"
-                className="w-full h-full object-cover card-img"
+              return (
+                <Link
+                  key={item.id}
+                  href={item.targetUrl}
+                  onMouseEnter={() => setActiveIndex(index)}
+                  onFocus={() => setActiveIndex(index)}
+                  onClick={() => {
+                    setActiveIndex(index);
+                    scrollToCard(index);
+                  }}
+                  style={{ zIndex }}
+                  className={`group shrink-0 relative rounded-2xl overflow-hidden snap-center transition-all duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] select-none block cursor-pointer border border-white/40 ${scale} ${translateY} ${
+                    isActive
+                      ? "shadow-2xl ring-2 ring-white/60 md:ring-[#0194F3]/30"
+                      : "shadow-xl hover:shadow-2xl"
+                  } w-[82vw] max-w-[340px] sm:w-[380px] md:w-[460px] lg:w-[480px] h-[480px] sm:h-[500px] md:h-[520px] md:-ml-32 lg:-ml-36 md:first:ml-0`}
+                >
+                  {/* Authentic Vietnam Photography (100% Sắc Nét, Không Bị Mờ, Không Badge Phía Trên) */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={item.imageUrl}
+                    alt={item.title}
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
+                    loading="lazy"
+                  />
+
+                  {/* Scrim Gradient mờ nhẹ nâng chữ ở đáy */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/30 via-40% to-transparent pointer-events-none" />
+
+                  {/* Bottom Editorial Content Area */}
+                  <div className="absolute bottom-0 inset-x-0 p-6 sm:p-7 space-y-2 text-white pointer-events-none">
+                    {/* Destination Title (Luôn hiển thị thanh lịch, rõ ràng) */}
+                    <h3 className="text-xl sm:text-2xl font-semibold text-white tracking-tight leading-snug drop-shadow-sm group-hover:text-sky-200 transition-colors">
+                      {item.title}
+                    </h3>
+
+                    {/* Expandable Details Panel: CHỈ BUNG RA KHI THẺ HOVER / ACTIVE (Phương án 1) */}
+                    <div
+                      className={`space-y-2 overflow-hidden transition-all duration-300 ease-out ${
+                        isActive
+                          ? "opacity-100 max-h-32 translate-y-0"
+                          : "opacity-0 max-h-0 -translate-y-2"
+                      }`}
+                    >
+                      {/* Weather Line (MSN Weather SVG Icon + Chuẩn Font Trắng Cao Cấp) */}
+                      <div className="inline-flex items-center gap-2 text-xs sm:text-sm font-medium drop-shadow-sm">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={item.weatherIconUrl}
+                          alt={item.weatherCondition}
+                          className="w-5 h-5 shrink-0 drop-shadow-sm"
+                          loading="lazy"
+                        />
+                        <span className="font-semibold text-white">
+                          {item.weatherTemp}
+                        </span>
+                        <span className="text-white/40">•</span>
+                        <span className="text-white/90 font-normal">
+                          {item.weatherCondition}
+                        </span>
+                      </div>
+
+                      {/* Full Unclipped Description (Không bị ... cụt chữ) */}
+                      <p className="text-xs sm:text-sm text-slate-200/90 font-normal leading-relaxed">
+                        {item.subtitle}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Mobile & Tablet Interactive Indicator Dots */}
+        <div className="flex items-center justify-center gap-2 pt-2 md:hidden">
+          {SEASONAL_DESTINATIONS.map((dest, idx) => (
+            <button
+              key={dest.id}
+              type="button"
+              onClick={() => {
+                setActiveIndex(idx);
+                scrollToCard(idx);
+              }}
+              aria-label={`Xem thẻ mùa ${dest.title}`}
+              className="min-h-[44px] min-w-[20px] flex items-center justify-center cursor-pointer"
+            >
+              <span
+                className={`h-1.5 rounded-full transition-all duration-300 block ${
+                  activeIndex === idx
+                    ? "w-6 bg-[#0194F3]"
+                    : "w-1.5 bg-slate-300 hover:bg-slate-400"
+                }`}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-              <span className="absolute top-4 left-4 px-3 py-1 rounded-full bg-white/95 text-[11px] font-bold text-slate-900 shadow-xs">
-                Non nước Tràng An
-              </span>
-              <span className="absolute top-4 right-4 px-2.5 py-1 rounded-lg bg-[#0194F3] text-white text-xs font-bold">
-                2N1Đ Mẫu
-              </span>
-              <div className="absolute bottom-4 left-4 right-4 text-white">
-                <span className="text-xs font-medium text-blue-200">Di sản thế giới</span>
-                <h3 className="text-2xl font-bold">Tràng An — Tam Cốc</h3>
-              </div>
-            </div>
-            <div className="p-5 space-y-3">
-              <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">
-                Thuyền nan lướt qua thạch nhũ lung linh, đạp xe ven đồng lúa chín và leo đỉnh Hang Múa ngắm trọn non xanh.
-              </p>
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                <span className="text-slate-500">Chi phí ước tính:</span>
-                <strong className="font-bold text-slate-900">~1.650.000 đ</strong>
-              </div>
-            </div>
-          </article>
+            </button>
+          ))}
         </div>
       </div>
     </section>

@@ -1,5 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { TravelArea, Category, PlaceSource, CrawlJob, DataCoverage, Prisma } from '@prisma/client';
+import {
+  TravelArea,
+  Category,
+  PlaceSource,
+  CrawlJob,
+  DataCoverage,
+  Prisma,
+} from '@prisma/client';
 import { PrismaService } from '../../database/prisma.service';
 import {
   ICrawlerRepository,
@@ -39,7 +46,10 @@ export class CrawlerRepository implements ICrawlerRepository {
     return map;
   }
 
-  async findPlaceSourceByExternal(provider: string, externalId: string): Promise<PlaceSource | null> {
+  async findPlaceSourceByExternal(
+    provider: string,
+    externalId: string,
+  ): Promise<PlaceSource | null> {
     return this.prisma.placeSource.findUnique({
       where: {
         provider_externalId: { provider, externalId },
@@ -48,7 +58,11 @@ export class CrawlerRepository implements ICrawlerRepository {
     });
   }
 
-  async findNearbyPlaces(lat: number, lng: number, radiusMeters: number): Promise<any[]> {
+  async findNearbyPlaces(
+    lat: number,
+    lng: number,
+    radiusMeters: number,
+  ): Promise<any[]> {
     return this.prisma.$queryRaw`
       SELECT id, name, name_normalized, category_id, area_id
       FROM places
@@ -69,13 +83,13 @@ export class CrawlerRepository implements ICrawlerRepository {
     });
   }
 
-  async getUnenrichedPlacesByArea(areaId: number, limit: number = 50): Promise<any[]> {
+  async getUnenrichedPlacesByArea(
+    areaId: number,
+    limit: number = 50,
+  ): Promise<any[]> {
     return this.prisma.place.findMany({
       where: {
-        OR: [
-          { areaId },
-          { area: { parentId: areaId } },
-        ],
+        OR: [{ areaId }, { area: { parentId: areaId } }],
         status: PlaceStatus.ACTIVE,
         deletedAt: null,
         AND: [
@@ -91,10 +105,7 @@ export class CrawlerRepository implements ICrawlerRepository {
         ],
       },
       include: { sources: true, images: true, category: true, area: true },
-      orderBy: [
-        { imageCount: 'asc' },
-        { ratingAvg: 'asc' },
-      ],
+      orderBy: [{ imageCount: 'asc' }, { ratingAvg: 'asc' }],
       take: limit,
     });
   }
@@ -105,20 +116,30 @@ export class CrawlerRepository implements ICrawlerRepository {
       data: {
         ...(data.name && { name: data.name }),
         ...(data.nameNormalized && { nameNormalized: data.nameNormalized }),
-        ...(data.description !== undefined && { description: data.description }),
+        ...(data.description !== undefined && {
+          description: data.description,
+        }),
         ...(data.address !== undefined && { address: data.address }),
         ...(data.phone !== undefined && { phone: data.phone }),
         ...(data.website !== undefined && { website: data.website }),
-        ...(data.openingHours !== undefined && { openingHours: data.openingHours }),
+        ...(data.openingHours !== undefined && {
+          openingHours: data.openingHours,
+        }),
         ...(data.priceLevel !== undefined && { priceLevel: data.priceLevel }),
         ...(data.ratingAvg !== undefined && { ratingAvg: data.ratingAvg }),
-        ...(data.reviewCount !== undefined && { reviewCount: data.reviewCount }),
+        ...(data.reviewCount !== undefined && {
+          reviewCount: data.reviewCount,
+        }),
         ...(data.tags && { tags: data.tags }),
       },
     });
   }
 
-  async createPlaceImages(placeId: string, photoUrls: string[], sourceName: string = 'enrichment'): Promise<number> {
+  async createPlaceImages(
+    placeId: string,
+    photoUrls: string[],
+    sourceName: string = 'enrichment',
+  ): Promise<number> {
     if (!photoUrls || photoUrls.length === 0) return 0;
 
     // Filter out duplicate URLs already stored for this place
@@ -196,7 +217,10 @@ export class CrawlerRepository implements ICrawlerRepository {
     });
   }
 
-  async updatePlaceSource(id: string, data: UpdatePlaceSourceInput): Promise<PlaceSource> {
+  async updatePlaceSource(
+    id: string,
+    data: UpdatePlaceSourceInput,
+  ): Promise<PlaceSource> {
     return this.prisma.placeSource.update({
       where: { id },
       data: {
@@ -220,16 +244,27 @@ export class CrawlerRepository implements ICrawlerRepository {
     });
   }
 
-  async updateCrawlJob(id: string, data: UpdateCrawlJobInput): Promise<CrawlJob> {
+  async updateCrawlJob(
+    id: string,
+    data: UpdateCrawlJobInput,
+  ): Promise<CrawlJob> {
     return this.prisma.crawlJob.update({
       where: { id },
       data: {
         ...(data.status && { status: data.status as any }),
         ...(data.totalItems !== undefined && { totalItems: data.totalItems }),
-        ...(data.processedItems !== undefined && { processedItems: data.processedItems }),
-        ...(data.insertedCount !== undefined && { insertedCount: data.insertedCount }),
-        ...(data.updatedCount !== undefined && { updatedCount: data.updatedCount }),
-        ...(data.duplicateCount !== undefined && { duplicateCount: data.duplicateCount }),
+        ...(data.processedItems !== undefined && {
+          processedItems: data.processedItems,
+        }),
+        ...(data.insertedCount !== undefined && {
+          insertedCount: data.insertedCount,
+        }),
+        ...(data.updatedCount !== undefined && {
+          updatedCount: data.updatedCount,
+        }),
+        ...(data.duplicateCount !== undefined && {
+          duplicateCount: data.duplicateCount,
+        }),
         ...(data.errorCount !== undefined && { errorCount: data.errorCount }),
         ...(data.checkpoint !== undefined && { checkpoint: data.checkpoint }),
         ...(data.lastError !== undefined && { lastError: data.lastError }),
@@ -245,7 +280,10 @@ export class CrawlerRepository implements ICrawlerRepository {
     });
   }
 
-  async upsertDataCoverage(areaId: number, data: UpsertCoverageInput): Promise<any> {
+  async upsertDataCoverage(
+    areaId: number,
+    data: UpsertCoverageInput,
+  ): Promise<any> {
     return this.prisma.$executeRaw`
       INSERT INTO data_coverage (area_id, place_count, status, last_crawled_at)
       VALUES (${areaId}, ${data.placeCount}, ${data.status}::coverage_status_enum, ${data.lastCrawledAt})

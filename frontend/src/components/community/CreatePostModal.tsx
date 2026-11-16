@@ -144,13 +144,7 @@ export function CreatePostModal({
         (percent) => setUploadProgress(percent),
         controller.signal
       );
-      const rawRes = res as unknown as Record<string, unknown>;
-      const newItems: UploadedMediaItem[] =
-        (Array.isArray(res?.items) ? res.items : null) ||
-        (Array.isArray((rawRes?.data as Record<string, unknown>)?.items)
-          ? ((rawRes.data as Record<string, unknown>).items as UploadedMediaItem[])
-          : null) ||
-        [];
+      const newItems: UploadedMediaItem[] = Array.isArray(res?.items) ? res.items : [];
 
       setUploadedItems((prev) =>
         [...prev, ...newItems].slice(
@@ -322,7 +316,7 @@ export function CreatePostModal({
           <div>
             <h2
               id="create-post-modal-title"
-              className="text-[15px] font-black text-[#0F172A] tracking-[-0.01em]"
+              className="text-[15px] font-bold text-slate-900 tracking-tight"
             >
               Tạo bài chia sẻ mới
             </h2>
@@ -448,16 +442,16 @@ export function CreatePostModal({
 
           {/* Upload Button or Progress Bar */}
           {isUploading ? (
-            <div className="w-full p-4 rounded-[16px] border border-[#BAE6FD] bg-[#F0F9FF] space-y-2.5">
+            <div className="w-full p-4 rounded-[16px] border border-sky-200 bg-sky-50 space-y-2.5">
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2 min-w-0 pr-2">
-                  <Loader2 className="size-4 animate-spin text-[#0194F3] shrink-0" />
-                  <span className="font-bold text-[#0F172A] truncate">
+                  <Loader2 className="size-4 animate-spin text-brand-blue shrink-0" />
+                  <span className="font-bold text-foreground truncate">
                     Đang tải {uploadingFileName || "tệp"} lên máy chủ...
                   </span>
                 </div>
                 <div className="flex items-center gap-2.5 shrink-0">
-                  <span className="font-extrabold text-[#0194F3] text-sm tabular-nums">
+                  <span className="font-extrabold text-brand-blue text-sm tabular-nums">
                     {uploadProgress}%
                   </span>
                   <button
@@ -473,14 +467,14 @@ export function CreatePostModal({
               </div>
 
               {/* Progress Bar Track */}
-              <div className="w-full h-2 rounded-full bg-[#E0F2FE] overflow-hidden">
+              <div className="w-full h-2 rounded-full bg-sky-100 overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-[#0194F3] to-[#0068B8] rounded-full transition-all duration-150 ease-out"
+                  className="h-full bg-gradient-to-r from-brand-blue to-primary rounded-full transition-all duration-150 ease-out"
                   style={{ width: `${Math.max(4, uploadProgress)}%` }}
                 />
               </div>
 
-              <div className="flex items-center justify-between text-[11px] text-[#64748B]">
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                 <span>Bạn có thể nhấn Hủy bất cứ lúc nào</span>
                 <span>
                   {uploadProgress === 100
@@ -497,9 +491,9 @@ export function CreatePostModal({
               }
               onClick={() => fileInputRef.current?.click()}
               aria-label="Chọn ảnh hoặc video từ thiết bị"
-              className="w-full py-3.5 px-4 rounded-[16px] border-2 border-dashed border-[#CBD5E1] hover:border-[#0194F3] bg-[#F8FAFC] hover:bg-[#F0F7FF]/50 transition-colors flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 min-h-[54px]"
+              className="w-full py-3.5 px-4 rounded-[16px] border-2 border-dashed border-border hover:border-brand-blue bg-muted/40 hover:bg-secondary/40 transition-colors flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 min-h-[54px]"
             >
-              <div className="flex items-center gap-2 text-[#0194F3] text-[12px] font-bold">
+              <div className="flex items-center gap-2 text-brand-blue text-[12px] font-bold">
                 <Upload className="size-4" />
                 <ImageIcon className="size-4" />
                 <Film className="size-4" />
@@ -639,12 +633,12 @@ export function CreatePostModal({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-end gap-2.5 pt-3.5 border-t border-[#F1F5F9]">
+        <div className="flex items-center justify-end gap-2.5 pt-3.5 border-t border-border">
           <button
             type="button"
             onClick={handleClose}
             disabled={createPostMutation.isPending}
-            className="h-9 px-4 rounded-[10px] border border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-[12px] font-bold text-[#334155] transition-colors cursor-pointer disabled:opacity-50"
+            className="h-9 px-4 rounded-[10px] border border-border bg-card hover:bg-muted text-[12px] font-bold text-foreground transition-colors cursor-pointer disabled:opacity-50"
           >
             Hủy
           </button>
@@ -655,7 +649,7 @@ export function CreatePostModal({
               createPostMutation.isPending ||
               isUploading
             }
-            className="h-9 px-5 rounded-[10px] bg-[#0194F3] hover:bg-[#007FE3] text-white text-[12px] font-extrabold inline-flex items-center gap-1.5 shadow-[0_2px_6px_rgba(1,148,243,0.25)] transition-colors cursor-pointer disabled:opacity-50"
+            className="h-9 px-5 rounded-[10px] bg-primary hover:bg-primary-hover text-primary-foreground text-[12px] font-extrabold inline-flex items-center gap-1.5 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
           >
             {createPostMutation.isPending && (
               <Loader2 className="size-3.5 animate-spin" />

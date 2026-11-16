@@ -1,8 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios, { AxiosInstance } from 'axios';
 import { ConfigService } from '@nestjs/config';
-import { ICrawlerProvider, NormalizedPlace } from '../interfaces/provider.interface';
-import { OsmCategorySlug, CrawlProviderName } from '../../../common/enums/crawler.enum';
+import {
+  ICrawlerProvider,
+  NormalizedPlace,
+} from '../interfaces/provider.interface';
+import {
+  OsmCategorySlug,
+  CrawlProviderName,
+} from '../../../common/enums/crawler.enum';
 import { normalizeVietnamese } from '../../../common/utils/string.util';
 
 /** Maps OSM amenity/tourism/historic/natural/leisure tags to internal category slugs */
@@ -46,7 +52,8 @@ export class OsmProvider implements ICrawlerProvider {
     this.httpClient = axios.create({
       timeout: 45_000, // 45 seconds — Overpass can be slow
       headers: {
-        'User-Agent': 'TripGenieBot/1.0 (https://tripgenie.app; contact@tripgenie.app)',
+        'User-Agent':
+          'TripGenieBot/1.0 (https://tripgenie.app; contact@tripgenie.app)',
       },
     });
   }
@@ -57,7 +64,9 @@ export class OsmProvider implements ICrawlerProvider {
     minLng: number,
     maxLng: number,
   ): Promise<NormalizedPlace[]> {
-    this.logger.log(`Fetching OSM data for bbox [${minLat}, ${minLng}, ${maxLat}, ${maxLng}]`);
+    this.logger.log(
+      `Fetching OSM data for bbox [${minLat}, ${minLng}, ${maxLat}, ${maxLng}]`,
+    );
 
     const query = this.buildOverpassQuery(minLat, maxLat, minLng, maxLng);
 
@@ -135,7 +144,9 @@ export class OsmProvider implements ICrawlerProvider {
     };
   }
 
-  private mapOsmTagsToCategory(tags: Record<string, string>): OsmCategorySlug | null {
+  private mapOsmTagsToCategory(
+    tags: Record<string, string>,
+  ): OsmCategorySlug | null {
     if (tags.amenity) {
       const mapped = OSM_TAG_TO_CATEGORY[`amenity:${tags.amenity}`];
       if (mapped) return mapped;
@@ -171,7 +182,9 @@ export class OsmProvider implements ICrawlerProvider {
   private extractTags(osmTags: Record<string, string>): string[] {
     const tags: string[] = [];
     if (osmTags.cuisine) {
-      tags.push(...osmTags.cuisine.split(';').map((t) => t.trim().toLowerCase()));
+      tags.push(
+        ...osmTags.cuisine.split(';').map((t) => t.trim().toLowerCase()),
+      );
     }
     return tags;
   }

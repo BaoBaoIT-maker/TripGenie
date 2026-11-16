@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "itineraries" ADD COLUMN IF NOT EXISTS "party_size" INTEGER NOT NULL DEFAULT 1;

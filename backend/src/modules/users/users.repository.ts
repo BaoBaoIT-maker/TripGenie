@@ -45,7 +45,9 @@ export class UsersRepository implements IUsersRepository {
     });
   }
 
-  async findUserWithIdentities(id: string): Promise<(User & { identities: UserIdentity[] }) | null> {
+  async findUserWithIdentities(
+    id: string,
+  ): Promise<(User & { identities: UserIdentity[] }) | null> {
     return this.prisma.user.findFirst({
       where: {
         id,
@@ -91,7 +93,10 @@ export class UsersRepository implements IUsersRepository {
     });
   }
 
-  async findIdentity(provider: string, providerUserId: string): Promise<UserIdentity | null> {
+  async findIdentity(
+    provider: string,
+    providerUserId: string,
+  ): Promise<UserIdentity | null> {
     return this.prisma.userIdentity.findFirst({
       where: {
         provider: provider as any,
@@ -103,7 +108,9 @@ export class UsersRepository implements IUsersRepository {
     });
   }
 
-  async createIdentity(data: Prisma.UserIdentityCreateInput): Promise<UserIdentity> {
+  async createIdentity(
+    data: Prisma.UserIdentityCreateInput,
+  ): Promise<UserIdentity> {
     return this.prisma.userIdentity.create({
       data,
     });

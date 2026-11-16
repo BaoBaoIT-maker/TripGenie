@@ -103,9 +103,17 @@ export function mapAuthorSummary(
 ): CommunityAuthorSummary {
   const meetsMeritThreshold = Boolean(
     metrics &&
-      metrics.postCount >= COMMUNITY_CONSTANTS.CREATOR_AUTO_VERIFY_MIN_POSTS &&
-      (metrics.totalClonesReceived >= COMMUNITY_CONSTANTS.CREATOR_AUTO_VERIFY_MIN_CLONES ||
-        metrics.totalLikesReceived >= COMMUNITY_CONSTANTS.CREATOR_AUTO_VERIFY_MIN_LIKES),
+    metrics.postCount >= COMMUNITY_CONSTANTS.CREATOR_AUTO_VERIFY_MIN_POSTS &&
+    (metrics.totalClonesReceived >=
+      COMMUNITY_CONSTANTS.CREATOR_AUTO_VERIFY_MIN_CLONES ||
+      metrics.totalLikesReceived >=
+        COMMUNITY_CONSTANTS.CREATOR_AUTO_VERIFY_MIN_LIKES),
+  );
+
+  const isVerified = Boolean(
+    user.isVerifiedCreator ||
+    user.role === UserRole.ADMIN ||
+    meetsMeritThreshold,
   );
 
   return {
@@ -114,15 +122,14 @@ export function mapAuthorSummary(
     fullName: user.fullName,
     avatarUrl: user.avatarUrl ?? null,
     bio: user.bio ?? null,
-    isVerified: Boolean(
-      user.isVerifiedCreator ||
-        user.role === UserRole.ADMIN ||
-        meetsMeritThreshold,
-    ),
+    isVerified,
+    isVerifiedCreator: isVerified,
   };
 }
 
-export function mapGroupSummary(raw: RawCommunityGroupRow): CommunityGroupSummary {
+export function mapGroupSummary(
+  raw: RawCommunityGroupRow,
+): CommunityGroupSummary {
   return {
     id: raw.id,
     name: raw.name,
@@ -142,7 +149,9 @@ export function mapItinerarySummary(
 ): CommunityLinkedItinerarySummary | null {
   if (!raw) return null;
   const prefs =
-    raw.aiPreferences && typeof raw.aiPreferences === 'object' && !Array.isArray(raw.aiPreferences)
+    raw.aiPreferences &&
+    typeof raw.aiPreferences === 'object' &&
+    !Array.isArray(raw.aiPreferences)
       ? (raw.aiPreferences as Record<string, unknown>)
       : {};
   const coverPhoto =

@@ -1,7 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CollectionsService } from './collections.service';
 import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
-import { NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 
 describe('CollectionsService', () => {
   let service: CollectionsService;
@@ -53,13 +57,18 @@ describe('CollectionsService', () => {
 
   describe('getUserCollections', () => {
     it('should ensure default collection and return user collections', async () => {
-      mockRepo.findOrCreateDefaultCollection.mockResolvedValue({ id: 'c-1', title: 'Yêu thích' });
+      mockRepo.findOrCreateDefaultCollection.mockResolvedValue({
+        id: 'c-1',
+        title: 'Yêu thích',
+      });
       mockRepo.findUserCollections.mockResolvedValue([
         { id: 'c-1', title: 'Yêu thích', _count: { places: 2 } },
       ]);
 
       const result = await service.getUserCollections('u-1');
-      expect(mockRepo.findOrCreateDefaultCollection).toHaveBeenCalledWith('u-1');
+      expect(mockRepo.findOrCreateDefaultCollection).toHaveBeenCalledWith(
+        'u-1',
+      );
       expect(mockRepo.findUserCollections).toHaveBeenCalledWith('u-1');
       expect(result).toHaveLength(1);
     });
@@ -88,9 +97,9 @@ describe('CollectionsService', () => {
         userId: 'owner-id',
         isPublic: false,
       });
-      await expect(service.getCollectionDetail('stranger-id', 'c-1')).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.getCollectionDetail('stranger-id', 'c-1'),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('should allow access if collection is public even if caller is not owner', async () => {
@@ -147,13 +156,23 @@ describe('CollectionsService', () => {
   describe('togglePlace', () => {
     it('should add place to default collection when not currently saved in any collection', async () => {
       mockRepo.findCollectionsContainingPlace.mockResolvedValue([]);
-      mockRepo.findOrCreateDefaultCollection.mockResolvedValue({ id: 'c-default' });
+      mockRepo.findOrCreateDefaultCollection.mockResolvedValue({
+        id: 'c-default',
+      });
 
       const result = await service.togglePlace('u-1', { placeId: 'p-1' });
 
-      expect(mockRepo.findCollectionsContainingPlace).toHaveBeenCalledWith('u-1', 'p-1');
-      expect(mockRepo.findOrCreateDefaultCollection).toHaveBeenCalledWith('u-1');
-      expect(mockRepo.addPlaceToCollection).toHaveBeenCalledWith('c-default', 'p-1');
+      expect(mockRepo.findCollectionsContainingPlace).toHaveBeenCalledWith(
+        'u-1',
+        'p-1',
+      );
+      expect(mockRepo.findOrCreateDefaultCollection).toHaveBeenCalledWith(
+        'u-1',
+      );
+      expect(mockRepo.addPlaceToCollection).toHaveBeenCalledWith(
+        'c-default',
+        'p-1',
+      );
       expect(result).toEqual({
         isSaved: true,
         collectionId: 'c-default',
@@ -166,9 +185,18 @@ describe('CollectionsService', () => {
 
       const result = await service.togglePlace('u-1', { placeId: 'p-1' });
 
-      expect(mockRepo.findCollectionsContainingPlace).toHaveBeenCalledWith('u-1', 'p-1');
-      expect(mockRepo.removePlaceFromCollection).toHaveBeenCalledWith('c-1', 'p-1');
-      expect(mockRepo.removePlaceFromCollection).toHaveBeenCalledWith('c-2', 'p-1');
+      expect(mockRepo.findCollectionsContainingPlace).toHaveBeenCalledWith(
+        'u-1',
+        'p-1',
+      );
+      expect(mockRepo.removePlaceFromCollection).toHaveBeenCalledWith(
+        'c-1',
+        'p-1',
+      );
+      expect(mockRepo.removePlaceFromCollection).toHaveBeenCalledWith(
+        'c-2',
+        'p-1',
+      );
       expect(result).toEqual({
         isSaved: false,
         collectionId: 'c-1',
@@ -177,13 +205,22 @@ describe('CollectionsService', () => {
     });
 
     it('should toggle place in specific collection when collectionId is provided', async () => {
-      mockRepo.findCollectionById.mockResolvedValue({ id: 'c-custom', userId: 'u-1' });
+      mockRepo.findCollectionById.mockResolvedValue({
+        id: 'c-custom',
+        userId: 'u-1',
+      });
       mockRepo.isPlaceInCollection.mockResolvedValue(true);
 
-      const result = await service.togglePlace('u-1', { placeId: 'p-1', collectionId: 'c-custom' });
+      const result = await service.togglePlace('u-1', {
+        placeId: 'p-1',
+        collectionId: 'c-custom',
+      });
 
       expect(mockRepo.findCollectionById).toHaveBeenCalledWith('c-custom');
-      expect(mockRepo.removePlaceFromCollection).toHaveBeenCalledWith('c-custom', 'p-1');
+      expect(mockRepo.removePlaceFromCollection).toHaveBeenCalledWith(
+        'c-custom',
+        'p-1',
+      );
       expect(result).toEqual({
         isSaved: false,
         collectionId: 'c-custom',
@@ -192,7 +229,10 @@ describe('CollectionsService', () => {
     });
 
     it('should throw ForbiddenException if user does not own target collection', async () => {
-      mockRepo.findCollectionById.mockResolvedValue({ id: 'c-other', userId: 'other-user' });
+      mockRepo.findCollectionById.mockResolvedValue({
+        id: 'c-other',
+        userId: 'other-user',
+      });
 
       await expect(
         service.togglePlace('u-1', { placeId: 'p-1', collectionId: 'c-other' }),
@@ -205,8 +245,10 @@ describe('CollectionsService', () => {
       mockRepo.findCollectionsContainingPlace.mockResolvedValue(['c-1', 'c-2']);
       const result = await service.getCollectionsContainingPlace('u-1', 'p-1');
       expect(result).toEqual(['c-1', 'c-2']);
-      expect(mockRepo.findCollectionsContainingPlace).toHaveBeenCalledWith('u-1', 'p-1');
+      expect(mockRepo.findCollectionsContainingPlace).toHaveBeenCalledWith(
+        'u-1',
+        'p-1',
+      );
     });
   });
 });
-

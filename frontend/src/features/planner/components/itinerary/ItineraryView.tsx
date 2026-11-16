@@ -1,79 +1,87 @@
 'use client';
 
-import { useMemo, useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  ArrowLeft,
-  Printer,
-  Sparkles,
-  Share2,
-  Send,
-  X,
-  MessageSquare,
-  MapPin,
-  Bot,
-  Map as MapIcon,
-  List,
-  Trash2,
-  Copy,
-  Loader2,
-  Calendar,
-  Users,
-  Bike,
-  Gauge,
-  UtensilsCrossed,
-  Coffee,
-  Check,
-  Camera,
-  Info,
-  UserPlus,
-} from 'lucide-react';
 import { toast } from 'sonner';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/common/ErrorState';
-import {
-  useItineraryQuery,
-  useDeleteItinerary,
-  useCloneItinerary,
-  useUpdateTransitMode,
-  useUpdateCoverPhoto,
-  useUpdateTourBriefing,
-  useCopilotChat,
-  useCopilotHistory,
-  useDirectSwapActivity,
-  useApplyProposal,
-} from '../../hooks/use-itinerary-planner';
-import ItineraryTimeline from './ItineraryTimeline';
-import BudgetBreakdownCard from './BudgetBreakdownCard';
-import ItineraryMap from './ItineraryMap';
-import PlaceAlternativesModal from './PlaceAlternativesModal';
-import CoverPhotoModal from './CoverPhotoModal';
-import { TourBriefingBanner } from './TourBriefingBanner';
-import { TourBriefingPrintModal } from './TourBriefingPrintModal';
-import { ItineraryPrintSheet } from './ItineraryPrintSheet';
-import { DEFAULT_PRINT_SHEET_OPTIONS, EMPTY_TOUR_BRIEFING, type PrintSheetOptions } from './tour-briefing';
-import { BUDGET_LABEL } from '../../itinerary-labels';
-import ItineraryWizardModal from '../ItineraryWizardModal';
-import CopilotDrawer, { LocatePlaceTarget } from './CopilotDrawer';
-import { TripCompanionCard } from '../companions/TripCompanionCard';
-import { InviteTripCompanionDialog } from '../companions/InviteTripCompanionDialog';
-import { TripCompanionsPanel } from '../companions/TripCompanionsPanel';
+import { AppModalPortal } from '@/components/common/AppModalPortal';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { placeService } from '@/services/place.service';
-import { fetchMultiStopRoute, fetchRoute, Coordinate } from '@/services/routing.service';
+import { fetchDailyRouteSegments, type Coordinate } from '@/services/routing.service';
+import { getDayColor, type DiscoveryPlace, type ItineraryPathSegment } from '@/features/map/types';
+import {
+  DEFAULT_MAP_CENTER,
+  PARTY_SIZE_BOUNDS,
+  TRANSIT_MODE_LABELS,
+  getDestinationCover,
+  type WorkspaceTabKey,
+} from '../../constants/itinerary.constants';
+import {
+  useAddDestination,
+  useApplyProposal,
+  useCloneItinerary,
+  useCopilotChat,
+  useCopilotHistory,
+  useDeleteItinerary,
+  useDirectSwapActivity,
+  useItineraryQuery,
+  useItineraryWeatherQuery,
+  useMoveDestination,
+  useRemoveDestination,
+  useUpdateCoverPhoto,
+  useUpdateDestination,
+  useUpdateItineraryMeta,
+  useUpdateTourBriefing,
+  useUpdateTransitMode,
+} from '../../hooks/use-itinerary-planner';
+import { useTripCompanions } from '../../hooks/use-trip-companions';
+import { useCreateGroupProposal, useTripProposals } from '../../hooks/use-trip-proposals';
+import ItineraryWizardModal from '../ItineraryWizardModal';
+import { PlaceSearchDialog, type PlaceSearchMode } from '../PlaceSearchDialog';
+import { TripCompanionCard } from '../companions/TripCompanionCard';
+import { TripCompanionsPanel } from '../companions/TripCompanionsPanel';
+import { TripProposalsPanel } from '../companions/TripProposalsPanel';
+import BudgetBreakdownCard from './BudgetBreakdownCard';
+import CopilotDrawer, { type CopilotMessageItem, type LocatePlaceTarget } from './CopilotDrawer';
+import CoverPhotoModal from './CoverPhotoModal';
+import { EditDestinationDialog } from './EditDestinationDialog';
+import { EditItineraryMetaDialog } from './EditItineraryMetaDialog';
+import { ItineraryHeroHeader } from './ItineraryHeroHeader';
+import ItineraryMap from './ItineraryMap';
+import { ItineraryPrintSheet } from './ItineraryPrintSheet';
+import ItineraryTimeline from './ItineraryTimeline';
+import { MobileItineraryMapCarousel, type MobileItineraryStop } from './MobileItineraryMapCarousel';
+import { ModalCopilotAssist } from './ModalCopilotAssist';
+import PlaceAlternativesModal from './PlaceAlternativesModal';
+import { TourBriefingBanner } from './TourBriefingBanner';
+import { TourBriefingPrintModal } from './TourBriefingPrintModal';
+import {
+  DEFAULT_PRINT_SHEET_OPTIONS,
+  EMPTY_TOUR_BRIEFING,
+  type PrintSheetOptions,
+} from './tour-briefing';
 import type {
-  ItineraryDetail,
-  ItineraryActivity,
-  ItineraryDay,
-  TransitMode,
   CopilotProposal,
+  ItineraryActivity,
+  MoveDirection,
   TourBriefing,
+  TransitMode,
+  UpdateDestinationRequest,
+  UpdateItineraryMetaRequest,
 } from '@/types/itinerary';
-import { getDayColor, type ItineraryPathSegment, type DiscoveryPlace } from '@/features/map/types';
+import type { Place } from '@/types/place';
 
 interface Props {
   id: string;
+}
+
+interface PlaceSearchModalState {
+  open: boolean;
+  mode: PlaceSearchMode;
+  dayNumber: number;
+  destinationId?: string;
+  targetStopName?: string;
 }
 
 const PRICE_LEVEL_NUMERIC: Record<string, number> = {
@@ -83,12 +91,9 @@ const PRICE_LEVEL_NUMERIC: Record<string, number> = {
   LUXURY: 4,
 };
 
-const TRANSIT_MODE_LABELS: Record<string, string> = {
-  FLIGHT: 'Máy bay',
-  SLEEPER_BUS: 'Xe khách',
-  TRAIN: 'Tàu hỏa',
-  PERSONAL_CAR: 'Ô tô cá nhân',
-  PERSONAL_MOTORBIKE: 'Xe máy',
+const INITIAL_COPILOT_GREETING: CopilotMessageItem = {
+  sender: 'ai',
+  text: 'Chào bạn! Tôi là Genie Copilot. Tôi có thể giúp bạn đề xuất đổi quán ăn/điểm tham quan, điều chỉnh lịch trình hoặc giải đáp mọi thắc mắc về chuyến đi!',
 };
 
 function formatShortDate(isoString: string | null | undefined, dayIndex: number): string {
@@ -104,137 +109,74 @@ function formatShortDate(isoString: string | null | undefined, dayIndex: number)
 
 export default function ItineraryView({ id }: Props) {
   const router = useRouter();
-  const { data, isLoading, error } = useItineraryQuery(id);
-  const deleteMutation = useDeleteItinerary();
-  const cloneMutation = useCloneItinerary();
-  const updateTransitMutation = useUpdateTransitMode();
-  const updateCoverMutation = useUpdateCoverPhoto(id);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
-
-  const handleDelete = async () => {
-    try {
-      await deleteMutation.mutateAsync(id);
-      toast.success('Đã xóa lịch trình thành công!');
-      router.push('/planner');
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Không thể xóa lịch trình. Vui lòng thử lại!');
-    }
-  };
-
-  const handleClone = async () => {
-    try {
-      const cloned = await cloneMutation.mutateAsync(id);
-      toast.success('Đã sao chép lịch trình thành công vào chuyến đi của bạn!');
-      router.push(`/itineraries/${cloned.id}`);
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Không thể sao chép lịch trình. Vui lòng thử lại!');
-    }
-  };
-
-  const handleUpdateTransitMode = async (newMode: TransitMode) => {
-    try {
-      await updateTransitMutation.mutateAsync({ id, transitMode: newMode });
-      toast.success('Đã cập nhật phương tiện di chuyển và tính lại chi phí!');
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Không thể cập nhật phương tiện di chuyển. Vui lòng thử lại!');
-    }
-  };
-
-  const handleSaveCoverPhoto = async (newCoverUrl: string) => {
-    try {
-      await updateCoverMutation.mutateAsync(newCoverUrl);
-      toast.success('Đã cập nhật ảnh bìa lịch trình thành công!');
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Không thể cập nhật ảnh bìa. Vui lòng thử lại!');
-      throw err;
-    }
-  };
-
-  // Tour Briefing & Print Preview Modal state.
-  // draftOverride holds unsaved edits; otherwise the saved server value is shown (derived, no effect-sync).
-  const updateTourBriefingMutation = useUpdateTourBriefing(id);
-  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
-  const [draftOverride, setDraftOverride] = useState<TourBriefing | null>(null);
-  const [printOptions, setPrintOptions] = useState<PrintSheetOptions>(DEFAULT_PRINT_SHEET_OPTIONS);
-  const draftBriefing = draftOverride ?? data?.tourBriefing ?? EMPTY_TOUR_BRIEFING;
-
-  const handleSaveTourBriefing = async (briefing: TourBriefing) => {
-    await updateTourBriefingMutation.mutateAsync(briefing);
-    setDraftOverride(null);
-  };
-
-  const handleClosePrintModal = () => {
-    setIsPrintModalOpen(false);
-    setDraftOverride(null);
-  };
-
-  const [dayScope, setDayScope] = useState<'all' | number>('all');
-  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
-  const [hoveredPlaceId, setHoveredPlaceId] = useState<string | null>(null);
-
-  // Auto-scroll timeline to selected activity
-  useEffect(() => {
-    if (!selectedPlaceId) return;
-    const cardEl = document.getElementById(`itinerary-activity-${selectedPlaceId}`);
-    if (cardEl) {
-      cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  }, [selectedPlaceId]);
-
-  // Local state for interactive editing (Micro-AI swap, delete, add)
-  const [days, setDays] = useState<ItineraryDay[]>([]);
-
   const { user } = useAuth();
+  const { data, isLoading, error } = useItineraryQuery(id);
+  const { data: weatherData } = useItineraryWeatherQuery(id);
 
   // Access rights & collaborative roles
   const isOwner = Boolean(data?.isOwner);
   const canEdit = Boolean(data?.canEdit ?? isOwner);
   const canManageMembers = Boolean(data?.canManageMembers ?? isOwner);
   const isMemberOrOwner = Boolean(isOwner || data?.viewerRole);
-  const [isHeaderInviteOpen, setIsHeaderInviteOpen] = useState(false);
-  const [isHeaderCompanionsOpen, setIsHeaderCompanionsOpen] = useState(false);
 
-  // Copilot mutations and history
+  const { data: companionsData } = useTripCompanions(id, isMemberOrOwner);
+  const { data: proposalsData } = useTripProposals(id, isMemberOrOwner);
+
+  // Mutations
+  const deleteMutation = useDeleteItinerary();
+  const cloneMutation = useCloneItinerary();
+  const updateTransitMutation = useUpdateTransitMode();
+  const updateCoverMutation = useUpdateCoverPhoto(id);
+  const updateTourBriefingMutation = useUpdateTourBriefing(id);
+  const updateMetaMutation = useUpdateItineraryMeta(id);
+  const moveDestinationMutation = useMoveDestination(id);
+  const updateDestinationMutation = useUpdateDestination(id);
+  const createProposalMutation = useCreateGroupProposal(id);
   const chatMutation = useCopilotChat(id);
   const directSwapMutation = useDirectSwapActivity(id);
   const applyProposalMutation = useApplyProposal(id);
+  const addDestinationMutation = useAddDestination(id);
+  const removeDestinationMutation = useRemoveDestination(id);
+
+  // Workspace & navigation state
+  const [activeTab, setActiveTab] = useState<WorkspaceTabKey>('itinerary');
+  const effectiveTab: WorkspaceTabKey =
+    !isMemberOrOwner && (activeTab === 'voting' || activeTab === 'group') ? 'itinerary' : activeTab;
+  const [dayScope, setDayScope] = useState<'all' | number>('all');
+  const [mobileTab, setMobileTab] = useState<'timeline' | 'map'>('timeline');
+  const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(null);
+  const [movingStopId, setMovingStopId] = useState<string | null>(null);
+
+  // Modals & Drawers state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showCloneModal, setShowCloneModal] = useState(false);
+  const [isCoverModalOpen, setIsCoverModalOpen] = useState(false);
+  const [isEditMetaOpen, setIsEditMetaOpen] = useState(false);
+  const [isRefreshingSchedule, setIsRefreshingSchedule] = useState(false);
+  const [isHeaderCompanionsOpen, setIsHeaderCompanionsOpen] = useState(false);
+  const [editingDestination, setEditingDestination] = useState<ItineraryActivity | null>(null);
+  const [selectedActivityForSwap, setSelectedActivityForSwap] = useState<ItineraryActivity | null>(null);
+  const [placeSearchState, setPlaceSearchState] = useState<PlaceSearchModalState | null>(null);
+  const [isWizardOpen, setIsWizardOpen] = useState(false);
+  const [wizardPrefilledDestination, setWizardPrefilledDestination] = useState('');
+
+  // Print & Tour Briefing Modal state
+  const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+  const [draftOverride, setDraftOverride] = useState<TourBriefing | null>(null);
+  const [printOptions, setPrintOptions] = useState<PrintSheetOptions>(DEFAULT_PRINT_SHEET_OPTIONS);
+  const draftBriefing = draftOverride ?? data?.tourBriefing ?? EMPTY_TOUR_BRIEFING;
+
+  // Copilot state
   const [applyingProposalId, setApplyingProposalId] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
-  const { data: historyMessages } = useCopilotHistory(id, sessionId, canEdit);
-
-  // Modal states for 1-click swap and wizard
-  const [selectedActivityForSwap, setSelectedActivityForSwap] = useState<ItineraryActivity | null>(null);
-  const [isWizardOpen, setIsWizardOpen] = useState(false);
-  const [wizardPrefilledDestination, setWizardPrefilledDestination] = useState<string>('');
-  // Copilot Drawer state
+  const { data: historyMessages } = useCopilotHistory(id, sessionId, isMemberOrOwner);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
-  const [copilotMessages, setCopilotMessages] = useState<
-    Array<{
-      sender: 'ai' | 'user';
-      text: string;
-      action?: {
-        type: 'CREATE_NEW_TRIP';
-        destination: string;
-      };
-      appliedTool?: {
-        name: string;
-        resultMessage: string;
-      };
-      proposal?: CopilotProposal;
-      proposalStatus?: 'PENDING' | 'APPLIED' | 'REJECTED';
-    }>
-  >([
-    {
-      sender: 'ai',
-      text: 'Chào bạn! Tôi là Genie Copilot. Tôi có thể giúp bạn đề xuất đổi quán ăn/điểm tham quan, hoán đổi thứ tự ngày hoặc giải đáp mọi thắc mắc về lịch trình!',
-    },
+  const [copilotMessages, setCopilotMessages] = useState<CopilotMessageItem[]>([
+    INITIAL_COPILOT_GREETING,
   ]);
   const [copilotInput, setCopilotInput] = useState('');
-
   const isHistoryLoadedRef = useRef(false);
 
-  // Sync historical messages if existing (only once on initial load, prevent overwriting active conversation)
   useEffect(() => {
     if (!isHistoryLoadedRef.current && historyMessages && historyMessages.length > 0) {
       isHistoryLoadedRef.current = true;
@@ -249,101 +191,98 @@ export default function ItineraryView({ id }: Props) {
     }
   }, [historyMessages]);
 
-  // Mobile View Switch (Timeline vs Map)
-  const [mobileTab, setMobileTab] = useState<'timeline' | 'map'>('timeline');
+  useEffect(() => {
+    if (!selectedPlaceId || effectiveTab !== 'itinerary') return;
+    const cardEl = document.getElementById(`itinerary-activity-${selectedPlaceId}`);
+    if (cardEl) {
+      cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [selectedPlaceId, effectiveTab]);
+
+  const days = useMemo(() => data?.days ?? [], [data?.days]);
+  const totalDays = data?.totalDays || days.length || 3;
+  const totalNights = Math.max(0, totalDays - 1);
+
+  const visibleDays = useMemo(
+    () => (dayScope === 'all' ? days : days.filter((d) => d.dayNumber === dayScope)),
+    [days, dayScope]
+  );
+
+  // Members & pending group proposals derived counts
+  const members = companionsData?.members?.length
+    ? companionsData.members
+    : (data?.members ?? []);
+  const memberCount = data?.memberCount ?? (members.length || 1);
+
+  const { pendingProposalsCount, pendingProposalCountByStop } = useMemo(() => {
+    const list = proposalsData?.proposals ?? [];
+    const byStop: Record<string, number> = {};
+    let pendingCount = 0;
+
+    for (const proposal of list) {
+      if (proposal.status !== 'PENDING') continue;
+      pendingCount += 1;
+      if (proposal.destinationId) {
+        byStop[proposal.destinationId] = (byStop[proposal.destinationId] ?? 0) + 1;
+      }
+    }
+
+    return {
+      pendingProposalsCount: pendingCount,
+      pendingProposalCountByStop: byStop,
+    };
+  }, [proposalsData?.proposals]);
 
   // Road Routing Segments per day (OSRM)
   const [pathSegments, setPathSegments] = useState<ItineraryPathSegment[]>([]);
   const [roadPolyline, setRoadPolyline] = useState<[number, number][]>([]);
 
   useEffect(() => {
-    if (data?.days) {
-      setDays(data.days);
-    }
-  }, [data]);
-
-  const totalDays = data?.totalDays || days.length || 3;
-  const totalNights = Math.max(0, totalDays - 1);
-
-  const visibleDays = useMemo(() => {
-    return dayScope === 'all' ? days : days.filter((d) => d.dayNumber === dayScope);
-  }, [days, dayScope]);
-
-  // Road Route computation per day using real OSRM road geometry
-  useEffect(() => {
     let active = true;
 
     async function computeDailySegments() {
-      const segments: ItineraryPathSegment[] = [];
-      const flatCoords: [number, number][] = [];
-
-      for (const day of visibleDays) {
+      const dayInputs = visibleDays.map((day) => {
         const coords: Coordinate[] = day.activities
           .filter((a): a is ItineraryActivity => a.latitude != null && a.longitude != null)
           .map((a) => ({ latitude: Number(a.latitude), longitude: Number(a.longitude) }));
 
-        // Deduplicate consecutive identical coordinates
         const unique: Coordinate[] = [];
         for (const c of coords) {
           const prev = unique[unique.length - 1];
-          if (!prev || Math.abs(prev.latitude - c.latitude) > 0.0002 || Math.abs(prev.longitude - c.longitude) > 0.0002) {
+          if (
+            !prev ||
+            Math.abs(prev.latitude - c.latitude) > 0.0002 ||
+            Math.abs(prev.longitude - c.longitude) > 0.0002
+          ) {
             unique.push(c);
           }
         }
 
-        const color = getDayColor(day.dayNumber);
-
-        if (unique.length < 2) {
-          const dayPts = unique.map((c) => [c.longitude, c.latitude] as [number, number]);
-          segments.push({
-            dayNumber: day.dayNumber,
-            color,
-            coordinates: dayPts,
-          });
-          flatCoords.push(...dayPts);
-          continue;
-        }
-
-        let dayGeometry: [number, number][] | null = null;
-        try {
-          const res = await fetchMultiStopRoute(unique, 'motorcycle');
-          if (res.geometry?.coordinates && res.geometry.coordinates.length > 0) {
-            dayGeometry = res.geometry.coordinates as [number, number][];
-          }
-        } catch {
-          // Multi-stop failed, try pair-by-pair fallback
-          try {
-            const pairPoints: [number, number][] = [];
-            for (let i = 0; i < unique.length - 1; i++) {
-              const seg = await fetchRoute(unique[i], unique[i + 1], 'motorcycle');
-              if (seg.geometry?.coordinates) {
-                pairPoints.push(...(seg.geometry.coordinates as [number, number][]));
-              }
-            }
-            if (pairPoints.length > 0) {
-              dayGeometry = pairPoints;
-            }
-          } catch {
-            // fallback below
-          }
-        }
-
-        const finalCoords = dayGeometry && dayGeometry.length >= 2
-          ? dayGeometry
-          : unique.map((c) => [c.longitude, c.latitude] as [number, number]);
-
-        segments.push({
+        return {
           dayNumber: day.dayNumber,
-          color,
-          coordinates: finalCoords,
+          color: getDayColor(day.dayNumber),
+          points: unique,
+        };
+      });
+
+      const colorByDay = new Map(dayInputs.map((d) => [d.dayNumber, d.color]));
+      const resolvedRoutes = await fetchDailyRouteSegments(dayInputs, 'motorcycle');
+
+      if (!active) return;
+
+      const segments: ItineraryPathSegment[] = [];
+      const flatCoords: [number, number][] = [];
+      for (const route of resolvedRoutes) {
+        segments.push({
+          dayNumber: route.dayNumber,
+          color: colorByDay.get(route.dayNumber) ?? getDayColor(route.dayNumber),
+          coordinates: route.coordinates,
         });
-        flatCoords.push(...finalCoords);
+        flatCoords.push(...route.coordinates);
       }
 
-      if (active) {
-        setPathSegments(segments);
-        setRoadPolyline(flatCoords);
-      }
+      setPathSegments(segments);
+      setRoadPolyline(flatCoords);
     }
 
     computeDailySegments();
@@ -377,11 +316,11 @@ export default function ItineraryView({ id }: Props) {
             address: a.address ?? '',
             latitude: Number(a.latitude),
             longitude: Number(a.longitude),
-            rating: a.ratingAvg ?? 4.7,
-            reviewCount: a.reviewCount ?? 120,
+            rating: a.ratingAvg ?? null,
+            reviewCount: a.reviewCount ?? 0,
             priceLevel: a.priceLevel ? (PRICE_LEVEL_NUMERIC[a.priceLevel] ?? 2) : null,
-            isOpenNow: true,
-            primaryImage: a.imageUrl,
+            isOpenNow: a.openingStatus ? a.openingStatus.state === 'OPEN' : null,
+            primaryImage: a.thumbnailUrl ?? a.imageUrl,
             images: a.imageUrl ? [a.imageUrl] : [],
             phone: null,
             website: null,
@@ -400,7 +339,7 @@ export default function ItineraryView({ id }: Props) {
     return { mapPlaces: places, markerLabels: labels, markerColors: colors, pathLine: fallbackLine };
   }, [visibleDays, data?.destination]);
 
-  // Preview place for map inspection (from Copilot proposals or chat place cards)
+  // Preview place for map inspection (Copilot proposals or chat place cards)
   const [previewPlace, setPreviewPlace] = useState<DiscoveryPlace | null>(null);
 
   const finalMapPlaces = useMemo(() => {
@@ -411,76 +350,283 @@ export default function ItineraryView({ id }: Props) {
 
   const finalMarkerLabels = useMemo(() => {
     if (!previewPlace || selectedPlaceId !== previewPlace.id) return markerLabels;
-    return { ...markerLabels, [previewPlace.id]: '✨' };
+    return { ...markerLabels, [previewPlace.id]: '★' };
   }, [markerLabels, previewPlace, selectedPlaceId]);
 
   const finalMarkerColors = useMemo(() => {
     if (!previewPlace || selectedPlaceId !== previewPlace.id) return markerColors;
-    return { ...markerColors, [previewPlace.id]: '#0068B8' };
+    return { ...markerColors, [previewPlace.id]: '#0194F3' };
   }, [markerColors, previewPlace, selectedPlaceId]);
 
-  const mapCenter = useMemo(() => {
-    return finalMapPlaces[0]
-      ? { latitude: finalMapPlaces[0].latitude, longitude: finalMapPlaces[0].longitude }
-      : { latitude: 16.0544, longitude: 108.2022 };
-  }, [finalMapPlaces]);
+  const mapCenter = useMemo(
+    () =>
+      finalMapPlaces[0]
+        ? { latitude: finalMapPlaces[0].latitude, longitude: finalMapPlaces[0].longitude }
+        : DEFAULT_MAP_CENTER,
+    [finalMapPlaces]
+  );
+
+  const finalPathLine = useMemo(
+    () => (roadPolyline.length > 0 ? roadPolyline : pathLine),
+    [roadPolyline, pathLine]
+  );
+
+  // Synchronized stop list for mobile map carousel preview
+  const mobileMapStops: MobileItineraryStop[] = useMemo(() => {
+    const list: MobileItineraryStop[] = [];
+    visibleDays.forEach((d) => {
+      d.activities.forEach((act) => {
+        if (act.latitude != null && act.longitude != null) {
+          list.push({
+            placeId: act.placeId,
+            placeName: act.placeName,
+            categoryLabel: act.categoryName || 'Điểm đến',
+            address: act.address ?? '',
+            imageUrl: act.thumbnailUrl ?? act.imageUrl,
+            rating: act.ratingAvg,
+            stopNumber: finalMarkerLabels[act.placeId] || '',
+            stopColor: finalMarkerColors[act.placeId] || '#0194F3',
+            timeSlot: act.startTime && act.endTime ? `${act.startTime} – ${act.endTime}` : undefined,
+            dayNumber: d.dayNumber,
+          });
+        }
+      });
+    });
+    return list;
+  }, [visibleDays, finalMarkerLabels, finalMarkerColors]);
 
   const transitName = data?.intercityTransit?.mode
     ? TRANSIT_MODE_LABELS[data.intercityTransit.mode] || data.intercityTransit.mode
     : 'Máy bay';
 
-  // Micro-AI handlers
-  function handleSwapPlace(placeId: string, activity?: ItineraryActivity) {
-    const act =
-      activity ||
-      days.flatMap((d) => d.activities).find((a) => a.placeId === placeId) ||
-      null;
-    setSelectedActivityForSwap(act);
-  }
-
-  function handleDeletePlace(placeId: string) {
-    const act = days.flatMap((d) => d.activities).find((a) => a.placeId === placeId);
-    if (window.confirm(`Bạn có chắc muốn xóa "${act?.placeName || 'địa điểm này'}" khỏi lịch trình?`)) {
-      setDays((prev) =>
-        prev.map((d) => ({
-          ...d,
-          activities: d.activities.filter((a) => a.placeId !== placeId),
-        }))
-      );
+  // Core Itinerary Handlers
+  const handleDelete = async () => {
+    try {
+      await deleteMutation.mutateAsync(id);
+      toast.success('Đã xóa lịch trình thành công!');
+      router.push('/planner');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Không thể xóa lịch trình. Vui lòng thử lại!');
     }
-  }
+  };
 
-  function handleAddPlace(dayNumber: number) {
-    const input = window.prompt(`Nhập tên địa điểm bạn muốn thêm vào Ngày ${dayNumber}:`, '');
-    if (input === null) return;
-    const placeName = input.trim() || `Điểm tham quan mới Ngày ${dayNumber}`;
-    const newAct: ItineraryActivity = {
-      placeId: `custom-add-${Date.now()}`,
-      placeName,
-      startTime: '16:00',
-      endTime: '17:30',
-      durationMinutes: 90,
-      visitOrder: 99,
-      notes: 'Địa điểm được bổ sung vào lịch trình.',
-      latitude: mapCenter.latitude + (Math.random() * 0.008 - 0.004),
-      longitude: mapCenter.longitude + (Math.random() * 0.008 - 0.004),
-      address: `${data?.destination || 'Khu vực trung tâm'}, Việt Nam`,
-      imageUrl: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=400&auto=format&fit=crop&q=80',
-      categoryName: 'Điểm tham quan',
-      distanceToNextKm: null,
-    };
+  const handleClone = async () => {
+    if (!user) {
+      toast.error('Vui lòng đăng nhập để sao chép lịch trình vào tài khoản của bạn');
+      router.push('/login');
+      return;
+    }
+    try {
+      const cloned = await cloneMutation.mutateAsync(id);
+      setShowCloneModal(false);
+      toast.success('Đã sao chép lịch trình thành công vào chuyến đi của bạn!');
+      router.push(`/itineraries/${cloned.id}`);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Không thể sao chép lịch trình. Vui lòng thử lại!');
+    }
+  };
 
-    setDays((prev) =>
-      prev.map((d) => {
-        if (d.dayNumber !== dayNumber) return d;
-        return {
-          ...d,
-          activities: [...d.activities, newAct],
-        };
-      })
-    );
-  }
+  const { mutateAsync: updateTransitAsync } = updateTransitMutation;
+  const handleUpdateTransitMode = useCallback(
+    async (newMode: TransitMode) => {
+      try {
+        await updateTransitAsync({ id, transitMode: newMode });
+        toast.success('Đã cập nhật phương tiện di chuyển và tính lại chi phí!');
+      } catch (err: unknown) {
+        toast.error(
+          err instanceof Error
+            ? err.message
+            : 'Không thể cập nhật phương tiện di chuyển. Vui lòng thử lại!'
+        );
+      }
+    },
+    [id, updateTransitAsync]
+  );
 
+  const handleSaveCoverPhoto = async (newCoverUrl: string) => {
+    try {
+      await updateCoverMutation.mutateAsync(newCoverUrl);
+      toast.success('Đã cập nhật ảnh bìa lịch trình thành công!');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Không thể cập nhật ảnh bìa. Vui lòng thử lại!');
+      throw err;
+    }
+  };
+
+  const handleSaveTourBriefing = async (briefing: TourBriefing) => {
+    await updateTourBriefingMutation.mutateAsync(briefing);
+    setDraftOverride(null);
+  };
+
+  const handleClosePrintModal = () => {
+    setIsPrintModalOpen(false);
+    setDraftOverride(null);
+  };
+
+  const { mutateAsync: updateMetaAsync, isPending: isUpdatingMeta } = updateMetaMutation;
+  const handleUpdatePartySize = useCallback(
+    async (nextSize: number) => {
+      if (!isOwner || isUpdatingMeta) return;
+      const clamped = Math.min(PARTY_SIZE_BOUNDS.MAX, Math.max(PARTY_SIZE_BOUNDS.MIN, nextSize));
+      try {
+        await updateMetaAsync({ partySize: clamped });
+        toast.success(`Đã cập nhật quy mô ${clamped} người và tính lại dự toán!`);
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : 'Không thể cập nhật số người.');
+      }
+    },
+    [isOwner, isUpdatingMeta, updateMetaAsync]
+  );
+
+  const handleSubmitEditMeta = useCallback(
+    async (dto: UpdateItineraryMetaRequest) => {
+      setIsEditMetaOpen(false);
+      setIsRefreshingSchedule(true);
+      try {
+        await updateMetaAsync(dto);
+        toast.success('Đã cập nhật thông tin chuyến đi!');
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : 'Không thể cập nhật thông tin chuyến đi.');
+        throw err;
+      } finally {
+        setIsRefreshingSchedule(false);
+      }
+    },
+    [updateMetaAsync]
+  );
+
+  const { mutateAsync: updateDestinationAsync } = updateDestinationMutation;
+  const handleSubmitEditDestination = useCallback(
+    async (destinationId: string, dto: UpdateDestinationRequest) => {
+      try {
+        await updateDestinationAsync({ destinationId, dto });
+        toast.success('Đã cập nhật điểm dừng thành công!');
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : 'Không thể cập nhật điểm dừng.');
+        throw err;
+      }
+    },
+    [updateDestinationAsync]
+  );
+
+  const { mutateAsync: moveDestinationAsync } = moveDestinationMutation;
+  const handleMoveStop = useCallback(
+    async (destinationId: string, direction: MoveDirection) => {
+      if (movingStopId) return;
+      setMovingStopId(destinationId);
+      try {
+        await moveDestinationAsync({ destinationId, direction });
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : 'Không thể đổi thứ tự điểm dừng.');
+      } finally {
+        setMovingStopId(null);
+      }
+    },
+    [moveDestinationAsync, movingStopId]
+  );
+
+  // Stop Swap / Delete / Add / Propose Handlers
+  const handleSwapPlace = useCallback(
+    (placeId: string, activity?: ItineraryActivity) => {
+      const act =
+        activity || days.flatMap((d) => d.activities).find((a) => a.placeId === placeId) || null;
+      setSelectedActivityForSwap(act);
+    },
+    [days]
+  );
+
+  const { mutateAsync: removeDestinationAsync } = removeDestinationMutation;
+  const handleDeletePlace = useCallback(
+    async (placeId: string, activity?: ItineraryActivity) => {
+      const act =
+        activity || days.flatMap((d) => d.activities).find((a) => a.placeId === placeId);
+      if (!act) return;
+      if (!act.id) {
+        toast.error(
+          'Điểm dừng mẫu này chưa được lưu thành bản ghi riêng — hãy nhờ Genie Copilot chỉnh sửa.'
+        );
+        return;
+      }
+      if (!window.confirm(`Bạn có chắc muốn xóa "${act.placeName || 'địa điểm này'}" khỏi lịch trình?`)) {
+        return;
+      }
+      try {
+        await removeDestinationAsync(act.id);
+        toast.success(`Đã xóa "${act.placeName}" khỏi lịch trình.`);
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : 'Không thể xóa địa điểm khỏi lịch trình.');
+      }
+    },
+    [days, removeDestinationAsync]
+  );
+
+  const handleAddPlace = useCallback((dayNumber: number) => {
+    setPlaceSearchState({ open: true, mode: 'add', dayNumber });
+  }, []);
+
+  const handleProposeNewForDay = useCallback((dayNumber: number) => {
+    setPlaceSearchState({ open: true, mode: 'propose-new', dayNumber });
+  }, []);
+
+  const handleProposeSwap = useCallback(
+    (placeId: string, activity?: ItineraryActivity) => {
+      const act =
+        activity || days.flatMap((d) => d.activities).find((a) => a.placeId === placeId);
+      if (!act?.id) {
+        toast.error('Điểm dừng này chưa có mã bản ghi để mở bình chọn đổi điểm.');
+        return;
+      }
+      const ownerDay = days.find((d) =>
+        d.activities.some((a) => a.id === act.id || a.placeId === act.placeId)
+      );
+      setPlaceSearchState({
+        open: true,
+        mode: 'propose-swap',
+        dayNumber: ownerDay?.dayNumber ?? 1,
+        destinationId: act.id,
+        targetStopName: act.placeName,
+      });
+    },
+    [days]
+  );
+
+  const handleDirectAddPlace = async (place: Place) => {
+    const dayNumber = placeSearchState?.dayNumber ?? days[0]?.dayNumber ?? 1;
+    try {
+      await addDestinationMutation.mutateAsync({ placeId: place.id, dayNumber });
+      toast.success(`Đã thêm "${place.name}" vào Ngày ${dayNumber}!`);
+      setPlaceSearchState(null);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Không thể thêm địa điểm vào lịch trình.');
+    }
+  };
+
+  const handleCreateProposalFromSearch = async (payload: {
+    place: Place;
+    dayNumber: number;
+    proposedStartTime?: string;
+    notes?: string;
+  }) => {
+    if (!placeSearchState) return;
+    const isSwap = placeSearchState.mode === 'propose-swap' && Boolean(placeSearchState.destinationId);
+    await createProposalMutation.mutateAsync({
+      placeId: payload.place.id,
+      destinationId: isSwap ? placeSearchState.destinationId : undefined,
+      dayNumber: payload.dayNumber,
+      proposedStartTime: payload.proposedStartTime,
+      notes: payload.notes,
+    });
+    setPlaceSearchState(null);
+  };
+
+  const handleAskCopilotFromModal = useCallback((prompt: string) => {
+    setSelectedActivityForSwap(null);
+    setPlaceSearchState(null);
+    setIsCopilotOpen(true);
+    setCopilotInput(prompt);
+  }, []);
+
+  // Copilot Drawer Handlers
   async function handleSendCopilot(textToSend?: string) {
     const msg = (textToSend || copilotInput).trim();
     if (!msg || chatMutation.isPending) return;
@@ -489,13 +635,16 @@ export default function ItineraryView({ id }: Props) {
     setCopilotInput('');
 
     try {
-      const res = await chatMutation.mutateAsync({ message: msg, sessionId });
+      const res = await chatMutation.mutateAsync({
+        message: msg,
+        sessionId,
+        autoApply: canEdit,
+      });
       if (res.sessionId) {
         setSessionId(res.sessionId);
       }
 
       if (res.modified && res.itinerary?.days) {
-        setDays(res.itinerary.days);
         toast.success('AI đã tự động cập nhật lịch trình của bạn!');
       }
 
@@ -515,8 +664,8 @@ export default function ItineraryView({ id }: Props) {
           proposalStatus: res.proposal ? 'PENDING' : undefined,
         },
       ]);
-    } catch (err: any) {
-      toast.error(err?.message || 'Có lỗi khi trò chuyện với Genie Copilot.');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Có lỗi khi trò chuyện với Genie Copilot.');
       setCopilotMessages((prev) => [
         ...prev,
         {
@@ -530,24 +679,19 @@ export default function ItineraryView({ id }: Props) {
   const handleConfirmProposal = async (msgIndex: number, proposal: CopilotProposal) => {
     try {
       setApplyingProposalId(proposal.id);
-      const res = await applyProposalMutation.mutateAsync({
+      await applyProposalMutation.mutateAsync({
         toolName: proposal.toolName,
         args: proposal.args,
         proposalId: proposal.id,
       });
 
-      if (res.itinerary?.days) {
-        setDays(res.itinerary.days);
-      }
-      toast.success(res.message || 'Đã cập nhật lịch trình thành công!');
+      toast.success('Đã cập nhật lịch trình thành công!');
 
       setCopilotMessages((prev) =>
-        prev.map((msg, idx) =>
-          idx === msgIndex ? { ...msg, proposalStatus: 'APPLIED' } : msg
-        )
+        prev.map((msg, idx) => (idx === msgIndex ? { ...msg, proposalStatus: 'APPLIED' } : msg))
       );
-    } catch (err: any) {
-      toast.error(err?.message || 'Không thể cập nhật lịch trình. Vui lòng thử lại!');
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Không thể cập nhật lịch trình. Vui lòng thử lại!');
     } finally {
       setApplyingProposalId(null);
     }
@@ -555,28 +699,41 @@ export default function ItineraryView({ id }: Props) {
 
   const handleRejectProposal = (msgIndex: number) => {
     setCopilotMessages((prev) =>
-      prev.map((msg, idx) =>
-        idx === msgIndex ? { ...msg, proposalStatus: 'REJECTED' } : msg
-      )
+      prev.map((msg, idx) => (idx === msgIndex ? { ...msg, proposalStatus: 'REJECTED' } : msg))
     );
     toast.info('Đã giữ nguyên lịch trình hiện tại.');
   };
 
   const handleResetSession = () => {
     setSessionId(undefined);
-    setCopilotMessages([
-      {
-        sender: 'ai',
-        text: 'Chào bạn! Tôi là Genie Copilot. Tôi có thể giúp bạn đề xuất đổi quán ăn/điểm tham quan, hoán đổi thứ tự ngày hoặc giải đáp mọi thắc mắc về lịch trình!',
-      },
-    ]);
+    setCopilotMessages([INITIAL_COPILOT_GREETING]);
     toast.info('Đã làm mới phiên trò chuyện Copilot.');
   };
+
+  // Map inspection & jump handlers
+  const handleSelectPlace = useCallback((placeId: string | null) => {
+    setSelectedPlaceId(placeId);
+    setPreviewPlace((prev) => (prev && (!placeId || placeId !== prev.id) ? null : prev));
+  }, []);
+
+  const handleSelectTimelinePlace = useCallback(
+    (placeId: string) => {
+      handleSelectPlace(placeId);
+      setMobileTab((prev) => (prev === 'timeline' ? 'map' : prev));
+    },
+    [handleSelectPlace]
+  );
+
+  const handleJumpToStop = useCallback((placeId: string) => {
+    setActiveTab('itinerary');
+    setDayScope('all');
+    setSelectedPlaceId(placeId);
+    setMobileTab('timeline');
+  }, []);
 
   const handleLocatePlaceOnMap = async (target: LocatePlaceTarget) => {
     const cleanName = target.name.toLowerCase().trim();
 
-    // 1. Check if place already exists in visible days (mapPlaces)
     const existing = mapPlaces.find(
       (p) =>
         (target.id && p.id === target.id) ||
@@ -585,13 +742,13 @@ export default function ItineraryView({ id }: Props) {
     );
 
     if (existing) {
+      setActiveTab('itinerary');
       setSelectedPlaceId(existing.id);
       if (mobileTab === 'timeline') setMobileTab('map');
       toast.success(`Đang mở vị trí "${existing.name}" trên bản đồ!`);
       return;
     }
 
-    // 2. If target has exact coordinates (e.g. from Copilot proposal)
     if (target.latitude && target.longitude) {
       const previewId = target.id || `preview-${Date.now()}`;
       const previewItem: DiscoveryPlace = {
@@ -605,10 +762,10 @@ export default function ItineraryView({ id }: Props) {
         address: target.address || '',
         latitude: target.latitude,
         longitude: target.longitude,
-        rating: target.rating ?? 4.8,
-        reviewCount: 60,
-        priceLevel: 2,
-        isOpenNow: true,
+        rating: target.rating ?? null,
+        reviewCount: 0,
+        priceLevel: null,
+        isOpenNow: null,
         primaryImage: target.imageUrl || null,
         images: target.imageUrl ? [target.imageUrl] : [],
         phone: null,
@@ -617,13 +774,13 @@ export default function ItineraryView({ id }: Props) {
         tags: [],
       };
       setPreviewPlace(previewItem);
+      setActiveTab('itinerary');
       setSelectedPlaceId(previewId);
       if (mobileTab === 'timeline') setMobileTab('map');
       toast.success(`Đang mở vị trí "${target.name}" trên bản đồ!`);
       return;
     }
 
-    // 3. Fallback: Search in backend places database by name
     try {
       const res = await placeService.searchPlaces({ keyword: target.name, limit: 1 });
       if (res.places && res.places.length > 0) {
@@ -639,10 +796,10 @@ export default function ItineraryView({ id }: Props) {
           address: found.address || '',
           latitude: found.latitude,
           longitude: found.longitude,
-          rating: found.rating ?? 4.8,
-          reviewCount: found.reviewCount ?? 50,
-          priceLevel: found.priceLevel ?? 2,
-          isOpenNow: true,
+          rating: found.rating ?? null,
+          reviewCount: found.reviewCount ?? 0,
+          priceLevel: found.priceLevel ?? null,
+          isOpenNow: null,
           primaryImage: found.coverImage || null,
           images: found.images || [],
           phone: found.phone || null,
@@ -651,6 +808,7 @@ export default function ItineraryView({ id }: Props) {
           tags: found.tags || [],
         };
         setPreviewPlace(previewItem);
+        setActiveTab('itinerary');
         setSelectedPlaceId(found.id);
         if (mobileTab === 'timeline') setMobileTab('map');
         toast.success(`Đang mở vị trí "${found.name}" trên bản đồ!`);
@@ -662,13 +820,6 @@ export default function ItineraryView({ id }: Props) {
     }
   };
 
-  const handleSelectPlace = (placeId: string | null) => {
-    setSelectedPlaceId(placeId);
-    if (!placeId || (previewPlace && placeId !== previewPlace.id)) {
-      setPreviewPlace(null);
-    }
-  };
-
   function handleShareLink() {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(window.location.href);
@@ -676,338 +827,338 @@ export default function ItineraryView({ id }: Props) {
     }
   }
 
-  if (isLoading) return <ItineraryViewSkeleton />;
+  if (isLoading || isRefreshingSchedule) return <ItineraryViewSkeleton />;
 
   if (error || !data) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center p-8 bg-[#F8FAFC]">
         <ErrorState
           title="Không tìm thấy lịch trình"
-          message={error instanceof Error ? error.message : 'Lịch trình không tồn tại hoặc đã bị xóa.'}
-          onRetry={() => (window.location.href = '/planner')}
+          message={
+            error instanceof Error ? error.message : 'Lịch trình không tồn tại hoặc đã bị xóa.'
+          }
+          onRetry={() => {
+            router.push('/planner');
+          }}
         />
       </div>
     );
   }
 
-  const fallbackCoverPhoto =
-    data.destination?.toLowerCase().includes('đà lạt')
-      ? 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=1200&auto=format&fit=crop&q=80'
-      : data.destination?.toLowerCase().includes('phú quốc')
-      ? 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&auto=format&fit=crop&q=80'
-      : 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=1200&auto=format&fit=crop&q=80';
-  const activeCoverPhoto = data.coverPhoto || fallbackCoverPhoto;
+  const activeCoverPhoto = data.coverPhoto || getDestinationCover(data.destination);
+  const hasTourBriefing = Boolean(
+    data.tourBriefing &&
+      (data.tourBriefing.leaderName ||
+        data.tourBriefing.leaderPhone ||
+        data.tourBriefing.meetingPoint ||
+        data.tourBriefing.notes)
+  );
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 pb-20 lg:pb-10 print:min-h-0 print:bg-white print:pb-0">
+    <div className="min-h-screen bg-[#F8FAFC] text-[#10243A] pb-24 lg:pb-10 print:min-h-0 print:bg-white print:pb-0">
       <main className="max-w-[1600px] mx-auto p-4 lg:p-6 space-y-5 print:hidden">
-        {/* =========================================================================
-            1. HERO TRIP HEADER (Matches Figma Prompt Screen 2 Item 1)
-            ========================================================================= */}
-        <div className="bg-white rounded-3xl border border-slate-200/90 overflow-hidden shadow-xs">
-          {/* Panoramic Cover Image */}
-          <div className="relative h-44 sm:h-52 w-full overflow-hidden bg-slate-100">
-            <img
-              src={activeCoverPhoto}
-              alt={data.title}
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/30 to-transparent" />
-
-            <Link
-              href="/planner"
-              className="absolute top-4 left-4 size-9 rounded-full bg-white/90 backdrop-blur text-slate-700 hover:text-slate-950 hover:bg-white flex items-center justify-center transition-all shadow-sm z-10"
-              title="Quay lại danh sách"
-            >
-              <ArrowLeft className="size-5" />
-            </Link>
-
-            {/* Edit Cover Photo Button (Owner & Editor) */}
-            {canEdit && (
-              <button
-                type="button"
-                onClick={() => setIsCoverModalOpen(true)}
-                className="absolute top-4 right-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/60 hover:bg-slate-900/80 text-white backdrop-blur-md text-xs font-semibold shadow-md transition-all cursor-pointer border border-white/20 hover:scale-105 active:scale-95 z-10"
-                title="Chỉnh sửa ảnh bìa lịch trình"
-              >
-                <Camera className="size-3.5" />
-                <span>Đổi ảnh bìa</span>
-              </button>
-            )}
-
-            <div className="absolute bottom-4 left-5 right-5 text-white">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="px-2.5 py-0.5 bg-[#0068B8]/95 backdrop-blur text-white text-[11px] font-bold rounded-md shadow-xs">
-                  {totalDays} Ngày {totalNights} Đêm
-                </span>
-                <span className="px-2.5 py-0.5 bg-white/90 backdrop-blur text-slate-900 text-[11px] font-bold rounded-md shadow-xs">
-                  {BUDGET_LABEL[data.budgetLevel] || 'Tiêu chuẩn'}
-                </span>
-                {isOwner ? (
-                  <span className="px-2.5 py-0.5 bg-amber-500/95 backdrop-blur text-white text-[11px] font-bold rounded-md shadow-xs">
-                    Chủ chuyến đi
-                  </span>
-                ) : data?.viewerRole === 'EDITOR' ? (
-                  <span className="px-2.5 py-0.5 bg-blue-600/95 backdrop-blur text-white text-[11px] font-bold rounded-md shadow-xs">
-                    Bạn đồng hành • Có quyền sửa
-                  </span>
-                ) : data?.viewerRole === 'VIEWER' ? (
-                  <span className="px-2.5 py-0.5 bg-slate-700/95 backdrop-blur text-white text-[11px] font-bold rounded-md shadow-xs">
-                    Bạn đồng hành • Chỉ xem
-                  </span>
-                ) : null}
-              </div>
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-white drop-shadow-sm">
-                {data.title || `Hành trình khám phá ${data.destination || 'Việt Nam'}`}
-              </h1>
-            </div>
-          </div>
-
-          {/* Meta Bar & Quick Action Buttons */}
-          <div className="p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4">
-            <div className="text-xs text-slate-600 font-medium flex items-center gap-3 flex-wrap">
-              {data.startDate && data.endDate && (
-                <span className="inline-flex items-center gap-1">
-                  <Calendar className="size-3.5 text-slate-400" aria-hidden="true" />
-                  <span>{data.startDate} – {data.endDate}</span>
-                </span>
-              )}
-              <span className="inline-flex items-center gap-1">
-                <Users className="size-3.5 text-slate-400" aria-hidden="true" />
-                <span>2 người lớn</span>
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <Bike className="size-3.5 text-slate-400" aria-hidden="true" />
-                <span>Di chuyển: {transitName}</span>
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <Gauge className="size-3.5 text-slate-400" aria-hidden="true" />
-                <span>Nhịp độ: Cân bằng</span>
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              {canManageMembers && (
-                <button
-                  type="button"
-                  onClick={() => setIsHeaderInviteOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#0068B8] hover:bg-[#00569C] text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs"
-                >
-                  <UserPlus className="size-3.5" />
-                  <span>Mời bạn đồng hành</span>
-                </button>
-              )}
-              {isMemberOrOwner && (
-                <button
-                  type="button"
-                  onClick={() => setIsHeaderCompanionsOpen(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-sky-200 bg-sky-50/70 hover:bg-sky-100/70 text-sky-950 text-xs font-semibold transition-colors cursor-pointer"
-                >
-                  <Users className="size-3.5 text-[#0068B8]" />
-                  <span>Bạn đồng hành</span>
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={handleShareLink}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
-              >
-                <Share2 className="size-3.5 text-[#0194F3]" />
-                <span>Chia sẻ link</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsPrintModalOpen(true)}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-sky-200 bg-sky-50/60 hover:bg-sky-100/70 text-sky-950 text-xs font-semibold transition-colors cursor-pointer"
-              >
-                <Printer className="size-3.5 text-[#0068B8]" />
-                <span>Tờ hướng dẫn / Xuất PDF</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleClone}
-                disabled={cloneMutation.isPending}
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {cloneMutation.isPending ? (
-                  <Loader2 className="size-3.5 animate-spin text-[#0194F3]" />
-                ) : (
-                  <Copy className="size-3.5 text-[#0194F3]" />
-                )}
-                <span>{isOwner ? 'Sao chép' : 'Nhân bản về lịch trình của tôi'}</span>
-              </button>
-              {isOwner && (
-                <button
-                  type="button"
-                  onClick={() => setShowDeleteModal(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-700 text-xs font-semibold transition-colors cursor-pointer"
-                >
-                  <Trash2 className="size-3.5" />
-                  <span>Xóa</span>
-                </button>
-              )}
-            </div>
-          </div>
-          {!isMemberOrOwner && (
-            <div className="px-4 py-3 bg-sky-50/80 border-t border-sky-200/70 flex flex-wrap items-center justify-between gap-2 text-xs text-sky-950">
-              <span>
-                Bạn đang xem lịch trình chia sẻ công khai ở <strong>chế độ chỉ đọc</strong>. Hãy nhấn <strong>Nhân bản về lịch trình của tôi</strong> để tùy chỉnh lộ trình bằng AI Copilot!
-              </span>
-            </div>
-          )}
-        </div>
-
-        {/* =========================================================================
-            1B. TOUR BRIEFING & ASSEMBLY BANNER (Shared with Members & Print Sheet)
-            ========================================================================= */}
-        <TourBriefingBanner
-          briefing={data.tourBriefing}
+        {/* 1. Hero Header & 4 Workspace Tabs */}
+        <ItineraryHeroHeader
+          data={data}
+          activeCoverPhoto={activeCoverPhoto}
+          totalDays={totalDays}
+          totalNights={totalNights}
           isOwner={isOwner}
-          onOpenModal={() => setIsPrintModalOpen(true)}
+          canEdit={canEdit}
+          isMemberOrOwner={isMemberOrOwner}
+          memberCount={memberCount}
+          members={members}
+          pendingProposalsCount={pendingProposalsCount}
+          activeTab={effectiveTab}
+          onSelectTab={setActiveTab}
+          onBack={() => router.push('/planner')}
+          onOpenCoverModal={() => setIsCoverModalOpen(true)}
+          onOpenEditMetaModal={() => setIsEditMetaOpen(true)}
+          onOpenCompanionsModal={() => setIsHeaderCompanionsOpen(true)}
+          onOpenPrintModal={() => setIsPrintModalOpen(true)}
+          onShare={handleShareLink}
+          onClone={() => setShowCloneModal(true)}
+          onOpenDeleteModal={() => setShowDeleteModal(true)}
+          onUpdatePartySize={handleUpdatePartySize}
+          isCloning={cloneMutation.isPending}
+          isUpdatingMeta={isUpdatingMeta}
         />
 
-        {/* =========================================================================
-            SPLIT LAYOUT (50% Timeline, 50% Sticky Map)
-            ========================================================================= */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* LEFT COLUMN: TIMELINE (Width: 6 cols on Large Screens) */}
+        {/* Public Viewer Notice */}
+        {!isMemberOrOwner && (
+          <div className="px-4 py-3 rounded-2xl bg-[#F0F7FF] border border-[#D0E7FF] flex flex-wrap items-center justify-between gap-2 text-xs text-[#10243A]">
+            <span className="flex items-center gap-2">
+              <i className="fa-solid fa-eye text-[#0194F3]" aria-hidden="true" />
+              <span>
+                Bạn đang xem lịch trình chia sẻ công khai ở <strong>chế độ chỉ đọc</strong>. Nhấn{' '}
+                <button
+                  type="button"
+                  onClick={() => setShowCloneModal(true)}
+                  className="font-bold underline text-[#0194F3] hover:text-[#007AD0] cursor-pointer"
+                >
+                  Sao chép lịch trình
+                </button>{' '}
+                ở trên để tự do chỉnh sửa và dùng Genie Copilot.
+              </span>
+            </span>
+          </div>
+        )}
+
+        {/* 2. Workspace Tab Views */}
+        {effectiveTab === 'itinerary' && (
           <div
-            className={`lg:col-span-6 space-y-5 ${
-              mobileTab === 'map' ? 'hidden lg:block' : 'block'
-            }`}
+            role="tabpanel"
+            aria-label="Lịch trình và bản đồ"
+            className="space-y-4"
           >
-            {/* Trip Companions Card (Collaborative Planning) */}
-            {isMemberOrOwner && (
+            {/* Sticky Day Selector Rail (Universal: visible across both timeline & map on mobile and desktop) */}
+            <div className="sticky top-[66px] z-20 py-2 bg-[#F8FAFC]/95 backdrop-blur-md">
+              <div
+                role="tablist"
+                aria-label="Chọn ngày xem lịch trình"
+                className="inline-flex items-center gap-1 p-1 bg-white/90 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-2xs max-w-full overflow-x-auto no-scrollbar"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={dayScope === 'all'}
+                  onClick={() => setDayScope('all')}
+                  className={`h-9 px-3.5 rounded-xl text-xs shrink-0 cursor-pointer inline-flex items-center gap-1.5 transition-all duration-150 select-none ${
+                    dayScope === 'all'
+                      ? 'bg-[#0194F3] text-white shadow-xs font-bold'
+                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 font-semibold'
+                  }`}
+                >
+                  <span>Tất cả</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded-md text-[10px] tabular-nums transition-colors ${
+                      dayScope === 'all'
+                        ? 'bg-white/20 text-white font-bold'
+                        : 'bg-slate-100 text-slate-500 font-medium'
+                    }`}
+                  >
+                    {days.length} ngày
+                  </span>
+                </button>
+
+                {days.map((day, idx) => {
+                  const active = dayScope === day.dayNumber;
+                  const shortDate = formatShortDate(data.startDate, idx);
+                  return (
+                    <button
+                      key={day.dayNumber}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setDayScope(day.dayNumber)}
+                      className={`h-9 px-3.5 rounded-xl text-xs shrink-0 cursor-pointer inline-flex items-center gap-1.5 transition-all duration-150 select-none ${
+                        active
+                          ? 'bg-[#0194F3] text-white shadow-xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 font-semibold'
+                      }`}
+                    >
+                      <span>Ngày {day.dayNumber}</span>
+                      {shortDate && (
+                        <span
+                          className={`px-1.5 py-0.5 rounded-md text-[10px] tabular-nums transition-colors ${
+                            active
+                              ? 'bg-white/20 text-white font-bold'
+                              : 'bg-slate-100 text-slate-500 font-medium'
+                          }`}
+                        >
+                          {shortDate}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Left Column: Timeline Stream */}
+              <div
+                className={`lg:col-span-6 space-y-4 ${
+                  mobileTab === 'map' ? 'hidden lg:block' : 'block'
+                }`}
+              >
+                <ItineraryTimeline
+                  days={visibleDays}
+                  transit={data.intercityTransit}
+                  destination={data.destination}
+                  startDate={data.startDate}
+                  endDate={data.endDate}
+                  selectedPlaceId={selectedPlaceId}
+                  onSelectPlace={handleSelectTimelinePlace}
+                  onSwapPlace={canEdit ? handleSwapPlace : undefined}
+                  onDeletePlace={canEdit ? handleDeletePlace : undefined}
+                  onAddPlace={canEdit ? handleAddPlace : undefined}
+                  onChangeTransitMode={canEdit ? handleUpdateTransitMode : undefined}
+                  isUpdatingTransitMode={updateTransitMutation.isPending}
+                  weatherData={weatherData}
+                  isCollapsibleDays={dayScope === 'all'}
+                  isMemberOrOwner={isMemberOrOwner}
+                  onEditStop={canEdit ? (act) => setEditingDestination(act) : undefined}
+                  onMoveStop={canEdit ? handleMoveStop : undefined}
+                  movingStopId={movingStopId}
+                  onProposeSwap={isMemberOrOwner ? handleProposeSwap : undefined}
+                  onProposeNewForDay={isMemberOrOwner ? handleProposeNewForDay : undefined}
+                  pendingProposalCountByStop={pendingProposalCountByStop}
+                  onOpenVotingTab={isMemberOrOwner ? () => setActiveTab('voting') : undefined}
+                />
+              </div>
+
+              {/* Right Column: Sticky Interactive Map */}
+              <div
+                className={`lg:col-span-6 lg:sticky lg:top-[128px] ${
+                  mobileTab === 'timeline' ? 'hidden lg:block' : 'block'
+                }`}
+              >
+                <div className="bg-white rounded-3xl border border-slate-200 p-2.5 shadow-xs">
+                  <div className="relative w-full h-[620px] lg:h-[calc(100vh-190px)] min-h-[520px] rounded-2xl overflow-hidden">
+                    <ItineraryMap
+                      places={finalMapPlaces}
+                      center={mapCenter}
+                      markerLabels={finalMarkerLabels}
+                      markerColors={finalMarkerColors}
+                      pathLine={finalPathLine}
+                      pathSegments={pathSegments}
+                      selectedPlaceId={selectedPlaceId}
+                      onSelectPlace={handleSelectPlace}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Map Carousel Overlay (Active only in mobile map view when stops exist) */}
+        {effectiveTab === 'itinerary' && mobileTab === 'map' && mobileMapStops.length > 0 && (
+          <div className="fixed bottom-20 inset-x-0 z-30 lg:hidden pointer-events-none">
+            <MobileItineraryMapCarousel
+              stops={mobileMapStops}
+              selectedPlaceId={selectedPlaceId}
+              onSelectStop={handleSelectPlace}
+              onJumpToTimeline={handleJumpToStop}
+              onNavigateDetail={(placeId) => router.push(`/places/${placeId}`)}
+            />
+          </div>
+        )}
+
+        {effectiveTab === 'budget' && (
+          <div role="tabpanel" aria-label="Bảng dự toán chi phí" className="max-w-5xl">
+            {data.budgetBreakdown ? (
+              <BudgetBreakdownCard
+                breakdown={data.budgetBreakdown}
+                days={days}
+                transitModeName={transitName}
+                totalDays={totalDays}
+                isOwner={isOwner}
+                isUpdatingPartySize={isUpdatingMeta}
+                onUpdatePartySize={handleUpdatePartySize}
+                onJumpToStop={handleJumpToStop}
+              />
+            ) : (
+              <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center space-y-2">
+                <div className="size-11 rounded-2xl bg-[#F0F7FF] text-[#0194F3] flex items-center justify-center mx-auto">
+                  <i className="fa-solid fa-wallet text-base" aria-hidden="true" />
+                </div>
+                <p className="text-sm font-bold text-[#10243A]">Chưa có bảng dự toán chi tiết</p>
+                <p className="text-xs text-slate-500">
+                  Dự toán sẽ tự động được tổng hợp sau khi lịch trình có địa điểm và phương tiện di chuyển.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {effectiveTab === 'voting' && isMemberOrOwner && (
+          <div role="tabpanel" aria-label="Bình chọn nhóm" className="max-w-4xl">
+            <TripProposalsPanel
+              itineraryId={id}
+              days={days}
+              canEdit={canEdit}
+              isMemberOrOwner={isMemberOrOwner}
+              currentUser={
+                user
+                  ? { id: user.id, fullName: user.fullName, avatarUrl: user.avatarUrl }
+                  : null
+              }
+              onOpenCreateProposal={() =>
+                setPlaceSearchState({
+                  open: true,
+                  mode: 'propose-new',
+                  dayNumber: typeof dayScope === 'number' ? dayScope : (days[0]?.dayNumber ?? 1),
+                })
+              }
+              onOpenCompanionsModal={() => setIsHeaderCompanionsOpen(true)}
+            />
+          </div>
+        )}
+
+        {effectiveTab === 'group' && isMemberOrOwner && (
+          <div
+            role="tabpanel"
+            aria-label="Đoàn và hướng dẫn"
+            className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start"
+          >
+            <div className="lg:col-span-7">
+              {hasTourBriefing || isOwner ? (
+                <TourBriefingBanner
+                  briefing={data.tourBriefing}
+                  isOwner={isOwner}
+                  onOpenModal={() => setIsPrintModalOpen(true)}
+                />
+              ) : (
+                <section
+                  aria-label="Thông tin điều hành đoàn"
+                  className="bg-white border border-slate-200 rounded-2xl p-6 text-center space-y-2.5"
+                >
+                  <div className="size-11 rounded-2xl bg-[#F0F7FF] text-[#0194F3] flex items-center justify-center mx-auto">
+                    <i className="fa-solid fa-clipboard-list text-base" aria-hidden="true" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Chưa có thông tin điều hành đoàn
+                  </h3>
+                  <p className="text-xs text-slate-500 max-w-md mx-auto">
+                    Trưởng đoàn chưa cập nhật giờ tập trung, điểm đón hoặc ghi chú liên hệ khẩn cấp cho chuyến đi này.
+                  </p>
+                </section>
+              )}
+            </div>
+            <div className="lg:col-span-5">
               <TripCompanionCard
                 itineraryId={id}
                 canManageMembers={canManageMembers}
                 currentUserId={user?.id}
                 isMemberOrOwner={isMemberOrOwner}
               />
-            )}
-
-            {/* Sticky Day Tabs (tripplanner style) */}
-            <div className="sticky top-16 z-20 bg-[#F8FAFC]/95 backdrop-blur-md pb-2 pt-1 border-b border-slate-200 flex items-center gap-1.5 overflow-x-auto">
-              <button
-                type="button"
-                onClick={() => setDayScope('all')}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all shrink-0 cursor-pointer ${
-                  dayScope === 'all'
-                    ? 'bg-[#0068B8] text-white shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200'
-                }`}
-              >
-                Tất cả các ngày
-              </button>
-
-              {days.map((day, idx) => {
-                const active = dayScope === day.dayNumber;
-                const shortDate = formatShortDate(data.startDate, idx);
-                const dayColor = getDayColor(day.dayNumber);
-                return (
-                  <button
-                    key={day.dayNumber}
-                    type="button"
-                    onClick={() => setDayScope(day.dayNumber)}
-                    className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all shrink-0 cursor-pointer flex items-center gap-1.5 ${
-                      active
-                        ? 'text-white shadow-xs font-bold'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 bg-white border border-slate-200'
-                    }`}
-                    style={active ? { backgroundColor: dayColor } : {}}
-                  >
-                    <span
-                      className="size-2 rounded-full shrink-0"
-                      style={{ backgroundColor: active ? '#ffffff' : dayColor }}
-                    />
-                    <span>Ngày {day.dayNumber} {shortDate ? `(${shortDate})` : ''}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Timeline Stream */}
-            <ItineraryTimeline
-              days={visibleDays}
-              transit={data.intercityTransit}
-              destination={data.destination}
-              startDate={data.startDate}
-              endDate={data.endDate}
-              selectedPlaceId={selectedPlaceId}
-              onSelectPlace={(placeId) => {
-                handleSelectPlace(placeId);
-                if (mobileTab === 'timeline') {
-                  setMobileTab('map');
-                }
-              }}
-              onHoverPlace={setHoveredPlaceId}
-              onSwapPlace={canEdit ? handleSwapPlace : undefined}
-              onDeletePlace={canEdit ? handleDeletePlace : undefined}
-              onAddPlace={canEdit ? handleAddPlace : undefined}
-              onChangeTransitMode={canEdit ? handleUpdateTransitMode : undefined}
-              isUpdatingTransitMode={updateTransitMutation.isPending}
-            />
-
-            {/* Professional Cost Breakdown Table Widget */}
-            {data.budgetBreakdown && (
-              <BudgetBreakdownCard
-                breakdown={data.budgetBreakdown}
-                transitModeName={transitName}
-                totalDays={totalDays}
-              />
-            )}
-          </div>
-
-          {/* RIGHT COLUMN: STICKY MAP (Width: 6 cols on Large Screens) */}
-          <div
-            className={`lg:col-span-6 lg:sticky lg:top-20 ${
-              mobileTab === 'timeline' ? 'hidden lg:block' : 'block'
-            }`}
-          >
-            <div className="bg-white rounded-3xl border border-slate-200 p-2.5 shadow-xs">
-              <div className="relative w-full h-[620px] lg:h-[calc(100vh-140px)] min-h-[520px] rounded-2xl overflow-hidden">
-                <ItineraryMap
-                  places={finalMapPlaces}
-                  center={mapCenter}
-                  markerLabels={finalMarkerLabels}
-                  markerColors={finalMarkerColors}
-                  pathLine={roadPolyline.length > 0 ? roadPolyline : pathLine}
-                  pathSegments={pathSegments}
-                  selectedPlaceId={selectedPlaceId}
-                  hoveredPlaceId={hoveredPlaceId}
-                  onSelectPlace={handleSelectPlace}
-                  onHoverPlace={setHoveredPlaceId}
-                />
-              </div>
             </div>
           </div>
-        </div>
+        )}
       </main>
 
-      {/* =========================================================================
-          SCREEN 3: SLIDE-OVER AI COPILOT DRAWER (Matches Figma Prompt Screen 3)
-          ========================================================================= */}
-      {/* Floating Copilot Bubble Launcher (Owner & Editor — Anti-Slop MOTION=1) */}
-      {canEdit && !isCopilotOpen && (
-        <div className="fixed bottom-6 right-6 z-40 group print:hidden">
+      {/* Floating Copilot Bubble Launcher (Group Members & Owner) */}
+      {isMemberOrOwner && !isCopilotOpen && (
+        <div className="fixed bottom-6 right-4 sm:right-6 z-40 group print:hidden">
           <button
             type="button"
             onClick={() => setIsCopilotOpen(true)}
-            className="relative size-14 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-lg hover:opacity-95 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer border-2 border-white/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            className="relative size-12 sm:size-14 rounded-full bg-[#0194F3] hover:bg-[#007AD0] text-white flex items-center justify-center shadow-lg shadow-blue-500/25 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer border-2 border-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0194F3]"
             aria-label="Mở Genie Copilot"
           >
-            <Bot className="size-7 transition-transform group-hover:scale-105" />
+            <i className="fa-solid fa-robot text-lg sm:text-xl" aria-hidden="true" />
           </button>
 
-          {/* Floating Pill Label Tooltip on Hover */}
-          <div className="absolute right-full top-1/2 -translate-y-1/2 mr-3 px-3 py-1.5 rounded-xl bg-slate-900/90 backdrop-blur-md text-white text-xs font-bold whitespace-nowrap shadow-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+          <div className="hidden lg:block absolute right-full top-1/2 -translate-y-1/2 mr-3 px-3 py-1.5 rounded-xl bg-[#10243A] text-white text-xs font-bold whitespace-nowrap shadow-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             Genie Copilot
-            <div className="absolute top-1/2 -right-1 -translate-y-1/2 border-4 border-transparent border-l-slate-900/90" />
+            <div className="absolute top-1/2 -right-1 -translate-y-1/2 border-4 border-transparent border-l-[#10243A]" />
           </div>
         </div>
       )}
 
-      {/* Modern Slide-over AI Copilot Drawer */}
+      {/* Slide-over AI Copilot Drawer */}
       <CopilotDrawer
         isOpen={isCopilotOpen}
         onClose={() => setIsCopilotOpen(false)}
@@ -1027,44 +1178,34 @@ export default function ItineraryView({ id }: Props) {
         prefilledInput={copilotInput}
         onClearPrefilledInput={() => setCopilotInput('')}
         onLocatePlaceOnMap={handleLocatePlaceOnMap}
+        canEdit={canEdit}
       />
 
-      {/* =========================================================================
-          SCREEN 4: MOBILE FLOATING BOTTOM DOCK (Matches Figma Prompt Screen 4)
-          ========================================================================= */}
-      <div className="lg:hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-40 bg-white/95 backdrop-blur-md border border-slate-200 shadow-xl rounded-full p-1.5 flex items-center gap-1 print:hidden">
-        <button
-          type="button"
-          onClick={() => setMobileTab('timeline')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all ${
-            mobileTab === 'timeline'
-              ? 'bg-[#0068B8] text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <List className="size-3.5" />
-          <span>Lịch trình</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setMobileTab('map')}
-          className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-all ${
-            mobileTab === 'map'
-              ? 'bg-[#0068B8] text-white shadow-xs'
-              : 'text-slate-600 hover:bg-slate-100'
-          }`}
-        >
-          <MapIcon className="size-3.5" />
-          <span>Bản đồ</span>
-        </button>
-      </div>
+      {/* Floating Mobile Toggle Button (Explore-style single toggle: Timeline ⇄ Map) */}
+      {effectiveTab === 'itinerary' && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 lg:hidden print:hidden">
+          <button
+            type="button"
+            onClick={() => setMobileTab((prev) => (prev === 'timeline' ? 'map' : 'timeline'))}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-900 text-white font-semibold text-xs shadow-lg hover:bg-slate-800 active:scale-95 transition-all cursor-pointer"
+            aria-label={mobileTab === 'timeline' ? 'Chuyển sang xem bản đồ' : 'Chuyển sang xem lịch trình'}
+          >
+            {mobileTab === 'timeline' ? (
+              <>
+                <i className="fa-solid fa-map text-xs text-white" aria-hidden="true" />
+                <span>Bản đồ</span>
+              </>
+            ) : (
+              <>
+                <i className="fa-solid fa-list text-xs text-white" aria-hidden="true" />
+                <span>Lịch trình</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
-      {/* Header Trip Companion Dialogs */}
-      <InviteTripCompanionDialog
-        open={isHeaderInviteOpen}
-        onClose={() => setIsHeaderInviteOpen(false)}
-        itineraryId={id}
-      />
+      {/* Companion Management Panel */}
       <TripCompanionsPanel
         open={isHeaderCompanionsOpen}
         onClose={() => setIsHeaderCompanionsOpen(false)}
@@ -1073,98 +1214,230 @@ export default function ItineraryView({ id }: Props) {
         currentUserId={user?.id}
       />
 
-      {/* Delete Confirmation Modal */}
-      {showDeleteModal && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150"
-          onClick={() => !deleteMutation.isPending && setShowDeleteModal(false)}
-        >
-          <div
-            className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-md w-full p-6 space-y-5 animate-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="size-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
-              <Trash2 className="size-6" />
-            </div>
+      {/* Delete Confirmation Modal (Portal + ESC + Scroll Lock) */}
+      <AppModalPortal
+        open={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        disableClose={deleteMutation.isPending}
+        ariaLabelledBy="delete-itinerary-modal-title"
+        maxWidthClass="max-w-md"
+      >
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full p-6 space-y-5">
+          <div className="size-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
+            <i className="fa-solid fa-trash-can text-lg" aria-hidden="true" />
+          </div>
 
-            <div className="space-y-2">
-              <h3 className="text-lg font-bold text-slate-900">
-                Xóa lịch trình chuyến đi?
-              </h3>
-              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                Bạn có chắc chắn muốn xóa chuyến đi <strong className="text-slate-900 font-semibold">&quot;{data?.title}&quot;</strong>?
-              </p>
-              <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed flex items-start gap-1.5">
-                <Info className="size-4 text-[#0194F3] shrink-0 mt-0.5" aria-hidden="true" />
-                <span>
-                  <strong>Lưu ý:</strong> Chuyến đi sẽ được gỡ khỏi danh sách của bạn. Nếu có người khác đã sao chép (clone) lịch trình này về tài khoản của họ thì bản sao của họ <strong>hoàn toàn không bị mất</strong>.
-                </span>
-              </p>
-            </div>
+          <div className="space-y-2">
+            <h3 id="delete-itinerary-modal-title" className="text-base font-bold text-slate-900">
+              Xóa lịch trình chuyến đi?
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              Bạn có chắc chắn muốn xóa chuyến đi{' '}
+              <strong className="text-[#10243A] font-semibold">&quot;{data.title}&quot;</strong>?
+            </p>
+            <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed flex items-start gap-2">
+              <i
+                className="fa-solid fa-circle-info text-[#0194F3] shrink-0 mt-0.5 text-sm"
+                aria-hidden="true"
+              />
+              <span>
+                <strong>Lưu ý:</strong> Chuyến đi sẽ được gỡ khỏi danh sách của bạn. Nếu có thành viên
+                hoặc người khác đã sao chép lịch trình này về tài khoản của họ thì bản sao của họ{' '}
+                <strong>hoàn toàn không bị mất</strong>.
+              </span>
+            </p>
+          </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-2">
-              <button
-                type="button"
-                disabled={deleteMutation.isPending}
-                onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors cursor-pointer"
-              >
-                Hủy bỏ
-              </button>
-              <button
-                type="button"
-                disabled={deleteMutation.isPending}
-                onClick={handleDelete}
-                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs disabled:opacity-50 transition-all cursor-pointer"
-              >
-                {deleteMutation.isPending ? (
-                  <>
-                    <Loader2 className="size-3.5 animate-spin" />
-                    <span>Đang xóa...</span>
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="size-3.5" />
-                    <span>Xác nhận xóa</span>
-                  </>
-                )}
-              </button>
-            </div>
+          <div className="flex items-center justify-end gap-2.5 pt-2">
+            <button
+              type="button"
+              disabled={deleteMutation.isPending}
+              onClick={() => setShowDeleteModal(false)}
+              className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors cursor-pointer"
+            >
+              Hủy bỏ
+            </button>
+            <button
+              type="button"
+              disabled={deleteMutation.isPending}
+              onClick={handleDelete}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs disabled:opacity-50 transition-all cursor-pointer"
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <i className="fa-solid fa-circle-notch fa-spin text-xs" aria-hidden="true" />
+                  <span>Đang xóa...</span>
+                </>
+              ) : (
+                <>
+                  <i className="fa-solid fa-trash-can text-xs" aria-hidden="true" />
+                  <span>Xác nhận xóa</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
-      )}
+      </AppModalPortal>
 
-      {/* 1-Click Alternative Places Modal (Hybrid Model) */}
+      {/* Clone Confirmation Modal (Portal + ESC + Scroll Lock) */}
+      <AppModalPortal
+        open={showCloneModal}
+        onClose={() => setShowCloneModal(false)}
+        disableClose={cloneMutation.isPending}
+        ariaLabelledBy="clone-itinerary-modal-title"
+        maxWidthClass="max-w-md"
+      >
+        <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full p-6 space-y-5">
+          <div className="size-12 rounded-2xl bg-[#F0F7FF] text-[#0194F3] flex items-center justify-center">
+            <i className="fa-regular fa-clone text-lg" aria-hidden="true" />
+          </div>
+
+          <div className="space-y-2">
+            <h3 id="clone-itinerary-modal-title" className="text-base font-bold text-slate-900">
+              Sao chép lịch trình chuyến đi?
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
+              Bạn có chắc chắn muốn sao chép chuyến đi{' '}
+              <strong className="text-[#10243A] font-semibold">&quot;{data.title}&quot;</strong> vào tài khoản của mình không?
+            </p>
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-2">
+            <button
+              type="button"
+              disabled={cloneMutation.isPending}
+              onClick={() => setShowCloneModal(false)}
+              className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors cursor-pointer"
+            >
+              Hủy
+            </button>
+            <button
+              type="button"
+              disabled={cloneMutation.isPending}
+              onClick={handleClone}
+              className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#0194F3] hover:bg-[#007AD0] text-white text-xs font-bold shadow-xs disabled:opacity-50 transition-all cursor-pointer"
+            >
+              {cloneMutation.isPending ? (
+                <>
+                  <i className="fa-solid fa-circle-notch fa-spin text-xs" aria-hidden="true" />
+                  <span>Đang sao chép...</span>
+                </>
+              ) : (
+                <>
+                  <i className="fa-regular fa-clone text-xs" aria-hidden="true" />
+                  <span>Xác nhận</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </AppModalPortal>
+
+      {/* Edit Metadata Dialog (Title & Description) */}
+      <EditItineraryMetaDialog
+        open={isEditMetaOpen}
+        onClose={() => setIsEditMetaOpen(false)}
+        title={data.title}
+        description={data.description}
+        startDate={data.startDate}
+        endDate={data.endDate}
+        totalDays={totalDays}
+        onSubmit={handleSubmitEditMeta}
+        isSubmitting={isUpdatingMeta}
+        onAskCopilot={handleAskCopilotFromModal}
+      />
+
+      {/* Edit Stop Time/Day/Notes Dialog */}
+      <EditDestinationDialog
+        open={Boolean(editingDestination)}
+        onClose={() => setEditingDestination(null)}
+        activity={editingDestination}
+        days={days}
+        onSubmit={handleSubmitEditDestination}
+        isSubmitting={updateDestinationMutation.isPending}
+        canEdit={canEdit}
+        onAskCopilot={handleAskCopilotFromModal}
+      />
+
+      {/* Place Search Dialog (Direct Add or Group Proposal) */}
+      <PlaceSearchDialog
+        open={Boolean(placeSearchState?.open)}
+        onOpenChange={(open: boolean) => {
+          if (!open) setPlaceSearchState(null);
+        }}
+        onSelectPlace={handleDirectAddPlace}
+        mode={placeSearchState?.mode ?? 'add'}
+        days={days}
+        selectedDayNumber={placeSearchState?.dayNumber ?? days[0]?.dayNumber ?? 1}
+        onChangeDayNumber={(dayNumber: number) =>
+          setPlaceSearchState((prev) => (prev ? { ...prev, dayNumber } : prev))
+        }
+        targetStopName={placeSearchState?.targetStopName}
+        destinationCity={data.destination}
+        onProposePlace={handleCreateProposalFromSearch}
+        isSubmittingProposal={createProposalMutation.isPending}
+        copilotAssist={
+          isMemberOrOwner ? (
+            <ModalCopilotAssist
+              context={
+                placeSearchState?.mode === 'propose-swap'
+                  ? 'swap'
+                  : placeSearchState?.mode === 'propose-new'
+                    ? 'propose'
+                    : 'add'
+              }
+              placeName={placeSearchState?.targetStopName}
+              dayNumber={placeSearchState?.dayNumber}
+              canEdit={canEdit}
+              onAskCopilot={handleAskCopilotFromModal}
+            />
+          ) : undefined
+        }
+      />
+
+      {/* 1-Click Alternative Places Modal */}
       <PlaceAlternativesModal
         itineraryId={id}
         activity={selectedActivityForSwap}
         isOpen={Boolean(selectedActivityForSwap)}
         onClose={() => setSelectedActivityForSwap(null)}
+        canEdit={canEdit}
+        isMemberOrOwner={isMemberOrOwner}
         onSelectAlternative={async (newPlaceId) => {
           if (!selectedActivityForSwap) return;
           const destId = selectedActivityForSwap.id || selectedActivityForSwap.placeId;
           try {
-            const updated = await directSwapMutation.mutateAsync({
+            await directSwapMutation.mutateAsync({
               destinationId: destId,
               newPlaceId,
             });
-            if (updated?.days) {
-              setDays(updated.days);
-            }
             toast.success('Đã đổi địa điểm thành công!');
             setSelectedActivityForSwap(null);
-          } catch (err: any) {
-            toast.error(err?.message || 'Không thể đổi địa điểm. Vui lòng thử lại!');
+          } catch (err: unknown) {
+            toast.error(err instanceof Error ? err.message : 'Không thể đổi địa điểm. Vui lòng thử lại!');
           }
         }}
-        onAskCopilot={(placeName) => {
+        onProposeAlternative={async (newPlaceId) => {
+          if (!selectedActivityForSwap?.id) {
+            toast.error('Điểm dừng này chưa hỗ trợ mở bình chọn đổi điểm.');
+            return;
+          }
+          const ownerDay = days.find((d) =>
+            d.activities.some(
+              (a) => a.id === selectedActivityForSwap.id || a.placeId === selectedActivityForSwap.placeId
+            )
+          );
+          await createProposalMutation.mutateAsync({
+            placeId: newPlaceId,
+            destinationId: selectedActivityForSwap.id,
+            dayNumber: ownerDay?.dayNumber ?? 1,
+          });
           setSelectedActivityForSwap(null);
-          setIsCopilotOpen(true);
-          setCopilotInput(`Gợi ý cho tôi địa điểm tương đương để thay thế cho "${placeName}"`);
         }}
+        onAskCopilot={handleAskCopilotFromModal}
       />
 
-      {/* New Trip Wizard Modal (Triggered by Copilot when changing destination) */}
+      {/* New Trip Wizard Modal */}
       <ItineraryWizardModal
         isOpen={isWizardOpen}
         onClose={() => setIsWizardOpen(false)}
@@ -1196,7 +1469,7 @@ export default function ItineraryView({ id }: Props) {
         onTriggerPrint={() => window.print()}
       />
 
-      {/* Top-Level A4 Print Target (Normal document flow for multi-page A4 printing) */}
+      {/* Top-Level A4 Print Target */}
       <div className="hidden print:block">
         <ItineraryPrintSheet
           data={{ ...data, days }}
@@ -1213,7 +1486,7 @@ function ItineraryViewSkeleton() {
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
       <div className="max-w-[1600px] mx-auto p-4 lg:p-6 space-y-6">
-        <Skeleton className="h-52 w-full rounded-3xl bg-white border border-slate-200" />
+        <Skeleton className="h-56 w-full rounded-3xl bg-white border border-slate-200" />
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-6 space-y-4">
             <Skeleton className="h-10 w-full rounded-2xl bg-white" />

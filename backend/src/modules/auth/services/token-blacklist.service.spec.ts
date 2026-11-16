@@ -84,7 +84,9 @@ describe('TokenBlacklistService', () => {
       redisClient.exists.mockResolvedValue(0);
       const result = await service.isBlacklisted('jti-uuid-1');
       expect(result).toBe(false);
-      expect(redisClient.exists).toHaveBeenCalledWith('blacklist:token:jti-uuid-1');
+      expect(redisClient.exists).toHaveBeenCalledWith(
+        'blacklist:token:jti-uuid-1',
+      );
     });
 
     it('should return true when jti IS in blacklist', async () => {

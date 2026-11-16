@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+  Logger,
+} from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { Prisma } from '@prisma/client';
 import {
@@ -10,7 +16,12 @@ import {
 import {
   parseTimeOfDay,
   formatTimeOfDay,
+  timeToMinutes,
+  minutesToTimeStr,
   resolveNonOverlappingTimeSlot,
+  computeAdjacentMoveSchedule,
+  TIME_SCHEDULING_CONSTANTS,
+  type MoveDirection,
 } from '../../../common/utils/time-of-day.util';
 import { calculatePlaceEstimatedCost } from '../../../config/pricing.config';
 
@@ -23,8 +34,10 @@ interface BoundingBox {
   centerLng: number;
 }
 
-const QUERY_FILLER_REGEX = /\b(đi|nhé|nha|ạ|giúp tôi|cho tôi|với|nhá|nè|luôn)\b/gi;
-const VENUE_PREFIX_REGEX = /^(quán ăn|nhà hàng|quán|tiệm|khu du lịch|điểm tham quan|địa điểm|chỗ)\s+/i;
+const QUERY_FILLER_REGEX =
+  /\b(đi|nhé|nha|ạ|giúp tôi|cho tôi|với|nhá|nè|luôn)\b/gi;
+const VENUE_PREFIX_REGEX =
+  /^(quán ăn|nhà hàng|quán|tiệm|khu du lịch|điểm tham quan|địa điểm|chỗ)\s+/i;
 const COMMAND_STOP_WORDS = new Set([
   'đổi',
   'sang',
@@ -37,7 +50,12 @@ const COMMAND_STOP_WORDS = new Set([
   'thêm',
   'vào',
 ]);
-const FOOD_CATEGORY_SLUGS = new Set(['nha-hang', 'ca-phe', 'an-vat-via-he', 'bar-pub']);
+const FOOD_CATEGORY_SLUGS = new Set([
+  'nha-hang',
+  'ca-phe',
+  'an-vat-via-he',
+  'bar-pub',
+]);
 
 function normalizeVietnamese(value: string): string {
   return value
@@ -85,11 +103,14 @@ export class CopilotToolsService {
       currentPlace.longitude,
     );
 
-    const existingDestinations = await this.prisma.itineraryDestination.findMany({
-      where: { itineraryId },
-      select: { placeId: true },
-    });
-    const excludedPlaceIds = new Set(existingDestinations.map((d) => d.placeId));
+    const existingDestinations =
+      await this.prisma.itineraryDestination.findMany({
+        where: { itineraryId },
+        select: { placeId: true },
+      });
+    const excludedPlaceIds = new Set(
+      existingDestinations.map((d) => d.placeId),
+    );
 
     let candidates = await this.prisma.place.findMany({
       where: {
@@ -111,7 +132,12 @@ export class CopilotToolsService {
     if (candidates.length < limit) {
       const more = await this.prisma.place.findMany({
         where: {
-          id: { notIn: [...Array.from(excludedPlaceIds), ...candidates.map((c) => c.id)] },
+          id: {
+            notIn: [
+              ...Array.from(excludedPlaceIds),
+              ...candidates.map((c) => c.id),
+            ],
+          },
           deletedAt: null,
           status: 'ACTIVE',
           latitude: { gte: bbox.minLat, lte: bbox.maxLat },
@@ -140,13 +166,290 @@ export class CopilotToolsService {
         address: p.address,
         latitude: p.latitude,
         longitude: p.longitude,
-        ratingAvg: Number(p.ratingAvg ?? COPILOT_CONSTANTS.DEFAULT_RATING_FALLBACK),
+        ratingAvg: Number(
+          p.ratingAvg ?? COPILOT_CONSTANTS.DEFAULT_RATING_FALLBACK,
+        ),
         reviewCount: p.reviewCount ?? 0,
         priceLevel: p.priceLevel ? String(p.priceLevel) : null,
         imageUrl: p.images[0]?.imageUrl ?? null,
         categoryName: p.category?.nameVi ?? p.category?.name ?? 'Địa điểm',
         distanceKm: Math.round(dist * 10) / 10,
       };
+    });
+  }
+
+  /**
+   * Transactional add-activity used inside multi-step DB transactions (e.g., proposal approval).
+   */
+  async addActivityInTx(
+    tx: Prisma.TransactionClient,
+    itineraryId: string,
+    dto: {
+      place: {
+        id: string;
+        name: string;
+        ratingAvg?: unknown;
+        priceRange?: unknown;
+        priceLevel?: string | null;
+        category?: {
+          name?: string | null;
+          nameVi?: string | null;
+          slug?: string | null;
+        } | null;
+      };
+      dayNumber: number;
+      timeSlot?: string;
+      startTime?: string;
+      endTime?: string;
+      notes?: string;
+    },
+  ): Promise<void> {
+    const existingInSameDay = await tx.itineraryDestination.findFirst({
+      where: { itineraryId, dayNumber: dto.dayNumber, placeId: dto.place.id },
+      select: { id: true },
+    });
+    if (existingInSameDay) {
+      throw new ConflictException(
+        `Địa điểm "${dto.place.name}" đã có trong Ngày ${dto.dayNumber} của lịch trình.`,
+      );
+    }
+
+    const dayActivities = await tx.itineraryDestination.findMany({
+      where: { itineraryId, dayNumber: dto.dayNumber },
+      orderBy: [{ startTime: 'asc' }, { visitOrder: 'asc' }],
+    });
+
+    const schedule = this.resolveNewActivitySchedule(dayActivities, {
+      timeSlot: dto.timeSlot,
+      startTime: dto.startTime,
+      endTime: dto.endTime,
+    });
+    if ('errorMessage' in schedule) {
+      throw new BadRequestException(schedule.errorMessage);
+    }
+
+    await this.insertActivityRowTx(tx, {
+      itineraryId,
+      place: dto.place,
+      dayNumber: dto.dayNumber,
+      dayActivities,
+      startTimeStr: schedule.startTimeStr,
+      endTimeStr: schedule.endTimeStr,
+      durationMinutes: schedule.durationMinutes,
+      notes: dto.notes?.trim() || null,
+    });
+  }
+
+  /**
+   * Direct REST add destination to itinerary without LLM round-trip.
+   */
+  async addActivityDirect(
+    itineraryId: string,
+    dto: {
+      placeId: string;
+      dayNumber: number;
+      timeSlot?: string;
+      startTime?: string;
+      endTime?: string;
+      notes?: string;
+    },
+  ): Promise<void> {
+    const res = await this.addActivity(itineraryId, {
+      dayNumber: dto.dayNumber,
+      placeId: dto.placeId,
+      timeSlot: dto.timeSlot,
+      startTime: dto.startTime,
+      endTime: dto.endTime,
+      notes: dto.notes,
+      query: '',
+      dryRun: false,
+    });
+    if (!res.success) {
+      if (res.errorCode === 'CONFLICT')
+        throw new ConflictException(res.message);
+      if (res.errorCode === 'BAD_REQUEST')
+        throw new BadRequestException(res.message);
+      throw new NotFoundException(res.message);
+    }
+  }
+
+  /**
+   * Direct REST update of destination schedule, dayNumber, or notes inside transaction.
+   */
+  async updateActivityDirect(
+    itineraryId: string,
+    destinationId: string,
+    dto: {
+      dayNumber?: number;
+      startTime?: string;
+      endTime?: string;
+      notes?: string;
+    },
+  ): Promise<void> {
+    const target = await this.prisma.itineraryDestination.findFirst({
+      where: { id: destinationId, itineraryId },
+      include: { place: true },
+    });
+    if (!target) {
+      throw new NotFoundException('Không tìm thấy hoạt động trong lịch trình.');
+    }
+
+    const nextDay = dto.dayNumber ?? target.dayNumber;
+    const isDayChanging = nextDay !== target.dayNumber;
+
+    if (isDayChanging) {
+      const dup = await this.prisma.itineraryDestination.findFirst({
+        where: { itineraryId, dayNumber: nextDay, placeId: target.placeId },
+      });
+      if (dup) {
+        throw new ConflictException(
+          `Địa điểm "${target.place.name}" đã có trong Ngày ${nextDay}.`,
+        );
+      }
+    }
+
+    const resolvedStart = dto.startTime ?? formatTimeOfDay(target.startTime);
+    const resolvedEnd = dto.endTime ?? formatTimeOfDay(target.endTime);
+
+    let durationMinutes = target.estimatedDurationMinutes;
+    if (resolvedStart && resolvedEnd) {
+      const startMin = timeToMinutes(resolvedStart);
+      const endMin = timeToMinutes(resolvedEnd);
+      if (startMin == null || endMin == null || endMin <= startMin) {
+        throw new BadRequestException('Giờ kết thúc phải sau giờ bắt đầu.');
+      }
+      durationMinutes = endMin - startMin;
+    } else if (dto.startTime && !resolvedEnd) {
+      const startMin = timeToMinutes(dto.startTime);
+      if (startMin == null)
+        throw new BadRequestException('Giờ bắt đầu không hợp lệ.');
+    } else if (!resolvedStart && dto.endTime) {
+      throw new BadRequestException(
+        'Cần có giờ bắt đầu khi cập nhật giờ kết thúc.',
+      );
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      let nextOrder = target.visitOrder;
+      if (isDayChanging) {
+        const siblings = await tx.itineraryDestination.findMany({
+          where: { itineraryId, dayNumber: nextDay },
+          select: { visitOrder: true },
+        });
+        const maxOrder = siblings.reduce(
+          (max, item) =>
+            Math.max(max, item.visitOrder ? Number(item.visitOrder) : 0),
+          0,
+        );
+        nextOrder = new Prisma.Decimal(maxOrder + 1);
+      }
+
+      await tx.itineraryDestination.update({
+        where: { id: destinationId },
+        data: {
+          ...(dto.dayNumber !== undefined
+            ? { dayNumber: nextDay, visitOrder: nextOrder }
+            : {}),
+          ...(dto.startTime !== undefined
+            ? { startTime: parseTimeOfDay(dto.startTime) }
+            : {}),
+          ...(dto.endTime !== undefined
+            ? { endTime: parseTimeOfDay(dto.endTime) }
+            : {}),
+          ...(durationMinutes !== undefined
+            ? { estimatedDurationMinutes: durationMinutes }
+            : {}),
+          ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+        },
+      });
+    });
+  }
+
+  /**
+   * Direct REST delete destination without LLM round-trip.
+   */
+  async removeActivityDirect(
+    itineraryId: string,
+    destinationId: string,
+  ): Promise<void> {
+    const res = await this.removeActivity(itineraryId, {
+      destinationId,
+      placeName: '',
+      dryRun: false,
+    });
+    if (!res.success) {
+      throw new NotFoundException(res.message);
+    }
+  }
+
+  /**
+   * Plan A (Phương án A): Direct reorder within a day — swaps adjacent stop order
+   * and deterministically shifts start/end times while preserving durations and gaps.
+   */
+  async moveActivityDirect(
+    itineraryId: string,
+    destinationId: string,
+    direction: MoveDirection,
+  ): Promise<void> {
+    const target = await this.prisma.itineraryDestination.findFirst({
+      where: { id: destinationId, itineraryId },
+      select: { id: true, dayNumber: true },
+    });
+    if (!target) {
+      throw new NotFoundException('Không tìm thấy hoạt động trong lịch trình.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const sameDayRows = await tx.itineraryDestination.findMany({
+        where: { itineraryId, dayNumber: target.dayNumber },
+        orderBy: [{ startTime: 'asc' }, { visitOrder: 'asc' }, { id: 'asc' }],
+        select: {
+          id: true,
+          startTime: true,
+          endTime: true,
+          estimatedDurationMinutes: true,
+          visitOrder: true,
+        },
+      });
+
+      const moveResult = computeAdjacentMoveSchedule(
+        sameDayRows,
+        destinationId,
+        direction,
+      );
+      if (moveResult.status === 'NOT_FOUND') {
+        throw new NotFoundException('Không tìm thấy hoạt động trong ngày.');
+      }
+      if (moveResult.status === 'AT_BOUNDARY') {
+        throw new BadRequestException(
+          direction === 'UP'
+            ? 'Địa điểm này đang ở vị trí đầu tiên trong ngày.'
+            : 'Địa điểm này đang ở vị trí cuối cùng trong ngày.',
+        );
+      }
+
+      const previousById = new Map(sameDayRows.map((row) => [row.id, row]));
+      const changedUpdates = moveResult.updates.filter((update) => {
+        const prev = previousById.get(update.id);
+        return (
+          !prev ||
+          Number(prev.visitOrder) !== update.visitOrder ||
+          formatTimeOfDay(prev.startTime) !== update.startTimeStr ||
+          formatTimeOfDay(prev.endTime) !== update.endTimeStr
+        );
+      });
+
+      for (const update of changedUpdates) {
+        await tx.itineraryDestination.update({
+          where: { id: update.id },
+          data: {
+            visitOrder: new Prisma.Decimal(update.visitOrder),
+            startTime: parseTimeOfDay(update.startTimeStr),
+            endTime: parseTimeOfDay(update.endTimeStr),
+            estimatedDurationMinutes: update.durationMinutes,
+          },
+        });
+      }
     });
   }
 
@@ -306,7 +609,8 @@ export class CopilotToolsService {
           newPlaceId: newPlace.id,
           newPlaceName: newPlace.name,
           newPlaceRating: newPlace.ratingAvg,
-          newPlaceCategory: newPlace.category?.nameVi || newPlace.category?.name,
+          newPlaceCategory:
+            newPlace.category?.nameVi || newPlace.category?.name,
           newPlaceAddress: newPlace.address,
           newPlaceCoordinates: {
             latitude: Number(newPlace.latitude),
@@ -349,22 +653,35 @@ export class CopilotToolsService {
     args: {
       dayNumber: number;
       timeSlot?: string;
+      startTime?: string;
+      endTime?: string;
+      notes?: string;
       query: string;
       categorySlug?: string;
       placeId?: string;
       dryRun?: boolean;
     },
   ): Promise<CopilotToolExecutionResult> {
-    const { dayNumber, timeSlot, query, categorySlug, placeId, dryRun } = args;
+    const {
+      dayNumber,
+      timeSlot,
+      startTime,
+      endTime,
+      notes,
+      query,
+      categorySlug,
+      placeId,
+      dryRun,
+    } = args;
 
     let place = placeId
-      ? await this.prisma.place.findUnique({
-          where: { id: placeId },
+      ? await this.prisma.place.findFirst({
+          where: { id: placeId, deletedAt: null },
           include: { category: true },
         })
       : null;
 
-    if (!place) {
+    if (!place && !placeId && query) {
       const bbox = await this.resolveItineraryBbox(itineraryId);
       const existingPlaceIds = (
         await this.prisma.itineraryDestination.findMany({
@@ -386,6 +703,7 @@ export class CopilotToolsService {
       return {
         toolName: COPILOT_TOOL_NAMES.ADD_ACTIVITY,
         success: false,
+        errorCode: 'NOT_FOUND',
         message: `Không tìm thấy địa điểm phù hợp để thêm vào ngày ${dayNumber}.`,
       };
     }
@@ -397,6 +715,7 @@ export class CopilotToolsService {
       return {
         toolName: COPILOT_TOOL_NAMES.ADD_ACTIVITY,
         success: false,
+        errorCode: 'CONFLICT',
         message: `Địa điểm "${place.name}" đã có trong Ngày ${dayNumber} của lịch trình.`,
       };
     }
@@ -406,12 +725,20 @@ export class CopilotToolsService {
       orderBy: [{ startTime: 'asc' }, { visitOrder: 'asc' }],
     });
 
-    const baseSlot = this.resolveTimeSlotRange(timeSlot);
-    const {
-      start: startTimeStr,
-      end: endTimeStr,
-      durationMinutes,
-    } = resolveNonOverlappingTimeSlot(baseSlot, dayActivities);
+    const resolved = this.resolveNewActivitySchedule(dayActivities, {
+      timeSlot,
+      startTime,
+      endTime,
+    });
+    if ('errorMessage' in resolved) {
+      return {
+        toolName: COPILOT_TOOL_NAMES.ADD_ACTIVITY,
+        success: false,
+        errorCode: 'BAD_REQUEST',
+        message: resolved.errorMessage,
+      };
+    }
+    const { startTimeStr, endTimeStr, durationMinutes } = resolved;
 
     const isRevisit =
       (await this.prisma.itineraryDestination.findFirst({
@@ -445,36 +772,24 @@ export class CopilotToolsService {
       };
     }
 
-    const maxOrder = dayActivities.reduce(
-      (max, item) => Math.max(max, item.visitOrder ? Number(item.visitOrder) : 0),
-      0,
-    );
-    const nextOrder = maxOrder + 1;
-    const { cost: estimatedCost } = calculatePlaceEstimatedCost({
-      category: place.category,
-      priceRange: place.priceRange,
-      priceLevel: place.priceLevel,
-      placeName: place.name,
-    });
+    const resolvedNotes =
+      notes?.trim() ||
+      (query
+        ? `Được thêm vào ngày ${dayNumber}${isRevisit ? ' (ghé lại)' : ''}: ${query}`
+        : null);
 
-    await this.prisma.itineraryDestination.create({
-      data: {
+    await this.prisma.$transaction((tx) =>
+      this.insertActivityRowTx(tx, {
         itineraryId,
-        placeId: place.id,
+        place,
         dayNumber,
-        visitOrder: new Prisma.Decimal(nextOrder),
-        startTime: parseTimeOfDay(startTimeStr),
-        endTime: parseTimeOfDay(endTimeStr),
-        estimatedDurationMinutes: durationMinutes,
-        estimatedCost: new Prisma.Decimal(estimatedCost),
-        notes: `Được thêm vào ngày ${dayNumber}${isRevisit ? ' (ghé lại)' : ''}: ${query}`,
-      },
-    });
-
-    await this.prisma.itinerary.update({
-      where: { id: itineraryId },
-      data: { totalPlaces: { increment: 1 } },
-    });
+        dayActivities,
+        startTimeStr,
+        endTimeStr,
+        durationMinutes,
+        notes: resolvedNotes,
+      }),
+    );
 
     return {
       toolName: COPILOT_TOOL_NAMES.ADD_ACTIVITY,
@@ -495,7 +810,7 @@ export class CopilotToolsService {
   async removeActivity(
     itineraryId: string,
     args: {
-      dayNumber: number;
+      dayNumber?: number;
       placeName: string;
       destinationId?: string;
       dryRun?: boolean;
@@ -504,35 +819,42 @@ export class CopilotToolsService {
     const { dayNumber, placeName, destinationId, dryRun } = args;
 
     const matches = await this.prisma.itineraryDestination.findMany({
-      where: { itineraryId, dayNumber },
+      where: destinationId
+        ? { id: destinationId, itineraryId }
+        : { itineraryId, ...(dayNumber ? { dayNumber } : {}) },
       include: { place: true },
     });
 
     const target = destinationId
-      ? matches.find((m) => m.id === destinationId)
+      ? matches[0]
       : matches.find((m) =>
-          normalizeVietnamese(m.place.name).includes(normalizeVietnamese(placeName)),
+          normalizeVietnamese(m.place.name).includes(
+            normalizeVietnamese(placeName),
+          ),
         );
 
     if (!target) {
       return {
         toolName: COPILOT_TOOL_NAMES.REMOVE_ACTIVITY,
         success: false,
-        message: `Không tìm thấy địa điểm "${placeName}" trong ngày ${dayNumber} để xóa.`,
+        errorCode: 'NOT_FOUND',
+        message: `Không tìm thấy địa điểm "${placeName}" để xóa khỏi lịch trình.`,
       };
     }
+
+    const effectiveDayNumber = dayNumber ?? target.dayNumber;
 
     if (dryRun) {
       return {
         toolName: COPILOT_TOOL_NAMES.REMOVE_ACTIVITY,
         success: true,
-        message: `Đề xuất xóa hoạt động "${target.place.name}" khỏi Ngày ${dayNumber}.`,
+        message: `Đề xuất xóa hoạt động "${target.place.name}" khỏi Ngày ${effectiveDayNumber}.`,
         data: {
-          dayNumber,
+          dayNumber: effectiveDayNumber,
           oldPlaceName: target.place.name,
           placeName: target.place.name,
           args: {
-            dayNumber,
+            dayNumber: effectiveDayNumber,
             placeName: target.place.name,
             destinationId: target.id,
           },
@@ -540,24 +862,35 @@ export class CopilotToolsService {
       };
     }
 
-    await this.prisma.itineraryDestination.delete({
-      where: { id: target.id },
-    });
-
-    await this.prisma.itinerary.update({
-      where: { id: itineraryId },
-      data: { totalPlaces: { decrement: 1 } },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.itineraryDestination.delete({
+        where: { id: target.id },
+      });
+      await this.syncItineraryTotalPlaces(tx, itineraryId);
     });
 
     return {
       toolName: COPILOT_TOOL_NAMES.REMOVE_ACTIVITY,
       success: true,
-      message: `Đã xóa hoạt động "${target.place.name}" khỏi ngày ${dayNumber}.`,
+      message: `Đã xóa hoạt động "${target.place.name}" khỏi ngày ${effectiveDayNumber}.`,
       data: {
-        dayNumber,
+        dayNumber: effectiveDayNumber,
         removedPlaceName: target.place.name,
       },
     };
+  }
+
+  private async syncItineraryTotalPlaces(
+    tx: Prisma.TransactionClient,
+    itineraryId: string,
+  ): Promise<void> {
+    const totalPlaces = await tx.itineraryDestination.count({
+      where: { itineraryId },
+    });
+    await tx.itinerary.update({
+      where: { id: itineraryId },
+      data: { totalPlaces },
+    });
   }
 
   /**
@@ -584,7 +917,9 @@ export class CopilotToolsService {
     const target = destinationId
       ? matches.find((m) => m.id === destinationId)
       : matches.find((m) =>
-          normalizeVietnamese(m.place.name).includes(normalizeVietnamese(placeName)),
+          normalizeVietnamese(m.place.name).includes(
+            normalizeVietnamese(placeName),
+          ),
         );
 
     if (!target) {
@@ -619,15 +954,20 @@ export class CopilotToolsService {
       orderBy: [{ startTime: 'asc' }, { visitOrder: 'asc' }],
     });
     const maxOrder = toDayDestinations.reduce(
-      (max, item) => Math.max(max, item.visitOrder ? Number(item.visitOrder) : 0),
+      (max, item) =>
+        Math.max(max, item.visitOrder ? Number(item.visitOrder) : 0),
       0,
     );
     const nextOrder = maxOrder + 1;
     const baseMoveSlot = args.targetTimeSlot
       ? this.resolveTimeSlotRange(args.targetTimeSlot)
       : {
-          start: formatTimeOfDay(target.startTime) || COPILOT_CONSTANTS.TIME_SLOTS.AFTERNOON.start,
-          end: formatTimeOfDay(target.endTime) || COPILOT_CONSTANTS.TIME_SLOTS.AFTERNOON.end,
+          start:
+            formatTimeOfDay(target.startTime) ||
+            COPILOT_CONSTANTS.TIME_SLOTS.AFTERNOON.start,
+          end:
+            formatTimeOfDay(target.endTime) ||
+            COPILOT_CONSTANTS.TIME_SLOTS.AFTERNOON.end,
         };
     const {
       start: movedStartStr,
@@ -726,7 +1066,11 @@ export class CopilotToolsService {
       startTime: Date | null;
       place: {
         name: string;
-        category?: { name: string; nameVi?: string | null; slug?: string } | null;
+        category?: {
+          name: string;
+          nameVi?: string | null;
+          slug?: string;
+        } | null;
       };
     },
   >(
@@ -739,35 +1083,55 @@ export class CopilotToolsService {
       categorySlug?: string;
     },
   ): T {
-    const { dayNumber, currentPlaceName, mealOrActivityType, query, categorySlug } = criteria;
+    const {
+      dayNumber,
+      currentPlaceName,
+      mealOrActivityType,
+      query,
+      categorySlug,
+    } = criteria;
     const isFoodSwap =
       (categorySlug ? FOOD_CATEGORY_SLUGS.has(categorySlug) : false) ||
-      /sáng|trưa|tối|breakfast|lunch|dinner|cafe/i.test((mealOrActivityType || '').toLowerCase()) ||
+      /sáng|trưa|tối|breakfast|lunch|dinner|cafe/i.test(
+        (mealOrActivityType || '').toLowerCase(),
+      ) ||
       /ăn|hải sản|cơm|bún|mì|phở|lẩu|bánh|quán|nhà hàng|cafe|cà phê|nướng/i.test(
         query.toLowerCase(),
       );
 
     const isFoodActivity = (a: T) =>
-      (a.place.category?.slug ? FOOD_CATEGORY_SLUGS.has(a.place.category.slug) : false) ||
+      (a.place.category?.slug
+        ? FOOD_CATEGORY_SLUGS.has(a.place.category.slug)
+        : false) ||
       /ăn|nhà hàng|ẩm thực|quán|cafe|cà phê|restaurant|food|street/i.test(
-        (a.place.category?.nameVi || a.place.category?.name || '').toLowerCase(),
+        (
+          a.place.category?.nameVi ||
+          a.place.category?.name ||
+          ''
+        ).toLowerCase(),
       );
 
     if (currentPlaceName) {
       const normCurrent = normalizeVietnamese(currentPlaceName);
       const exactMatch = allActivities.find((a) => {
         const normPlace = normalizeVietnamese(a.place.name);
-        return normPlace.includes(normCurrent) || normCurrent.includes(normPlace);
+        return (
+          normPlace.includes(normCurrent) || normCurrent.includes(normPlace)
+        );
       });
-      if (exactMatch && (!isFoodSwap || isFoodActivity(exactMatch))) return exactMatch;
+      if (exactMatch && (!isFoodSwap || isFoodActivity(exactMatch)))
+        return exactMatch;
 
-      const keywords = normCurrent.split(/[\s,()/-]+/).filter((w) => w.length >= 3);
+      const keywords = normCurrent
+        .split(/[\s,()/-]+/)
+        .filter((w) => w.length >= 3);
       if (keywords.length > 0) {
         const overlapMatch = allActivities.find((a) => {
           const normPlace = normalizeVietnamese(a.place.name);
           return keywords.some((kw) => normPlace.includes(kw));
         });
-        if (overlapMatch && (!isFoodSwap || isFoodActivity(overlapMatch))) return overlapMatch;
+        if (overlapMatch && (!isFoodSwap || isFoodActivity(overlapMatch)))
+          return overlapMatch;
       }
     }
 
@@ -788,9 +1152,12 @@ export class CopilotToolsService {
         const timeStr = formatTimeOfDay(a.startTime);
         if (!timeStr) return false;
         const hour = parseInt(timeStr.split(':')[0], 10);
-        if (typeLow.includes('sáng') || typeLow.includes('breakfast')) return hour < 11;
-        if (typeLow.includes('trưa') || typeLow.includes('lunch')) return hour >= 11 && hour < 14;
-        if (typeLow.includes('tối') || typeLow.includes('dinner')) return hour >= 17;
+        if (typeLow.includes('sáng') || typeLow.includes('breakfast'))
+          return hour < 11;
+        if (typeLow.includes('trưa') || typeLow.includes('lunch'))
+          return hour >= 11 && hour < 14;
+        if (typeLow.includes('tối') || typeLow.includes('dinner'))
+          return hour >= 17;
         return false;
       });
       if (byMealType) return byMealType;
@@ -828,9 +1195,13 @@ export class CopilotToolsService {
       allowRevisitExisting,
     } = params;
 
-    const cleanQuery = query.replace(/[.,!?]/g, ' ').replace(QUERY_FILLER_REGEX, '').trim();
+    const cleanQuery = query
+      .replace(/[.,!?]/g, ' ')
+      .replace(QUERY_FILLER_REGEX, '')
+      .trim();
     const searchQuery = cleanQuery || query.trim();
-    const corePhrase = searchQuery.replace(VENUE_PREFIX_REGEX, '').trim() || searchQuery;
+    const corePhrase =
+      searchQuery.replace(VENUE_PREFIX_REGEX, '').trim() || searchQuery;
     const normPhrase = normalizeVietnamese(corePhrase);
 
     const baseWhere: Prisma.PlaceWhereInput = {
@@ -852,7 +1223,9 @@ export class CopilotToolsService {
           { address: { contains: corePhrase, mode: 'insensitive' } },
           { tags: { has: corePhrase.toLowerCase() } },
           { category: { name: { contains: corePhrase, mode: 'insensitive' } } },
-          { category: { nameVi: { contains: corePhrase, mode: 'insensitive' } } },
+          {
+            category: { nameVi: { contains: corePhrase, mode: 'insensitive' } },
+          },
         ],
       },
       include: { category: true },
@@ -874,7 +1247,11 @@ export class CopilotToolsService {
         where: {
           ...baseWhere,
           OR: [
-            { AND: keywords.map((k) => ({ name: { contains: k, mode: 'insensitive' } })) },
+            {
+              AND: keywords.map((k) => ({
+                name: { contains: k, mode: 'insensitive' },
+              })),
+            },
             {
               AND: normKeywords.map((nk) => ({
                 nameNormalized: { contains: nk, mode: 'insensitive' },
@@ -894,7 +1271,9 @@ export class CopilotToolsService {
         where: {
           ...baseWhere,
           OR: [
-            ...keywords.map((k) => ({ name: { contains: k, mode: 'insensitive' as const } })),
+            ...keywords.map((k) => ({
+              name: { contains: k, mode: 'insensitive' as const },
+            })),
             ...normKeywords.map((nk) => ({
               nameNormalized: { contains: nk, mode: 'insensitive' as const },
             })),
@@ -916,7 +1295,8 @@ export class CopilotToolsService {
           const sameCategory =
             (Boolean(preferredCategorySlug) &&
               candidate.category?.slug === preferredCategorySlug) ||
-            (Boolean(preferredCategoryId) && candidate.categoryId === preferredCategoryId);
+            (Boolean(preferredCategoryId) &&
+              candidate.categoryId === preferredCategoryId);
           const score =
             matchedCount * COPILOT_CONSTANTS.KEYWORD_MATCH_WEIGHT +
             (sameCategory ? COPILOT_CONSTANTS.CATEGORY_AFFINITY_WEIGHT : 0) +
@@ -927,7 +1307,9 @@ export class CopilotToolsService {
           (item) =>
             item.matchedCount >= 2 ||
             (item.matchedCount >= 1 &&
-              (!preferredCategoryId && !preferredCategorySlug ? true : item.sameCategory)),
+              (!preferredCategoryId && !preferredCategorySlug
+                ? true
+                : item.sameCategory)),
         )
         .sort((a, b) => b.score - a.score);
 
@@ -971,16 +1353,117 @@ export class CopilotToolsService {
     return fallbackCandidates[0] ?? null;
   }
 
-  private async persistActivitySwap(
+  private resolveNewActivitySchedule(
+    dayActivities: Array<{ startTime: Date | null; endTime: Date | null }>,
+    opts: { timeSlot?: string; startTime?: string; endTime?: string },
+  ):
+    | { startTimeStr: string; endTimeStr: string; durationMinutes: number }
+    | { errorMessage: string } {
+    if (opts.startTime || opts.endTime) {
+      const defaultDur =
+        TIME_SCHEDULING_CONSTANTS.DEFAULT_ACTIVITY_DURATION_MINUTES;
+      const startMin = opts.startTime ? timeToMinutes(opts.startTime) : null;
+      const endMin = opts.endTime ? timeToMinutes(opts.endTime) : null;
+      if (
+        (opts.startTime && startMin == null) ||
+        (opts.endTime && endMin == null)
+      ) {
+        return { errorMessage: 'Định dạng giờ không hợp lệ (HH:mm).' };
+      }
+      const resolvedStartMin =
+        startMin ?? Math.max(0, (endMin as number) - defaultDur);
+      const resolvedEndMin =
+        endMin ??
+        Math.min(
+          TIME_SCHEDULING_CONSTANTS.MAX_CLOCK_MINUTE_OF_DAY,
+          resolvedStartMin + defaultDur,
+        );
+      if (resolvedEndMin <= resolvedStartMin) {
+        return { errorMessage: 'Giờ kết thúc phải sau giờ bắt đầu.' };
+      }
+      return {
+        startTimeStr: minutesToTimeStr(resolvedStartMin),
+        endTimeStr: minutesToTimeStr(resolvedEndMin),
+        durationMinutes: resolvedEndMin - resolvedStartMin,
+      };
+    }
+
+    const baseSlot = this.resolveTimeSlotRange(opts.timeSlot);
+    const resolvedSlot = resolveNonOverlappingTimeSlot(baseSlot, dayActivities);
+    return {
+      startTimeStr: resolvedSlot.start,
+      endTimeStr: resolvedSlot.end,
+      durationMinutes: resolvedSlot.durationMinutes,
+    };
+  }
+
+  private async insertActivityRowTx(
+    tx: Prisma.TransactionClient,
+    params: {
+      itineraryId: string;
+      place: {
+        id: string;
+        name: string;
+        category?: {
+          name?: string | null;
+          nameVi?: string | null;
+          slug?: string | null;
+        } | null;
+        priceRange?: unknown;
+        priceLevel?: string | null;
+      };
+      dayNumber: number;
+      dayActivities: Array<{ visitOrder: Prisma.Decimal | number | null }>;
+      startTimeStr: string;
+      endTimeStr: string;
+      durationMinutes: number;
+      notes: string | null;
+    },
+  ): Promise<void> {
+    const maxOrder = params.dayActivities.reduce(
+      (max, item) =>
+        Math.max(max, item.visitOrder ? Number(item.visitOrder) : 0),
+      0,
+    );
+    const { cost: estimatedCost } = calculatePlaceEstimatedCost({
+      category: params.place.category,
+      priceRange: params.place.priceRange,
+      priceLevel: params.place.priceLevel,
+      placeName: params.place.name,
+    });
+
+    await tx.itineraryDestination.create({
+      data: {
+        itineraryId: params.itineraryId,
+        placeId: params.place.id,
+        dayNumber: params.dayNumber,
+        visitOrder: new Prisma.Decimal(maxOrder + 1),
+        startTime: parseTimeOfDay(params.startTimeStr),
+        endTime: parseTimeOfDay(params.endTimeStr),
+        estimatedDurationMinutes: params.durationMinutes,
+        estimatedCost: new Prisma.Decimal(estimatedCost),
+        notes: params.notes,
+      },
+    });
+
+    await this.syncItineraryTotalPlaces(tx, params.itineraryId);
+  }
+
+  async persistActivitySwap(
     destinationId: string,
     newPlace: {
       id: string;
       name: string;
-      category?: { name?: string | null; nameVi?: string | null; slug?: string | null } | null;
+      category?: {
+        name?: string | null;
+        nameVi?: string | null;
+        slug?: string | null;
+      } | null;
       priceRange?: unknown;
       priceLevel?: string | null;
     },
     notes: string,
+    tx?: Prisma.TransactionClient,
   ): Promise<void> {
     const { cost: newEstimatedCost } = calculatePlaceEstimatedCost({
       category: newPlace.category,
@@ -989,7 +1472,7 @@ export class CopilotToolsService {
       placeName: newPlace.name,
     });
 
-    await this.prisma.itineraryDestination.update({
+    await (tx || this.prisma).itineraryDestination.update({
       where: { id: destinationId },
       data: {
         placeId: newPlace.id,
@@ -999,7 +1482,10 @@ export class CopilotToolsService {
     });
   }
 
-  private resolveTimeSlotRange(timeSlot?: string): { start: string; end: string } {
+  private resolveTimeSlotRange(timeSlot?: string): {
+    start: string;
+    end: string;
+  } {
     const slot = (timeSlot || '').toLowerCase();
     const matched = COPILOT_CONSTANTS.TIME_SLOT_ALIASES.find((rule) =>
       rule.keywords.some((kw) => slot.includes(kw)),
@@ -1061,9 +1547,17 @@ export class CopilotToolsService {
     });
 
     if (activities.length > 0) {
-      const avgLat = activities.reduce((acc, a) => acc + a.place.latitude, 0) / activities.length;
-      const avgLng = activities.reduce((acc, a) => acc + a.place.longitude, 0) / activities.length;
-      return this.computeBboxAround(avgLat, avgLng, COPILOT_CONSTANTS.DEFAULT_BOUNDING_RADIUS_KM);
+      const avgLat =
+        activities.reduce((acc, a) => acc + a.place.latitude, 0) /
+        activities.length;
+      const avgLng =
+        activities.reduce((acc, a) => acc + a.place.longitude, 0) /
+        activities.length;
+      return this.computeBboxAround(
+        avgLat,
+        avgLng,
+        COPILOT_CONSTANTS.DEFAULT_BOUNDING_RADIUS_KM,
+      );
     }
 
     return this.computeBboxAround(
@@ -1073,7 +1567,11 @@ export class CopilotToolsService {
     );
   }
 
-  private computeBboxAround(lat: number, lng: number, radiusKm: number): BoundingBox {
+  private computeBboxAround(
+    lat: number,
+    lng: number,
+    radiusKm: number,
+  ): BoundingBox {
     const deltaLat = radiusKm / 111;
     const deltaLng = radiusKm / (111 * Math.cos((lat * Math.PI) / 180));
     return {
@@ -1086,7 +1584,12 @@ export class CopilotToolsService {
     };
   }
 
-  private haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  private haversineDistance(
+    lat1: number,
+    lon1: number,
+    lat2: number,
+    lon2: number,
+  ): number {
     const dLat = ((lat2 - lat1) * Math.PI) / 180;
     const dLon = ((lon2 - lon1) * Math.PI) / 180;
     const a =
@@ -1095,6 +1598,10 @@ export class CopilotToolsService {
         Math.cos((lat2 * Math.PI) / 180) *
         Math.sin(dLon / 2) *
         Math.sin(dLon / 2);
-    return COPILOT_CONSTANTS.EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return (
+      COPILOT_CONSTANTS.EARTH_RADIUS_KM *
+      2 *
+      Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+    );
   }
 }

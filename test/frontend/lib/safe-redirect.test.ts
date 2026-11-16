@@ -9,7 +9,7 @@ import {
 describe('getSafeRedirectUrl', () => {
   it('cho phép các đường dẫn nội bộ hợp lệ', () => {
     expect(getSafeRedirectUrl('/explore')).toBe('/explore');
-    expect(getSafeRedirectUrl('/planner/new')).toBe('/planner/new');
+    expect(getSafeRedirectUrl('/planner')).toBe('/planner');
     expect(getSafeRedirectUrl('/profile?tab=account')).toBe('/profile?tab=account');
   });
 

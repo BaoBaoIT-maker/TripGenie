@@ -23,7 +23,9 @@ import Redis from 'ioredis';
           connectTimeout: 10000,
           retryStrategy: (times: number) => {
             if (times > 10) {
-              logger.error(`Redis reconnection failed after ${times} attempts.`);
+              logger.error(
+                `Redis reconnection failed after ${times} attempts.`,
+              );
               return null;
             }
             return Math.min(times * 100, 3000);
@@ -32,10 +34,12 @@ import Redis from 'ioredis';
 
         let client: Redis;
         if (redisUrl?.startsWith('redis')) {
-          const isLocal = redisUrl.includes('localhost') || redisUrl.includes('127.0.0.1');
-          const url = !isLocal && redisUrl.startsWith('redis://')
-            ? redisUrl.replace('redis://', 'rediss://')
-            : redisUrl;
+          const isLocal =
+            redisUrl.includes('localhost') || redisUrl.includes('127.0.0.1');
+          const url =
+            !isLocal && redisUrl.startsWith('redis://')
+              ? redisUrl.replace('redis://', 'rediss://')
+              : redisUrl;
 
           client = new Redis(url, {
             ...commonOptions,

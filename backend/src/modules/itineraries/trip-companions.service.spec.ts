@@ -73,8 +73,16 @@ describe('TripCompanionsService', () => {
         expiresAt: '2026-11-10T00:00:00.000Z',
       });
 
-      const res = await service.inviteCompanion('itin-1', 'owner-1', 'friend@example.com');
-      expect(mockRepo.createInvitation).toHaveBeenCalledWith('itin-1', 'owner-1', 'invitee-1');
+      const res = await service.inviteCompanion(
+        'itin-1',
+        'owner-1',
+        'friend@example.com',
+      );
+      expect(mockRepo.createInvitation).toHaveBeenCalledWith(
+        'itin-1',
+        'owner-1',
+        'invitee-1',
+      );
       expect(res.invitationId).toBe('inv-1');
     });
   });
@@ -87,36 +95,59 @@ describe('TripCompanionsService', () => {
       });
 
       const res = await service.acceptInvitation('inv-1', 'invitee-1');
-      expect(mockRepo.acceptInvitation).toHaveBeenCalledWith('inv-1', 'invitee-1');
+      expect(mockRepo.acceptInvitation).toHaveBeenCalledWith(
+        'inv-1',
+        'invitee-1',
+      );
       expect(res.role).toBe('VIEWER');
     });
   });
 
   describe('declineInvitation', () => {
     it('delegates to repository', async () => {
-      mockRepo.declineInvitation.mockResolvedValue({ success: true, status: 'DECLINED' });
+      mockRepo.declineInvitation.mockResolvedValue({
+        success: true,
+        status: 'DECLINED',
+      });
 
       const res = await service.declineInvitation('inv-1', 'invitee-1');
-      expect(mockRepo.declineInvitation).toHaveBeenCalledWith('inv-1', 'invitee-1');
+      expect(mockRepo.declineInvitation).toHaveBeenCalledWith(
+        'inv-1',
+        'invitee-1',
+      );
       expect(res.success).toBe(true);
     });
   });
 
   describe('revokeInvitation', () => {
     it('delegates to repository', async () => {
-      mockRepo.revokeInvitation.mockResolvedValue({ success: true, status: 'REVOKED' });
+      mockRepo.revokeInvitation.mockResolvedValue({
+        success: true,
+        status: 'REVOKED',
+      });
 
       const res = await service.revokeInvitation('inv-1', 'owner-1');
-      expect(mockRepo.revokeInvitation).toHaveBeenCalledWith('inv-1', 'owner-1');
+      expect(mockRepo.revokeInvitation).toHaveBeenCalledWith(
+        'inv-1',
+        'owner-1',
+      );
       expect(res.success).toBe(true);
     });
   });
 
   describe('member management', () => {
     it('updateMemberRole delegates to repository', async () => {
-      mockRepo.updateMemberRole.mockResolvedValue({ userId: 'user-2', role: 'EDITOR' });
+      mockRepo.updateMemberRole.mockResolvedValue({
+        userId: 'user-2',
+        role: 'EDITOR',
+      });
 
-      const res = await service.updateMemberRole('itin-1', 'owner-1', 'user-2', 'EDITOR');
+      const res = await service.updateMemberRole(
+        'itin-1',
+        'owner-1',
+        'user-2',
+        'EDITOR',
+      );
       expect(mockRepo.updateMemberRole).toHaveBeenCalledWith(
         'itin-1',
         'owner-1',
@@ -127,15 +158,25 @@ describe('TripCompanionsService', () => {
     });
 
     it('removeMember delegates to repository', async () => {
-      mockRepo.removeMember.mockResolvedValue({ success: true, removedUserId: 'user-2' });
+      mockRepo.removeMember.mockResolvedValue({
+        success: true,
+        removedUserId: 'user-2',
+      });
 
       const res = await service.removeMember('itin-1', 'owner-1', 'user-2');
-      expect(mockRepo.removeMember).toHaveBeenCalledWith('itin-1', 'owner-1', 'user-2');
+      expect(mockRepo.removeMember).toHaveBeenCalledWith(
+        'itin-1',
+        'owner-1',
+        'user-2',
+      );
       expect(res.success).toBe(true);
     });
 
     it('leaveTrip delegates to repository', async () => {
-      mockRepo.leaveTrip.mockResolvedValue({ success: true, leftUserId: 'user-2' });
+      mockRepo.leaveTrip.mockResolvedValue({
+        success: true,
+        leftUserId: 'user-2',
+      });
 
       const res = await service.leaveTrip('itin-1', 'user-2');
       expect(mockRepo.leaveTrip).toHaveBeenCalledWith('itin-1', 'user-2');

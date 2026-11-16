@@ -9,6 +9,11 @@ import type {
   CopilotChatResponse,
   CopilotHistoryMessage,
   AlternativePlaceItem,
+  AddDestinationRequest,
+  UpdateDestinationRequest,
+  UpdateItineraryMetaRequest,
+  MoveDirection,
+  TripWeatherResponse,
 } from '@/types/itinerary';
 
 // Re-export so callers that import ApiError from here don't break
@@ -39,8 +44,15 @@ export const itineraryService = {
   updateTransitMode: (id: string, transitMode: TransitMode) =>
     apiClient<ItineraryDetail>(`/itineraries/${id}/transit-mode`, { method: 'PATCH', body: JSON.stringify({ transitMode }) }),
 
-  chatCopilot: (id: string, message: string, sessionId?: string) =>
-    apiClient<CopilotChatResponse>(`/itineraries/${id}/chat`, { method: 'POST', body: JSON.stringify({ message, sessionId }) }),
+  chatCopilot: (id: string, message: string, sessionId?: string, autoApply?: boolean) =>
+    apiClient<CopilotChatResponse>(`/itineraries/${id}/chat`, {
+      method: 'POST',
+      body: JSON.stringify({
+        message,
+        ...(sessionId !== undefined ? { sessionId } : {}),
+        ...(autoApply !== undefined ? { autoApply } : {}),
+      }),
+    }),
 
   getChatHistory: (id: string, sessionId?: string) =>
     apiClient<CopilotHistoryMessage[]>(`/itineraries/${id}/chat/history${sessionId ? `?sessionId=${sessionId}` : ''}`),
@@ -59,4 +71,40 @@ export const itineraryService = {
 
   updateTourBriefing: (id: string, dto: TourBriefing) =>
     apiClient<ItineraryDetail>(`/itineraries/${id}/tour-briefing`, { method: 'PATCH', body: JSON.stringify(dto) }),
+
+  getWeather: (id: string) =>
+    apiClient<TripWeatherResponse>(`/itineraries/${id}/weather`),
+
+  updateItineraryMeta: (id: string, dto: UpdateItineraryMetaRequest) =>
+    apiClient<ItineraryDetail>(`/itineraries/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(dto),
+    }),
+
+  addDestination: (id: string, dto: AddDestinationRequest) =>
+    apiClient<ItineraryDetail>(`/itineraries/${id}/destinations`, {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    }),
+
+  updateDestination: (
+    id: string,
+    destinationId: string,
+    dto: UpdateDestinationRequest,
+  ) =>
+    apiClient<ItineraryDetail>(`/itineraries/${id}/destinations/${destinationId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(dto),
+    }),
+
+  moveDestination: (id: string, destinationId: string, direction: MoveDirection) =>
+    apiClient<ItineraryDetail>(`/itineraries/${id}/destinations/${destinationId}/move`, {
+      method: 'POST',
+      body: JSON.stringify({ direction }),
+    }),
+
+  removeDestination: (id: string, destinationId: string) =>
+    apiClient<ItineraryDetail>(`/itineraries/${id}/destinations/${destinationId}`, {
+      method: 'DELETE',
+    }),
 };

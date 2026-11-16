@@ -1,4 +1,13 @@
 import { apiClient } from '@/lib/api-client';
+import type {
+  CreateGroupProposalRequest,
+  GroupProposalItem,
+  GroupProposalsListResponse,
+  ProposalResolveAction,
+  ResolveGroupProposalResponse,
+  ToggleProposalVoteResponse,
+  WithdrawGroupProposalResponse,
+} from '@/types/itinerary';
 
 export interface CompanionMember {
   userId: string;
@@ -100,6 +109,46 @@ export const tripCompanionService = {
       `/trip-invitations/${invitationId}/revoke`,
       {
         method: 'POST',
+      },
+    ),
+};
+
+export const tripProposalService = {
+  listProposals: (itineraryId: string) =>
+    apiClient<GroupProposalsListResponse>(`/itineraries/${itineraryId}/proposals`),
+
+  createProposal: (itineraryId: string, dto: CreateGroupProposalRequest) =>
+    apiClient<GroupProposalItem>(`/itineraries/${itineraryId}/proposals`, {
+      method: 'POST',
+      body: JSON.stringify(dto),
+    }),
+
+  toggleVote: (itineraryId: string, proposalId: string) =>
+    apiClient<ToggleProposalVoteResponse>(
+      `/itineraries/${itineraryId}/proposals/${proposalId}/vote`,
+      {
+        method: 'POST',
+      },
+    ),
+
+  resolveProposal: (
+    itineraryId: string,
+    proposalId: string,
+    action: ProposalResolveAction,
+  ) =>
+    apiClient<ResolveGroupProposalResponse>(
+      `/itineraries/${itineraryId}/proposals/${proposalId}/resolve`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ action }),
+      },
+    ),
+
+  withdrawProposal: (itineraryId: string, proposalId: string) =>
+    apiClient<WithdrawGroupProposalResponse>(
+      `/itineraries/${itineraryId}/proposals/${proposalId}`,
+      {
+        method: 'DELETE',
       },
     ),
 };

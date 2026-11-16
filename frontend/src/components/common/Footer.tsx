@@ -13,6 +13,7 @@ export function Footer() {
                 alt="TripGenie Logo"
                 width={48}
                 height={48}
+                style={{ width: "auto", height: "auto" }}
                 className="h-11 sm:h-12 w-auto object-contain transition-transform group-hover:scale-105"
               />
               <div>

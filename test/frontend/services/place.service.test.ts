@@ -38,10 +38,10 @@ describe("placeService.searchPlaces", () => {
   it("returns empty places without falling back to mock when backend returns empty items", async () => {
     vi.mocked(apiClient).mockResolvedValueOnce({
       items: [],
-      meta: { totalItems: 0, page: 1, limit: 10, totalPages: 0 },
+      meta: { totalItems: 0, page: 1, limit: 9, totalPages: 0 },
     });
 
-    const result = await placeService.searchPlaces({ limit: 10 });
+    const result = await placeService.searchPlaces({ limit: 9 });
     expect(result.places).toHaveLength(0);
     expect(result.total).toBe(0);
   });
@@ -49,14 +49,14 @@ describe("placeService.searchPlaces", () => {
   it("propagates backend error by default instead of fabricating mock places", async () => {
     vi.mocked(apiClient).mockRejectedValueOnce(new Error("Network Error"));
 
-    await expect(placeService.searchPlaces({ limit: 5 })).rejects.toThrow("Network Error");
+    await expect(placeService.searchPlaces({ limit: 8 })).rejects.toThrow("Network Error");
   });
 
   it("throws error without mock fallback when allowMockFallback is false", async () => {
     vi.mocked(apiClient).mockRejectedValueOnce(new Error("Database connection down"));
 
     await expect(
-      placeService.searchPlaces({ limit: 5 })
+      placeService.searchPlaces({ limit: 7 })
     ).rejects.toThrow("Database connection down");
   });
 });

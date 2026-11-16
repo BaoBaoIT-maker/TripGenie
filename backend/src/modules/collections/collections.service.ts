@@ -76,13 +76,16 @@ export class CollectionsService {
     collectionId: string,
     dto: UpdateCollectionDto,
   ): Promise<Collection> {
-    const existing = await this.collectionsRepo.findCollectionById(collectionId);
+    const existing =
+      await this.collectionsRepo.findCollectionById(collectionId);
     if (!existing) {
       throw new NotFoundException('Không tìm thấy bộ sưu tập');
     }
 
     if (existing.userId !== userId) {
-      throw new ForbiddenException('Bạn không có quyền chỉnh sửa bộ sưu tập này');
+      throw new ForbiddenException(
+        'Bạn không có quyền chỉnh sửa bộ sưu tập này',
+      );
     }
 
     const isDefault = existing.title === DEFAULT_COLLECTION_TITLE;
@@ -113,7 +116,8 @@ export class CollectionsService {
     userId: string,
     collectionId: string,
   ): Promise<{ success: boolean; message: string }> {
-    const existing = await this.collectionsRepo.findCollectionById(collectionId);
+    const existing =
+      await this.collectionsRepo.findCollectionById(collectionId);
     if (!existing) {
       throw new NotFoundException('Không tìm thấy bộ sưu tập');
     }
@@ -182,10 +186,11 @@ export class CollectionsService {
     }
 
     // Global toggle: When no collectionId is specified
-    const containing = await this.collectionsRepo.findCollectionsContainingPlace(
-      userId,
-      dto.placeId,
-    );
+    const containing =
+      await this.collectionsRepo.findCollectionsContainingPlace(
+        userId,
+        dto.placeId,
+      );
 
     if (containing.length > 0) {
       await Promise.all(
@@ -215,13 +220,16 @@ export class CollectionsService {
     collectionId: string,
     dto: AddPlaceCollectionDto,
   ): Promise<CollectionPlace> {
-    const existing = await this.collectionsRepo.findCollectionById(collectionId);
+    const existing =
+      await this.collectionsRepo.findCollectionById(collectionId);
     if (!existing) {
       throw new NotFoundException('Không tìm thấy bộ sưu tập');
     }
 
     if (existing.userId !== userId) {
-      throw new ForbiddenException('Bạn không có quyền thêm địa điểm vào bộ sưu tập này');
+      throw new ForbiddenException(
+        'Bạn không có quyền thêm địa điểm vào bộ sưu tập này',
+      );
     }
 
     return this.collectionsRepo.addPlaceToCollection(
@@ -236,13 +244,16 @@ export class CollectionsService {
     collectionId: string,
     placeId: string,
   ): Promise<{ success: boolean; message: string }> {
-    const existing = await this.collectionsRepo.findCollectionById(collectionId);
+    const existing =
+      await this.collectionsRepo.findCollectionById(collectionId);
     if (!existing) {
       throw new NotFoundException('Không tìm thấy bộ sưu tập');
     }
 
     if (existing.userId !== userId) {
-      throw new ForbiddenException('Bạn không có quyền xóa địa điểm khỏi bộ sưu tập này');
+      throw new ForbiddenException(
+        'Bạn không có quyền xóa địa điểm khỏi bộ sưu tập này',
+      );
     }
 
     await this.collectionsRepo.removePlaceFromCollection(collectionId, placeId);
@@ -259,4 +270,3 @@ export class CollectionsService {
     return this.collectionsRepo.findCollectionsContainingPlace(userId, placeId);
   }
 }
-

@@ -5,7 +5,7 @@ export function EditorialMosaicSection() {
   return (
     <section
       id="food-guide"
-      className="py-24 sm:py-32 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-12"
+      className="py-14 sm:py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-10"
     >
       {/* Section Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">

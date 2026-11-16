@@ -25,7 +25,9 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -35,6 +37,7 @@ import { ExploreCardListSkeleton } from "@/components/place/ExploreListSkeleton"
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/common/EmptyState";
+import { TripGenieMark } from "@/components/common/TripGenieMark";
 import { VietMapLoader } from "@/components/map/VietMapLoader";
 import { PhotoContributeModal } from "@/components/place/PhotoContributeModal";
 import {
@@ -541,12 +544,24 @@ function ExploreContent() {
     }
   };
 
-  // Filter travel areas to PROVINCE and CITY only, sorted alphabetically in Vietnamese
+  // Popular Tourist Zones (Đà Lạt, Phú Quốc, Sa Pa, Hội An, Hạ Long, Nha Trang, etc.)
+  const touristZones = useMemo(() => {
+    return travelAreas
+      .filter((a) => a.type === "ZONE")
+      .sort((a, b) => (a.nameVi || a.name).localeCompare(b.nameVi || b.name, "vi"));
+  }, [travelAreas]);
+
+  // Provinces and major administrative cities
   const provinceAreas = useMemo(() => {
     return travelAreas
       .filter((a) => a.type === "PROVINCE" || a.type === "CITY")
       .sort((a, b) => (a.nameVi || a.name).localeCompare(b.nameVi || b.name, "vi"));
   }, [travelAreas]);
+
+  // Unified list of selectable areas for reverse geocoding / GPS matching
+  const selectableAreas = useMemo(() => {
+    return [...touristZones, ...provinceAreas];
+  }, [touristZones, provinceAreas]);
 
   // Find selected province name for GeoJSON boundary highlight and bounds fitting
   const selectedAreaObj = useMemo(() => {
@@ -810,7 +825,7 @@ function ExploreContent() {
           .replace(/đ/gi, "d")
           .trim();
         const matched =
-          provinceAreas.find((a) => {
+          selectableAreas.find((a) => {
             const nameNorm = (a.nameVi || a.name)
               .toLowerCase()
               .normalize("NFD")
@@ -860,7 +875,7 @@ function ExploreContent() {
         setPage(1);
       }
     },
-    [requestLocation, provinceAreas, travelAreas]
+    [requestLocation, selectableAreas, travelAreas]
   );
 
   // Reset all filters
@@ -1035,8 +1050,8 @@ function ExploreContent() {
 
         {/* Search & Location Filter Bar: 2 tiers on mobile, 1 compact inline tier on desktop */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-          {/* Keyword input with autocomplete */}
-          <div className="flex-1 min-w-[200px] lg:max-w-xs xl:max-w-sm">
+          {/* Keyword input with autocomplete: Expands freely across available desktop width */}
+          <div className="flex-1 min-w-0 sm:min-w-[220px]">
             <ExploreSearchBar
               keyword={keyword}
               onSearch={handleExecuteSearch}
@@ -1044,10 +1059,10 @@ function ExploreContent() {
             />
           </div>
 
-          {/* Location controls (Province dropdown + GPS nearby button) */}
-          <div className="flex items-center gap-2 sm:shrink-0">
+          {/* Location controls (Province dropdown + GPS nearby button): Docked to right side on desktop */}
+          <div className="flex items-center gap-2 sm:shrink-0 sm:ml-auto">
             {/* Province / City Select Dropdown */}
-            <div className="flex-1 sm:w-48 sm:flex-none">
+            <div className="flex-1 sm:w-44 xl:w-48 sm:flex-none">
               <Select
                 value={selectedAreaId === "all" ? "all" : String(selectedAreaId)}
                 onValueChange={(val) => {
@@ -1059,20 +1074,41 @@ function ExploreContent() {
                 <SelectTrigger className="h-10 sm:h-11 px-3 rounded-xl bg-slate-50 border-slate-200/80 text-xs sm:text-sm font-semibold text-slate-800">
                   <div className="flex items-center gap-2 truncate">
                     <MapPin className="size-4 text-[#0194F3] shrink-0" />
-                    <SelectValue placeholder="Chọn Tỉnh / Thành">
+                    <SelectValue placeholder="Chọn Tỉnh / Điểm đến">
                       {selectedAreaId === "all"
                         ? "Toàn quốc (Tất cả)"
-                        : selectedProvinceName || "Chọn Tỉnh / Thành"}
+                        : selectedProvinceName || "Chọn Tỉnh / Điểm đến"}
                     </SelectValue>
                   </div>
                 </SelectTrigger>
                 <SelectContent className="max-h-80">
                   <SelectItem value="all">Toàn quốc (Tất cả)</SelectItem>
-                  {provinceAreas.map((area) => (
-                    <SelectItem key={area.id} value={String(area.id)}>
-                      {area.nameVi || area.name}
-                    </SelectItem>
-                  ))}
+
+                  {touristZones.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-[#0194F3]">
+                        Điểm đến du lịch nổi bật
+                      </SelectLabel>
+                      {touristZones.map((area) => (
+                        <SelectItem key={area.id} value={String(area.id)}>
+                          {area.nameVi || area.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
+
+                  {provinceAreas.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Tỉnh / Thành phố
+                      </SelectLabel>
+                      {provinceAreas.map((area) => (
+                        <SelectItem key={area.id} value={String(area.id)}>
+                          {area.nameVi || area.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -1093,12 +1129,13 @@ function ExploreContent() {
               ) : (
                 <LocateFixed className="size-3.5" />
               )}
-              <span>{useGpsSearch ? "Đang tìm quanh đây" : "Tìm quanh đây"}</span>
+              <span className="inline lg:hidden xl:inline">{useGpsSearch ? "Đang tìm quanh đây" : "Tìm quanh đây"}</span>
+              <span className="hidden lg:inline xl:hidden">{useGpsSearch ? "Đang tìm" : "Quanh đây"}</span>
             </button>
           </div>
 
           {/* Desktop-only Inline Controls: Divider + Bộ lọc + Đang mở cửa + Sắp xếp */}
-          <div className="hidden lg:flex items-center gap-2 ml-auto shrink-0">
+          <div className="hidden lg:flex items-center gap-2 shrink-0">
             <div className="h-6 w-px bg-slate-200 mx-0.5" />
 
             {/* Button mở Filter Sheet Modal */}
@@ -1518,11 +1555,11 @@ function ExploreContent() {
                   <button
                     type="button"
                     onClick={() => window.dispatchEvent(new CustomEvent("tripgenie:open-advisor"))}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/95 backdrop-blur-md text-primary font-bold text-xs shadow-md border border-primary/20 hover:bg-white active:scale-95 transition-all cursor-pointer"
-                    title="Hỏi trợ lý AI về khu vực này"
+                    className="flex min-h-[44px] items-center gap-2 rounded-full border border-border bg-card px-3.5 py-2 text-xs font-bold text-foreground shadow-md transition-all hover:border-primary/50 active:scale-95 cursor-pointer"
+                    title="Hỏi cố vấn du lịch TripGenie về khu vực này"
                   >
-                    <Sparkles className="size-3.5 text-amber-500 fill-amber-500" />
-                    <span>Hỏi AI</span>
+                    <TripGenieMark className="size-4.5" />
+                    <span>Hỏi cố vấn</span>
                   </button>
                 </div>
               )}

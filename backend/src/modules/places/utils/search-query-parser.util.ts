@@ -66,9 +66,7 @@ const CATEGORY_SYNONYMS: { slug: string; patterns: RegExp[] }[] = [
   },
   {
     slug: 'spa',
-    patterns: [
-      /\b(spa|spas|massage|xông\s+hơi)\b/i,
-    ],
+    patterns: [/\b(spa|spas|massage|xông\s+hơi)\b/i],
   },
   {
     slug: 'vui-choi',
@@ -91,8 +89,7 @@ const LANDMARK_ANCHOR_PATTERN =
   /^(.*?)\s+(?:gần|quanh|sát|cạnh|kế\s+bên|near|around|close\s+to|by|next\s+to)\s+([^,]+)$/i;
 
 // Administrative area pattern ("quán cafe ở Đà Nẵng", "khách sạn tại Hải Châu", "hotels in Da Nang")
-const AREA_PATTERN =
-  /^(?:(.*?)\s+)?(?:ở|tại|in|at)\s+([^,]+)$/i;
+const AREA_PATTERN = /^(?:(.*?)\s+)?(?:ở|tại|in|at)\s+([^,]+)$/i;
 
 export function parseSearchQuery(rawQuery: string): ParsedPlaceSearchQuery {
   let workingQuery = (rawQuery || '').trim();
@@ -116,7 +113,10 @@ export function parseSearchQuery(rawQuery: string): ParsedPlaceSearchQuery {
     }
 
     if (!isNaN(meters) && meters > 0) {
-      extractedRadiusMeters = Math.min(Math.max(Math.round(meters), 500), 50000);
+      extractedRadiusMeters = Math.min(
+        Math.max(Math.round(meters), 500),
+        50000,
+      );
     }
     workingQuery = workingQuery.replace(distMatch[0], ' ').trim();
   }

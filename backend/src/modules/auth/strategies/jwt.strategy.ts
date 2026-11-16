@@ -24,7 +24,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
         },
       ]),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET', 'your_super_secret_jwt_key_min_32_characters'),
+      secretOrKey: configService.get<string>(
+        'JWT_SECRET',
+        'your_super_secret_jwt_key_min_32_characters',
+      ),
       passReqToCallback: false,
     });
   }
@@ -36,23 +39,31 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   async validate(payload: JwtPayload) {
     // 1. Check blacklist (revoked on logout)
     if (payload.jti) {
-      const revoked = await this.tokenBlacklistService.isBlacklisted(payload.jti);
+      const revoked = await this.tokenBlacklistService.isBlacklisted(
+        payload.jti,
+      );
       if (revoked) {
-        throw new UnauthorizedException('Token đã bị thu hồi, vui lòng đăng nhập lại');
+        throw new UnauthorizedException(
+          'Token đã bị thu hồi, vui lòng đăng nhập lại',
+        );
       }
     }
 
     // 2. Verify user still exists and is active
     const user = await this.usersRepository.findById(payload.sub);
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('Tài khoản không tồn tại hoặc đã bị khóa');
+      throw new UnauthorizedException(
+        'Tài khoản không tồn tại hoặc đã bị khóa',
+      );
     }
 
     // 3. Verify token authVersion matches current user authVersion
     const currentAuthVersion = user.authVersion ?? 0;
     const tokenAuthVersion = payload.authVersion ?? 0;
     if (tokenAuthVersion !== currentAuthVersion) {
-      throw new UnauthorizedException('Phiên đăng nhập đã hết hạn hoặc mật khẩu đã thay đổi, vui lòng đăng nhập lại');
+      throw new UnauthorizedException(
+        'Phiên đăng nhập đã hết hạn hoặc mật khẩu đã thay đổi, vui lòng đăng nhập lại',
+      );
     }
 
     // Return full profile + jti/exp so logout can revoke without re-decoding the token

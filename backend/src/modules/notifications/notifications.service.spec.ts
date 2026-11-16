@@ -64,7 +64,10 @@ describe('NotificationsService', () => {
 
   it('markAllRead should delegate to repository', async () => {
     const isoDate = new Date().toISOString();
-    mockRepo.markAllRead.mockResolvedValue({ updatedCount: 3, readAt: isoDate });
+    mockRepo.markAllRead.mockResolvedValue({
+      updatedCount: 3,
+      readAt: isoDate,
+    });
 
     const result = await service.markAllRead('user-1');
 

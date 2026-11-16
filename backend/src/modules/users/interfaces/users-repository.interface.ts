@@ -5,12 +5,20 @@ export interface IUsersRepository {
   findByUsername(username: string): Promise<User | null>;
   findByIdentifier(identifier: string): Promise<User | null>;
   findById(id: string): Promise<User | null>;
-  findUserWithIdentities(id: string): Promise<(User & { identities: UserIdentity[] }) | null>;
+  findUserWithIdentities(
+    id: string,
+  ): Promise<(User & { identities: UserIdentity[] }) | null>;
   create(data: Prisma.UserCreateInput): Promise<User>;
   update(id: string, data: Prisma.UserUpdateInput): Promise<User>;
   softDelete(id: string): Promise<User>;
-  findIdentity(provider: string, providerUserId: string): Promise<UserIdentity | null>;
+  findIdentity(
+    provider: string,
+    providerUserId: string,
+  ): Promise<UserIdentity | null>;
   createIdentity(data: Prisma.UserIdentityCreateInput): Promise<UserIdentity>;
   findPreferences(userId: string): Promise<UserPreference | null>;
-  upsertPreferences(userId: string, data: Prisma.UserPreferenceCreateWithoutUserInput): Promise<UserPreference>;
+  upsertPreferences(
+    userId: string,
+    data: Prisma.UserPreferenceCreateWithoutUserInput,
+  ): Promise<UserPreference>;
 }

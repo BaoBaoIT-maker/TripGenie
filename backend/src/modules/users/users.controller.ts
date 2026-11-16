@@ -1,4 +1,13 @@
-import { Controller, Patch, Get, Put, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Patch,
+  Get,
+  Put,
+  Body,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UpdateUsernameDto } from './dto/update-username.dto';
 import { UpdateUserPreferenceDto } from './dto/update-user-preference.dto';
@@ -19,7 +28,10 @@ export class UsersController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateUsernameDto,
   ) {
-    const updated = await this.usersService.updateUsername(user.id, dto.username);
+    const updated = await this.usersService.updateUsername(
+      user.id,
+      dto.username,
+    );
     return {
       message: 'Cập nhật tên tài khoản thành công',
       user: {
@@ -30,6 +42,7 @@ export class UsersController {
         avatarUrl: updated.avatarUrl,
         role: updated.role,
         isVerified: updated.isVerified,
+        isVerifiedCreator: updated.isVerifiedCreator,
       },
     };
   }
@@ -41,7 +54,10 @@ export class UsersController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateAvatarDto,
   ) {
-    const updated = await this.usersService.updateAvatar(user.id, dto.avatarUrl);
+    const updated = await this.usersService.updateAvatar(
+      user.id,
+      dto.avatarUrl,
+    );
     return {
       message: 'Cập nhật ảnh đại diện thành công',
       user: {
@@ -52,6 +68,7 @@ export class UsersController {
         avatarUrl: updated.avatarUrl,
         role: updated.role,
         isVerified: updated.isVerified,
+        isVerifiedCreator: updated.isVerifiedCreator,
       },
     };
   }
@@ -97,7 +114,10 @@ export class UsersController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: UpdateUserPreferenceDto,
   ) {
-    const preferences = await this.usersService.updateUserPreferences(user.id, dto);
+    const preferences = await this.usersService.updateUserPreferences(
+      user.id,
+      dto,
+    );
     return {
       message: 'Cập nhật sở thích du lịch thành công',
       preferences,

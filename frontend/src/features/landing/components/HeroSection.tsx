@@ -62,10 +62,10 @@ export function HeroSection() {
           <span className="text-[#0194F3] font-bold">28°C Nắng đẹp</span>
         </div>
 
-        <div className="hidden sm:flex items-center gap-2 text-slate-600 font-semibold">
+        <div className="hidden sm:flex items-center gap-2 text-slate-300 font-medium">
           <span>Cuộn xuống xem tiếp</span>
           <svg
-            className="size-3.5 animate-bounce"
+            className="size-3.5"
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"

@@ -68,7 +68,9 @@ Chiều dài 21 km uốn lượn nối liền Đà Nẵng và Huế, nhiều kh�
       const chunks = createSemanticChunks('Cẩm Nang', body);
 
       expect(chunks).toHaveLength(1);
-      expect(chunks[0].breadcrumbs).toBe('Cẩm Nang > 3. Cung đường > Đèo Hải Vân');
+      expect(chunks[0].breadcrumbs).toBe(
+        'Cẩm Nang > 3. Cung đường > Đèo Hải Vân',
+      );
     });
   });
 
@@ -86,7 +88,9 @@ Chiều dài 21 km uốn lượn nối liền Đà Nẵng và Huế, nhiều kh�
       };
 
       mockEmbeddingService = {
-        generateEmbedding: jest.fn().mockResolvedValue(new Array(1536).fill(0.01)),
+        generateEmbedding: jest
+          .fn()
+          .mockResolvedValue(new Array(1536).fill(0.01)),
         getModelName: jest.fn().mockReturnValue('models/gemini-embedding-2'),
       };
 
@@ -126,10 +130,13 @@ Chiều dài 21 km uốn lượn nối liền Đà Nẵng và Huế, nhiều kh�
           },
         ]);
 
-        const results = await service.searchKnowledge('Lên Sơn Trà có được đi xe ga?', {
-          areaId: 48,
-          minSimilarity: 0.25,
-        });
+        const results = await service.searchKnowledge(
+          'Lên Sơn Trà có được đi xe ga?',
+          {
+            areaId: 48,
+            minSimilarity: 0.25,
+          },
+        );
 
         expect(mockEmbeddingService.generateEmbedding).toHaveBeenCalledWith(
           'Lên Sơn Trà có được đi xe ga?',

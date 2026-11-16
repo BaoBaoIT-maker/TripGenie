@@ -23,6 +23,7 @@ vi.mock('@/features/preferences/hooks/use-user-preferences', () => ({
 vi.mock('@/services/place.service', () => ({
   placeService: {
     getCities: vi.fn().mockResolvedValue([]),
+    getTravelAreas: vi.fn().mockResolvedValue([]),
   },
 }));
 
@@ -36,6 +37,7 @@ describe('ItineraryWizardModal', () => {
     vi.clearAllMocks();
     vi.mocked(useUserPreferences).mockReturnValue({
       preferences: null,
+      data: null,
       isLoading: false,
     } as any);
 
@@ -61,54 +63,48 @@ describe('ItineraryWizardModal', () => {
       </QueryClientProvider>
     );
 
-  it('renders step 1 with initial destination and forward motion class', () => {
+  it('renders modal with initial destination, duration and title', () => {
     renderComponent({ initialDestination: 'Đà Lạt' });
 
-    expect(screen.getByText('Điểm đến')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Lên kế hoạch chuyến đi/i })).toBeInTheDocument();
     expect(screen.getByDisplayValue('Đà Lạt')).toBeInTheDocument();
-
-    const forwardEl = document.querySelector('.wizard-step-forward');
-    expect(forwardEl).toBeInTheDocument();
+    expect(screen.getByDisplayValue('TP. Hồ Chí Minh')).toBeInTheDocument();
+    expect(screen.getByText(/3 ngày 2 đêm/i)).toBeInTheDocument();
   });
 
-  it('navigates forward to step 2 and backward to step 1 with correct direction classes', async () => {
+  it('swaps origin and destination when clicking the swap button', async () => {
     const user = userEvent.setup();
-    renderComponent();
+    renderComponent({ initialDestination: 'Hà Nội' });
 
-    // Click Next button on Step 1
-    const nextBtn = screen.getByRole('button', { name: /Tiếp tục: Phương tiện di chuyển/i });
-    await user.click(nextBtn);
+    const swapBtn = screen.getByRole('button', { name: /Đổi chiều điểm đi \/ điểm đến/i });
+    await user.click(swapBtn);
 
-    // Step 2 should be rendered with forward motion
-    expect(screen.getByText(/Lựa chọn chặng liên tỉnh/i)).toBeInTheDocument();
-    expect(document.querySelector('.wizard-step-forward')).toBeInTheDocument();
-
-    // Click Back button on Step 2
-    const backBtn = screen.getByRole('button', { name: /Quay lại/i });
-    await user.click(backBtn);
-
-    // Should be back on Step 1 with backward motion class
-    expect(screen.getByText(/ĐIỂM KHỞI HÀNH/i)).toBeInTheDocument();
-    expect(document.querySelector('.wizard-step-backward')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Hà Nội')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('TP. Hồ Chí Minh')).toBeInTheDocument();
   });
 
-  it('submits generation on step 3 once and guards against duplicate clicks', async () => {
+  it('submits generation form with selected options and incremented partySize', async () => {
     const user = userEvent.setup();
-    renderComponent();
+    renderComponent({ initialDestination: 'Đà Nẵng' });
 
-    // Step 1 -> Step 2
-    await user.click(screen.getByRole('button', { name: /Tiếp tục: Phương tiện di chuyển/i }));
+    await user.click(screen.getByRole('button', { name: /Tăng số người/i }));
 
-    // Step 2 -> Step 3
-    await user.click(screen.getByRole('button', { name: /Tiếp tục: Gu & Ngân sách/i }));
-
-    // Verify Step 3 is rendered
-    expect(screen.getByText(/TẠO LỊCH TRÌNH VỚI AI/i)).toBeInTheDocument();
-
-    // Click submit
-    const submitBtn = screen.getByRole('button', { name: /TẠO LỊCH TRÌNH VỚI AI/i });
+    // Submit button
+    const submitBtn = screen.getByRole('button', { name: /Tạo lịch trình/i });
+    expect(submitBtn).toBeInTheDocument();
     await user.click(submitBtn);
 
     expect(mockMutate).toHaveBeenCalledTimes(1);
+    expect(mockMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        originCity: 'TP. Hồ Chí Minh',
+        destinationCity: 'Đà Nẵng',
+        transitMode: 'FLIGHT',
+        intracityMode: 'MOTORBIKE_RENTAL',
+        budgetLevel: 'MEDIUM',
+        partySize: 2,
+      }),
+      expect.any(Object)
+    );
   });
 });

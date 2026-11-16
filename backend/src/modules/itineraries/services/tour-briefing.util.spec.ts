@@ -1,4 +1,7 @@
-import { normalizeTourBriefing, redactTourBriefing } from './tour-briefing.util';
+import {
+  normalizeTourBriefing,
+  redactTourBriefing,
+} from './tour-briefing.util';
 
 describe('tour-briefing.util', () => {
   const full = {
@@ -9,8 +12,16 @@ describe('tour-briefing.util', () => {
   };
 
   it('normalizeTourBriefing trims fields and returns null when everything is blank', () => {
-    expect(normalizeTourBriefing({ ...full, leaderName: '  Linh  ' })?.leaderName).toBe('Linh');
-    expect(normalizeTourBriefing({ leaderName: ' ', leaderPhone: '', notes: undefined })).toBeNull();
+    expect(
+      normalizeTourBriefing({ ...full, leaderName: '  Linh  ' })?.leaderName,
+    ).toBe('Linh');
+    expect(
+      normalizeTourBriefing({
+        leaderName: ' ',
+        leaderPhone: '',
+        notes: undefined,
+      }),
+    ).toBeNull();
   });
 
   it('redactTourBriefing keeps everything for owner / trip members', () => {
@@ -27,7 +38,9 @@ describe('tour-briefing.util', () => {
   });
 
   it('redactTourBriefing returns null when only private fields were set', () => {
-    expect(redactTourBriefing({ leaderPhone: '0905123456', notes: 'x' }, false)).toBeNull();
+    expect(
+      redactTourBriefing({ leaderPhone: '0905123456', notes: 'x' }, false),
+    ).toBeNull();
     expect(redactTourBriefing(null, false)).toBeNull();
   });
 });

@@ -68,7 +68,10 @@ export class OtpService {
    * Generates a 6-digit cryptographic OTP, saves challenge in Redis, and sends email.
    * Throws if cooldown is active, rate limit exceeded, or email sending fails.
    */
-  async generateAndSendOtp(email: string, purpose: OtpPurpose): Promise<OtpChallengeResult> {
+  async generateAndSendOtp(
+    email: string,
+    purpose: OtpPurpose,
+  ): Promise<OtpChallengeResult> {
     const normalizedEmail = email.toLowerCase().trim();
     const cooldownKey = this.getCooldownKey(purpose, normalizedEmail);
     const challengeKey = this.getChallengeKey(purpose, normalizedEmail);
@@ -85,7 +88,9 @@ export class OtpService {
     } catch (err: any) {
       if (err instanceof BadRequestException) throw err;
       this.logger.error(`Redis cooldown check error: ${err.message}`);
-      throw new ServiceUnavailableException('Dịch vụ xác thực tạm thời không khả dụng, vui lòng thử lại');
+      throw new ServiceUnavailableException(
+        'Dịch vụ xác thực tạm thời không khả dụng, vui lòng thử lại',
+      );
     }
 
     // 2. Check Hourly Rate Limit (max 5 per hour per email/purpose)
@@ -95,12 +100,16 @@ export class OtpService {
         await this.redisClient.expire(rateLimitKey, 3600);
       }
       if (requestsThisHour > OtpService.HOURLY_LIMIT) {
-        throw new BadRequestException('Bạn đã vượt quá giới hạn gửi OTP trong 1 giờ. Vui lòng thử lại sau.');
+        throw new BadRequestException(
+          'Bạn đã vượt quá giới hạn gửi OTP trong 1 giờ. Vui lòng thử lại sau.',
+        );
       }
     } catch (err: any) {
       if (err instanceof BadRequestException) throw err;
       this.logger.error(`Redis rate limit error: ${err.message}`);
-      throw new ServiceUnavailableException('Dịch vụ xác thực tạm thời không khả dụng, vui lòng thử lại');
+      throw new ServiceUnavailableException(
+        'Dịch vụ xác thực tạm thời không khả dụng, vui lòng thử lại',
+      );
     }
 
     // 3. Generate Cryptographically Secure 6-digit OTP
@@ -125,14 +134,25 @@ export class OtpService {
         OtpService.OTP_TTL_SECONDS,
       );
       // Set Cooldown key for 60s
-      await this.redisClient.set(cooldownKey, '1', 'EX', OtpService.RESEND_COOLDOWN_SECONDS);
+      await this.redisClient.set(
+        cooldownKey,
+        '1',
+        'EX',
+        OtpService.RESEND_COOLDOWN_SECONDS,
+      );
     } catch (err: any) {
       this.logger.error(`Redis set challenge error: ${err.message}`);
-      throw new ServiceUnavailableException('Dịch vụ lưu trữ xác thực tạm thời không khả dụng');
+      throw new ServiceUnavailableException(
+        'Dịch vụ lưu trữ xác thực tạm thời không khả dụng',
+      );
     }
 
     // 5. Send Email via MailService
-    const emailSent = await this.mailService.sendOtpEmail(normalizedEmail, rawOtp, purpose);
+    const emailSent = await this.mailService.sendOtpEmail(
+      normalizedEmail,
+      rawOtp,
+      purpose,
+    );
     if (!emailSent) {
       // Clean up challenge so user isn't stuck with unreachable code
       try {
@@ -162,7 +182,11 @@ export class OtpService {
    * Verifies the provided OTP against the active challenge in Redis.
    * Decrements attempts on failure; deletes challenge on success (single-use consume).
    */
-  async verifyOtp(email: string, rawOtp: string, purpose: OtpPurpose): Promise<boolean> {
+  async verifyOtp(
+    email: string,
+    rawOtp: string,
+    purpose: OtpPurpose,
+  ): Promise<boolean> {
     const normalizedEmail = email.toLowerCase().trim();
     const challengeKey = this.getChallengeKey(purpose, normalizedEmail);
 
@@ -171,7 +195,9 @@ export class OtpService {
       rawData = await this.redisClient.get(challengeKey);
     } catch (err: any) {
       this.logger.error(`Redis get challenge error: ${err.message}`);
-      throw new ServiceUnavailableException('Dịch vụ xác thực tạm thời không khả dụng, vui lòng thử lại');
+      throw new ServiceUnavailableException(
+        'Dịch vụ xác thực tạm thời không khả dụng, vui lòng thử lại',
+      );
     }
 
     if (!rawData) {
@@ -205,7 +231,12 @@ export class OtpService {
       challenge.attempts += 1;
       const remainingTtl = await this.redisClient.ttl(challengeKey);
       if (remainingTtl > 0) {
-        await this.redisClient.set(challengeKey, JSON.stringify(challenge), 'EX', remainingTtl);
+        await this.redisClient.set(
+          challengeKey,
+          JSON.stringify(challenge),
+          'EX',
+          remainingTtl,
+        );
       }
       const attemptsLeft = challenge.maxAttempts - challenge.attempts;
       throw new BadRequestException(

@@ -13,6 +13,7 @@ export interface CommunityAuthorSummary {
   avatarUrl: string | null;
   bio: string | null;
   isVerified: boolean;
+  isVerifiedCreator?: boolean;
 }
 
 export interface CommunityGroupSummary {
@@ -190,17 +191,31 @@ export interface PostReportResult {
 
 export interface ICommunityRepository {
   findActiveGroups(): Promise<CommunityGroupSummary[]>;
-  findGroupByIdOrSlug(identifier: string): Promise<CommunityGroupSummary | null>;
+  findGroupByIdOrSlug(
+    identifier: string,
+  ): Promise<CommunityGroupSummary | null>;
   findDefaultGroup(): Promise<CommunityGroupSummary | null>;
-  createCommunityGroup(data: CreateCommunityGroupData): Promise<CommunityGroupSummary>;
+  createCommunityGroup(
+    data: CreateCommunityGroupData,
+  ): Promise<CommunityGroupSummary>;
   getSidebarDiscovery(viewerId?: string): Promise<SidebarDiscoveryData>;
   findFeedPosts(params: FindFeedParams): Promise<FeedPageResult>;
-  findPostById(postId: string, viewerId?: string): Promise<CommunityPostView | null>;
-  findItineraryOwner(itineraryId: string): Promise<{ id: string; creatorId: string } | null>;
+  findPostById(
+    postId: string,
+    viewerId?: string,
+  ): Promise<CommunityPostView | null>;
+  findItineraryOwner(
+    itineraryId: string,
+  ): Promise<{ id: string; creatorId: string } | null>;
   createPost(data: CreatePostData): Promise<CommunityPostView>;
   updatePost(
     postId: string,
-    data: { title: string; caption?: string | null; tags: string[]; groupId?: string | null },
+    data: {
+      title: string;
+      caption?: string | null;
+      tags: string[];
+      groupId?: string | null;
+    },
     viewerId?: string,
   ): Promise<CommunityPostView>;
   softDeletePost(postId: string): Promise<void>;
@@ -209,7 +224,10 @@ export interface ICommunityRepository {
     userId: string,
   ): Promise<{ isLiked: boolean; likeCount: number }>;
   reportPost(data: CreatePostReportData): Promise<PostReportResult>;
-  findPostComments(postId: string, limit?: number): Promise<CommunityCommentView[]>;
+  findPostComments(
+    postId: string,
+    limit?: number,
+  ): Promise<CommunityCommentView[]>;
   findCommentById(commentId: string): Promise<CommentAccessView | null>;
   getCommentContext(
     postId: string,

@@ -1,4 +1,7 @@
-import { PRICING_CONFIG, SafetyAdvisory } from '../../../../config/pricing.config';
+import {
+  PRICING_CONFIG,
+  SafetyAdvisory,
+} from '../../../../config/pricing.config';
 import { TransitModeEnum } from '../../dto/generate-itinerary.dto';
 
 export interface TransitHubDto {
@@ -84,7 +87,10 @@ export interface TransitStrategyContext {
 export interface ITransitStrategy {
   readonly mode: TransitModeEnum;
   calculate(context: TransitStrategyContext): Promise<IntercityTransitResult>;
-  summarize?(result: IntercityTransitResult, roadDistanceKm: number): TransitModeSummary | null;
+  summarize?(
+    result: IntercityTransitResult,
+    roadDistanceKm: number,
+  ): TransitModeSummary | null;
 }
 
 const EARTH_RADIUS_KM = 6371;
@@ -122,7 +128,12 @@ export function findNearestHub(
   let minDist = Infinity;
   for (const hub of hubs) {
     if (hub.hubType !== hubType) continue;
-    const dist = computeHaversineDistance(lat, lng, hub.latitude, hub.longitude);
+    const dist = computeHaversineDistance(
+      lat,
+      lng,
+      hub.latitude,
+      hub.longitude,
+    );
     if (dist < minDist) {
       minDist = dist;
       nearest = { ...hub, distanceKm: Math.round(dist) };
@@ -150,7 +161,8 @@ export function isDirectCityHub(
  */
 export function computeLocalTransfer(
   rawDistanceKm?: number | null,
-  fallbackKm: number = PRICING_CONFIG.INTERCITY.TRANSFER.DEFAULT_AIRPORT_TRANSFER_KM,
+  fallbackKm: number = PRICING_CONFIG.INTERCITY.TRANSFER
+    .DEFAULT_AIRPORT_TRANSFER_KM,
 ): { transferKm: number; transferMinutes: number } {
   const T = PRICING_CONFIG.INTERCITY.TRANSFER;
   const transferKm =
@@ -183,5 +195,3 @@ export function formatDurationVi(minutes: number, compact = false): string {
 export function formatVndCurrency(amount: number): string {
   return `${Math.round(amount).toLocaleString('vi-VN')}đ`;
 }
-
-

@@ -11,6 +11,7 @@ export const COMMUNITY_CONSTANTS = {
   UPLOAD_SUBDIR: 'community',
   PUBLIC_URL_PREFIX: '/api/v1/uploads/community',
   STATIC_UPLOAD_CACHE_MAX_AGE: '7d',
+  CLOUDINARY_FOLDER: 'tripgenie/community',
   MAX_FILES_PER_UPLOAD: 6,
   MAX_FILE_SIZE_BYTES: 50 * 1024 * 1024, // 50MB
   DEFAULT_FEED_LIMIT: 12,

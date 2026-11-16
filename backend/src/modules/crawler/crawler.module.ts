@@ -62,7 +62,10 @@ import { CrawlerQueueName } from '../../common/enums/crawler.enum';
     // Multi-Provider Enrichment Array Token (Plug & Play Chain of Responsibility)
     {
       provide: INJECT_TOKENS.ENRICHMENT_PROVIDERS,
-      useFactory: (fsq: FoursquareProvider, wiki: WikimediaProvider) => [wiki, fsq],
+      useFactory: (fsq: FoursquareProvider, wiki: WikimediaProvider) => [
+        wiki,
+        fsq,
+      ],
       inject: [FoursquareProvider, WikimediaProvider],
     },
 

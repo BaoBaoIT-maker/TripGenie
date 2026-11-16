@@ -4,37 +4,18 @@ import { useState, useEffect, Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
-  Sparkles,
-  CalendarDays,
-  Bookmark,
-  Plus,
-  Compass,
-  Settings,
-  ShieldCheck,
-  Camera,
-  Heart,
-  MapPin,
-  Loader2,
   Check,
-  ExternalLink,
   LogIn,
-  MessageSquare,
-  Grid,
+  Plus,
+  X,
+  Loader2,
 } from "lucide-react";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { PlaceCard } from "@/components/place/PlaceCard";
-import { PostCard } from "@/components/community/PostCard";
-import { useCreatorProfile } from "@/features/community/hooks/use-community";
-import { useItinerariesListQuery } from "@/features/planner/hooks/use-itinerary-planner";
-import { formatVnd } from "@/features/planner/model/itinerary-format";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { AccountSecuritySection } from "@/features/auth/components/AccountSecuritySection";
-import { mapBackendPlaceToPlace } from "@/services/place.service";
-import {
-  useCollections,
-  useCollectionDetail,
-} from "@/features/collections/hooks/use-collections";
 import {
   useUserPreferences,
   useUpdateUserPreferences,
@@ -43,7 +24,7 @@ import { BudgetLevel } from "@/services/user-preference.service";
 import { DEFAULT_AVATAR } from "@/config/avatars";
 import { AvatarPickerModal } from "@/features/auth/components/AvatarPickerModal";
 
-const TRAVEL_STYLES = [
+const DEFAULT_TRAVEL_STYLES = [
   { id: "CULTURE", label: "Văn hóa & Di sản" },
   { id: "FOOD", label: "Ẩm thực địa phương" },
   { id: "CHILL", label: "Nghỉ dưỡng & Cafe" },
@@ -54,7 +35,7 @@ const TRAVEL_STYLES = [
   { id: "BUDGET", label: "Du lịch tiết kiệm" },
 ];
 
-const PREFERRED_CATEGORIES = [
+const DEFAULT_PREFERRED_CATEGORIES = [
   { id: "am-thuc", label: "Quán ăn & Ẩm thực" },
   { id: "cafe", label: "Quán cafe & Trà" },
   { id: "diem-tham-quan", label: "Điểm tham quan" },
@@ -63,7 +44,7 @@ const PREFERRED_CATEGORIES = [
   { id: "giai-tri", label: "Khu vui chơi giải trí" },
 ];
 
-const DIETARY_RESTRICTIONS = [
+const DEFAULT_DIETARY_RESTRICTIONS = [
   { id: "VEGETARIAN", label: "Ăn chay" },
   { id: "HALAL", label: "Halal" },
   { id: "NO_SEAFOOD", label: "Không ăn hải sản" },
@@ -94,19 +75,13 @@ function ProfileContent() {
       .toUpperCase();
   }, [user?.fullName]);
 
-  const [activeTab, setActiveTab] = useState<"planners" | "saved" | "community" | "preferences" | "account">(() => {
-    if (tabParam === "account") return "account";
-    if (tabParam === "preferences") return "preferences";
-    if (tabParam === "saved") return "saved";
-    if (tabParam === "community") return "community";
-    return "planners";
+  const [activeTab, setActiveTab] = useState<"account" | "preferences">(() => {
+    return tabParam === "preferences" ? "preferences" : "account";
   });
 
   useEffect(() => {
-    if (tabParam === "account") setActiveTab("account");
     if (tabParam === "preferences") setActiveTab("preferences");
-    if (tabParam === "saved") setActiveTab("saved");
-    if (tabParam === "community") setActiveTab("community");
+    else if (tabParam === "account") setActiveTab("account");
   }, [tabParam]);
 
   // Real Preferences from backend
@@ -121,6 +96,11 @@ function ProfileContent() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedDietary, setSelectedDietary] = useState<string[]>([]);
 
+  // Input state for custom user-defined preferences
+  const [customStyleInput, setCustomStyleInput] = useState("");
+  const [customCategoryInput, setCustomCategoryInput] = useState("");
+  const [customDietaryInput, setCustomDietaryInput] = useState("");
+
   useEffect(() => {
     if (userPref) {
       setSelectedBudget(userPref.budgetLevel || "MEDIUM");
@@ -130,62 +110,75 @@ function ProfileContent() {
     }
   }, [userPref]);
 
-  const toggleStyle = (id: string) => {
+  const toggleStyle = (value: string) => {
     setSelectedStyles((prev) =>
-      prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]
+      prev.includes(value) ? prev.filter((s) => s !== value) : [...prev, value]
     );
   };
 
-  const toggleCategory = (id: string) => {
+  const handleAddCustomStyle = () => {
+    const trimmed = customStyleInput.trim();
+    if (!trimmed) return;
+    if (!selectedStyles.includes(trimmed)) {
+      setSelectedStyles((prev) => [...prev, trimmed]);
+    }
+    setCustomStyleInput("");
+  };
+
+  const toggleCategory = (value: string) => {
     setSelectedCategories((prev) =>
-      prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]
+      prev.includes(value) ? prev.filter((c) => c !== value) : [...prev, value]
     );
   };
 
-  const toggleDietary = (id: string) => {
+  const handleAddCustomCategory = () => {
+    const trimmed = customCategoryInput.trim();
+    if (!trimmed) return;
+    if (!selectedCategories.includes(trimmed)) {
+      setSelectedCategories((prev) => [...prev, trimmed]);
+    }
+    setCustomCategoryInput("");
+  };
+
+  const toggleDietary = (value: string) => {
     setSelectedDietary((prev) =>
-      prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id]
+      prev.includes(value) ? prev.filter((d) => d !== value) : [...prev, value]
     );
   };
 
-  const handleSavePreferences = () => {
-    updatePrefMutation.mutate({
-      budgetLevel: selectedBudget,
-      travelStyle: selectedStyles,
-      preferredCategories: selectedCategories,
-      dietaryRestrictions: selectedDietary,
-    });
+  const handleAddCustomDietary = () => {
+    const trimmed = customDietaryInput.trim();
+    if (!trimmed) return;
+    if (!selectedDietary.includes(trimmed)) {
+      setSelectedDietary((prev) => [...prev, trimmed]);
+    }
+    setCustomDietaryInput("");
   };
 
-  // Real Database Itineraries for the logged-in user (strictly filtered by creatorId on backend)
-  const userIdentifier = user?.username || user?.id || "";
-  const { data: creatorProfile, isLoading: isCommunityLoading } = useCreatorProfile(userIdentifier);
-  const communityPosts = creatorProfile?.posts ?? [];
-
-  const { data: myItineraries = [], isLoading: isItinLoading } = useItinerariesListQuery();
-
-  // Real Collections & Saved Places
-  const { data: collections = [] } = useCollections();
-  const favoriteCollection = useMemo(() => {
-    return collections.find((c) => c.title === "Yêu thích") || collections[0];
-  }, [collections]);
-
-  const { data: favDetail, isLoading: isFavLoading } = useCollectionDetail(
-    favoriteCollection?.id || ""
-  );
-
-  const savedPlaceCount = favoriteCollection?._count?.places ?? 0;
+  const handleSavePreferences = async () => {
+    try {
+      await updatePrefMutation.mutateAsync({
+        budgetLevel: selectedBudget,
+        travelStyle: selectedStyles,
+        preferredCategories: selectedCategories,
+        dietaryRestrictions: selectedDietary,
+      });
+      toast.success("Đã lưu sở thích du lịch AI thành công");
+    } catch {
+      toast.error("Không thể lưu sở thích. Vui lòng thử lại sau.");
+    }
+  };
 
   if (!isAuthLoading && !user) {
     return (
       <div className="max-w-2xl mx-auto w-full px-4 py-16 text-center space-y-5">
         <div className="rounded-3xl border border-border bg-card p-10 space-y-4 shadow-xs">
-          <ShieldCheck className="size-12 mx-auto text-primary" />
+          <i className="fa-regular fa-circle-user text-5xl text-primary mx-auto block text-center" aria-hidden="true" />
           <h1 className="text-2xl font-bold font-heading text-foreground">
             Vui lòng đăng nhập để xem Hồ sơ cá nhân
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
-            Đăng nhập để quản lý các lịch trình du lịch AI của riêng bạn, bộ sưu tập địa điểm đã lưu và cá nhân hóa sở thích du lịch.
+            Đăng nhập để quản lý tài khoản và cá nhân hóa sở thích du lịch cùng TripGenie AI.
           </p>
           <div className="pt-2">
             <Link href="/login">
@@ -200,10 +193,15 @@ function ProfileContent() {
     );
   }
 
+  // Set of predefined IDs for badge recognition
+  const predefinedStyleIds = new Set(DEFAULT_TRAVEL_STYLES.map((s) => s.id));
+  const predefinedCategoryIds = new Set(DEFAULT_PREFERRED_CATEGORIES.map((c) => c.id));
+  const predefinedDietaryIds = new Set(DEFAULT_DIETARY_RESTRICTIONS.map((d) => d.id));
+
   return (
-    <div className="max-w-[1400px] mx-auto w-full px-4 py-8 sm:px-6 lg:px-8 xl:px-10 space-y-8 pb-16">
-      {/* Profile Header */}
-      <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 flex flex-col sm:flex-row items-center sm:items-start gap-6 shadow-xs">
+    <div className="max-w-[1200px] mx-auto w-full px-4 py-8 sm:px-6 lg:px-8 space-y-8 pb-16">
+      {/* Profile Header (Clean & Minimalist Hero) */}
+      <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 flex items-center gap-6 shadow-xs">
         <button
           type="button"
           onClick={() => setIsAvatarModalOpen(true)}
@@ -222,403 +220,77 @@ function ProfileContent() {
           </Avatar>
         </button>
 
-        <div className="flex-1 text-center sm:text-left space-y-2">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <h1 className="text-2xl sm:text-3xl font-bold font-heading text-foreground">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-foreground tracking-tight truncate">
               {user?.fullName || "Khách du lịch TripGenie"}
             </h1>
-            <div className="flex items-center justify-center sm:justify-end gap-2">
-              {user?.id && (
-                <Link href={`/community/profile/${encodeURIComponent(user.username || user.id)}`}>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-xs rounded-xl gap-1.5 cursor-pointer"
-                  >
-                    <ExternalLink className="size-3.5" />
-                    <span>Xem trang Cộng đồng</span>
-                  </Button>
-                </Link>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setActiveTab("account")}
-                className="text-xs rounded-xl gap-1.5 cursor-pointer"
+            {Boolean(user?.isVerifiedCreator || user?.role === "ADMIN") && (
+              <span
+                title={user?.role === "ADMIN" ? "Quản trị viên hệ thống" : "Thổ địa được xác thực bởi TripGenie"}
+                aria-label="Xác thực TripGenie"
+                className="text-brand-blue text-[20px] inline-flex items-center shrink-0"
               >
-                <Settings className="size-3.5" />
-                <span>Chỉnh sửa hồ sơ</span>
-              </Button>
-            </div>
+                <i className="fa-solid fa-circle-check" aria-hidden="true" />
+              </span>
+            )}
           </div>
-
-          <p className="text-xs sm:text-sm text-muted-foreground max-w-xl">
-            {user?.email || "Khám phá các điểm đến thông minh và thiết kế hành trình cùng TripGenie."}
-          </p>
-
-          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 text-xs text-muted-foreground pt-1">
-            <span className="inline-flex items-center gap-1 font-medium text-foreground/80">
-              <MapPin className="size-3 text-primary" />
-              <span>Việt Nam</span>
-            </span>
-            <span>•</span>
-            <button
-              type="button"
-              onClick={() => setActiveTab("planners")}
-              className={`inline-flex items-center gap-1.5 cursor-pointer transition-colors hover:text-primary ${
-                activeTab === "planners" ? "font-bold text-primary" : ""
-              }`}
-            >
-              <CalendarDays className="size-3.5" />
-              <span>{myItineraries.length} Lịch trình của tôi</span>
-            </button>
-            <span>•</span>
-            <button
-              type="button"
-              onClick={() => setActiveTab("community")}
-              className={`inline-flex items-center gap-1.5 cursor-pointer transition-colors hover:text-primary ${
-                activeTab === "community" ? "font-bold text-primary" : ""
-              }`}
-            >
-              <MessageSquare className="size-3.5" />
-              <span>{communityPosts.length} Bài viết cộng đồng</span>
-            </button>
-            <span>•</span>
-            <button
-              type="button"
-              onClick={() => setActiveTab("saved")}
-              className={`inline-flex items-center gap-1.5 cursor-pointer transition-colors hover:text-primary ${
-                activeTab === "saved" ? "font-bold text-primary" : ""
-              }`}
-            >
-              <Heart className="size-3.5 text-rose-500 fill-current" />
-              <span>{savedPlaceCount} Địa điểm đã lưu</span>
-            </button>
-          </div>
+          {user?.bio && (
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2 max-w-xl">
+              {user.bio}
+            </p>
+          )}
         </div>
       </div>
 
-      {/* Navigation Tabs */}
+      {/* Navigation Tabs (Only 2 Core Tabs) */}
       <div className="flex items-center gap-2 border-b border-border pb-3 overflow-x-auto scrollbar-none">
         <button
           type="button"
-          onClick={() => setActiveTab("planners")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 min-h-[44px] cursor-pointer ${
-            activeTab === "planners"
-              ? "bg-primary text-primary-foreground shadow-xs"
-              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-          }`}
-        >
-          <CalendarDays className="size-4" />
-          <span>Lịch trình của tôi ({myItineraries.length})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("saved")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 min-h-[44px] cursor-pointer ${
-            activeTab === "saved"
-              ? "bg-primary text-primary-foreground shadow-xs"
-              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-          }`}
-        >
-          <Bookmark className="size-4" />
-          <span>Địa điểm đã lưu ({savedPlaceCount})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("community")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 min-h-[44px] cursor-pointer ${
-            activeTab === "community"
-              ? "bg-primary text-primary-foreground shadow-xs"
-              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-          }`}
-        >
-          <MessageSquare className="size-4" />
-          <span>Bài viết cộng đồng ({communityPosts.length})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab("preferences")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 min-h-[44px] cursor-pointer ${
-            activeTab === "preferences"
-              ? "bg-primary text-primary-foreground shadow-xs"
-              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
-          }`}
-        >
-          <Sparkles className="size-4" />
-          <span>Sở thích du lịch AI</span>
-        </button>
-
-        <button
-          type="button"
           onClick={() => setActiveTab("account")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 min-h-[44px] cursor-pointer ${
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 min-h-[44px] cursor-pointer ${
             activeTab === "account"
               ? "bg-primary text-primary-foreground shadow-xs"
               : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
           }`}
         >
-          <ShieldCheck className="size-4" />
+          <i className="fa-regular fa-id-badge text-base" aria-hidden="true" />
           <span>Tài khoản & Bảo mật</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("preferences")}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-all shrink-0 min-h-[44px] cursor-pointer ${
+            activeTab === "preferences"
+              ? "bg-primary text-primary-foreground shadow-xs"
+              : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+          }`}
+        >
+          <i className="fa-solid fa-sliders text-sm" aria-hidden="true" />
+          <span>Sở thích du lịch</span>
         </button>
       </div>
 
-      {/* Tab: Account & Security */}
+      {/* Tab 1: Account & Security */}
       {activeTab === "account" && (
         <AccountSecuritySection onOpenAvatarModal={() => setIsAvatarModalOpen(true)} />
       )}
 
-      {/* Tab 1: Real User Itineraries List */}
-      {activeTab === "planners" && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold font-heading text-foreground">
-                Lịch trình chuyến đi của bạn
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Các chuyến đi thực tế do bạn tạo bằng AI hoặc nhân bản từ Cộng đồng.
-              </p>
-            </div>
-            <Link href="/planner">
-              <Button size="sm" className="rounded-xl font-semibold gap-1.5 text-xs cursor-pointer">
-                <Plus className="size-3.5" />
-                <span>Tạo lịch trình mới</span>
-              </Button>
-            </Link>
-          </div>
-
-          {isItinLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[1, 2, 3].map((i) => (
-                <div key={i} className="h-52 rounded-2xl bg-muted animate-pulse" />
-              ))}
-            </div>
-          ) : myItineraries.length === 0 ? (
-            <div className="rounded-3xl border border-dashed border-border/80 bg-muted/20 p-12 text-center space-y-3">
-              <CalendarDays className="size-10 mx-auto text-muted-foreground/50" />
-              <p className="text-sm font-semibold text-foreground">Bạn chưa có lịch trình nào</p>
-              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                Bắt đầu chuyến đi mới với sự hỗ trợ của AI hoặc khám phá Cộng đồng để nhân bản lịch trình yêu thích.
-              </p>
-              <Link href="/planner">
-                <Button size="sm" className="rounded-xl font-semibold gap-1.5 text-xs cursor-pointer">
-                  <Plus className="size-3.5" />
-                  <span>Tạo ngay</span>
-                </Button>
-              </Link>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {myItineraries.map((itin) => {
-                const totalPlaces =
-                  itin.days?.reduce((acc, d) => acc + (d.activities?.length || 0), 0) || 0;
-                const budgetText = itin.budgetBreakdown?.totalEstimated
-                  ? formatVnd(itin.budgetBreakdown.totalEstimated)
-                  : null;
-                return (
-                  <Link
-                    key={itin.id}
-                    href={`/itineraries/${itin.id}`}
-                    className="group rounded-2xl border border-border/80 bg-card p-5 flex flex-col justify-between space-y-4 shadow-xs hover:border-primary/50 transition-all"
-                  >
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondary text-secondary-foreground text-xs font-semibold">
-                          <MapPin className="size-3 text-primary" />
-                          <span>{itin.destination || "Việt Nam"}</span>
-                        </span>
-                        <span className="text-xs font-medium text-muted-foreground">
-                          {itin.totalDays || itin.days?.length || 1} ngày • {totalPlaces} điểm
-                        </span>
-                      </div>
-
-                      <h3 className="text-base font-bold font-heading text-foreground group-hover:text-primary transition-colors line-clamp-2">
-                        {itin.title}
-                      </h3>
-
-                      {itin.startDate && (
-                        <p className="text-xs text-muted-foreground">
-                          Khởi hành: {itin.startDate}
-                          {itin.endDate ? ` – ${itin.endDate}` : ""}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="flex items-center justify-between pt-3 border-t border-border/60 text-xs">
-                      <span className="text-muted-foreground">
-                        {budgetText ? `~${budgetText}` : "Chi phí linh hoạt"}
-                      </span>
-                      <span className="font-semibold text-primary inline-flex items-center gap-1">
-                        <span>Xem chi tiết</span>
-                        <ExternalLink className="size-3" />
-                      </span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tab: User Community Posts */}
-      {activeTab === "community" && (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-bold font-heading text-foreground">
-                Bài viết cộng đồng của bạn
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Tất cả bài viết, ảnh, video review và lịch trình bạn đã đăng tải lên Cộng đồng du lịch.
-              </p>
-            </div>
-
-            {user && (
-              <Link
-                href={`/community/profile/${encodeURIComponent(
-                  user.username || user.id
-                )}`}
-              >
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-10 px-4 rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
-                >
-                  <ExternalLink className="size-3.5" />
-                  <span>Xem kênh công khai</span>
-                </Button>
-              </Link>
-            )}
-          </div>
-
-          {isCommunityLoading ? (
-            <div className="space-y-4">
-              <div className="h-44 rounded-2xl bg-muted/40 animate-pulse border border-border" />
-              <div className="h-44 rounded-2xl bg-muted/40 animate-pulse border border-border" />
-            </div>
-          ) : communityPosts.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-border bg-card p-12 text-center space-y-3">
-              <MessageSquare className="size-10 mx-auto text-muted-foreground/60" />
-              <div className="space-y-1">
-                <h3 className="text-base font-bold text-foreground">
-                  Bạn chưa đăng bài viết nào
-                </h3>
-                <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                  Hãy chia sẻ cảm nhận, hình ảnh check-in và lịch trình chuyến đi của bạn để kết nối cùng cộng đồng du lịch TripGenie!
-                </p>
-              </div>
-              <div className="pt-2">
-                <Link href="/community">
-                  <Button className="h-10 px-5 rounded-xl text-xs font-semibold gap-1.5 cursor-pointer">
-                    <Plus className="size-4" />
-                    <span>Đến bảng tin Cộng đồng</span>
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6 max-w-3xl">
-              {communityPosts.map((post) => (
-                <PostCard key={post.id} post={post} />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tab 2: Saved Places (Real Collection Places) */}
-      {activeTab === "saved" && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold font-heading text-foreground">
-                Địa điểm đã lưu
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Các quán cafe, nhà hàng và điểm tham quan bạn đã lưu vào bộ sưu tập.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <Link
-                href="/collections"
-                className={buttonVariants({
-                  variant: "outline",
-                  size: "sm",
-                  className: "rounded-xl font-semibold gap-1.5 text-xs inline-flex items-center",
-                })}
-              >
-                <Bookmark className="size-3.5" />
-                <span>Xem tất cả bộ sưu tập</span>
-              </Link>
-              <Link
-                href="/places"
-                className={buttonVariants({
-                  size: "sm",
-                  className: "rounded-xl font-semibold gap-1.5 text-xs inline-flex items-center",
-                })}
-              >
-                <Compass className="size-3.5" />
-                <span>Khám phá thêm</span>
-              </Link>
-            </div>
-          </div>
-
-          {isFavLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="h-72 rounded-2xl bg-muted animate-pulse" />
-              ))}
-            </div>
-          ) : favDetail?.places && favDetail.places.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {favDetail.places.map((item) => {
-                const place = mapBackendPlaceToPlace(
-                  item.place as Parameters<typeof mapBackendPlaceToPlace>[0]
-                );
-                return <PlaceCard key={place.id} place={place} />;
-              })}
-            </div>
-          ) : (
-            <div className="rounded-3xl border border-dashed border-border/80 bg-muted/20 p-12 text-center space-y-3">
-              <Bookmark className="size-10 mx-auto text-muted-foreground/50" />
-              <p className="text-sm font-semibold text-foreground">Chưa có địa điểm nào được lưu</p>
-              <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                Bấm vào biểu tượng trái tim trên các địa điểm để lưu lại cho chuyến đi tiếp theo của bạn.
-              </p>
-              <Link href="/places">
-                <Button size="sm" className="rounded-xl font-semibold gap-1.5 text-xs">
-                  <Compass className="size-3.5" />
-                  <span>Khám phá địa điểm ngay</span>
-                </Button>
-              </Link>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Tab 3: Preferences Section for AI Recommendation */}
+      {/* Tab 2: Travel Preferences (With Custom Input & Quick Chips) */}
       {activeTab === "preferences" && (
-        <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 space-y-7 shadow-xs max-w-4xl">
-          <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase text-primary tracking-wider">
-              <Sparkles className="size-3.5" />
-              <span>Hồ sơ sở thích du lịch</span>
-            </div>
+        <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 space-y-8 shadow-xs max-w-4xl">
+          <div className="space-y-1 border-b border-border pb-4">
             <h2 className="text-xl font-bold font-heading text-foreground">
-              Cá nhân hóa trải nghiệm & Lịch trình AI
+              Sở thích du lịch
             </h2>
             <p className="text-xs text-muted-foreground">
-              TripGenie sử dụng các thông tin này để tự động ưu tiên gợi ý các điểm đến và tạo lịch trình phù hợp nhất với gu của bạn.
+              Tùy chỉnh ngân sách, phong cách và thói quen ăn uống để TripGenie đề xuất điểm đến và lịch trình phù hợp với gu của riêng bạn.
             </p>
           </div>
 
-          {/* Budget Level Selection */}
-          <div className="space-y-2.5">
+          {/* 1. Budget Level Selection */}
+          <div className="space-y-3">
             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               1. Mức ngân sách ưu tiên
             </label>
@@ -649,13 +321,20 @@ function ProfileContent() {
             </div>
           </div>
 
-          {/* Travel Styles Chips */}
-          <div className="space-y-2.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              2. Phong cách du lịch yêu thích
-            </label>
+          {/* 2. Travel Styles Chips & Custom Input */}
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                2. Phong cách du lịch yêu thích
+              </label>
+              <span className="text-[11px] text-muted-foreground">
+                Chọn gợi ý hoặc tự nhập phong cách của riêng bạn
+              </span>
+            </div>
+
+            {/* Quick Suggestion Chips */}
             <div className="flex flex-wrap gap-2">
-              {TRAVEL_STYLES.map((style) => {
+              {DEFAULT_TRAVEL_STYLES.map((style) => {
                 const isSelected = selectedStyles.includes(style.id);
                 return (
                   <button
@@ -672,16 +351,72 @@ function ProfileContent() {
                   </button>
                 );
               })}
+
+              {/* Custom User-Added Style Chips */}
+              {selectedStyles
+                .filter((s) => !predefinedStyleIds.has(s))
+                .map((customStyle) => (
+                  <span
+                    key={customStyle}
+                    className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold bg-primary text-primary-foreground shadow-xs min-h-[40px]"
+                  >
+                    <span>{customStyle}</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleStyle(customStyle)}
+                      className="hover:bg-white/20 rounded-full p-0.5 cursor-pointer transition-colors"
+                      title="Xóa sở thích này"
+                      aria-label={`Xóa ${customStyle}`}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                ))}
+            </div>
+
+            {/* Inline Custom Input */}
+            <div className="flex items-center gap-2 max-w-md pt-1">
+              <Input
+                type="text"
+                placeholder="Thêm phong cách khác (ví dụ: Chụp ảnh săn mây, Trekking...)"
+                value={customStyleInput}
+                onChange={(e) => setCustomStyleInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddCustomStyle();
+                  }
+                }}
+                className="h-10 rounded-xl text-xs bg-background border-border/80"
+                maxLength={60}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddCustomStyle}
+                disabled={!customStyleInput.trim()}
+                className="rounded-xl h-10 px-3.5 text-xs font-semibold shrink-0 cursor-pointer gap-1"
+              >
+                <Plus className="size-3.5" />
+                <span>Thêm</span>
+              </Button>
             </div>
           </div>
 
-          {/* Preferred Categories Chips */}
-          <div className="space-y-2.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              3. Thể loại địa điểm quan tâm
-            </label>
+          {/* 3. Preferred Categories Chips & Custom Input */}
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                3. Thể loại địa điểm quan tâm
+              </label>
+              <span className="text-[11px] text-muted-foreground">
+                Chọn gợi ý hoặc tự nhập loại địa điểm mong muốn
+              </span>
+            </div>
+
             <div className="flex flex-wrap gap-2">
-              {PREFERRED_CATEGORIES.map((cat) => {
+              {DEFAULT_PREFERRED_CATEGORIES.map((cat) => {
                 const isSelected = selectedCategories.includes(cat.id);
                 return (
                   <button
@@ -698,16 +433,72 @@ function ProfileContent() {
                   </button>
                 );
               })}
+
+              {/* Custom User-Added Category Chips */}
+              {selectedCategories
+                .filter((c) => !predefinedCategoryIds.has(c))
+                .map((customCat) => (
+                  <span
+                    key={customCat}
+                    className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold bg-primary text-primary-foreground shadow-xs min-h-[40px]"
+                  >
+                    <span>{customCat}</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleCategory(customCat)}
+                      className="hover:bg-white/20 rounded-full p-0.5 cursor-pointer transition-colors"
+                      title="Xóa thể loại này"
+                      aria-label={`Xóa ${customCat}`}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                ))}
+            </div>
+
+            {/* Inline Custom Input */}
+            <div className="flex items-center gap-2 max-w-md pt-1">
+              <Input
+                type="text"
+                placeholder="Thêm thể loại khác (ví dụ: Chợ đêm, Làng nghề...)"
+                value={customCategoryInput}
+                onChange={(e) => setCustomCategoryInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddCustomCategory();
+                  }
+                }}
+                className="h-10 rounded-xl text-xs bg-background border-border/80"
+                maxLength={60}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddCustomCategory}
+                disabled={!customCategoryInput.trim()}
+                className="rounded-xl h-10 px-3.5 text-xs font-semibold shrink-0 cursor-pointer gap-1"
+              >
+                <Plus className="size-3.5" />
+                <span>Thêm</span>
+              </Button>
             </div>
           </div>
 
-          {/* Dietary Restrictions Chips */}
-          <div className="space-y-2.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              4. Chế độ ăn uống & Kiêng cữ
-            </label>
+          {/* 4. Dietary Restrictions Chips & Custom Input */}
+          <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                4. Chế độ ăn uống & Kiêng cữ
+              </label>
+              <span className="text-[11px] text-muted-foreground">
+                Chọn gợi ý hoặc tự nhập dị ứng, kiêng cữ riêng
+              </span>
+            </div>
+
             <div className="flex flex-wrap gap-2">
-              {DIETARY_RESTRICTIONS.map((diet) => {
+              {DEFAULT_DIETARY_RESTRICTIONS.map((diet) => {
                 const isSelected = selectedDietary.includes(diet.id);
                 return (
                   <button
@@ -724,18 +515,68 @@ function ProfileContent() {
                   </button>
                 );
               })}
+
+              {/* Custom User-Added Dietary Chips */}
+              {selectedDietary
+                .filter((d) => !predefinedDietaryIds.has(d))
+                .map((customDiet) => (
+                  <span
+                    key={customDiet}
+                    className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold bg-primary text-primary-foreground shadow-xs min-h-[40px]"
+                  >
+                    <span>{customDiet}</span>
+                    <button
+                      type="button"
+                      onClick={() => toggleDietary(customDiet)}
+                      className="hover:bg-white/20 rounded-full p-0.5 cursor-pointer transition-colors"
+                      title="Xóa kiêng cữ này"
+                      aria-label={`Xóa ${customDiet}`}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                ))}
+            </div>
+
+            {/* Inline Custom Input */}
+            <div className="flex items-center gap-2 max-w-md pt-1">
+              <Input
+                type="text"
+                placeholder="Thêm dị ứng/kiêng cữ khác (ví dụ: Dị ứng đậu phộng, Ăn nhạt...)"
+                value={customDietaryInput}
+                onChange={(e) => setCustomDietaryInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddCustomDietary();
+                  }
+                }}
+                className="h-10 rounded-xl text-xs bg-background border-border/80"
+                maxLength={60}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddCustomDietary}
+                disabled={!customDietaryInput.trim()}
+                className="rounded-xl h-10 px-3.5 text-xs font-semibold shrink-0 cursor-pointer gap-1"
+              >
+                <Plus className="size-3.5" />
+                <span>Thêm</span>
+              </Button>
             </div>
           </div>
 
           {/* Save Button */}
-          <div className="pt-4 border-t border-border flex items-center justify-between">
+          <div className="pt-4 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground">
-              {isPrefLoading ? "Đang tải hồ sơ..." : "Thay đổi sẽ áp dụng ngay cho các lịch trình tạo mới."}
+              {isPrefLoading ? "Đang tải hồ sơ..." : "Thay đổi sẽ áp dụng ngay cho các lịch trình AI tạo mới."}
             </p>
             <Button
               onClick={handleSavePreferences}
               disabled={updatePrefMutation.isPending || isPrefLoading}
-              className="rounded-xl font-semibold text-xs h-10 px-5 gap-2"
+              className="rounded-xl font-semibold text-xs h-10 px-6 gap-2 cursor-pointer self-start sm:self-auto shadow-xs"
             >
               {updatePrefMutation.isPending && <Loader2 className="size-4 animate-spin" />}
               <span>Lưu sở thích du lịch</span>
@@ -758,7 +599,7 @@ export default function ProfilePage() {
   return (
     <Suspense
       fallback={
-        <div className="max-w-[1400px] mx-auto w-full px-4 py-8 sm:px-6 lg:px-8 xl:px-10">
+        <div className="max-w-[1200px] mx-auto w-full px-4 py-8 sm:px-6 lg:px-8">
           <div className="h-44 rounded-3xl bg-muted/40 animate-pulse border border-border" />
         </div>
       }

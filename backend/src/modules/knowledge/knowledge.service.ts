@@ -43,7 +43,9 @@ export class KnowledgeService {
       .filter((file) => file.endsWith('.md'))
       .sort();
 
-    this.logger.log(`Found ${files.length} knowledge markdown files to ingest.`);
+    this.logger.log(
+      `Found ${files.length} knowledge markdown files to ingest.`,
+    );
     const results: IngestionResult[] = [];
 
     for (const file of files) {
@@ -52,7 +54,10 @@ export class KnowledgeService {
         const res = await this.ingestFile(filePath);
         results.push(res);
       } catch (err: any) {
-        this.logger.error(`Error ingesting file ${file}: ${err.message}`, err.stack);
+        this.logger.error(
+          `Error ingesting file ${file}: ${err.message}`,
+          err.stack,
+        );
         results.push({
           filename: file,
           status: 'failed',
@@ -77,9 +82,8 @@ export class KnowledgeService {
     const { frontmatter, body } = parseFrontmatter(rawContent);
 
     // 1. Idempotency Check: Ponytail Rung 1 & 6 (String equality in RAM)
-    const existingDoc = await this.knowledgeRepo.findDocumentBySourceUrl(
-      relativeSourceUrl,
-    );
+    const existingDoc =
+      await this.knowledgeRepo.findDocumentBySourceUrl(relativeSourceUrl);
 
     if (existingDoc && existingDoc.content === rawContent) {
       this.logger.log(`[SKIP] Unchanged: ${filename}`);
@@ -90,7 +94,9 @@ export class KnowledgeService {
       };
     }
 
-    this.logger.log(`[INGESTING] Processing ${filename}: "${frontmatter.title}"...`);
+    this.logger.log(
+      `[INGESTING] Processing ${filename}: "${frontmatter.title}"...`,
+    );
 
     // 2. Resolve Area ID from area_slug
     let areaId: number | null = null;
@@ -106,12 +112,16 @@ export class KnowledgeService {
     }
 
     // 4. Generate Embeddings for each chunk
-    this.logger.log(`Generating embeddings for ${chunks.length} chunks of "${filename}"...`);
+    this.logger.log(
+      `Generating embeddings for ${chunks.length} chunks of "${filename}"...`,
+    );
     const embeddedChunks: EmbeddedChunkData[] = [];
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
-      const vector = await this.embeddingService.generateEmbedding(chunk.content);
+      const vector = await this.embeddingService.generateEmbedding(
+        chunk.content,
+      );
       embeddedChunks.push({
         index: i,
         content: chunk.content,
@@ -136,7 +146,9 @@ export class KnowledgeService {
       embeddedChunks,
     );
 
-    this.logger.log(`[SUCCESS] Ingested ${filename} -> ${savedDoc.chunkCount} chunks saved.`);
+    this.logger.log(
+      `[SUCCESS] Ingested ${filename} -> ${savedDoc.chunkCount} chunks saved.`,
+    );
 
     return {
       filename,

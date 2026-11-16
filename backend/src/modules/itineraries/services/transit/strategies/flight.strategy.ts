@@ -29,17 +29,28 @@ export class FlightTransitStrategy implements ITransitStrategy {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private async resolveAirports(
-    ctx: TransitStrategyContext,
-  ): Promise<{ originAirport: TransitHubDto | null; destAirport: TransitHubDto | null }> {
+  private async resolveAirports(ctx: TransitStrategyContext): Promise<{
+    originAirport: TransitHubDto | null;
+    destAirport: TransitHubDto | null;
+  }> {
     const hubs =
       ctx.activeHubs ??
       (await this.prisma.transitHub.findMany({
         where: { isActive: true, hubType: 'AIRPORT' },
       }));
     return {
-      originAirport: findNearestHub(hubs, 'AIRPORT', ctx.originCoords.lat, ctx.originCoords.lng),
-      destAirport: findNearestHub(hubs, 'AIRPORT', ctx.destCoords.lat, ctx.destCoords.lng),
+      originAirport: findNearestHub(
+        hubs,
+        'AIRPORT',
+        ctx.originCoords.lat,
+        ctx.originCoords.lng,
+      ),
+      destAirport: findNearestHub(
+        hubs,
+        'AIRPORT',
+        ctx.destCoords.lat,
+        ctx.destCoords.lng,
+      ),
     };
   }
 
@@ -48,7 +59,9 @@ export class FlightTransitStrategy implements ITransitStrategy {
     return {
       mode: this.mode,
       title: 'Máy bay',
-      durationText: res.isMultiModal ? `Nối chặng (~${durLabel})` : `Nhanh nhất (~${durLabel})`,
+      durationText: res.isMultiModal
+        ? `Nối chặng (~${durLabel})`
+        : `Nhanh nhất (~${durLabel})`,
       priceText: `Từ ~${formatVndCurrency(res.estimatedPriceOneWay)}`,
       estimatedPriceOneWay: res.estimatedPriceOneWay,
       durationMinutes: res.durationMinutes,
@@ -56,7 +69,9 @@ export class FlightTransitStrategy implements ITransitStrategy {
     };
   }
 
-  async calculate(ctx: TransitStrategyContext): Promise<IntercityTransitResult> {
+  async calculate(
+    ctx: TransitStrategyContext,
+  ): Promise<IntercityTransitResult> {
     const {
       originCity,
       destCity,
@@ -74,8 +89,11 @@ export class FlightTransitStrategy implements ITransitStrategy {
     const D = PRICING_CONFIG.DEFAULTS;
 
     const originCode = originAirport?.id || D.ORIGIN_AIRPORT_CODE;
-    const destCode = destAirport?.id || (isIsland ? D.ISLAND_AIRPORT_CODE : D.MAINLAND_AIRPORT_CODE);
-    const originAirportName = originAirport?.name || `Sân bay tại ${originCity}`;
+    const destCode =
+      destAirport?.id ||
+      (isIsland ? D.ISLAND_AIRPORT_CODE : D.MAINLAND_AIRPORT_CODE);
+    const originAirportName =
+      originAirport?.name || `Sân bay tại ${originCity}`;
     const destAirportName = destAirport?.name || `Sân bay đi ${destCity}`;
 
     const googleFlightsUrl = buildGoogleFlightsUrl({
@@ -84,10 +102,15 @@ export class FlightTransitStrategy implements ITransitStrategy {
       departDate,
       returnDate,
     });
-    const safetyAdvisory = checkTransitSafety(TransitModeEnum.FLIGHT, roadDistanceKm);
+    const safetyAdvisory = checkTransitSafety(
+      TransitModeEnum.FLIGHT,
+      roadDistanceKm,
+    );
 
     // Case 4: Origin and destination share the exact same gateway airport OR distance is too short (<150km) for commercial flights
-    const isSameAirport = Boolean(originAirport && destAirport && originAirport.id === destAirport.id);
+    const isSameAirport = Boolean(
+      originAirport && destAirport && originAirport.id === destAirport.id,
+    );
     const isTooShort = roadDistanceKm < T.MIN_FLIGHT_DISTANCE_KM;
 
     if (isSameAirport || isTooShort) {
@@ -96,7 +119,9 @@ export class FlightTransitStrategy implements ITransitStrategy {
         T.MIN_LOCAL_TRANSFER_MINUTES,
         Math.round(transferKm * T.REGIONAL_TRANSFER_MINS_PER_KM),
       );
-      const transferPrice = Math.round(transferKm * PRICING_CONFIG.INTERCITY.LIMOUSINE_BUS_PER_KM);
+      const transferPrice = Math.round(
+        transferKm * PRICING_CONFIG.INTERCITY.LIMOUSINE_BUS_PER_KM,
+      );
 
       const gatewayNotice = isSameAirport
         ? `${originCity} và ${destCity} cùng thuộc phạm vi cửa ngõ hàng không ${destAirportName} (~${transferKm}km), không khai thác chuyến bay thương mại giữa hai điểm này.`
@@ -168,9 +193,19 @@ export class FlightTransitStrategy implements ITransitStrategy {
     const flightDurationLabel = formatDurationVi(baseFlightDuration, true);
 
     const hasIslandDirectAirport =
-      isIsland && isDirectCityHub(destAirport, destCoords.areaId, T.ISLAND_DIRECT_HUB_MAX_KM);
+      isIsland &&
+      isDirectCityHub(
+        destAirport,
+        destCoords.areaId,
+        T.ISLAND_DIRECT_HUB_MAX_KM,
+      );
     const hasMainlandDirectAirport =
-      !isIsland && isDirectCityHub(destAirport, destCoords.areaId, T.LOCAL_HUB_MAX_DISTANCE_KM);
+      !isIsland &&
+      isDirectCityHub(
+        destAirport,
+        destCoords.areaId,
+        T.LOCAL_HUB_MAX_DISTANCE_KM,
+      );
 
     // Case 3: Island destination WITHOUT its own airport (e.g. Lý Sơn via Chu Lai VCL, Phú Quý, Cát Bà, Cô Tô)
     if (isIsland && !hasIslandDirectAirport) {
@@ -179,7 +214,9 @@ export class FlightTransitStrategy implements ITransitStrategy {
         T.DEFAULT_AIRPORT_TRANSFER_KM,
         destAirport?.distanceKm || T.ISLAND_PORT_DISTANCE_KM,
       );
-      const landTransferMinutes = Math.round(landTransferKm * T.REGIONAL_TRANSFER_MINS_PER_KM);
+      const landTransferMinutes = Math.round(
+        landTransferKm * T.REGIONAL_TRANSFER_MINS_PER_KM,
+      );
       const totalTransferMinutes = landTransferMinutes + T.FERRY_MINUTES;
       const totalTransferPrice =
         Math.round(landTransferKm * T.BUS_PER_KM) + T.FERRY_ONE_WAY_PASSENGER;
@@ -225,7 +262,9 @@ export class FlightTransitStrategy implements ITransitStrategy {
     // Case 2: Mainland destination far from nearest airport (e.g. Sa Pa, Hà Giang, Ninh Bình, Măng Đen, Phan Thiết)
     if (!isIsland && !hasMainlandDirectAirport) {
       const transferKm = destAirport?.distanceKm || T.LOCAL_HUB_MAX_DISTANCE_KM;
-      const transferMinutes = Math.round(transferKm * T.REGIONAL_TRANSFER_MINS_PER_KM);
+      const transferMinutes = Math.round(
+        transferKm * T.REGIONAL_TRANSFER_MINS_PER_KM,
+      );
       const transferPrice = Math.round(transferKm * T.BUS_PER_KM);
 
       const transferLeg: TransitTransferLeg = {
@@ -268,7 +307,9 @@ export class FlightTransitStrategy implements ITransitStrategy {
     }
 
     // Case 1: Direct / Satellite Airport (e.g. Đà Nẵng, Phú Quốc, Đà Lạt, Nha Trang, Hội An via DAD)
-    const { transferKm, transferMinutes } = computeLocalTransfer(destAirport?.distanceKm);
+    const { transferKm, transferMinutes } = computeLocalTransfer(
+      destAirport?.distanceKm,
+    );
 
     return {
       mode: this.mode,
@@ -283,7 +324,9 @@ export class FlightTransitStrategy implements ITransitStrategy {
       },
       safetyAdvisory,
       originHub: originAirport || undefined,
-      destHub: destAirport ? { ...destAirport, distanceKm: transferKm } : undefined,
+      destHub: destAirport
+        ? { ...destAirport, distanceKm: transferKm }
+        : undefined,
       isIsland,
       isMultiModal: false,
       details: {
@@ -297,5 +340,3 @@ export class FlightTransitStrategy implements ITransitStrategy {
     };
   }
 }
-
-

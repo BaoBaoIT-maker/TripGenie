@@ -28,7 +28,9 @@ export class CollectionsController {
   @Get()
   @UseGuards(JwtAuthGuard)
   async getMyCollections(@CurrentUser() user: AuthenticatedUser) {
-    const collections = await this.collectionsService.getUserCollections(user.id);
+    const collections = await this.collectionsService.getUserCollections(
+      user.id,
+    );
     return {
       message: 'Lấy danh sách bộ sưu tập thành công',
       collections,
@@ -38,7 +40,9 @@ export class CollectionsController {
   @Get('saved-place-ids')
   @UseGuards(JwtAuthGuard)
   async getSavedPlaceIds(@CurrentUser() user: AuthenticatedUser) {
-    const savedPlaceIds = await this.collectionsService.getSavedPlaceIds(user.id);
+    const savedPlaceIds = await this.collectionsService.getSavedPlaceIds(
+      user.id,
+    );
     return {
       savedPlaceIds,
     };
@@ -51,7 +55,10 @@ export class CollectionsController {
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateCollectionDto,
   ) {
-    const collection = await this.collectionsService.createCollection(user.id, dto);
+    const collection = await this.collectionsService.createCollection(
+      user.id,
+      dto,
+    );
     return {
       message: 'Tạo bộ sưu tập mới thành công',
       collection,
@@ -94,7 +101,10 @@ export class CollectionsController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('id') userId?: string,
   ) {
-    const collection = await this.collectionsService.getCollectionDetail(userId, id);
+    const collection = await this.collectionsService.getCollectionDetail(
+      userId,
+      id,
+    );
     return {
       collection,
     };

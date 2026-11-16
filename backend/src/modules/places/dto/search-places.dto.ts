@@ -16,15 +16,31 @@ import { BudgetLevel } from '@prisma/client';
 import { PlaceSortBy, SortOrder } from '../../../common/enums/places.enum';
 
 /** Safe transformer for comma-delimited strings or native array query parameters */
-const transformStringArray = ({ value }: { value: unknown }): string[] | undefined => {
+const transformStringArray = ({
+  value,
+}: {
+  value: unknown;
+}): string[] | undefined => {
   if (value === undefined || value === null || value === '') return undefined;
-  if (Array.isArray(value)) return value.map(String).map((s) => s.trim()).filter(Boolean);
-  if (typeof value === 'string') return value.split(',').map((s) => s.trim()).filter(Boolean);
+  if (Array.isArray(value))
+    return value
+      .map(String)
+      .map((s) => s.trim())
+      .filter(Boolean);
+  if (typeof value === 'string')
+    return value
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
   return undefined;
 };
 
 /** Safe transformer for comma-delimited enum values */
-const transformBudgetLevels = ({ value }: { value: unknown }): BudgetLevel[] | undefined => {
+const transformBudgetLevels = ({
+  value,
+}: {
+  value: unknown;
+}): BudgetLevel[] | undefined => {
   if (value === undefined || value === null || value === '') return undefined;
   const rawList = Array.isArray(value)
     ? value
@@ -32,12 +48,18 @@ const transformBudgetLevels = ({ value }: { value: unknown }): BudgetLevel[] | u
       ? value.split(',').map((s) => s.trim())
       : [];
   const validLevels = Object.values(BudgetLevel);
-  const filtered = rawList.filter((v) => validLevels.includes(v as BudgetLevel)) as BudgetLevel[];
+  const filtered = rawList.filter((v) =>
+    validLevels.includes(v as BudgetLevel),
+  ) as BudgetLevel[];
   return filtered.length > 0 ? filtered : undefined;
 };
 
 /** Safe boolean transformer from query param ("true", "1", true) */
-const transformBoolean = ({ value }: { value: unknown }): boolean | undefined => {
+const transformBoolean = ({
+  value,
+}: {
+  value: unknown;
+}): boolean | undefined => {
   if (value === undefined || value === null || value === '') return undefined;
   return value === 'true' || value === true || value === '1' || value === 1;
 };

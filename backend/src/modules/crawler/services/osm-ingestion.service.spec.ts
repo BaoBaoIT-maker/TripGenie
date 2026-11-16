@@ -2,7 +2,11 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { OsmIngestionService } from './osm-ingestion.service';
 import { DeduplicationService } from './deduplication.service';
 import { INJECT_TOKENS } from '../../../common/constants/inject-tokens';
-import { CrawlJobStatus, DataCoverageStatus, PlaceStatus } from '../../../common/enums/crawler.enum';
+import {
+  CrawlJobStatus,
+  DataCoverageStatus,
+  PlaceStatus,
+} from '../../../common/enums/crawler.enum';
 
 describe('OsmIngestionService', () => {
   let service: OsmIngestionService;
@@ -73,9 +77,15 @@ describe('OsmIngestionService', () => {
   });
 
   it('should mark FAILED if area has no bbox', async () => {
-    crawlerRepo.getAreaById.mockResolvedValue({ id: 1, name: 'X', bboxMinLat: null });
+    crawlerRepo.getAreaById.mockResolvedValue({
+      id: 1,
+      name: 'X',
+      bboxMinLat: null,
+    });
     await service.processArea('job-1', 1);
-    expect(crawlerRepo.updateCrawlJob).toHaveBeenCalledWith('job-1', { status: CrawlJobStatus.FAILED });
+    expect(crawlerRepo.updateCrawlJob).toHaveBeenCalledWith('job-1', {
+      status: CrawlJobStatus.FAILED,
+    });
   });
 
   it('should INSERT new place and source when no duplicate found', async () => {
@@ -96,7 +106,11 @@ describe('OsmIngestionService', () => {
     expect(crawlerRepo.createPlaceSource).toHaveBeenCalled();
     expect(crawlerRepo.updateCrawlJob).toHaveBeenCalledWith(
       'job-1',
-      expect.objectContaining({ status: CrawlJobStatus.COMPLETED, insertedCount: 1, duplicateCount: 0 }),
+      expect.objectContaining({
+        status: CrawlJobStatus.COMPLETED,
+        insertedCount: 1,
+        duplicateCount: 0,
+      }),
     );
   });
 
@@ -109,18 +123,27 @@ describe('OsmIngestionService', () => {
     expect(crawlerRepo.createPlace).not.toHaveBeenCalled();
     expect(crawlerRepo.updateCrawlJob).toHaveBeenCalledWith(
       'job-1',
-      expect.objectContaining({ status: CrawlJobStatus.COMPLETED, insertedCount: 0, duplicateCount: 1 }),
+      expect.objectContaining({
+        status: CrawlJobStatus.COMPLETED,
+        insertedCount: 0,
+        duplicateCount: 1,
+      }),
     );
   });
 
   it('should increment errorCount when a single item fails', async () => {
-    deduplicationService.findDuplicate.mockRejectedValue(new Error('DB timeout'));
+    deduplicationService.findDuplicate.mockRejectedValue(
+      new Error('DB timeout'),
+    );
 
     await service.processArea('job-1', 1);
 
     expect(crawlerRepo.updateCrawlJob).toHaveBeenCalledWith(
       'job-1',
-      expect.objectContaining({ status: CrawlJobStatus.COMPLETED, errorCount: 1 }),
+      expect.objectContaining({
+        status: CrawlJobStatus.COMPLETED,
+        errorCount: 1,
+      }),
     );
   });
 
@@ -137,7 +160,10 @@ describe('OsmIngestionService', () => {
     await service.processArea('job-1', 1);
     expect(crawlerRepo.updateCrawlJob).toHaveBeenCalledWith(
       'job-1',
-      expect.objectContaining({ status: CrawlJobStatus.FAILED, lastError: 'Overpass timeout' }),
+      expect.objectContaining({
+        status: CrawlJobStatus.FAILED,
+        lastError: 'Overpass timeout',
+      }),
     );
   });
 });

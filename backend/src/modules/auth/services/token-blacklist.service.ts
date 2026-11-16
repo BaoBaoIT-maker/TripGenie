@@ -33,11 +33,7 @@ export class TokenBlacklistService {
    */
   async revokeAccessToken(token: string): Promise<void> {
     try {
-      const payload = this.jwtService.decode(token) as {
-        jti?: string;
-        exp?: number;
-        sub?: string;
-      } | null;
+      const payload = this.jwtService.decode(token);
 
       if (!payload?.jti || !payload?.exp) {
         this.logger.warn('Token missing jti or exp — cannot blacklist');
@@ -84,7 +80,9 @@ export class TokenBlacklistService {
    */
   async isBlacklisted(jti: string): Promise<boolean> {
     try {
-      const result = await this.redisClient.exists(`${this.BLACKLIST_PREFIX}${jti}`);
+      const result = await this.redisClient.exists(
+        `${this.BLACKLIST_PREFIX}${jti}`,
+      );
       return result === 1;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);

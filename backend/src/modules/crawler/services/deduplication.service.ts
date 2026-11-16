@@ -15,7 +15,10 @@ export class DeduplicationService {
     private readonly configService: ConfigService,
   ) {
     // Configurable via env: DEDUP_RADIUS_METERS (default 50m)
-    this.radiusMeters = this.configService.get<number>('DEDUP_RADIUS_METERS', 50);
+    this.radiusMeters = this.configService.get<number>(
+      'DEDUP_RADIUS_METERS',
+      50,
+    );
   }
 
   /**
@@ -45,7 +48,12 @@ export class DeduplicationService {
     );
 
     for (const nearby of nearbyPlaces) {
-      if (this.isSimilarName(place.nameNormalized, nearby.name_normalized as string)) {
+      if (
+        this.isSimilarName(
+          place.nameNormalized,
+          nearby.name_normalized as string,
+        )
+      ) {
         this.logger.debug(
           `Duplicate detected via spatial+lexical: "${place.name}" ≈ "${nearby.name}"`,
         );

@@ -1,4 +1,10 @@
-import { IsEmail, IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 import { IsMaxUtf8Bytes } from '@/common/decorators/is-max-utf8-bytes.decorator';
 import { AUTH_CONSTANTS } from '@/common/constants/auth.constants';
 

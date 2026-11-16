@@ -62,7 +62,9 @@ export class ItineraryAccessService {
     });
 
     if (!row) {
-      throw new NotFoundException('Không tìm thấy lịch trình du lịch hoặc lịch trình đã bị xóa.');
+      throw new NotFoundException(
+        'Không tìm thấy lịch trình du lịch hoặc lịch trình đã bị xóa.',
+      );
     }
 
     const baseItinerary = {
@@ -121,9 +123,13 @@ export class ItineraryAccessService {
     const access = await this.getAccess(itineraryId, userId, tx);
     if (!access.canView) {
       if (!userId) {
-        throw new UnauthorizedException('Vui lòng đăng nhập để xem lịch trình riêng tư này.');
+        throw new UnauthorizedException(
+          'Vui lòng đăng nhập để xem lịch trình riêng tư này.',
+        );
       }
-      throw new ForbiddenException('Bạn không có quyền xem lịch trình riêng tư này.');
+      throw new ForbiddenException(
+        'Bạn không có quyền xem lịch trình riêng tư này.',
+      );
     }
     return access;
   }
@@ -137,12 +143,37 @@ export class ItineraryAccessService {
     tx?: Prisma.TransactionClient,
   ): Promise<ItineraryAccess> {
     if (!userId) {
-      throw new UnauthorizedException('Vui lòng đăng nhập để chỉnh sửa lịch trình này.');
+      throw new UnauthorizedException(
+        'Vui lòng đăng nhập để chỉnh sửa lịch trình này.',
+      );
     }
     const access = await this.getAccess(itineraryId, userId, tx);
     if (!access.canEdit) {
       throw new ForbiddenException(
         'Bạn chỉ có quyền xem hoặc không có quyền chỉnh sửa nội dung lịch trình này.',
+      );
+    }
+    return access;
+  }
+
+  /**
+   * Assert actor is an active member of the itinerary's group (OWNER, EDITOR, or VIEWER).
+   * Blocks non-member/public guests from private group features (voting, group Copilot).
+   */
+  async assertIsGroupMember(
+    itineraryId: string,
+    userId?: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ItineraryAccess> {
+    if (!userId) {
+      throw new UnauthorizedException(
+        'Vui lòng đăng nhập để tham gia tính năng nhóm của lịch trình.',
+      );
+    }
+    const access = await this.getAccess(itineraryId, userId, tx);
+    if (access.role === null) {
+      throw new ForbiddenException(
+        'Chỉ thành viên trong đoàn mới có quyền truy cập nội dung này.',
       );
     }
     return access;
@@ -157,11 +188,15 @@ export class ItineraryAccessService {
     tx?: Prisma.TransactionClient,
   ): Promise<ItineraryAccess> {
     if (!userId) {
-      throw new UnauthorizedException('Vui lòng đăng nhập để thực hiện thao tác quản lý này.');
+      throw new UnauthorizedException(
+        'Vui lòng đăng nhập để thực hiện thao tác quản lý này.',
+      );
     }
     const access = await this.getAccess(itineraryId, userId, tx);
     if (!access.isOwner) {
-      throw new ForbiddenException('Chỉ chủ sở hữu lịch trình mới có quyền thực hiện thao tác này.');
+      throw new ForbiddenException(
+        'Chỉ chủ sở hữu lịch trình mới có quyền thực hiện thao tác này.',
+      );
     }
     return access;
   }

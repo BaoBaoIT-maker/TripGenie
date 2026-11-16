@@ -471,27 +471,25 @@ export function CommunityClientShell({
                       handleOpenComposer(false);
                     }
                   }}
-                  className="flex-1 min-w-0 h-11 px-3.5 sm:px-4 rounded-[14px] bg-[#F8FAFC] hover:bg-[#F1F5F9] border border-[#E2E8F0] hover:border-[#CBD5E1] flex items-center justify-between cursor-pointer transition-colors"
+                  className="flex-1 min-w-0 h-10 px-3.5 sm:px-4 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 flex items-center justify-between cursor-pointer transition-colors"
                 >
-                  <span className="text-[13px] text-[#64748B] truncate select-none">
-                    {currentUser
-                      ? `${currentUser.fullName} ơi, chia sẻ ảnh, video hoặc lộ trình chuyến đi vừa qua nhé...`
-                      : "Khánh Linh ơi, chia sẻ ảnh, video hoặc lộ trình chuyến đi vừa qua nhé..."}
+                  <span className="text-[13px] text-slate-500 truncate select-none">
+                    Chia sẻ kinh nghiệm, ảnh hoặc lộ trình chuyến đi của bạn...
                   </span>
-                  <i className="fa-regular fa-face-smile text-[#94A3B8] text-[17px] ml-2.5 shrink-0" />
+                  <i className="fa-regular fa-face-smile text-slate-400 text-base ml-2.5 shrink-0" />
                 </div>
               </div>
 
-              {/* Tầng dưới: Các công cụ với icon màu đen than chì chuyên nghiệp + Nút Đăng bài viên thuốc đen */}
-              <div className="mt-3.5 pt-3.5 border-t border-[#F1F5F9] flex items-center justify-between flex-wrap gap-2">
+              {/* Tầng dưới: Các công cụ với icon màu đen than chì chuyên nghiệp + Nút Đăng bài */}
+              <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
                 <div className="flex items-center gap-1 flex-wrap min-w-0">
                   {/* Nút Tệp */}
                   <button
                     type="button"
                     onClick={handlePickFiles}
-                    className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-[10px] bg-transparent hover:bg-[#F1F5F9] text-[12px] font-semibold text-[#334155] hover:text-[#0F172A] transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-transparent hover:bg-slate-100 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
                   >
-                    <i className="fa-solid fa-folder text-[#0F172A] text-[14px]" />
+                    <i className="fa-solid fa-folder text-slate-700 text-[13px]" />
                     <span>Tệp</span>
                   </button>
 
@@ -499,9 +497,9 @@ export function CommunityClientShell({
                   <button
                     type="button"
                     onClick={handlePickMedia}
-                    className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-[10px] bg-transparent hover:bg-[#F1F5F9] text-[12px] font-semibold text-[#334155] hover:text-[#0F172A] transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-transparent hover:bg-slate-100 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
                   >
-                    <i className="fa-solid fa-image text-[#0F172A] text-[14px]" />
+                    <i className="fa-solid fa-image text-slate-700 text-[13px]" />
                     <span>Ảnh / Video</span>
                   </button>
 
@@ -509,19 +507,20 @@ export function CommunityClientShell({
                   <button
                     type="button"
                     onClick={() => handleOpenComposer(true)}
-                    className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-[10px] bg-transparent hover:bg-[#F1F5F9] text-[12px] font-semibold text-[#334155] hover:text-[#0F172A] transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-transparent hover:bg-slate-100 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
                   >
-                    <i className="fa-solid fa-route text-[#0F172A] text-[14px]" />
+                    <i className="fa-solid fa-route text-slate-700 text-[13px]" />
                     <span>Lịch trình</span>
                   </button>
                 </div>
 
-                {/* Nút Đăng bài viên thuốc màu đen */}
+                {/* Nút Đăng bài */}
                 <button
                   type="button"
                   onClick={() => handleOpenComposer(false)}
-                  className="bg-[#0F172A] hover:bg-[#1E293B] text-white rounded-full px-5 sm:px-[26px] py-2 text-[13px] font-extrabold inline-flex items-center gap-2 transition-colors shadow-[0_2px_6px_rgba(15,23,42,0.15)] active:scale-95 cursor-pointer shrink-0"
+                  className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-4 py-2 text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-xs active:scale-[0.98] cursor-pointer shrink-0"
                 >
+                  <i className="fa-solid fa-pen-to-square text-[11px]" aria-hidden="true" />
                   <span>Đăng bài</span>
                 </button>
               </div>
@@ -541,10 +540,10 @@ export function CommunityClientShell({
                 <button
                   type="button"
                   onClick={() => setSort("LATEST")}
-                  className={`px-3.5 py-2 rounded-[10px] text-[12px] font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 ${
                     sort === "LATEST"
                       ? "bg-[#0194F3] text-white"
-                      : "bg-transparent text-[#475569] hover:bg-[#F1F5F9]"
+                      : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                   }`}
                 >
                   <i className="fa-regular fa-clock" />
@@ -554,10 +553,10 @@ export function CommunityClientShell({
                 <button
                   type="button"
                   onClick={() => setSort("TRENDING")}
-                  className={`px-3.5 py-2 rounded-[10px] text-[12px] font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 ${
                     sort === "TRENDING"
                       ? "bg-[#0194F3] text-white"
-                      : "bg-transparent text-[#475569] hover:bg-[#F1F5F9]"
+                      : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                   }`}
                 >
                   <i
@@ -571,10 +570,10 @@ export function CommunityClientShell({
                 <button
                   type="button"
                   onClick={() => setSort("MOST_CLONED")}
-                  className={`px-3.5 py-2 rounded-[10px] text-[12px] font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-colors shrink-0 ${
                     sort === "MOST_CLONED"
                       ? "bg-[#0194F3] text-white"
-                      : "bg-transparent text-[#475569] hover:bg-[#F1F5F9]"
+                      : "bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                   }`}
                 >
                   <i className="fa-regular fa-clone" />

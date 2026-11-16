@@ -126,17 +126,23 @@ export class CommunityService {
 
     const slug = this.slugifyGroupName(dto.slug?.trim() || trimmedName);
     if (!slug) {
-      throw new BadRequestException('Định danh (slug) nhóm cộng đồng không hợp lệ');
+      throw new BadRequestException(
+        'Định danh (slug) nhóm cộng đồng không hợp lệ',
+      );
     }
 
     const existing = await this.communityRepository.findGroupByIdOrSlug(slug);
     if (existing) {
-      throw new ConflictException(`Nhóm cộng đồng với slug "${slug}" đã tồn tại`);
+      throw new ConflictException(
+        `Nhóm cộng đồng với slug "${slug}" đã tồn tại`,
+      );
     }
 
     for (const url of [dto.iconUrl, dto.coverUrl]) {
       if (url && !SAFE_MEDIA_URL_REGEX.test(url.trim())) {
-        throw new BadRequestException(`Đường dẫn hình ảnh nhóm không hợp lệ: "${url}"`);
+        throw new BadRequestException(
+          `Đường dẫn hình ảnh nhóm không hợp lệ: "${url}"`,
+        );
       }
     }
 
@@ -156,7 +162,11 @@ export class CommunityService {
   }
 
   async getSidebarDiscovery(viewerId?: string): Promise<SidebarDiscoveryData> {
-    if (!viewerId && this.sidebarCache && Date.now() < this.sidebarCache.expiresAt) {
+    if (
+      !viewerId &&
+      this.sidebarCache &&
+      Date.now() < this.sidebarCache.expiresAt
+    ) {
       return this.sidebarCache.data;
     }
 
@@ -194,15 +204,22 @@ export class CommunityService {
     });
   }
 
-  async getPostById(postId: string, viewerId?: string): Promise<CommunityPostView> {
+  async getPostById(
+    postId: string,
+    viewerId?: string,
+  ): Promise<CommunityPostView> {
     const post = await this.communityRepository.findPostById(postId, viewerId);
     if (!post) {
-      throw new NotFoundException('Không tìm thấy bài viết hoặc bài viết đã bị xóa');
+      throw new NotFoundException(
+        'Không tìm thấy bài viết hoặc bài viết đã bị xóa',
+      );
     }
     return post;
   }
 
-  private async resolveTargetGroupId(groupIdOrSlug?: string): Promise<string | null> {
+  private async resolveTargetGroupId(
+    groupIdOrSlug?: string,
+  ): Promise<string | null> {
     if (groupIdOrSlug && groupIdOrSlug.trim()) {
       const group = await this.communityRepository.findGroupByIdOrSlug(
         groupIdOrSlug.trim(),
@@ -276,7 +293,9 @@ export class CommunityService {
   ): Promise<CommunityPostView> {
     const post = await this.communityRepository.findPostById(postId, userId);
     if (!post) {
-      throw new NotFoundException('Không tìm thấy bài viết hoặc bài viết đã bị xóa');
+      throw new NotFoundException(
+        'Không tìm thấy bài viết hoặc bài viết đã bị xóa',
+      );
     }
 
     this.assertCanModifyPost(post, userId, userRole, 'chỉnh sửa bài viết');
@@ -315,7 +334,9 @@ export class CommunityService {
   ): Promise<{ success: boolean; id: string }> {
     const post = await this.communityRepository.findPostById(postId, userId);
     if (!post) {
-      throw new NotFoundException('Không tìm thấy bài viết hoặc bài viết đã bị xóa');
+      throw new NotFoundException(
+        'Không tìm thấy bài viết hoặc bài viết đã bị xóa',
+      );
     }
 
     this.assertCanModifyPost(post, userId, userRole, 'xóa bài viết');
@@ -334,7 +355,10 @@ export class CommunityService {
       throw new NotFoundException('Không tìm thấy bài viết');
     }
 
-    const result = await this.communityRepository.togglePostLike(postId, userId);
+    const result = await this.communityRepository.togglePostLike(
+      postId,
+      userId,
+    );
     this.invalidateSidebarCache();
     return {
       postId,
@@ -353,7 +377,9 @@ export class CommunityService {
     }
 
     if (post.userId === userId) {
-      throw new BadRequestException('Bạn không thể tự báo cáo bài viết của chính mình');
+      throw new BadRequestException(
+        'Bạn không thể tự báo cáo bài viết của chính mình',
+      );
     }
 
     return this.communityRepository.reportPost({
@@ -381,9 +407,14 @@ export class CommunityService {
       throw new NotFoundException('Không tìm thấy bài viết');
     }
 
-    const context = await this.communityRepository.getCommentContext(postId, commentId);
+    const context = await this.communityRepository.getCommentContext(
+      postId,
+      commentId,
+    );
     if (!context) {
-      throw new NotFoundException('Không tìm thấy bình luận hoặc bình luận đã bị xóa');
+      throw new NotFoundException(
+        'Không tìm thấy bình luận hoặc bình luận đã bị xóa',
+      );
     }
 
     return context;
@@ -412,7 +443,12 @@ export class CommunityService {
     userId: string,
     userRole: UserRole | undefined,
     commentId: string,
-  ): Promise<{ success: boolean; commentId: string; postId: string; commentCount: number }> {
+  ): Promise<{
+    success: boolean;
+    commentId: string;
+    postId: string;
+    commentCount: number;
+  }> {
     const comment = await this.communityRepository.findCommentById(commentId);
     if (!comment) {
       throw new NotFoundException('Không tìm thấy bình luận');
@@ -450,7 +486,9 @@ export class CommunityService {
     );
 
     if (!profile) {
-      throw new NotFoundException('Không tìm thấy trang cá nhân của người dùng này');
+      throw new NotFoundException(
+        'Không tìm thấy trang cá nhân của người dùng này',
+      );
     }
 
     return profile;

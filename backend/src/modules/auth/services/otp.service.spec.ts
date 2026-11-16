@@ -1,6 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
-import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { OtpService } from './otp.service';
 import { MailService } from './mail.service';
 
@@ -59,7 +62,10 @@ describe('OtpService', () => {
     });
 
     it('nên tạo challenge và gửi email khi hợp lệ', async () => {
-      const result = await otpService.generateAndSendOtp('user@example.com', 'email-verification');
+      const result = await otpService.generateAndSendOtp(
+        'user@example.com',
+        'email-verification',
+      );
 
       expect(mockRedisClient.set).toHaveBeenCalledTimes(2); // challenge + cooldown
       expect(mockMailService.sendOtpEmail).toHaveBeenCalledWith(
@@ -87,7 +93,11 @@ describe('OtpService', () => {
       mockRedisClient.get.mockResolvedValue(null);
 
       await expect(
-        otpService.verifyOtp('user@example.com', '123456', 'email-verification'),
+        otpService.verifyOtp(
+          'user@example.com',
+          '123456',
+          'email-verification',
+        ),
       ).rejects.toThrow(BadRequestException);
     });
 
@@ -103,7 +113,11 @@ describe('OtpService', () => {
       mockRedisClient.ttl.mockResolvedValue(500);
 
       await expect(
-        otpService.verifyOtp('user@example.com', '123456', 'email-verification'),
+        otpService.verifyOtp(
+          'user@example.com',
+          '123456',
+          'email-verification',
+        ),
       ).rejects.toThrow(/Mã OTP không chính xác/);
 
       expect(mockRedisClient.set).toHaveBeenCalled();
@@ -120,11 +134,17 @@ describe('OtpService', () => {
       };
       mockRedisClient.get.mockResolvedValue(JSON.stringify(challenge));
 
-      const result = await otpService.verifyOtp('user@example.com', rawOtp, 'email-verification');
+      const result = await otpService.verifyOtp(
+        'user@example.com',
+        rawOtp,
+        'email-verification',
+      );
 
       expect(result).toBe(true);
       expect(mockRedisClient.del).toHaveBeenCalledWith(
-        expect.stringContaining('otp:challenge:email-verification:user@example.com'),
+        expect.stringContaining(
+          'otp:challenge:email-verification:user@example.com',
+        ),
       );
     });
   });

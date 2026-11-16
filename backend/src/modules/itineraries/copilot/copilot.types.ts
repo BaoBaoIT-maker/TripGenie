@@ -1,4 +1,10 @@
-import { IsString, IsNotEmpty, IsOptional, IsUUID, IsBoolean } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsUUID,
+  IsBoolean,
+} from 'class-validator';
 import { TIME_SCHEDULING_CONSTANTS } from '../../../common/utils/time-of-day.util';
 
 /** DTO for user chat messages sent to Genie Copilot. */
@@ -57,6 +63,7 @@ export interface CopilotToolExecutionResult {
   toolName: string;
   success: boolean;
   message: string;
+  errorCode?: 'NOT_FOUND' | 'CONFLICT' | 'BAD_REQUEST';
   data?: Record<string, unknown>;
 }
 
@@ -146,8 +153,10 @@ export const COPILOT_CONSTANTS = {
   CATEGORY_AFFINITY_WEIGHT: 5,
   SWAP_TEMP_DAY_NUMBER: 9999,
   DEFAULT_DURATION_MINUTES: 90,
-  TRANSIT_BUFFER_MINUTES: TIME_SCHEDULING_CONSTANTS.DEFAULT_TRANSIT_BUFFER_MINUTES,
-  MIN_ACTIVITY_DURATION_MINUTES: TIME_SCHEDULING_CONSTANTS.DEFAULT_MIN_DURATION_MINUTES,
+  TRANSIT_BUFFER_MINUTES:
+    TIME_SCHEDULING_CONSTANTS.DEFAULT_TRANSIT_BUFFER_MINUTES,
+  MIN_ACTIVITY_DURATION_MINUTES:
+    TIME_SCHEDULING_CONSTANTS.DEFAULT_MIN_DURATION_MINUTES,
   MAX_MINUTE_OF_DAY: TIME_SCHEDULING_CONSTANTS.DEFAULT_MAX_ACTIVITY_END_MINUTE,
   DEFAULT_RATING_FALLBACK: 4.7,
   GUEST_FALLBACK_USER_ID: '00000000-0000-0000-0000-000000000001',
@@ -180,7 +189,8 @@ export const COPILOT_TOOL_NAMES = {
   CHANGE_DESTINATION: 'change_destination',
 } as const;
 
-export type CopilotToolName = (typeof COPILOT_TOOL_NAMES)[keyof typeof COPILOT_TOOL_NAMES];
+export type CopilotToolName =
+  (typeof COPILOT_TOOL_NAMES)[keyof typeof COPILOT_TOOL_NAMES];
 
 export const COPILOT_FUNCTION_DECLARATIONS = [
   {
@@ -192,7 +202,8 @@ export const COPILOT_FUNCTION_DECLARATIONS = [
       properties: {
         newDestination: {
           type: 'STRING',
-          description: 'Tên tỉnh/thành phố hoặc điểm đến mới mà người dùng muốn đi tới.',
+          description:
+            'Tên tỉnh/thành phố hoặc điểm đến mới mà người dùng muốn đi tới.',
         },
       },
       required: ['newDestination'],
@@ -217,7 +228,8 @@ export const COPILOT_FUNCTION_DECLARATIONS = [
         },
         mealOrActivityType: {
           type: 'STRING',
-          description: 'Loại hoạt động hoặc bữa ăn: sáng, trưa, tối, cafe, tham quan, giải trí.',
+          description:
+            'Loại hoạt động hoặc bữa ăn: sáng, trưa, tối, cafe, tham quan, giải trí.',
         },
         query: {
           type: 'STRING',
@@ -246,11 +258,13 @@ export const COPILOT_FUNCTION_DECLARATIONS = [
         },
         timeSlot: {
           type: 'STRING',
-          description: 'Khung giờ hoặc buổi muốn chèn: "morning" (sáng), "lunch" (trưa), "afternoon" (chiều), "dinner" (tối), "night" (đêm).',
+          description:
+            'Khung giờ hoặc buổi muốn chèn: "morning" (sáng), "lunch" (trưa), "afternoon" (chiều), "dinner" (tối), "night" (đêm).',
         },
         query: {
           type: 'STRING',
-          description: 'Tên riêng hoặc từ khóa cốt lõi của địa điểm muốn thêm (bỏ các từ đệm như "thêm", "quán", "tiệm").',
+          description:
+            'Tên riêng hoặc từ khóa cốt lõi của địa điểm muốn thêm (bỏ các từ đệm như "thêm", "quán", "tiệm").',
         },
         categorySlug: {
           type: 'STRING',
@@ -301,7 +315,8 @@ export const COPILOT_FUNCTION_DECLARATIONS = [
         },
         targetTimeSlot: {
           type: 'STRING',
-          description: 'Khung giờ ở ngày đích: "morning", "afternoon", "evening". Mặc định "afternoon".',
+          description:
+            'Khung giờ ở ngày đích: "morning", "afternoon", "evening". Mặc định "afternoon".',
         },
       },
       required: ['placeName', 'fromDay', 'toDay'],

@@ -4,7 +4,11 @@ import { ICrawlerRepository } from '../interfaces/crawler-repository.interface';
 import { ICrawlerProvider } from '../interfaces/provider.interface';
 import { IIngestionService } from '../interfaces/ingestion.interface';
 import { DeduplicationService } from './deduplication.service';
-import { CrawlJobStatus, DataCoverageStatus, PlaceStatus } from '../../../common/enums/crawler.enum';
+import {
+  CrawlJobStatus,
+  DataCoverageStatus,
+  PlaceStatus,
+} from '../../../common/enums/crawler.enum';
 
 @Injectable()
 export class OsmIngestionService implements IIngestionService {
@@ -28,11 +32,15 @@ export class OsmIngestionService implements IIngestionService {
     const area = await this.crawlerRepo.getAreaById(areaId);
     if (!area || !area.bboxMinLat) {
       this.logger.error(`Area ${areaId} invalid or missing bbox`);
-      await this.crawlerRepo.updateCrawlJob(jobId, { status: CrawlJobStatus.FAILED });
+      await this.crawlerRepo.updateCrawlJob(jobId, {
+        status: CrawlJobStatus.FAILED,
+      });
       return;
     }
 
-    await this.crawlerRepo.updateCrawlJob(jobId, { status: CrawlJobStatus.RUNNING });
+    await this.crawlerRepo.updateCrawlJob(jobId, {
+      status: CrawlJobStatus.RUNNING,
+    });
 
     try {
       const places = await this.provider.fetchByBbox(
@@ -49,7 +57,9 @@ export class OsmIngestionService implements IIngestionService {
       let errorCount = 0;
       let processedItems = 0;
 
-      await this.crawlerRepo.updateCrawlJob(jobId, { totalItems: places.length });
+      await this.crawlerRepo.updateCrawlJob(jobId, {
+        totalItems: places.length,
+      });
 
       for (const place of places) {
         processedItems++;
@@ -58,7 +68,8 @@ export class OsmIngestionService implements IIngestionService {
           const catId = categoryMap.get(place.categorySlug);
           if (!catId) continue;
 
-          const existingPlaceId = await this.deduplicationService.findDuplicate(place);
+          const existingPlaceId =
+            await this.deduplicationService.findDuplicate(place);
           let finalPlaceId: string | null = existingPlaceId;
 
           if (!existingPlaceId) {
@@ -85,10 +96,11 @@ export class OsmIngestionService implements IIngestionService {
 
           if (!finalPlaceId) continue;
 
-          const existingSource = await this.crawlerRepo.findPlaceSourceByExternal(
-            place.provider,
-            place.externalId,
-          );
+          const existingSource =
+            await this.crawlerRepo.findPlaceSourceByExternal(
+              place.provider,
+              place.externalId,
+            );
 
           if (!existingSource) {
             await this.crawlerRepo.createPlaceSource({
@@ -99,10 +111,13 @@ export class OsmIngestionService implements IIngestionService {
               lastSyncedAt: new Date(),
             });
           } else {
-            await this.crawlerRepo.updatePlaceSource(existingSource.id as string, {
-              rawData: place.sourceData,
-              lastSyncedAt: new Date(),
-            });
+            await this.crawlerRepo.updatePlaceSource(
+              existingSource.id as string,
+              {
+                rawData: place.sourceData,
+                lastSyncedAt: new Date(),
+              },
+            );
           }
 
           // Flush progress to DB every 50 items to reduce write amplification
@@ -117,7 +132,9 @@ export class OsmIngestionService implements IIngestionService {
         } catch (err) {
           errorCount++;
           const message = err instanceof Error ? err.message : String(err);
-          this.logger.error(`Error processing OSM node ${place.externalId}: ${message}`);
+          this.logger.error(
+            `Error processing OSM node ${place.externalId}: ${message}`,
+          );
         }
       }
 
@@ -131,7 +148,9 @@ export class OsmIngestionService implements IIngestionService {
       });
 
       // Update data_coverage cache for this area
-      const activeCount = await this.crawlerRepo.countActivePlacesByArea(area.id);
+      const activeCount = await this.crawlerRepo.countActivePlacesByArea(
+        area.id,
+      );
       await this.crawlerRepo.upsertDataCoverage(area.id, {
         placeCount: activeCount,
         status: DataCoverageStatus.PARTIAL,

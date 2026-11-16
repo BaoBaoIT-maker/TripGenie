@@ -23,7 +23,9 @@ export class LocalDiskStorageProvider implements IMediaStorageProvider {
   // ponytail: local disk storage suits single-node deployments; swap provider binding in CommunityModule to S3/Cloudinary when scaling horizontally.
   async saveFiles(files: RawUploadFile[]): Promise<UploadedMediaItem[]> {
     if (!files || files.length === 0) {
-      throw new BadRequestException('Vui lòng chọn ít nhất 1 tệp ảnh hoặc video để tải lên');
+      throw new BadRequestException(
+        'Vui lòng chọn ít nhất 1 tệp ảnh hoặc video để tải lên',
+      );
     }
 
     if (files.length > COMMUNITY_CONSTANTS.MAX_FILES_PER_UPLOAD) {
@@ -47,7 +49,9 @@ export class LocalDiskStorageProvider implements IMediaStorageProvider {
       }
 
       if (!file.buffer || file.size <= 0) {
-        throw new BadRequestException(`Tệp "${file.originalname}" rỗng hoặc không hợp lệ`);
+        throw new BadRequestException(
+          `Tệp "${file.originalname}" rỗng hoặc không hợp lệ`,
+        );
       }
 
       if (file.size > COMMUNITY_CONSTANTS.MAX_FILE_SIZE_BYTES) {
@@ -73,7 +77,10 @@ export class LocalDiskStorageProvider implements IMediaStorageProvider {
   }
 
   async deleteFile(fileUrl: string): Promise<void> {
-    if (!fileUrl || !fileUrl.startsWith(COMMUNITY_CONSTANTS.PUBLIC_URL_PREFIX)) {
+    if (
+      !fileUrl ||
+      !fileUrl.startsWith(COMMUNITY_CONSTANTS.PUBLIC_URL_PREFIX)
+    ) {
       return;
     }
     const safeName = basename(fileUrl);

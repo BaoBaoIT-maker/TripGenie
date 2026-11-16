@@ -6,11 +6,13 @@ import {
   buildGoogleFlightsUrl,
   buildGoogleMapsDirUrl,
   buildVexereBusUrl,
+  resolveVexereBusPartner,
   calculateFlightDuration,
   calculateFlightFare,
 } from '../../../../config/pricing.config';
 import { INJECT_TOKENS } from '../../../../common/constants/inject-tokens';
 import { OptionalJwtAuthGuard } from '../../../../common/guards/optional-jwt-auth.guard';
+import { JwtAuthGuard } from '../../../../common/guards/jwt-auth.guard';
 import { PrismaService } from '../../../../database/prisma.service';
 import { TransitModeEnum } from '../../dto/generate-itinerary.dto';
 import { ItinerariesController } from '../../itineraries.controller';
@@ -157,13 +159,19 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
   // =========================================================================
   describe('1. Pure Domain Helpers & URL Builders', () => {
     it('computeHaversineDistance calculates accurate great-circle distance (Đà Lạt center to Liên Khương ~23km)', () => {
-      const dist = computeHaversineDistance(11.9404, 108.4583, 11.7506, 108.3736);
+      const dist = computeHaversineDistance(
+        11.9404,
+        108.4583,
+        11.7506,
+        108.3736,
+      );
       expect(Math.round(dist)).toBeGreaterThanOrEqual(22);
       expect(Math.round(dist)).toBeLessThanOrEqual(25);
     });
 
     it('isDirectCityHub satisfies both Tier 1 (areaId match for international >45km) and Tier 2 (<=45km satellite)', () => {
-      const limitKm = PRICING_CONFIG.INTERCITY.TRANSFER.LOCAL_HUB_MAX_DISTANCE_KM;
+      const limitKm =
+        PRICING_CONFIG.INTERCITY.TRANSFER.LOCAL_HUB_MAX_DISTANCE_KM;
 
       // International airport 60km away with matching areaId (e.g. Tokyo Narita NRT) -> Direct Local Hub
       const naritaHub: TransitHubDto = {
@@ -195,18 +203,26 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
     it('computeLocalTransfer clamps urban minimum distance and falls back cleanly when distance is 0/undefined', () => {
       // Urban airport 2km from center -> clamped to MIN_LOCAL_TRANSFER_KM (4km) and MIN_LOCAL_TRANSFER_MINUTES (15p)
       const near = computeLocalTransfer(2);
-      expect(near.transferKm).toBe(PRICING_CONFIG.INTERCITY.TRANSFER.MIN_LOCAL_TRANSFER_KM);
-      expect(near.transferMinutes).toBe(PRICING_CONFIG.INTERCITY.TRANSFER.MIN_LOCAL_TRANSFER_MINUTES);
+      expect(near.transferKm).toBe(
+        PRICING_CONFIG.INTERCITY.TRANSFER.MIN_LOCAL_TRANSFER_KM,
+      );
+      expect(near.transferMinutes).toBe(
+        PRICING_CONFIG.INTERCITY.TRANSFER.MIN_LOCAL_TRANSFER_MINUTES,
+      );
 
       // Missing/0 distance -> falls back to DEFAULT_AIRPORT_TRANSFER_KM (12km)
       const fallback = computeLocalTransfer(0);
-      expect(fallback.transferKm).toBe(PRICING_CONFIG.INTERCITY.TRANSFER.DEFAULT_AIRPORT_TRANSFER_KM);
+      expect(fallback.transferKm).toBe(
+        PRICING_CONFIG.INTERCITY.TRANSFER.DEFAULT_AIRPORT_TRANSFER_KM,
+      );
 
       // Liên Khương 28km -> keeps 28km and computes realistic minutes (~36p)
       const dalat = computeLocalTransfer(28);
       expect(dalat.transferKm).toBe(28);
       expect(dalat.transferMinutes).toBe(
-        Math.round(28 * PRICING_CONFIG.INTERCITY.TRANSFER.LOCAL_TRANSFER_MINS_PER_KM),
+        Math.round(
+          28 * PRICING_CONFIG.INTERCITY.TRANSFER.LOCAL_TRANSFER_MINS_PER_KM,
+        ),
       );
     });
 
@@ -235,7 +251,12 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
         toExternalId: '24',
         departDateVn: '20-10-2026',
       });
-      expect(vexere).toContain('ve-xe-khach-tu-sai-gon-di-da-lat-29t241.html?date=20-10-2026');
+      expect(vexere).toContain(
+        've-xe-khach-tu-sai-gon-di-da-lat-29t241.html?date=20-10-2026',
+      );
+      expect(resolveVexereBusPartner('Đà Lạt')?.slug).toBe('da-lat');
+      expect(resolveVexereBusPartner('Thành phố Vinh')?.slug).toBe('nghe-an');
+      expect(resolveVexereBusPartner('Vĩnh Long')).toBeNull();
     });
 
     it('calculateFlightDuration & calculateFlightFare calculate smooth continuous affine pricing and duration based on air distance (km)', () => {
@@ -259,11 +280,17 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
 
     it('calculateFlightFare applies contextual multipliers dynamically (Budget Tier, Seasonality, Day of Week)', () => {
       // Base: Đà Nẵng (605km) baseFare = 1,224,750
-      const lowBudget = calculateFlightFare({ airDistanceKm: 605, budgetLevel: 'LOW' });
+      const lowBudget = calculateFlightFare({
+        airDistanceKm: 605,
+        budgetLevel: 'LOW',
+      });
       // 1,224,750 * 0.8 = 979,800 -> 980,000
       expect(lowBudget.finalFare).toBe(980_000);
 
-      const highBudget = calculateFlightFare({ airDistanceKm: 605, budgetLevel: 'HIGH' });
+      const highBudget = calculateFlightFare({
+        airDistanceKm: 605,
+        budgetLevel: 'HIGH',
+      });
       // 1,224,750 * 1.7 = 2,082,075 -> 2,080,000
       expect(highBudget.finalFare).toBe(2_080_000);
 
@@ -273,7 +300,9 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
         budgetLevel: 'MEDIUM',
         departDate: '2027-02-05',
       });
-      expect(tetPeak.multipliers.season).toBe(PRICING_CONFIG.INTERCITY.FLIGHT.PEAK_MULTIPLIERS.TET_PEAK);
+      expect(tetPeak.multipliers.season).toBe(
+        PRICING_CONFIG.INTERCITY.FLIGHT.PEAK_MULTIPLIERS.TET_PEAK,
+      );
       expect(tetPeak.finalFare).toBeGreaterThan(1_500_000);
     });
   });
@@ -287,7 +316,9 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
     const busStrategy = new BusTransitStrategy({
       $queryRaw: jest.fn().mockResolvedValue([]),
     } as never);
-    const motorbikeStrategy = new RoadTransitStrategy(TransitModeEnum.PERSONAL_MOTORBIKE);
+    const motorbikeStrategy = new RoadTransitStrategy(
+      TransitModeEnum.PERSONAL_MOTORBIKE,
+    );
     const carStrategy = new RoadTransitStrategy(TransitModeEnum.PERSONAL_CAR);
 
     it('Flight Case 1: Local / Satellite Airport Transfer (TP.HCM -> Đà Lạt via Liên Khương & TP.HCM -> Hội An via Đà Nẵng)', async () => {
@@ -352,7 +383,12 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
     });
 
     it('Flight Case 3: Island Ferry Multi-Modal (Đảo Lý Sơn via Chu Lai + Cảng Sa Kỳ) vs Direct Island Airport (Phú Quốc)', async () => {
-      const saKyPort = findNearestHub(MOCK_HUBS, 'FERRY_TERMINAL', 15.3804, 109.1167);
+      const saKyPort = findNearestHub(
+        MOCK_HUBS,
+        'FERRY_TERMINAL',
+        15.3804,
+        109.1167,
+      );
       const lySonRes = await flightStrategy.calculate({
         originCity: 'TP. Hồ Chí Minh',
         destCity: 'Đảo Lý Sơn',
@@ -386,7 +422,9 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
 
       expect(phuQuocRes.isMultiModal).toBe(false);
       expect(phuQuocRes.destHub?.id).toBe('PQC');
-      expect(phuQuocRes.details.routeSteps?.[1]).toContain('về trung tâm Phú Quốc');
+      expect(phuQuocRes.details.routeSteps?.[1]).toContain(
+        'về trung tâm Phú Quốc',
+      );
     });
 
     it('Flight Case 4: Same-Gateway / Short-Haul Fallback (TP.HCM -> Vũng Tàu shares SGN)', async () => {
@@ -404,7 +442,9 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
 
       expect(vungTauRes.isMultiModal).toBe(true);
       expect(vungTauRes.transferLeg?.type).toBe('BUS');
-      expect(vungTauRes.details.routeSteps?.[0]).toContain('Lưu ý cửa ngõ hàng không');
+      expect(vungTauRes.details.routeSteps?.[0]).toContain(
+        'Lưu ý cửa ngõ hàng không',
+      );
       expect(vungTauRes.deepLinks.googleFlights).toBeUndefined();
       expect(vungTauRes.deepLinks.googleMaps).toBeDefined();
     });
@@ -423,7 +463,9 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
       });
       expect(directTrain.isMultiModal).toBe(false);
       expect(directTrain.destHub?.id).toBe('DNA');
-      expect(directTrain.details.routeSteps?.[1]).toContain('Trung chuyển về khách sạn');
+      expect(directTrain.details.routeSteps?.[1]).toContain(
+        'Trung chuyển về khách sạn',
+      );
 
       // 2. Regional station transfer: Đà Lạt via Ga Tháp Chàm (~68km)
       const dalatTrain = await trainStrategy.calculate({
@@ -442,7 +484,12 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
       expect(dalatTrain.transferLeg?.fromName).toContain('Ga Tháp Chàm');
 
       // 3. Island train + ferry: Hà Nội -> Đảo Lý Sơn (must use Ga Quảng Ngãi & Cảng Sa Kỳ, NOT hardcoded Sài Gòn / Rạch Giá!)
-      const saKyPort = findNearestHub(MOCK_HUBS, 'FERRY_TERMINAL', 15.3804, 109.1167);
+      const saKyPort = findNearestHub(
+        MOCK_HUBS,
+        'FERRY_TERMINAL',
+        15.3804,
+        109.1167,
+      );
       const lySonTrain = await trainStrategy.calculate({
         originCity: 'Hà Nội',
         destCity: 'Đảo Lý Sơn',
@@ -457,12 +504,21 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
       expect(lySonTrain.isMultiModal).toBe(true);
       expect(lySonTrain.transferLeg?.type).toBe('FERRY');
       expect(lySonTrain.transferLeg?.fromName).toBe('Ga Quảng Ngãi');
-      expect(lySonTrain.transferLeg?.title).toContain('Cảng Sa Kỳ (Quảng Ngãi)');
-      expect(lySonTrain.details.routeSteps?.join(' ')).not.toContain('Rạch Giá');
+      expect(lySonTrain.transferLeg?.title).toContain(
+        'Cảng Sa Kỳ (Quảng Ngãi)',
+      );
+      expect(lySonTrain.details.routeSteps?.join(' ')).not.toContain(
+        'Rạch Giá',
+      );
     });
 
     it('BusTransitStrategy & RoadTransitStrategy handle mainland, island ferry, and safety thresholds accurately', async () => {
-      const rachGiaPort = findNearestHub(MOCK_HUBS, 'FERRY_TERMINAL', 10.227, 103.9632);
+      const rachGiaPort = findNearestHub(
+        MOCK_HUBS,
+        'FERRY_TERMINAL',
+        10.227,
+        103.9632,
+      );
 
       // Bus to Phú Quốc
       const busIsland = await busStrategy.calculate({
@@ -478,7 +534,26 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
       });
       expect(busIsland.isMultiModal).toBe(true);
       expect(busIsland.transferLeg?.type).toBe('FERRY');
-      expect(busIsland.transferLeg?.fromName).toBe('Bến tàu Rạch Giá (Kiên Giang)');
+      expect(busIsland.transferLeg?.fromName).toBe(
+        'Bến tàu Rạch Giá (Kiên Giang)',
+      );
+      expect(busIsland.deepLinks.vexere).toBe(
+        'https://vexere.com/vi-VN/ve-xe-khach-tu-sai-gon-di-kien-giang-129t1381.html?date=20-10-2026',
+      );
+
+      const busDalat = await busStrategy.calculate({
+        originCity: 'TP. Hồ Chí Minh',
+        destCity: 'Đà Lạt',
+        departDate: '2026-10-20',
+        originCoords: { lat: 10.7769, lng: 106.7009, areaId: 10 },
+        destCoords: { lat: 11.9404, lng: 108.4583, areaId: 40 },
+        roadDistanceKm: 308,
+        isIsland: false,
+        activeHubs: MOCK_HUBS,
+      });
+      expect(busDalat.deepLinks.vexere).toBe(
+        'https://vexere.com/vi-VN/ve-xe-khach-tu-sai-gon-di-da-lat-129t1371.html?date=20-10-2026',
+      );
 
       // Motorbike > 350km triggers WARNING safetyAdvisory
       const longBike = await motorbikeStrategy.calculate({
@@ -491,7 +566,9 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
         isIsland: false,
       });
       expect(longBike.safetyAdvisory?.level).toBe('WARNING');
-      expect(motorbikeStrategy.summarize(longBike, 960)?.warning).toBe('Chú ý cự ly xa');
+      expect(motorbikeStrategy.summarize(longBike, 960)?.warning).toBe(
+        'Chú ý cự ly xa',
+      );
 
       // Car > 600km triggers INFO safetyAdvisory and computes highway BOT toll
       const longCar = await carStrategy.calculate({
@@ -523,29 +600,48 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
       transitHub: {
         findMany: jest.fn().mockResolvedValue(MOCK_HUBS),
       },
-      $queryRaw: jest.fn().mockImplementation((strings: TemplateStringsArray, ...values: any[]) => {
-        const sql = strings.join(' ');
-        // Mock travel_areas bbox center lookup
-        if (sql.includes('FROM travel_areas') && sql.includes('bbox_min_lat')) {
-          const term = String(values[0] || '').toLowerCase();
-          if (term.includes('hồ chí minh')) {
-            return Promise.resolve([{ lat: 10.7769, lng: 106.7009, area_id: 10 }]);
-          }
-          if (term.includes('đà lạt')) {
-            return Promise.resolve([{ lat: 11.9404, lng: 108.4583, area_id: 40 }]);
-          }
-          if (term.includes('đà nẵng')) {
-            return Promise.resolve([{ lat: 16.0544, lng: 108.2022, area_id: 30 }]);
-          }
-          if (term.includes('sa pa')) {
-            return Promise.resolve([{ lat: 22.3364, lng: 103.8438, area_id: 99 }]);
-          }
-        }
-        return Promise.resolve([]);
-      }),
+      $queryRaw: jest
+        .fn()
+        .mockImplementation(
+          (strings: TemplateStringsArray, ...values: any[]) => {
+            const sql = strings.join(' ');
+            // Mock travel_areas bbox center lookup
+            if (
+              sql.includes('FROM travel_areas') &&
+              sql.includes('bbox_min_lat')
+            ) {
+              const term = String(values[0] || '').toLowerCase();
+              if (term.includes('hồ chí minh')) {
+                return Promise.resolve([
+                  { lat: 10.7769, lng: 106.7009, area_id: 10 },
+                ]);
+              }
+              if (term.includes('đà lạt')) {
+                return Promise.resolve([
+                  { lat: 11.9404, lng: 108.4583, area_id: 40 },
+                ]);
+              }
+              if (term.includes('đà nẵng')) {
+                return Promise.resolve([
+                  { lat: 16.0544, lng: 108.2022, area_id: 30 },
+                ]);
+              }
+              if (term.includes('sa pa')) {
+                return Promise.resolve([
+                  { lat: 22.3364, lng: 103.8438, area_id: 99 },
+                ]);
+              }
+            }
+            return Promise.resolve([]);
+          },
+        ),
       itinerary: {
-        findFirst: jest.fn().mockImplementation(() => Promise.resolve(storedItineraryState)),
-        findUnique: jest.fn().mockImplementation(() => Promise.resolve(storedItineraryState)),
+        findFirst: jest
+          .fn()
+          .mockImplementation(() => Promise.resolve(storedItineraryState)),
+        findUnique: jest
+          .fn()
+          .mockImplementation(() => Promise.resolve(storedItineraryState)),
         update: jest.fn().mockImplementation(({ data }) => {
           storedItineraryState = {
             ...storedItineraryState,
@@ -579,7 +675,11 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
               new RoadTransitStrategy(TransitModeEnum.PERSONAL_MOTORBIKE),
               new RoadTransitStrategy(TransitModeEnum.PERSONAL_CAR),
             ],
-            inject: [FlightTransitStrategy, BusTransitStrategy, TrainTransitStrategy],
+            inject: [
+              FlightTransitStrategy,
+              BusTransitStrategy,
+              TrainTransitStrategy,
+            ],
           },
           TransitService,
           ItineraryAccessService,
@@ -591,13 +691,25 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
       })
         .overrideGuard(OptionalJwtAuthGuard)
         .useValue({ canActivate: () => true })
+        .overrideGuard(JwtAuthGuard)
+        .useValue({
+          canActivate: (context: any) => {
+            const req = context.switchToHttp().getRequest();
+            req.user = { id: 'test-user-id' };
+            return true;
+          },
+        })
+        .overrideGuard(OptionalJwtAuthGuard)
+        .useValue({ canActivate: () => true })
         .compile();
 
       app = moduleFixture.createNestApplication();
       await app.init();
 
       transitService = moduleFixture.get<TransitService>(TransitService);
-      plannerService = moduleFixture.get<ItineraryPlannerService>(ItineraryPlannerService);
+      plannerService = moduleFixture.get<ItineraryPlannerService>(
+        ItineraryPlannerService,
+      );
     });
 
     afterAll(async () => {
@@ -608,7 +720,7 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
       // Seed a legacy itinerary snapshot where destName was saved as airport name and routeSteps was empty
       storedItineraryState = {
         id: mockItineraryId,
-        creatorId: null,
+        creatorId: 'test-user-id',
         title: 'Khám phá Đà Nẵng 3N2Đ',
         destination: 'Đà Nẵng',
         startDate: new Date('2026-10-20T00:00:00.000Z'),
@@ -647,7 +759,9 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
             durationMinutes: 80,
             estimatedPriceOneWay: 1400000,
             estimatedPriceRoundTrip: 2800000,
-            deepLinks: { googleFlights: 'https://www.google.com/travel/flights' },
+            deepLinks: {
+              googleFlights: 'https://www.google.com/travel/flights',
+            },
             safetyAdvisory: null,
             originHub: MOCK_HUBS[0],
             destHub: { ...MOCK_HUBS[2], distanceKm: 5 },
@@ -701,8 +815,12 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
       expect(transit.destName).toBe('Đà Nẵng');
       // Missing routeSteps is populated with 2 steps including local airport-to-downtown transfer
       expect(transit.details.routeSteps).toHaveLength(2);
-      expect(transit.details.routeSteps[1]).toContain('Trung chuyển sân bay về trung tâm');
-      expect(transit.details.routeSteps[1]).toContain('về trung tâm Đà Nẵng (~5km');
+      expect(transit.details.routeSteps[1]).toContain(
+        'Trung chuyển sân bay về trung tâm',
+      );
+      expect(transit.details.routeSteps[1]).toContain(
+        'về trung tâm Đà Nẵng (~5km',
+      );
     });
 
     it('PATCH /itineraries/:id/transit-mode recalculates multi-modal/transfer steps and updates budgetBreakdown in DB', async () => {

@@ -17,7 +17,11 @@ import { ItineraryAccessService } from './services/itinerary-access.service';
 import { TransitService } from './services/transit.service';
 import { CopilotAgentService } from './copilot/copilot-agent.service';
 import { CopilotToolsService } from './copilot/copilot-tools.service';
-import { CopilotChatDto, DirectSwapDto, ApplyProposalDto } from './copilot/copilot.types';
+import {
+  CopilotChatDto,
+  DirectSwapDto,
+  ApplyProposalDto,
+} from './copilot/copilot.types';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '@/common/guards/optional-jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
@@ -28,6 +32,11 @@ import {
   UpdateTransitModeDto,
   UpdateCoverPhotoDto,
   UpdateTourBriefingDto,
+  UpdatePartySizeDto,
+  UpdateItineraryDto,
+  AddDestinationDto,
+  UpdateDestinationDto,
+  MoveDestinationDto,
 } from './dto/generate-itinerary.dto';
 
 @Controller('itineraries')
@@ -48,7 +57,10 @@ export class ItinerariesController {
   @UseGuards(JwtAuthGuard)
   @Post('generate')
   @HttpCode(HttpStatus.CREATED)
-  generate(@Body() dto: GenerateItineraryDto, @CurrentUser('id') userId: string) {
+  generate(
+    @Body() dto: GenerateItineraryDto,
+    @CurrentUser('id') userId: string,
+  ) {
     return this.plannerService.generateItinerary(dto, userId);
   }
 
@@ -60,6 +72,19 @@ export class ItinerariesController {
   @HttpCode(HttpStatus.OK)
   previewTransit(@Body() dto: TransitPreviewDto) {
     return this.transitService.calculateIntercityTransit(dto);
+  }
+
+  /**
+   * Retrieve hybrid weather forecast / seasonal climate breakdown for an itinerary.
+   * GET /api/v1/itineraries/:id/weather
+   */
+  @UseGuards(OptionalJwtAuthGuard)
+  @Get(':id/weather')
+  getWeather(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.plannerService.getWeatherById(id, userId);
   }
 
   /**
@@ -187,7 +212,13 @@ export class ItinerariesController {
     @Body() dto: CopilotChatDto,
     @CurrentUser('id') userId: string,
   ) {
-    return this.copilotAgent.chat(id, dto.message, userId, dto.sessionId, dto.autoApply);
+    return this.copilotAgent.chat(
+      id,
+      dto.message,
+      userId,
+      dto.sessionId,
+      dto.autoApply,
+    );
   }
 
   /**
@@ -202,7 +233,13 @@ export class ItinerariesController {
     @Body() dto: ApplyProposalDto,
     @CurrentUser('id') userId: string,
   ) {
-    return this.copilotAgent.applyProposal(id, dto.toolName, dto.args, userId, dto.proposalId);
+    return this.copilotAgent.applyProposal(
+      id,
+      dto.toolName,
+      dto.args,
+      userId,
+      dto.proposalId,
+    );
   }
 
   /**
@@ -248,7 +285,100 @@ export class ItinerariesController {
     @CurrentUser('id') userId: string,
   ) {
     await this.accessService.assertCanEdit(id, userId);
-    await this.copilotTools.swapActivityDirect(id, destinationId, dto.newPlaceId);
+    await this.copilotTools.swapActivityDirect(
+      id,
+      destinationId,
+      dto.newPlaceId,
+    );
     return this.plannerService.getById(id, userId);
+  }
+
+  /**
+   * Add a destination directly into a specific day without LLM round-trip.
+   * POST /api/v1/itineraries/:id/destinations
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/destinations')
+  @HttpCode(HttpStatus.CREATED)
+  async addDestination(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AddDestinationDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    await this.accessService.assertCanEdit(id, userId);
+    await this.copilotTools.addActivityDirect(id, dto);
+    return this.plannerService.getById(id, userId);
+  }
+
+  /**
+   * Update destination day/time/notes directly without LLM round-trip.
+   * PATCH /api/v1/itineraries/:id/destinations/:destinationId
+   */
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id/destinations/:destinationId')
+  @HttpCode(HttpStatus.OK)
+  async updateDestination(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('destinationId', ParseUUIDPipe) destinationId: string,
+    @Body() dto: UpdateDestinationDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    await this.accessService.assertCanEdit(id, userId);
+    await this.copilotTools.updateActivityDirect(id, destinationId, dto);
+    return this.plannerService.getById(id, userId);
+  }
+
+  /**
+   * Move a destination one slot earlier/later within the same day (swap order + shift time + ripple).
+   * POST /api/v1/itineraries/:id/destinations/:destinationId/move
+   */
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/destinations/:destinationId/move')
+  @HttpCode(HttpStatus.OK)
+  async moveDestination(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('destinationId', ParseUUIDPipe) destinationId: string,
+    @Body() dto: MoveDestinationDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    await this.accessService.assertCanEdit(id, userId);
+    await this.copilotTools.moveActivityDirect(
+      id,
+      destinationId,
+      dto.direction,
+    );
+    return this.plannerService.getById(id, userId);
+  }
+
+  /**
+   * Remove a destination from the itinerary directly without LLM round-trip.
+   * DELETE /api/v1/itineraries/:id/destinations/:destinationId
+   */
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/destinations/:destinationId')
+  @HttpCode(HttpStatus.OK)
+  async removeDestination(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('destinationId', ParseUUIDPipe) destinationId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    await this.accessService.assertCanEdit(id, userId);
+    await this.copilotTools.removeActivityDirect(id, destinationId);
+    return this.plannerService.getById(id, userId);
+  }
+
+  /**
+   * Update trip metadata (title/description for OWNER/EDITOR; partySize for OWNER only).
+   * PATCH /api/v1/itineraries/:id
+   */
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id')
+  @HttpCode(HttpStatus.OK)
+  updateItineraryMeta(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateItineraryDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.plannerService.updateItineraryMeta(id, dto, userId);
   }
 }

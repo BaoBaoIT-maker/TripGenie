@@ -125,7 +125,7 @@ export const PlaceCard = memo(function PlaceCard({
     <div
       onClick={handleCardInteraction}
       className={cn(
-        "group relative flex flex-col overflow-hidden rounded-2xl border bg-white transition-all duration-300 hover:-translate-y-1 hover:shadow-xl cursor-pointer",
+        "group relative flex flex-col overflow-hidden rounded-2xl border bg-white transition-all duration-200 hover:shadow-xl cursor-pointer",
         isSelected
           ? "border-[#0194F3] ring-2 ring-[#0194F3] ring-offset-2 ring-offset-background shadow-lg"
           : "border-slate-200/80 hover:border-slate-300 shadow-2xs",

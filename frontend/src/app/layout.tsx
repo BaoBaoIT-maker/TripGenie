@@ -39,6 +39,7 @@ export default function RootLayout({
   return (
     <html
       lang="vi"
+      data-scroll-behavior="smooth"
       className={`scroll-smooth ${inter.variable} ${geistMono.variable} ${playfair.variable} h-full antialiased`}
     >
       <head>

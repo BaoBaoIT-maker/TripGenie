@@ -60,7 +60,9 @@ describe('CollectionsController', () => {
   });
 
   it('should get user collections', async () => {
-    mockService.getUserCollections.mockResolvedValue([{ id: 'c-1', title: 'Yêu thích' }]);
+    mockService.getUserCollections.mockResolvedValue([
+      { id: 'c-1', title: 'Yêu thích' },
+    ]);
     const res = await controller.getMyCollections(mockUser);
     expect(res.collections).toHaveLength(1);
     expect(mockService.getUserCollections).toHaveBeenCalledWith('user-123');
@@ -81,21 +83,31 @@ describe('CollectionsController', () => {
     });
     const res = await controller.togglePlace(mockUser, { placeId: 'p-1' });
     expect(res.isSaved).toBe(true);
-    expect(mockService.togglePlace).toHaveBeenCalledWith('user-123', { placeId: 'p-1' });
+    expect(mockService.togglePlace).toHaveBeenCalledWith('user-123', {
+      placeId: 'p-1',
+    });
   });
 
   it('should get collection detail', async () => {
-    mockService.getCollectionDetail.mockResolvedValue({ id: 'c-1', title: 'Yêu thích' });
+    mockService.getCollectionDetail.mockResolvedValue({
+      id: 'c-1',
+      title: 'Yêu thích',
+    });
     const res = await controller.getCollectionDetail('c-1', 'user-123');
     expect(res.collection.title).toBe('Yêu thích');
-    expect(mockService.getCollectionDetail).toHaveBeenCalledWith('user-123', 'c-1');
+    expect(mockService.getCollectionDetail).toHaveBeenCalledWith(
+      'user-123',
+      'c-1',
+    );
   });
 
   it('should get collections containing place', async () => {
     mockService.getCollectionsContainingPlace.mockResolvedValue(['c-1', 'c-2']);
     const res = await controller.getCollectionsContainingPlace(mockUser, 'p-1');
     expect(res.collectionIds).toEqual(['c-1', 'c-2']);
-    expect(mockService.getCollectionsContainingPlace).toHaveBeenCalledWith('user-123', 'p-1');
+    expect(mockService.getCollectionsContainingPlace).toHaveBeenCalledWith(
+      'user-123',
+      'p-1',
+    );
   });
 });
-

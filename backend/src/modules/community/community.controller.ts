@@ -157,7 +157,11 @@ export class CommunityController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id', ParseUUIDPipe) id: string,
   ) {
-    const result = await this.communityService.deletePost(user.id, user.role, id);
+    const result = await this.communityService.deletePost(
+      user.id,
+      user.role,
+      id,
+    );
     return {
       message: 'Đã xóa bài viết',
       ...result,
@@ -211,7 +215,10 @@ export class CommunityController {
     @Param('id', ParseUUIDPipe) id: string,
     @Param('commentId', ParseUUIDPipe) commentId: string,
   ) {
-    const context = await this.communityService.getCommentContext(id, commentId);
+    const context = await this.communityService.getCommentContext(
+      id,
+      commentId,
+    );
     return {
       message: 'Lấy thông tin ngữ cảnh bình luận thành công',
       ...context,

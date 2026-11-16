@@ -8,7 +8,9 @@ describe('GoogleStrategy', () => {
 
   beforeEach(() => {
     mockConfigService = {
-      get: jest.fn().mockImplementation((key: string, defaultValue?: any) => defaultValue),
+      get: jest
+        .fn()
+        .mockImplementation((key: string, defaultValue?: any) => defaultValue),
     };
     strategy = new GoogleStrategy(mockConfigService as ConfigService);
   });
@@ -25,7 +27,10 @@ describe('GoogleStrategy', () => {
     const done = jest.fn();
     await strategy.validate('access', 'refresh', mockProfile as any, done);
 
-    expect(done).toHaveBeenCalledWith(expect.any(UnauthorizedException), undefined);
+    expect(done).toHaveBeenCalledWith(
+      expect.any(UnauthorizedException),
+      undefined,
+    );
   });
 
   it('chấp nhận tài khoản Google nếu email đã được xác minh', async () => {

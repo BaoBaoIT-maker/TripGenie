@@ -1,182 +1,332 @@
 'use client';
 
-import { formatVnd } from '../../model/itinerary-format';
-import type { BudgetBreakdown } from '@/types/itinerary';
-import {
-  Ticket,
-  UtensilsCrossed,
-  BedDouble,
-  Car,
-  Plane,
-  Info,
-} from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { formatVnd, isDiningActivity } from '../../model/itinerary-format';
+import { BUDGET_BUFFER_RATIO, PARTY_SIZE_BOUNDS } from '../../constants/itinerary.constants';
+import type { BudgetBreakdown, ItineraryActivity, ItineraryDay } from '@/types/itinerary';
 
 interface Props {
   breakdown: BudgetBreakdown;
+  days?: ItineraryDay[];
   transitModeName?: string;
   totalDays?: number;
+  isOwner?: boolean;
+  isUpdatingPartySize?: boolean;
+  onUpdatePartySize?: (nextSize: number) => void;
+  onJumpToStop?: (placeId: string) => void;
+}
+
+interface ExpandableStopItem {
+  dayNumber: number;
+  activity: ItineraryActivity;
+}
+
+interface LedgerRowConfig {
+  id: 'transit' | 'hotel' | 'food' | 'tickets' | 'local';
+  iconClass: string;
+  title: string;
+  subtitle: string;
+  amount: number;
+  stops?: ExpandableStopItem[];
 }
 
 export default function BudgetBreakdownCard({
   breakdown,
+  days = [],
   transitModeName,
   totalDays = 3,
+  isOwner = false,
+  isUpdatingPartySize = false,
+  onUpdatePartySize,
+  onJumpToStop,
 }: Props) {
-  const nights = Math.max(1, totalDays - 1);
-  const total = Math.max(1, breakdown.totalEstimated);
+  const [expandedRow, setExpandedRow] = useState<'food' | 'tickets' | null>(null);
 
-  // Compute percentages for the 5-segment bar
-  const pTransit = Math.round((breakdown.transitRoundTrip / total) * 100);
-  const pHotel = Math.round((breakdown.accommodation / total) * 100);
-  const pFood = Math.round((breakdown.food / total) * 100);
-  const pTickets = Math.round((breakdown.tickets / total) * 100);
-  const pLocal = Math.max(1, 100 - (pTransit + pHotel + pFood + pTickets));
+  const nights = Math.max(1, totalDays - 1);
+  const partySize = Math.max(PARTY_SIZE_BOUNDS.MIN, breakdown.partySize ?? PARTY_SIZE_BOUNDS.DEFAULT);
+  const roomsNeeded = Math.max(1, Math.ceil(partySize / 2));
+  const total = Math.max(1, breakdown.totalEstimated);
+  const perPerson = breakdown.perPersonEstimated ?? Math.round(breakdown.totalEstimated / partySize);
+  const contingencyAmount = Math.round(breakdown.totalEstimated * BUDGET_BUFFER_RATIO);
+  const recommendedTotal = breakdown.totalEstimated + contingencyAmount;
+
+  const { foodStops, ticketStops } = useMemo(() => {
+    const food: ExpandableStopItem[] = [];
+    const tickets: ExpandableStopItem[] = [];
+
+    for (const day of days) {
+      for (const activity of day.activities) {
+        if (activity.estimatedCost == null || activity.estimatedCost <= 0) continue;
+        if (isDiningActivity(activity.categoryName, activity.placeName)) {
+          food.push({ dayNumber: day.dayNumber, activity });
+        } else {
+          tickets.push({ dayNumber: day.dayNumber, activity });
+        }
+      }
+    }
+
+    return { foodStops: food, ticketStops: tickets };
+  }, [days]);
+
+  const rows: LedgerRowConfig[] = [
+    {
+      id: 'transit',
+      iconClass: 'fa-solid fa-plane',
+      title: `Vé ${transitModeName?.toLowerCase() || 'di chuyển'} khứ hồi`,
+      subtitle:
+        partySize > 1
+          ? `Ước tính cho ${partySize} hành khách theo chặng liên tỉnh`
+          : 'Cước phí vé khứ hồi theo tuyến đường và thời điểm dự kiến',
+      amount: breakdown.transitRoundTrip,
+    },
+    {
+      id: 'hotel',
+      iconClass: 'fa-solid fa-bed',
+      title: `Lưu trú khách sạn (${nights} đêm · ${roomsNeeded} phòng)`,
+      subtitle: 'Phân bổ theo số lượng phòng đôi và hạng sao ngân sách',
+      amount: breakdown.accommodation,
+    },
+    {
+      id: 'food',
+      iconClass: 'fa-solid fa-utensils',
+      title: `Ẩm thực & Đặc sản (${totalDays} ngày)`,
+      subtitle: 'Theo khoảng giá tham khảo các quán ăn và cafe trong lịch trình',
+      amount: breakdown.food,
+      stops: foodStops,
+    },
+    {
+      id: 'tickets',
+      iconClass: 'fa-solid fa-ticket',
+      title: 'Vé tham quan & Trải nghiệm',
+      subtitle: 'Tổng giá vé niêm yết tại các điểm có thu phí (điểm miễn phí tính 0đ)',
+      amount: breakdown.tickets,
+      stops: ticketStops,
+    },
+    {
+      id: 'local',
+      iconClass: 'fa-solid fa-car',
+      title: `Di chuyển nội thành (${totalDays} ngày)`,
+      subtitle: 'Thuê xe hoặc gọi xe nội đô di chuyển giữa các điểm dừng',
+      amount: breakdown.localTransit,
+    },
+  ];
+
+  const handleStepPartySize = (delta: number) => {
+    if (!onUpdatePartySize || isUpdatingPartySize) return;
+    const next = Math.min(PARTY_SIZE_BOUNDS.MAX, Math.max(PARTY_SIZE_BOUNDS.MIN, partySize + delta));
+    if (next !== partySize) {
+      onUpdatePartySize(next);
+    }
+  };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4 shadow-xs">
-      {/* Header with Total Estimated */}
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h4 className="text-xs font-bold uppercase tracking-wider text-slate-900">
-            Dự toán chi phí 5 khoản
-          </h4>
-          <p className="text-[11px] text-slate-500 mt-0.5">Ước lượng minh bạch từ dữ liệu địa điểm thực tế</p>
-        </div>
-        <span className="text-sm font-extrabold text-sky-900 bg-sky-50 border border-sky-200/80 px-3 py-1 rounded-full shadow-2xs">
-          ~{formatVnd(breakdown.totalEstimated)} / người
-        </span>
-      </div>
-
-      {/* Multi-colored Progress Bar (Matches Figma Prompt Screen 2 Item 3) */}
-      <div className="space-y-1.5">
-        <div className="w-full h-3 rounded-full overflow-hidden flex bg-slate-100 shadow-2xs">
-          <div
-            style={{ width: `${pTransit}%` }}
-            className="bg-[#0068B8] transition-all duration-500"
-            title={`Vé di chuyển: ${pTransit}%`}
-          />
-          <div
-            style={{ width: `${pHotel}%` }}
-            className="bg-indigo-600 transition-all duration-500"
-            title={`Khách sạn: ${pHotel}%`}
-          />
-          <div
-            style={{ width: `${pFood}%` }}
-            className="bg-amber-500 transition-all duration-500"
-            title={`Ăn uống: ${pFood}%`}
-          />
-          <div
-            style={{ width: `${pTickets}%` }}
-            className="bg-rose-500 transition-all duration-500"
-            title={`Vé tham quan: ${pTickets}%`}
-          />
-          <div
-            style={{ width: `${pLocal}%` }}
-            className="bg-emerald-500 transition-all duration-500"
-            title={`Đi lại nội thành: ${pLocal}%`}
-          />
-        </div>
-
-        {/* Legend */}
-        <div className="flex items-center justify-between text-[11px] text-slate-500 flex-wrap gap-x-3 gap-y-1 pt-0.5">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-[#0068B8]" />
-            Di chuyển ({pTransit}%)
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-indigo-600" />
-            Khách sạn ({pHotel}%)
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-amber-500" />
-            Ăn uống ({pFood}%)
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-rose-500" />
-            Vé ({pTickets}%)
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-emerald-500" />
-            Nội thành ({pLocal}%)
-          </span>
-        </div>
-      </div>
-
-      {/* Detailed 5-Row Cost List */}
-      <div className="divide-y divide-slate-100 text-xs pt-1">
-        <div className="py-2.5 flex items-start justify-between gap-2">
-          <div className="space-y-0.5">
-            <span className="text-slate-800 font-medium flex items-center gap-2">
-              <span className="size-2 rounded-full bg-[#0068B8] shrink-0" />
-              1. Vé {transitModeName || 'di chuyển'} khứ hồi
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      {/* Left: Clean Monochrome Ledger */}
+      <section
+        aria-label="Bảng kê chi phí chi tiết"
+        className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 overflow-hidden"
+      >
+        <div className="p-5 sm:p-6 border-b border-slate-100 flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+              Tổng dự toán {partySize > 1 ? `cho ${partySize} người` : 'toàn chuyến đi'}
             </span>
-            <p className="text-[11px] text-slate-500 pl-4">Cước phí vé theo chặng và ngày khởi hành</p>
+            <div className="text-2xl sm:text-3xl font-bold text-slate-900 tabular-nums tracking-tight">
+              ~{formatVnd(breakdown.totalEstimated)}
+            </div>
+            <p className="text-xs text-slate-500 tabular-nums">
+              Bình quân ~<strong className="text-slate-900 font-semibold">{formatVnd(perPerson)}</strong>/người
+              {' · '}
+              {roomsNeeded} phòng lưu trú
+            </p>
           </div>
-          <span className="font-bold text-slate-900 shrink-0">
-            {formatVnd(breakdown.transitRoundTrip)}
-          </span>
-        </div>
 
-        <div className="py-2.5 flex items-start justify-between gap-2">
-          <div className="space-y-0.5">
-            <span className="text-slate-800 font-medium flex items-center gap-2">
-              <span className="size-2 rounded-full bg-indigo-600 shrink-0" />
-              2. Lưu trú khách sạn ({nights} đêm)
+          {isOwner && onUpdatePartySize ? (
+            <div className="flex flex-col items-end gap-1">
+              <span className="text-[11px] font-semibold text-slate-500">Quy mô tính giá</span>
+              <div className="inline-flex items-center rounded-xl border border-slate-200 bg-slate-50 p-0.5">
+                <button
+                  type="button"
+                  aria-label="Giảm số người"
+                  disabled={isUpdatingPartySize || partySize <= PARTY_SIZE_BOUNDS.MIN}
+                  onClick={() => handleStepPartySize(-1)}
+                  className="size-8 rounded-lg bg-white hover:bg-[#F0F7FF] text-[#10243A] hover:text-[#0194F3] flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40"
+                >
+                  <i className="fa-solid fa-minus text-[10px]" aria-hidden="true" />
+                </button>
+                <span className="px-3 text-xs font-bold text-[#10243A] tabular-nums min-w-[64px] text-center">
+                  {partySize} người
+                </span>
+                <button
+                  type="button"
+                  aria-label="Tăng số người"
+                  disabled={isUpdatingPartySize || partySize >= PARTY_SIZE_BOUNDS.MAX}
+                  onClick={() => handleStepPartySize(1)}
+                  className="size-8 rounded-lg bg-white hover:bg-[#F0F7FF] text-[#10243A] hover:text-[#0194F3] flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40"
+                >
+                  <i className="fa-solid fa-plus text-[10px]" aria-hidden="true" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <span className="px-3 py-1.5 rounded-xl bg-[#F5F9FF] border border-[#D0E7FF] text-xs font-bold text-[#0194F3] tabular-nums">
+              {partySize} người · {roomsNeeded} phòng
             </span>
-            <p className="text-[11px] text-slate-500 pl-4">Đơn giá phòng theo tiêu chuẩn sao đã tính hệ số vùng</p>
-          </div>
-          <span className="font-bold text-slate-900 shrink-0">
-            {formatVnd(breakdown.accommodation)}
-          </span>
+          )}
         </div>
 
-        <div className="py-2.5 flex items-start justify-between gap-2">
-          <div className="space-y-0.5">
-            <span className="text-slate-800 font-medium flex items-center gap-2">
-              <span className="size-2 rounded-full bg-emerald-500 shrink-0" />
-              3. Di chuyển nội địa ({totalDays} ngày)
+        {/* 5 Monochrome Pricing Rows */}
+        <div className="divide-y divide-slate-100">
+          {rows.map((row) => {
+            const pct = Math.round((row.amount / total) * 100);
+            const isExpandable = (row.id === 'food' || row.id === 'tickets') && (row.stops?.length ?? 0) > 0;
+            const isExpanded = expandedRow === row.id;
+
+            return (
+              <div key={row.id} className="px-5 sm:px-6 py-4 space-y-2.5">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3 min-w-0">
+                    <div className="size-9 rounded-xl bg-slate-100 text-[#10243A] flex items-center justify-center shrink-0 mt-0.5">
+                      <i className={`${row.iconClass} text-xs`} aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0 space-y-0.5">
+                      <div className="text-xs sm:text-[13px] font-bold text-[#10243A]">
+                        {row.title}
+                      </div>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">{row.subtitle}</p>
+                      {isExpandable && (
+                        <button
+                          type="button"
+                          aria-expanded={isExpanded}
+                          onClick={() =>
+                            setExpandedRow((curr) =>
+                              curr === row.id ? null : (row.id as 'food' | 'tickets'),
+                            )
+                          }
+                          className="mt-1 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#0194F3] hover:underline cursor-pointer"
+                        >
+                          <span className="tabular-nums">
+                            {isExpanded
+                              ? 'Ẩn chi tiết từng điểm'
+                              : `Xem ${row.stops!.length} điểm tính phí`}
+                          </span>
+                          <i
+                            className={`fa-solid fa-chevron-down text-[9px] transition-transform ${
+                              isExpanded ? 'rotate-180' : ''
+                            }`}
+                            aria-hidden="true"
+                          />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="text-right shrink-0 space-y-0.5">
+                    <div className="text-xs sm:text-sm font-bold text-[#10243A] tabular-nums">
+                      {formatVnd(row.amount)}
+                    </div>
+                    <div className="text-[11px] font-medium text-slate-400 tabular-nums">{pct}% tổng</div>
+                  </div>
+                </div>
+
+                {/* Single subtle monochrome proportion bar */}
+                <div className="pl-12">
+                  <div className="w-full h-1 rounded-full bg-slate-100 overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-[#0194F3]/75 transition-all duration-300"
+                      style={{ width: `${Math.max(2, pct)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Accordion Traceability Stops */}
+                {isExpandable && isExpanded && row.stops && (
+                  <div className="ml-12 mt-2 rounded-xl border border-slate-200/80 bg-slate-50/70 divide-y divide-slate-200/60 overflow-hidden">
+                    {row.stops.map(({ dayNumber, activity }, idx) => (
+                      <button
+                        key={`${activity.id || activity.placeId}-${idx}`}
+                        type="button"
+                        onClick={() => onJumpToStop?.(activity.placeId)}
+                        className="w-full px-3.5 py-2.5 flex items-center justify-between gap-3 text-left hover:bg-[#F0F7FF] transition-colors cursor-pointer group"
+                      >
+                        <div className="min-w-0">
+                          <div className="text-xs font-semibold text-[#10243A] group-hover:text-[#0194F3] truncate">
+                            {activity.placeName}
+                          </div>
+                          <div className="text-[10px] text-slate-500 tabular-nums">
+                            Ngày {dayNumber}
+                            {activity.startTime ? ` · ${activity.startTime}` : ''}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs font-bold text-[#10243A] tabular-nums">
+                            ~{formatVnd(activity.estimatedCost ?? 0)}/người
+                          </span>
+                          {onJumpToStop && (
+                            <i
+                              className="fa-solid fa-arrow-right text-[10px] text-slate-400 group-hover:text-[#0194F3]"
+                              aria-hidden="true"
+                            />
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Right: Split Summary & Contingency Reserve */}
+      <aside className="lg:col-span-5 space-y-4">
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
+          <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
+            <i className="fa-solid fa-receipt text-[#0194F3]" aria-hidden="true" />
+            <span>Tóm tắt chia tiền &amp; Dự phòng</span>
+          </h3>
+
+          <div className="divide-y divide-slate-100 text-xs">
+            <div className="py-2.5 flex items-center justify-between gap-2">
+              <span className="text-slate-600">Ước tính cơ bản ({partySize} người)</span>
+              <span className="font-semibold text-slate-900 tabular-nums">
+                {formatVnd(breakdown.totalEstimated)}
+              </span>
+            </div>
+
+            <div className="py-2.5 flex items-center justify-between gap-2">
+              <span className="text-slate-600">Chia đều mỗi thành viên</span>
+              <span className="font-bold text-[#0194F3] tabular-nums">
+                ~{formatVnd(perPerson)}/người
+              </span>
+            </div>
+
+            <div className="py-2.5 flex items-center justify-between gap-2">
+              <span className="text-slate-600 tabular-nums">
+                Quỹ dự phòng phát sinh (+{Math.round(BUDGET_BUFFER_RATIO * 100)}%)
+              </span>
+              <span className="font-semibold text-slate-700 tabular-nums">
+                +{formatVnd(contingencyAmount)}
+              </span>
+            </div>
+
+            <div className="pt-3 flex items-center justify-between gap-2">
+              <span className="font-semibold text-slate-900">Mức chuẩn bị khuyến nghị</span>
+              <span className="text-base font-bold text-slate-900 tabular-nums">
+                ~{formatVnd(recommendedTotal)}
+              </span>
+            </div>
+          </div>
+
+          <div className="rounded-xl bg-[#F5F9FF] border border-[#D0E7FF] p-3.5 text-[11px] text-slate-600 flex items-start gap-2.5 leading-relaxed">
+            <i className="fa-solid fa-circle-info text-[#0194F3] shrink-0 mt-0.5" aria-hidden="true" />
+            <span>
+              Ngân sách được tính tự động từ thông tin lưu trú, vé tham quan niêm yết và mặt bằng ẩm thực tại điểm dừng. Con số bình quân tự động cập nhật ngay khi bạn điều chỉnh số người hoặc phương tiện di chuyển.
             </span>
-            <p className="text-[11px] text-slate-500 pl-4">Thuê xe máy / Taxi nội thành kèm phụ cấp xăng xe</p>
           </div>
-          <span className="font-bold text-slate-900 shrink-0">
-            {formatVnd(breakdown.localTransit)}
-          </span>
         </div>
-
-        <div className="py-2.5 flex items-start justify-between gap-2">
-          <div className="space-y-0.5">
-            <span className="text-slate-800 font-medium flex items-center gap-2">
-              <span className="size-2 rounded-full bg-rose-500 shrink-0" />
-              4. Vé tham quan danh lam thắng cảnh
-            </span>
-            <p className="text-[11px] text-slate-500 pl-4">Tổng giá vé niêm yết của các điểm đến trong lịch (điểm miễn phí: 0đ)</p>
-          </div>
-          <span className="font-bold text-slate-900 shrink-0">
-            {formatVnd(breakdown.tickets)}
-          </span>
-        </div>
-
-        <div className="py-2.5 flex items-start justify-between gap-2">
-          <div className="space-y-0.5">
-            <span className="text-slate-800 font-medium flex items-center gap-2">
-              <span className="size-2 rounded-full bg-amber-500 shrink-0" />
-              5. Ẩm thực & Cafe địa phương ({totalDays} ngày)
-            </span>
-            <p className="text-[11px] text-slate-500 pl-4">Tính theo khoảng giá thực đơn các quán ăn/cafe được xếp lịch</p>
-          </div>
-          <span className="font-bold text-slate-900 shrink-0">
-            {formatVnd(breakdown.food)}
-          </span>
-        </div>
-      </div>
-
-      {/* Advisory Note */}
-      <div className="rounded-xl bg-slate-50 border border-slate-200/80 p-3 text-[11px] text-slate-600 flex items-start gap-2 leading-relaxed">
-        <Info className="size-3.5 text-[#0194F3] shrink-0 mt-0.5" aria-hidden="true" />
-        <span>
-          <strong>Lưu ý:</strong> Ngân sách được tính tự động từ dữ liệu giá cào được của từng địa điểm. Khuyến nghị dự phòng 10-15% cho mua sắm quà lưu niệm hoặc chi tiêu phát sinh theo mùa du lịch.
-        </span>
-      </div>
+      </aside>
     </div>
   );
 }

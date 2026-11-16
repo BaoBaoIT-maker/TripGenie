@@ -62,7 +62,9 @@ describe('PlacesService', () => {
     };
 
     const mockEmbedding: jest.Mocked<IEmbeddingService> = {
-      generateEmbedding: jest.fn().mockResolvedValue(new Array(1536).fill(0.01)),
+      generateEmbedding: jest
+        .fn()
+        .mockResolvedValue(new Array(1536).fill(0.01)),
       getModelName: jest.fn().mockReturnValue('models/gemini-embedding-2'),
     };
 
@@ -186,7 +188,9 @@ describe('PlacesService', () => {
         total: 1,
       });
 
-      const result = await service.searchPlaces({ keyword: 'quán cafe ở Đà Nẵng' });
+      const result = await service.searchPlaces({
+        keyword: 'quán cafe ở Đà Nẵng',
+      });
 
       expect(repository.findAreaByName).toHaveBeenCalledWith('Đà Nẵng');
       expect(repository.searchPlaces).toHaveBeenCalledWith(
@@ -208,7 +212,7 @@ describe('PlacesService', () => {
       const result = await service.searchPlaces({
         keyword: 'quán cafe quanh đây',
         lat: 10.776,
-        lng: 106.700,
+        lng: 106.7,
         radiusMeters: 5000,
       });
 
@@ -251,7 +255,9 @@ describe('PlacesService', () => {
         minSimilarity: 0.5,
       });
 
-      expect(embeddingService.generateEmbedding).toHaveBeenCalledWith('quán cafe view biển yên tĩnh');
+      expect(embeddingService.generateEmbedding).toHaveBeenCalledWith(
+        'quán cafe view biển yên tĩnh',
+      );
       expect(repository.searchSemantic).toHaveBeenCalledWith(
         expect.any(Array),
         5,
@@ -275,7 +281,9 @@ describe('PlacesService', () => {
         category: { name: 'Nha hang', nameVi: 'Nhà hàng' },
       };
 
-      repository.findPlacesWithoutEmbedding.mockResolvedValue([mockUnembeddedPlace as never]);
+      repository.findPlacesWithoutEmbedding.mockResolvedValue([
+        mockUnembeddedPlace as never,
+      ]);
 
       const result = await service.syncEmbeddings({ limit: 10, areaId: 1 });
 
@@ -371,9 +379,13 @@ describe('PlacesService', () => {
 
       repository.findById.mockResolvedValue(mockDetailedPlace as never);
 
-      const result = await service.getPlaceById('a0000000-0000-0000-0000-000000000001');
+      const result = await service.getPlaceById(
+        'a0000000-0000-0000-0000-000000000001',
+      );
 
-      expect(repository.findById).toHaveBeenCalledWith('a0000000-0000-0000-0000-000000000001');
+      expect(repository.findById).toHaveBeenCalledWith(
+        'a0000000-0000-0000-0000-000000000001',
+      );
       expect(result.name).toBe('Art Coffee');
       expect(result.images).toHaveLength(1);
       expect(result.sources).toHaveLength(1);

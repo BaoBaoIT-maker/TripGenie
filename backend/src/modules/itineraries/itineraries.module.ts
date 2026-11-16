@@ -4,6 +4,8 @@ import { ItinerariesController } from './itineraries.controller';
 import { TripCompanionsController } from './trip-companions.controller';
 import { TripCompanionsService } from './trip-companions.service';
 import { TripCompanionsRepository } from './trip-companions.repository';
+import { TripProposalsService } from './trip-proposals.service';
+import { TripProposalsController } from './trip-proposals.controller';
 import { ItineraryPlannerService } from './services/itinerary-planner.service';
 import { ItineraryAccessService } from './services/itinerary-access.service';
 import { TransitService } from './services/transit.service';
@@ -19,15 +21,21 @@ import { CopilotSummaryProcessor } from './copilot/copilot-summary.processor';
 import { COPILOT_SUMMARY_QUEUE } from './copilot/copilot.types';
 import { PrismaModule } from '../../database/prisma.module';
 import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
+import { WeatherModule } from '../weather/weather.module';
 
 @Module({
   imports: [
     PrismaModule,
+    WeatherModule,
     BullModule.registerQueue({
       name: COPILOT_SUMMARY_QUEUE,
     }),
   ],
-  controllers: [ItinerariesController, TripCompanionsController],
+  controllers: [
+    ItinerariesController,
+    TripCompanionsController,
+    TripProposalsController,
+  ],
   providers: [
     FlightTransitStrategy,
     BusTransitStrategy,
@@ -49,6 +57,7 @@ import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
     },
     TripCompanionsRepository,
     TripCompanionsService,
+    TripProposalsService,
     ItineraryAccessService,
     ItineraryPlannerService,
     TransitService,
@@ -57,6 +66,15 @@ import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
     CopilotAgentService,
     CopilotSummaryProcessor,
   ],
-  exports: [TripCompanionsService, TripCompanionsRepository, ItineraryAccessService, ItineraryPlannerService, TransitService, CopilotToolsService, CopilotAgentService],
+  exports: [
+    TripCompanionsService,
+    TripCompanionsRepository,
+    TripProposalsService,
+    ItineraryAccessService,
+    ItineraryPlannerService,
+    TransitService,
+    CopilotToolsService,
+    CopilotAgentService,
+  ],
 })
 export class ItinerariesModule {}

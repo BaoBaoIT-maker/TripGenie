@@ -117,7 +117,7 @@ export function EditPostModal({
           <div>
             <h2
               id="edit-post-modal-title"
-              className="text-[15px] font-black text-[#0F172A]"
+              className="text-[15px] font-bold text-slate-900"
             >
               Chỉnh sửa bài chia sẻ
             </h2>

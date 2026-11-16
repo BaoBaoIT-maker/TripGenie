@@ -15,10 +15,7 @@ import {
   ADVISOR_TOOL_NAMES,
   AdvisorToolName,
 } from './advisor.constants';
-import {
-  AdvisorPlaceSummary,
-  ToolExecutionOutcome,
-} from './advisor.types';
+import { AdvisorPlaceSummary, ToolExecutionOutcome } from './advisor.types';
 
 type ToolHandler = (
   args: Record<string, unknown>,

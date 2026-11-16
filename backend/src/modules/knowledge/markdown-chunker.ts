@@ -19,7 +19,9 @@ export interface SemanticChunk {
 
 /** Reads one top-level scalar (`key: "value"`) from a YAML block. Other keys (lists, notes) are ignored. */
 function readYamlScalar(yamlBlock: string, key: string): string | undefined {
-  const match = yamlBlock.match(new RegExp(`^${key}:\\s*["']?(.*?)["']?\\s*$`, 'm'));
+  const match = yamlBlock.match(
+    new RegExp(`^${key}:\\s*["']?(.*?)["']?\\s*$`, 'm'),
+  );
   return match?.[1] || undefined;
 }
 
@@ -47,7 +49,10 @@ export function parseFrontmatter(raw: string): ParsedMarkdownDoc {
  * Pure function: splits markdown body by Heading 2 (##) and Heading 3 (###).
  * Injects hierarchical Breadcrumbs so every chunk is context-aware.
  */
-export function createSemanticChunks(docTitle: string, body: string): SemanticChunk[] {
+export function createSemanticChunks(
+  docTitle: string,
+  body: string,
+): SemanticChunk[] {
   const chunks: SemanticChunk[] = [];
   const lines = body.split(/\r?\n/);
 
@@ -58,7 +63,8 @@ export function createSemanticChunks(docTitle: string, body: string): SemanticCh
   const flushChunk = () => {
     const text = currentLines.join('\n').trim();
     currentLines = [];
-    if (!text || text.length < KNOWLEDGE_CONSTANTS.MIN_CHUNK_CHAR_LENGTH) return;
+    if (!text || text.length < KNOWLEDGE_CONSTANTS.MIN_CHUNK_CHAR_LENGTH)
+      return;
 
     const breadcrumbParts = [docTitle];
     if (currentH2) breadcrumbParts.push(currentH2);
@@ -66,7 +72,10 @@ export function createSemanticChunks(docTitle: string, body: string): SemanticCh
     const breadcrumbs = breadcrumbParts.join(' > ');
 
     // Injected Breadcrumb at the very top of each chunk (also embedded into the vector)
-    chunks.push({ content: `[Ngữ cảnh: ${breadcrumbs}]\n\n${text}`, breadcrumbs });
+    chunks.push({
+      content: `[Ngữ cảnh: ${breadcrumbs}]\n\n${text}`,
+      breadcrumbs,
+    });
   };
 
   for (const line of lines) {

@@ -1,5 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { NotFoundException, ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import {
+  NotFoundException,
+  ForbiddenException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ItineraryAccessService } from './itinerary-access.service';
 import { PrismaService } from '../../../database/prisma.service';
 
@@ -39,7 +43,9 @@ describe('ItineraryAccessService', () => {
   describe('getAccess', () => {
     it('throws NotFoundException if itinerary does not exist', async () => {
       mockPrisma.itinerary.findFirst.mockResolvedValue(null);
-      await expect(service.getAccess('missing-id', 'user-1')).rejects.toThrow(NotFoundException);
+      await expect(service.getAccess('missing-id', 'user-1')).rejects.toThrow(
+        NotFoundException,
+      );
     });
 
     it('identifies owner with full permissions', async () => {
@@ -141,9 +147,9 @@ describe('ItineraryAccessService', () => {
         tripGroup: { members: [] },
       });
 
-      await expect(service.assertCanView('itin-1', 'stranger-id')).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.assertCanView('itin-1', 'stranger-id'),
+      ).rejects.toThrow(ForbiddenException);
     });
   });
 
@@ -154,9 +160,9 @@ describe('ItineraryAccessService', () => {
         tripGroup: { members: [{ role: 'VIEWER' }] },
       });
 
-      await expect(service.assertCanEdit('itin-1', 'viewer-id')).rejects.toThrow(
-        ForbiddenException,
-      );
+      await expect(
+        service.assertCanEdit('itin-1', 'viewer-id'),
+      ).rejects.toThrow(ForbiddenException);
     });
 
     it('passes for EDITOR and OWNER', async () => {
@@ -177,7 +183,9 @@ describe('ItineraryAccessService', () => {
         tripGroup: { members: [{ role: 'EDITOR' }] },
       });
 
-      await expect(service.assertOwner('itin-1', 'editor-id')).rejects.toThrow(ForbiddenException);
+      await expect(service.assertOwner('itin-1', 'editor-id')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('passes for creator/owner', async () => {
@@ -188,6 +196,46 @@ describe('ItineraryAccessService', () => {
 
       const ownerAccess = await service.assertOwner('itin-1', 'owner-id');
       expect(ownerAccess.isOwner).toBe(true);
+    });
+  });
+
+  describe('assertIsGroupMember', () => {
+    it('allows OWNER, EDITOR, and VIEWER group members', async () => {
+      mockPrisma.itinerary.findFirst.mockResolvedValueOnce({
+        ...mockItineraryBase,
+        tripGroup: null,
+      });
+      const ownerAccess = await service.assertIsGroupMember(
+        'itin-1',
+        'owner-id',
+      );
+      expect(ownerAccess.isOwner).toBe(true);
+
+      mockPrisma.itinerary.findFirst.mockResolvedValueOnce({
+        ...mockItineraryBase,
+        tripGroup: { members: [{ role: 'VIEWER' }] },
+      });
+      const viewerAccess = await service.assertIsGroupMember(
+        'itin-1',
+        'viewer-id',
+      );
+      expect(viewerAccess.role).toBe('VIEWER');
+      expect(viewerAccess.canEdit).toBe(false);
+    });
+
+    it('blocks PUBLIC_GUEST and unauthenticated strangers even on public itineraries', async () => {
+      mockPrisma.itinerary.findFirst.mockResolvedValueOnce({
+        ...mockItineraryBase,
+        isPublic: true,
+        tripGroup: { members: [] },
+      });
+      await expect(
+        service.assertIsGroupMember('itin-1', 'stranger-id'),
+      ).rejects.toThrow(ForbiddenException);
+
+      await expect(
+        service.assertIsGroupMember('itin-1', undefined),
+      ).rejects.toThrow(UnauthorizedException);
     });
   });
 });

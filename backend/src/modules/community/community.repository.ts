@@ -8,6 +8,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '@/database/prisma.service';
 import { writeNotification } from '../notifications/notification-writer';
+import { NotificationTargetType } from '../notifications/notifications.constants';
 import {
   COMMUNITY_CONSTANTS,
   FEED_SORT_STRATEGIES,
@@ -569,8 +570,25 @@ export class CommunityRepository implements ICommunityRepository {
         where: { id: postId },
         data: { deletedAt: new Date() },
       });
-      await tx.notification.deleteMany({
+      const comments = await tx.postComment.findMany({
         where: { postId },
+        select: { id: true },
+      });
+      const commentIds = comments.map((c) => c.id);
+
+      await tx.notification.deleteMany({
+        where: {
+          OR: [
+            { targetType: NotificationTargetType.POST, targetId: postId },
+            { postId },
+            ...(commentIds.length > 0
+              ? [
+                  { targetType: NotificationTargetType.COMMENT, targetId: { in: commentIds } },
+                  { commentId: { in: commentIds } },
+                ]
+              : []),
+          ],
+        },
       });
 
       if (post?.itineraryId) {
@@ -662,7 +680,8 @@ export class CommunityRepository implements ICommunityRepository {
           recipientId: post.userId,
           actorId: userId,
           type: NotificationType.POST_LIKED,
-          postId,
+          targetType: NotificationTargetType.POST,
+          targetId: postId,
           eventKey: `post-like:${postId}:${userId}`,
         });
       }
@@ -866,8 +885,8 @@ export class CommunityRepository implements ICommunityRepository {
             recipientId: targetAuthorId,
             actorId: data.userId,
             type: NotificationType.COMMENT_REPLIED,
-            postId: data.postId,
-            commentId: created.id,
+            targetType: NotificationTargetType.COMMENT,
+            targetId: created.id,
             eventKey: `comment-reply:${created.id}`,
           });
         }
@@ -876,8 +895,8 @@ export class CommunityRepository implements ICommunityRepository {
             recipientId: post.userId,
             actorId: data.userId,
             type: NotificationType.POST_COMMENTED,
-            postId: data.postId,
-            commentId: created.id,
+            targetType: NotificationTargetType.COMMENT,
+            targetId: created.id,
             eventKey: `post-comment:${created.id}`,
           });
         }
@@ -887,8 +906,8 @@ export class CommunityRepository implements ICommunityRepository {
             recipientId: post.userId,
             actorId: data.userId,
             type: NotificationType.POST_COMMENTED,
-            postId: data.postId,
-            commentId: created.id,
+            targetType: NotificationTargetType.COMMENT,
+            targetId: created.id,
             eventKey: `post-comment:${created.id}`,
           });
         }
@@ -937,7 +956,10 @@ export class CommunityRepository implements ICommunityRepository {
       if (targetIds.length > 0) {
         await tx.notification.deleteMany({
           where: {
-            commentId: { in: targetIds },
+            OR: [
+              { targetType: NotificationTargetType.COMMENT, targetId: { in: targetIds } },
+              { commentId: { in: targetIds } },
+            ],
           },
         });
       }

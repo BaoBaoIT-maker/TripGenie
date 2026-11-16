@@ -4,6 +4,7 @@ import React, { useMemo } from "react";
 import Link from "next/link";
 import { Heart, MessageSquare, Reply, AlertCircle, Loader2, UserPlus, Check, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
 import type { NotificationFilter, NotificationItem } from "@/types/notification";
 import { formatRelativeTime } from "@/services/community.service";
 import { NOTIFICATION_CONFIG } from "../config/notification.config";
@@ -137,40 +138,43 @@ function NotificationRow({
   };
 
   const renderBadgeIcon = () => {
+    const baseBadge =
+      "absolute -bottom-1 -right-1 z-10 size-5 rounded-full flex items-center justify-center shadow-xs ring-2 ring-white dark:ring-slate-900";
+
     switch (item.type) {
       case "POST_LIKED":
         return (
-          <div className="absolute -bottom-1 -right-1 size-5 rounded-full bg-rose-500 text-white flex items-center justify-center shadow-xs">
+          <div className={cn(baseBadge, "bg-rose-500 text-white")}>
             <Heart className="size-3 fill-white" />
           </div>
         );
       case "POST_COMMENTED":
         return (
-          <div className="absolute -bottom-1 -right-1 size-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xs">
+          <div className={cn(baseBadge, "bg-primary text-primary-foreground")}>
             <MessageSquare className="size-3 fill-current" />
           </div>
         );
       case "COMMENT_REPLIED":
         return (
-          <div className="absolute -bottom-1 -right-1 size-5 rounded-full bg-teal-600 text-white flex items-center justify-center shadow-xs">
+          <div className={cn(baseBadge, "bg-[#0068B8] text-white")}>
             <Reply className="size-3" />
           </div>
         );
       case "TRIP_INVITED":
         return (
-          <div className="absolute -bottom-1 -right-1 size-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-xs">
+          <div className={cn(baseBadge, "bg-primary text-primary-foreground")}>
             <UserPlus className="size-3" />
           </div>
         );
       case "TRIP_INVITATION_ACCEPTED":
         return (
-          <div className="absolute -bottom-1 -right-1 size-5 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+          <div className={cn(baseBadge, "bg-emerald-600 text-white")}>
             <Check className="size-3 stroke-[3]" />
           </div>
         );
       case "TRIP_INVITATION_DECLINED":
         return (
-          <div className="absolute -bottom-1 -right-1 size-5 rounded-full bg-muted-foreground text-background flex items-center justify-center shadow-xs">
+          <div className={cn(baseBadge, "bg-muted-foreground text-background")}>
             <X className="size-3 stroke-[2.5]" />
           </div>
         );
@@ -185,7 +189,7 @@ function NotificationRow({
       onClick={() => onClick(item)}
       className={`group flex items-start gap-3 p-3.5 transition-colors rounded-xl ${
         isUnread
-          ? "bg-primary/5 hover:bg-primary/10"
+          ? "bg-sky-100/75 hover:bg-sky-100 dark:bg-sky-950/50 dark:hover:bg-sky-900/60"
           : "hover:bg-muted/60"
       }`}
     >
@@ -212,7 +216,7 @@ function NotificationRow({
 
       {isUnread && (
         <span
-          className="size-2.5 rounded-full bg-primary shrink-0 mt-2"
+          className="size-2.5 rounded-full bg-[#0194F3] shrink-0 mt-2 shadow-xs"
           aria-label="Chưa đọc"
         />
       )}

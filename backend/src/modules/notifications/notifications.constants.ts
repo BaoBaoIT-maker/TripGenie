@@ -13,3 +13,12 @@ export const NotificationFilter = {
 
 export type NotificationFilter =
   (typeof NotificationFilter)[keyof typeof NotificationFilter];
+
+export const NotificationTargetType = {
+  POST: 'POST',
+  COMMENT: 'COMMENT',
+  TRIP_INVITATION: 'TRIP_INVITATION',
+} as const;
+
+export type NotificationTargetType =
+  (typeof NotificationTargetType)[keyof typeof NotificationTargetType];

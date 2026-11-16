@@ -1,13 +1,15 @@
 import {
   Injectable,
   Inject,
+  Optional,
   NotFoundException,
   ForbiddenException,
   BadRequestException,
   ConflictException,
 } from '@nestjs/common';
-import { UserRole } from '@prisma/client';
+import { PostModerationStatus, UserRole } from '@prisma/client';
 import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
+import { AdminModerationService } from '../admin/admin-moderation.service';
 import {
   COMMUNITY_CONSTANTS,
   CommunitySortMode,
@@ -51,6 +53,8 @@ export class CommunityService {
     private readonly communityRepository: ICommunityRepository,
     @Inject(INJECT_TOKENS.MEDIA_STORAGE_PROVIDER)
     private readonly mediaStorageProvider: IMediaStorageProvider,
+    @Optional()
+    private readonly moderationService?: AdminModerationService,
   ) {}
 
   invalidateSidebarCache(): void {
@@ -270,15 +274,37 @@ export class CommunityService {
     }
 
     const resolvedGroupId = await this.resolveTargetGroupId(dto.groupId);
+    const trimmedCaption = dto.caption?.trim() || null;
+
+    let moderationFields: {
+      moderationStatus?: PostModerationStatus;
+      moderationNote?: string | null;
+      moderatedAt?: Date | null;
+    } = {};
+
+    if (this.moderationService) {
+      const evaluation = await this.moderationService.evaluatePostForCreation({
+        title: trimmedTitle,
+        caption: trimmedCaption,
+        tags: normalizedTags,
+      });
+      moderationFields = {
+        moderationStatus: evaluation.status,
+        moderationNote: evaluation.reason,
+        moderatedAt:
+          evaluation.status === PostModerationStatus.PENDING ? null : new Date(),
+      };
+    }
 
     const created = await this.communityRepository.createPost({
       userId,
       groupId: resolvedGroupId,
       title: trimmedTitle,
-      caption: dto.caption?.trim() || null,
+      caption: trimmedCaption,
       mediaUrls: sanitizedMediaUrls,
       tags: normalizedTags,
       itineraryId: dto.itineraryId ?? null,
+      ...moderationFields,
     });
 
     this.invalidateSidebarCache();
@@ -430,13 +456,27 @@ export class CommunityService {
       throw new BadRequestException('Nội dung bình luận không được để trống');
     }
 
-    return this.communityRepository.createComment({
+    if (this.moderationService) {
+      this.moderationService.assertCommentAllowedSync(trimmed);
+    }
+
+    const result = await this.communityRepository.createComment({
       postId,
       userId,
       content: trimmed,
       replyTargetCommentId: dto.parentId ?? null,
       replyToName: dto.replyToName ?? null,
     });
+
+    if (this.moderationService && result?.comment?.id) {
+      void this.moderationService.moderateCommentAsync(
+        result.comment.id,
+        postId,
+        trimmed,
+      );
+    }
+
+    return result;
   }
 
   async deleteComment(

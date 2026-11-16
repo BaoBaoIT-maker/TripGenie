@@ -513,7 +513,10 @@ export class CommunityRepository implements ICommunityRepository {
           mediaUrls: data.mediaUrls,
           tags: data.tags,
           itineraryId: data.itineraryId ?? null,
-          moderationStatus: PostModerationStatus.APPROVED,
+          moderationStatus:
+            data.moderationStatus ?? PostModerationStatus.APPROVED,
+          moderationNote: data.moderationNote ?? null,
+          moderatedAt: data.moderatedAt ?? null,
         },
         select: { id: true },
       });

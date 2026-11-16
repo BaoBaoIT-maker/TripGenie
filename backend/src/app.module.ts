@@ -17,6 +17,7 @@ import { CollectionsModule } from './modules/collections/collections.module';
 import { CommunityModule } from './modules/community/community.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { WeatherModule } from './modules/weather/weather.module';
+import { AdminModule } from './modules/admin/admin.module';
 import {
   appConfig,
   databaseConfig,
@@ -89,6 +90,7 @@ import { envValidationSchema } from './config/env.validation';
     CommunityModule,
     NotificationsModule,
     WeatherModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

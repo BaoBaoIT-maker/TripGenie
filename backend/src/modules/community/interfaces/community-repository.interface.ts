@@ -125,6 +125,9 @@ export interface CreatePostData {
   mediaUrls: string[];
   tags: string[];
   itineraryId?: string | null;
+  moderationStatus?: PostModerationStatus;
+  moderationNote?: string | null;
+  moderatedAt?: Date | null;
 }
 
 export interface CreateCommentData {

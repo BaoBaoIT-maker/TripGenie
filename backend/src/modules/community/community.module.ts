@@ -7,9 +7,10 @@ import { CommunityService } from './community.service';
 import { CommunityRepository } from './community.repository';
 import { LocalDiskStorageProvider } from './providers/local-disk-storage.provider';
 import { CloudinaryStorageProvider } from './providers/cloudinary-storage.provider';
+import { AdminModule } from '../admin/admin.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, AdminModule],
   controllers: [CommunityController],
   providers: [
     CommunityService,

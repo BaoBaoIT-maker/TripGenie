@@ -45,7 +45,7 @@ async function bootstrap() {
     }),
   );
 
-  // CORS Configuration (credentials: true for HttpOnly cookies, supports loopback equivalence)
+  // CORS Configuration (credentials: true for HttpOnly cookies, supports loopback equivalence and Vercel domains)
   const frontendUrl = configService.getOrThrow<string>('FRONTEND_BASE_URL');
   const allowedOrigins = Array.from(
     new Set([
@@ -55,7 +55,17 @@ async function bootstrap() {
     ]),
   );
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      const isExplicitlyAllowed = allowedOrigins.includes(origin);
+      const isVercelDomain = /^https:\/\/[a-zA-Z0-9_-]+\.vercel\.app$/.test(origin);
+      if (isExplicitlyAllowed || isVercelDomain) {
+        callback(null, true);
+      } else {
+        logger.warn(`Blocked by CORS: ${origin}`);
+        callback(new Error(`Not allowed by CORS: ${origin}`));
+      }
+    },
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
     allowedHeaders: [

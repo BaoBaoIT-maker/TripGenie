@@ -715,6 +715,44 @@ export class AdminModerationService {
       }),
     ]);
 
+    const postTargetIds = Array.from(
+      new Set(
+        rows.filter((r) => r.targetType === 'POST').map((r) => r.targetId),
+      ),
+    );
+    const targetPosts =
+      postTargetIds.length > 0 && this.prisma.communityPost?.findMany
+        ? ((await this.prisma.communityPost.findMany({
+            where: { id: { in: postTargetIds } },
+            select: {
+              id: true,
+              title: true,
+              caption: true,
+              mediaUrls: true,
+              moderationStatus: true,
+              commentCount: true,
+              createdAt: true,
+              user: {
+                select: {
+                  id: true,
+                  fullName: true,
+                  email: true,
+                  username: true,
+                  avatarUrl: true,
+                },
+              },
+              group: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                },
+              },
+            },
+          })) ?? [])
+        : [];
+    const postMap = new Map(targetPosts.map((p) => [p.id, p]));
+
     const items = rows.map((r) => {
       const targetReportCount =
         countMap.get(`${r.targetType}:${r.targetId}`) ?? 1;
@@ -722,6 +760,7 @@ export class AdminModerationService {
         ...r,
         targetReportCount,
         isHighPriorityAlert: targetReportCount >= threshold,
+        targetPost: postMap.get(r.targetId) ?? null,
       };
     });
 

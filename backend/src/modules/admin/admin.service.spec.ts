@@ -564,7 +564,7 @@ describe('AdminService', () => {
         }
       });
 
-      it('should safely soft-delete a non-default group and log audit', async () => {
+      it('should safely soft-delete a non-default group, reassign posts to default group, and log audit', async () => {
         const regularGroupMock = {
           id: 'group-regular-1',
           name: 'Phượt Tây Bắc',
@@ -574,11 +574,24 @@ describe('AdminService', () => {
           deletedAt: null,
         };
 
+        const defaultGroupMock = {
+          id: 'default-group-id',
+          name: 'Cộng đồng chung',
+          isDefault: true,
+          isActive: true,
+          deletedAt: null,
+        };
+
         const mockTx = {
           communityGroup: {
             findUnique: jest.fn().mockResolvedValue(regularGroupMock),
+            findFirst: jest.fn().mockResolvedValue(defaultGroupMock),
             update: jest.fn().mockResolvedValue({}),
           },
+          communityPost: {
+            updateMany: jest.fn().mockResolvedValue({ count: 5 }),
+          },
+          $executeRaw: jest.fn().mockResolvedValue(1),
           auditLog: { create: jest.fn().mockResolvedValue({}) },
         };
         mockPrisma.$transaction.mockImplementation(async (callback) => callback(mockTx));
@@ -590,11 +603,16 @@ describe('AdminService', () => {
         );
 
         expect(result.success).toBe(true);
+        expect(mockTx.communityPost.updateMany).toHaveBeenCalledWith({
+          where: { groupId: 'group-regular-1' },
+          data: { groupId: 'default-group-id' },
+        });
         expect(mockTx.communityGroup.update).toHaveBeenCalledWith({
           where: { id: 'group-regular-1' },
           data: {
             deletedAt: expect.any(Date),
             isActive: false,
+            postCount: 0,
           },
         });
         expect(mockTx.auditLog.create).toHaveBeenCalled();

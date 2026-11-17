@@ -183,6 +183,7 @@ enum ReportTargetType {
   POST
   COMMENT
   USER
+  COMMUNITY_GROUP
 
   @@map("report_target_type_enum")
 }

@@ -108,3 +108,21 @@ export function consumeOAuthReturnUrl(
   }
   return getSafeRedirectUrl(queryNext || stored, fallback);
 }
+
+/**
+ * Resolves the post-login destination based on user role.
+ * Admin accounts are routed directly to `/admin/dashboard` (or a requested `/admin/*` sub-route).
+ */
+export function resolvePostLoginRedirect(
+  role?: string | null,
+  explicitNext?: string | null,
+  defaultFallback = '/',
+): string {
+  if (role === 'ADMIN') {
+    const safeNext = getSafeRedirectUrl(explicitNext, '/admin/dashboard');
+    return safeNext === '/admin' || safeNext.startsWith('/admin/')
+      ? safeNext
+      : '/admin/dashboard';
+  }
+  return getSafeRedirectUrl(explicitNext, defaultFallback);
+}

@@ -25,6 +25,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useAuthModalStore } from "@/features/auth/stores/auth-modal.store";
 import { DEFAULT_AVATAR } from "@/config/avatars";
 import { cn } from "@/lib/utils";
 
@@ -50,6 +51,7 @@ export function MobileNavSheet({ triggerVariant = "light" }: MobileNavSheetProps
   const [open, setOpen] = React.useState(false);
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const openAuthModal = useAuthModalStore((state) => state.openAuthModal);
   const userInitials = getUserInitials(user?.fullName);
 
   const handleLinkClick = () => {
@@ -184,21 +186,27 @@ export function MobileNavSheet({ triggerVariant = "light" }: MobileNavSheetProps
             </div>
           ) : (
             <div className="space-y-2">
-              <Link
-                href="/login"
-                onClick={handleLinkClick}
-                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition-colors"
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  openAuthModal("login");
+                }}
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <LogIn className="size-4" />
                 <span>Đăng nhập</span>
-              </Link>
-              <Link
-                href="/register"
-                onClick={handleLinkClick}
-                className="flex items-center justify-center w-full py-2.5 rounded-xl text-sm font-bold bg-[#0194F3] hover:bg-[#0073D1] text-white shadow-md shadow-blue-500/20 transition-colors"
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  openAuthModal("register");
+                }}
+                className="flex items-center justify-center w-full py-2.5 rounded-xl text-sm font-bold bg-[#0194F3] hover:bg-[#0073D1] text-white shadow-md shadow-blue-500/20 transition-colors cursor-pointer"
               >
                 <span>Bắt đầu miễn phí</span>
-              </Link>
+              </button>
             </div>
           )}
         </div>

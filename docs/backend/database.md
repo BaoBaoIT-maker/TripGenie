@@ -45,8 +45,9 @@ CREATE TYPE audit_action_enum     AS ENUM (
     'TRIGGER_CRAWL', 'CANCEL_CRAWL'
 );
 -- [HIGH] Enum cho content report
-CREATE TYPE report_type_enum      AS ENUM ('SPAM', 'INAPPROPRIATE', 'FALSE_INFO', 'COPYRIGHT', 'OTHER');
-CREATE TYPE report_status_enum    AS ENUM ('PENDING', 'REVIEWING', 'RESOLVED', 'DISMISSED');
+CREATE TYPE report_target_type_enum AS ENUM ('PLACE', 'REVIEW', 'POST', 'COMMENT', 'USER', 'COMMUNITY_GROUP');
+CREATE TYPE report_type_enum        AS ENUM ('SPAM', 'INAPPROPRIATE', 'FALSE_INFO', 'COPYRIGHT', 'OTHER');
+CREATE TYPE report_status_enum      AS ENUM ('PENDING', 'REVIEWING', 'RESOLVED', 'DISMISSED');
 
 -- =============================================================================
 -- 3. PHÂN HỆ QUẢN LÝ NGƯỜI DÙNG & XÁC THỰC (USER & AUTH)
@@ -468,10 +469,7 @@ CREATE TABLE content_reports (
 
     -- Polymorphic target: report có thể nhắm vào post, comment, review, hoặc place
     -- CHECK constraint thay vì FK vì SQL không hỗ trợ polymorphic FK
-    target_type     VARCHAR(50) NOT NULL,
-    CONSTRAINT chk_report_target_type CHECK (
-        target_type IN ('post', 'comment', 'review', 'place')
-    ),
+    target_type     report_target_type_enum NOT NULL,
     target_id       UUID NOT NULL,
 
     report_type     report_type_enum NOT NULL,
@@ -576,8 +574,9 @@ CREATE TABLE audit_logs (
     -- CHECK constraint thay vì FK vì SQL không hỗ trợ polymorphic FK
     target_type   VARCHAR(50) NOT NULL,
     CONSTRAINT chk_audit_target_type CHECK (
-        target_type IN ('place', 'review', 'user', 'crawl_job',
-                        'itinerary', 'community_post', 'post_comment')
+        lower(target_type) IN ('place', 'review', 'user', 'crawl_job',
+                               'itinerary', 'community_post', 'post_comment',
+                               'community_group', 'content_report', 'travel_area', 'system_setting')
     ),
     target_id     UUID,                   -- NULL cho actions không có entity cụ thể
     target_label  TEXT,                   -- Human-readable: "Nhà hàng ABC" (snapshot tên lúc đó)

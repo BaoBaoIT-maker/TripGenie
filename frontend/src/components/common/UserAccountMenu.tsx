@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { User as UserIcon, LogOut } from "lucide-react";
+import { User as UserIcon, LogOut, ShieldCheck } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -77,8 +77,18 @@ export function UserAccountMenu({
         align="end"
         side="bottom"
         sideOffset={8}
-        className="w-44 p-1 shadow-lg border border-border/90 rounded-xl bg-card"
+        className="w-48 p-1 shadow-lg border border-border/90 rounded-xl bg-card"
       >
+        {user.role === "ADMIN" && (
+          <DropdownMenuItem
+            render={<Link href="/admin/dashboard" />}
+            className="group cursor-pointer rounded-lg px-3 py-2 text-sm font-semibold text-[#0194F3] hover:bg-sky-50 focus:bg-sky-50 data-[highlighted]:bg-sky-50 transition-colors flex items-center gap-2.5"
+          >
+            <ShieldCheck className="size-4 text-[#0194F3] transition-colors" />
+            <span>Trang quản trị</span>
+          </DropdownMenuItem>
+        )}
+
         <DropdownMenuItem
           render={<Link href="/profile" />}
           className="group cursor-pointer rounded-lg px-3 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground transition-colors flex items-center gap-2.5"

@@ -6,6 +6,7 @@ import { Send, Trash2, MessageSquare, CornerDownRight, X, Loader2 } from "lucide
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useAuthModalStore } from "@/features/auth/stores/auth-modal.store";
 import {
   usePostComments,
   useCreatePostComment,
@@ -290,12 +291,13 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
       ) : (
         <div className="flex items-center justify-between p-2.5 rounded-xl bg-muted/40 border border-border/60 text-xs text-muted-foreground">
           <span>Đăng nhập để bình luận và trao đổi kinh nghiệm cùng tác giả.</span>
-          <Link
-            href="/login"
-            className="font-semibold text-primary hover:underline shrink-0 ml-2"
+          <button
+            type="button"
+            onClick={() => useAuthModalStore.getState().openAuthModal("login")}
+            className="font-semibold text-primary hover:underline shrink-0 ml-2 cursor-pointer"
           >
             Đăng nhập
-          </Link>
+          </button>
         </div>
       )}
       {/* Confirm Delete Comment Modal */}

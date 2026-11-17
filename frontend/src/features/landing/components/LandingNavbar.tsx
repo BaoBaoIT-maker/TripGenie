@@ -9,6 +9,7 @@ import { NotificationBell } from "@/features/notifications/components/Notificati
 import { UserAccountMenu } from "@/components/common/UserAccountMenu";
 import { Button } from "@/components/ui/button";
 import { MobileNavSheet } from "@/components/common/MobileNavSheet";
+import { useAuthModalStore } from "@/features/auth/stores/auth-modal.store";
 
 const NAV_LINKS = [
   { href: "/explore", label: "Khám phá" },
@@ -18,6 +19,7 @@ const NAV_LINKS = [
 
 export function LandingNavbar() {
   const { user } = useAuth();
+  const openAuthModal = useAuthModalStore((state) => state.openAuthModal);
 
   return (
     <nav className="relative z-40 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-5 grid grid-cols-2 md:grid-cols-[1fr_auto_1fr] items-center">
@@ -86,18 +88,20 @@ export function LandingNavbar() {
           </div>
         ) : (
           <div className="flex items-center gap-2 sm:gap-3">
-            <Link
-              href="/login"
+            <button
+              type="button"
+              onClick={() => openAuthModal("login")}
               className="hidden sm:inline-flex px-4 py-2 text-sm font-bold text-white hover:text-[#38BDF8] transition-colors cursor-pointer drop-shadow-xs"
             >
               Đăng nhập
-            </Link>
-            <Link
-              href="/register"
+            </button>
+            <button
+              type="button"
+              onClick={() => openAuthModal("register")}
               className="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-[#0194F3] hover:bg-[#0084DE] text-white transition-all shadow-lg shadow-blue-500/30 active:scale-[0.98] cursor-pointer"
             >
               Bắt đầu miễn phí
-            </Link>
+            </button>
 
             {/* Mobile Navigation Drawer Trigger */}
             <MobileNavSheet triggerVariant="transparent" />

@@ -7,7 +7,6 @@ import { PrismaModule } from './database/prisma.module';
 import { RedisModule } from './database/redis.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
-import { CrawlerModule } from './modules/crawler/crawler.module';
 import { PlacesModule } from './modules/places/places.module';
 import { GeoModule } from './modules/geo/geo.module';
 import { ItinerariesModule } from './modules/itineraries/itineraries.module';
@@ -24,7 +23,6 @@ import {
   jwtConfig,
   redisConfig,
   aiConfig,
-  crawlerConfig,
   weatherConfig,
 } from './config';
 import { envValidationSchema } from './config/env.validation';
@@ -39,7 +37,6 @@ import { envValidationSchema } from './config/env.validation';
         jwtConfig,
         redisConfig,
         aiConfig,
-        crawlerConfig,
         weatherConfig,
       ],
       validationSchema: envValidationSchema,
@@ -49,17 +46,16 @@ import { envValidationSchema } from './config/env.validation';
       useFactory: (configService: ConfigService) => {
         const redisUrl = configService.get<string>('REDIS_URL');
         if (redisUrl?.startsWith('redis')) {
-          const isLocal =
-            redisUrl.includes('localhost') || redisUrl.includes('127.0.0.1');
           try {
             const parsed = new URL(redisUrl);
+            const isRediss = redisUrl.startsWith('rediss://');
             return {
               connection: {
                 host: parsed.hostname,
                 port: parseInt(parsed.port || '6379', 10),
                 username: parsed.username || undefined,
                 password: parsed.password || undefined,
-                tls: isLocal ? undefined : { rejectUnauthorized: false },
+                tls: isRediss ? { rejectUnauthorized: false } : undefined,
                 maxRetriesPerRequest: null,
               },
             };
@@ -80,7 +76,6 @@ import { envValidationSchema } from './config/env.validation';
     RedisModule,
     AuthModule,
     UsersModule,
-    CrawlerModule,
     PlacesModule,
     GeoModule,
     ItinerariesModule,

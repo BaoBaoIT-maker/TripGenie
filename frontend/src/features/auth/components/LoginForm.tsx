@@ -10,13 +10,14 @@ import { toast } from 'sonner';
 import { loginSchema, LoginFormData } from '../schemas/auth.schema';
 import { useAuth } from '../hooks/use-auth';
 import { GoogleAuthButton } from './GoogleAuthButton';
-import { getSafeRedirectUrl } from '@/lib/safe-redirect';
+import { getSafeRedirectUrl, resolvePostLoginRedirect } from '@/lib/safe-redirect';
 import { ApiClientError } from '@/lib/api-client';
 
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const nextUrl = getSafeRedirectUrl(searchParams.get('next'), '/');
+  const rawNext = searchParams.get('next');
+  const nextUrl = getSafeRedirectUrl(rawNext, '/');
   const errorParam = searchParams.get('error');
 
   const [showPassword, setShowPassword] = React.useState(false);
@@ -54,12 +55,13 @@ export function LoginForm() {
     setFormError(null);
     setIsUnverified(false);
     try {
-      await login({
+      const res = await login({
         identifier: data.identifier,
         password: data.password,
       });
       toast.success('Đăng nhập thành công!');
-      router.push(nextUrl);
+      const targetUrl = resolvePostLoginRedirect(res?.user?.role, rawNext, '/');
+      router.push(targetUrl);
       router.refresh();
     } catch (err: unknown) {
       if (err instanceof ApiClientError && err.code === 'EMAIL_NOT_VERIFIED') {
@@ -205,7 +207,7 @@ export function LoginForm() {
       <p className="text-center text-xs text-muted-foreground pt-2">
         Chưa có tài khoản?{' '}
         <Link
-          href={`/register${nextUrl !== '/explore' ? `?next=${encodeURIComponent(nextUrl)}` : ''}`}
+          href={nextUrl && nextUrl !== '/' && nextUrl !== '/explore' ? `/register?next=${encodeURIComponent(nextUrl)}` : '/register'}
           className="text-primary font-semibold hover:underline"
         >
           Đăng ký tài khoản mới

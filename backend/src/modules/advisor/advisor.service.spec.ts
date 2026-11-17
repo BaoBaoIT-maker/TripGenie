@@ -5,7 +5,6 @@ import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
 import {
   aiConfig,
   appConfig,
-  crawlerConfig,
   databaseConfig,
   jwtConfig,
   redisConfig,
@@ -524,7 +523,6 @@ describe('AdvisorService & AdvisorToolsService (Unit + Integration)', () => {
               jwtConfig,
               redisConfig,
               aiConfig,
-              crawlerConfig,
             ],
           }),
           PrismaModule,

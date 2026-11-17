@@ -34,16 +34,10 @@ import Redis from 'ioredis';
 
         let client: Redis;
         if (redisUrl?.startsWith('redis')) {
-          const isLocal =
-            redisUrl.includes('localhost') || redisUrl.includes('127.0.0.1');
-          const url =
-            !isLocal && redisUrl.startsWith('redis://')
-              ? redisUrl.replace('redis://', 'rediss://')
-              : redisUrl;
-
-          client = new Redis(url, {
+          const isRediss = redisUrl.startsWith('rediss://');
+          client = new Redis(redisUrl, {
             ...commonOptions,
-            tls: isLocal ? undefined : { rejectUnauthorized: false },
+            tls: isRediss ? { rejectUnauthorized: false } : undefined,
           });
         } else {
           client = new Redis({

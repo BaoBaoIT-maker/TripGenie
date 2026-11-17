@@ -50,11 +50,6 @@ export const envValidationSchema = Joi.object({
   CLOUDINARY_API_KEY: Joi.string().optional().allow(''),
   CLOUDINARY_API_SECRET: Joi.string().optional().allow(''),
 
-  // Crawler & External POI APIs
-  OVERPASS_API_URL: Joi.string().optional().allow(''),
-  FOURSQUARE_API_KEY: Joi.string().optional().allow(''),
-  DEDUP_RADIUS_METERS: Joi.number().optional().default(50),
-
   // Weather (Open-Meteo + seasonal fallback)
   WEATHER_API_BASE_URL: Joi.string().uri().optional().allow(''),
   WEATHER_TIMEOUT_MS: Joi.number()

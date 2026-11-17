@@ -17,8 +17,19 @@ export class ApiClientError extends Error {
   }
 }
 
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+const resolveApiBaseUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    return process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+  }
+  const backend =
+    process.env.BACKEND_API_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    'http://localhost:3000';
+  const cleanBase = backend.replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '');
+  return `${cleanBase}/api/v1`;
+};
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 let refreshPromise: Promise<boolean> | null = null;
 
@@ -115,11 +126,14 @@ export async function apiClient<T = unknown>(
     const errorCode = data && typeof data.code === 'string' ? data.code : undefined;
 
     if (data) {
+      if (data.errors !== undefined && data.errors !== null) {
+        errorDetails = data.errors;
+      }
       if (typeof data.message === 'string') {
         errorMessage = data.message;
       } else if (Array.isArray(data.message) && data.message.length > 0) {
         errorMessage = String(data.message[0]);
-        errorDetails = data.message;
+        if (!errorDetails) errorDetails = data.message;
       } else if (data.error) {
         errorMessage = String(data.error);
       }

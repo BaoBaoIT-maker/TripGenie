@@ -3,7 +3,6 @@ import { HeroSection } from "@/features/landing/components/HeroSection";
 import { DestinationsSection } from "@/features/landing/components/DestinationsSection";
 import { CoreFeaturesSection } from "@/features/landing/components/CoreFeaturesSection";
 import { EditorialMosaicSection } from "@/features/landing/components/EditorialMosaicSection";
-import { CompanionsSection } from "@/features/landing/components/CompanionsSection";
 import { LandingFooter } from "@/features/landing/components/LandingFooter";
 
 export const revalidate = 3600;
@@ -28,9 +27,6 @@ export default function HomePage() {
 
       {/* Section 3: Editorial Showcase (Google Arts & Culture Asymmetric Mosaic Grid) */}
       <EditorialMosaicSection />
-
-      {/* Section 4: Hội Bạn Đồng Hành (Collaborative Multi-user Planning Mockup) */}
-      <CompanionsSection />
 
       {/* Modern Landing Footer */}
       <LandingFooter />

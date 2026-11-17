@@ -6,7 +6,10 @@ import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 
-import { consumeOAuthReturnUrl } from '@/lib/safe-redirect';
+import {
+  consumeOAuthReturnUrl,
+  resolvePostLoginRedirect,
+} from '@/lib/safe-redirect';
 
 function SafeCallbackHandler() {
   const router = useRouter();
@@ -29,7 +32,12 @@ function SafeCallbackHandler() {
         const result = await refetchUser();
         if (result.data) {
           toast.success(`Chào mừng trở lại, ${result.data.fullName || 'bạn'}!`);
-          const target = consumeOAuthReturnUrl(rawNext, '/');
+          const consumedNext = consumeOAuthReturnUrl(rawNext, '/');
+          const target = resolvePostLoginRedirect(
+            result.data.role,
+            consumedNext,
+            '/',
+          );
           router.push(target);
           router.refresh();
         } else {

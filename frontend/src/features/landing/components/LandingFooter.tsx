@@ -34,9 +34,6 @@ export function LandingFooter() {
             <a href="#food-guide" className="hover:text-[#0194F3] transition-colors">
               Cẩm nang ẩm thực
             </a>
-            <a href="#companions" className="hover:text-[#0194F3] transition-colors">
-              Bạn đồng hành
-            </a>
           </div>
         </div>
 

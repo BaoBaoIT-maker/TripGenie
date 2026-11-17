@@ -1,0 +1,1626 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TripGenie — Admin Portal</title>
+
+  <!-- Google Fonts: 100% Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Font Awesome 6.5.2 -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    html, body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background-color: #F4F7FB;
+      color: #10243A;
+      -webkit-font-smoothing: antialiased;
+    }
+    .custom-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 9999px; }
+    .custom-scroll::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+    /* Finexy-style hatched bar pattern */
+    .bar-hatched {
+      background-color: #E2E8F0;
+      background-image: repeating-linear-gradient(
+        -45deg,
+        rgba(255, 255, 255, 0.55),
+        rgba(255, 255, 255, 0.55) 5px,
+        transparent 5px,
+        transparent 10px
+      );
+    }
+    .bar-primary-hatched {
+      background-color: #0194F3;
+      background-image: repeating-linear-gradient(
+        -45deg,
+        rgba(255, 255, 255, 0.16),
+        rgba(255, 255, 255, 0.16) 5px,
+        transparent 5px,
+        transparent 10px
+      );
+    }
+  </style>
+</head>
+<body class="h-full overflow-hidden select-none">
+
+  <div class="flex h-screen w-screen overflow-hidden p-3 sm:p-4 gap-4">
+
+    <!-- =================================================================== -->
+    <!-- SIDEBAR (AdminShell.tsx)                                            -->
+    <!-- =================================================================== -->
+    <aside class="w-64 shrink-0 bg-white rounded-[26px] border border-slate-200/80 shadow-[0_8px_30px_rgba(16,36,58,0.04)] flex flex-col justify-between p-4 select-none">
+
+      <div class="space-y-6">
+        <!-- Brand Logo: 100% Real TripGenie Brand Identity from Navbar.tsx -->
+        <div class="flex items-center gap-3 px-2 pt-1">
+          <img
+            src="../../frontend/public/images/logo_transparent.png"
+            alt="TripGenie Logo"
+            class="h-11 w-auto object-contain drop-shadow-xs shrink-0"
+            onerror="this.style.display='none'; document.getElementById('fallback-tg-svg').classList.remove('hidden');"
+          />
+          <!-- Exact SVG from TripGenieMark.tsx in case relative path is moved -->
+          <svg id="fallback-tg-svg" viewBox="0 0 100 100" fill="none" class="hidden size-10 shrink-0">
+            <circle cx="50" cy="11" r="5.5" stroke="#0194F3" stroke-width="4.2" />
+            <path d="M 73.5 32.5 A 36 36 0 1 1 59 21.5" stroke="#0194F3" stroke-width="6.5" stroke-linecap="round" />
+            <path d="M 22 76 L 36.5 47 L 48.5 64 L 56 54 L 64 78 A 31 31 0 0 1 22 76 Z" fill="#0194F3" />
+            <path d="M 59 41 L 78 72 A 31 31 0 0 1 54 87 L 54 64 L 59 41 Z" fill="#10243A" />
+            <path d="M 41 66 L 69 21 L 63 18.5 L 78 9.5 L 76.5 26.5 L 72 23.5 L 44.5 68 Z" fill="#0194F3" />
+          </svg>
+          <div class="min-w-0">
+            <span class="text-xl font-black tracking-tight text-slate-900 block leading-none">
+              TripGenie
+            </span>
+            <span class="block text-[10px] uppercase font-bold tracking-wider text-slate-500 mt-1">
+              Nền Tảng Du Lịch Thông Minh
+            </span>
+          </div>
+        </div>
+
+        <!-- Navigation Menu -->
+        <div class="space-y-4">
+          <div class="space-y-1">
+            <div class="px-3 pb-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tổng quan</div>
+
+            <button onclick="navigateRoute('dashboard')" data-route="dashboard" class="sidebar-link w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer bg-[#0194F3] text-white shadow-[0_4px_12px_rgba(1,148,243,0.25)]">
+              <span class="flex items-center gap-3">
+                <i class="fa-solid fa-table-columns text-sm w-4 text-center"></i>
+                <span>Bảng điều khiển</span>
+              </span>
+            </button>
+
+            <button onclick="navigateRoute('moderation')" data-route="moderation" class="sidebar-link w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-semibold text-slate-600 hover:bg-slate-100/80 hover:text-[#10243A] transition-all cursor-pointer">
+              <span class="flex items-center gap-3">
+                <i class="fa-solid fa-shield-halved text-sm w-4 text-center"></i>
+                <span>Kiểm duyệt & Báo cáo</span>
+              </span>
+              <span id="sidebar-mod-count" class="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-500 text-white">3</span>
+            </button>
+          </div>
+
+          <div class="space-y-1">
+            <div class="px-3 pb-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">Quản lý dữ liệu</div>
+
+            <button onclick="navigateRoute('users')" data-route="users" class="sidebar-link w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-semibold text-slate-600 hover:bg-slate-100/80 hover:text-[#10243A] transition-all cursor-pointer">
+              <span class="flex items-center gap-3">
+                <i class="fa-solid fa-users text-sm w-4 text-center"></i>
+                <span>Người dùng</span>
+              </span>
+              <span id="sidebar-users-badge" class="text-[11px] font-bold text-slate-400">4</span>
+            </button>
+
+            <button onclick="navigateRoute('places')" data-route="places" class="sidebar-link w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-semibold text-slate-600 hover:bg-slate-100/80 hover:text-[#10243A] transition-all cursor-pointer">
+              <span class="flex items-center gap-3">
+                <i class="fa-solid fa-map-location-dot text-sm w-4 text-center"></i>
+                <span>Địa điểm du lịch</span>
+              </span>
+              <span id="sidebar-places-badge" class="text-[11px] font-bold text-slate-400">3.842</span>
+            </button>
+
+            <button onclick="navigateRoute('community')" data-route="community" class="sidebar-link w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-semibold text-slate-600 hover:bg-slate-100/80 hover:text-[#10243A] transition-all cursor-pointer">
+              <span class="flex items-center gap-3">
+                <i class="fa-solid fa-layer-group text-sm w-4 text-center"></i>
+                <span>Chủ đề cộng đồng</span>
+              </span>
+              <span id="sidebar-groups-badge" class="text-[11px] font-bold text-slate-400">4</span>
+            </button>
+          </div>
+
+          <div class="space-y-1">
+            <div class="px-3 pb-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider">An ninh</div>
+
+            <button onclick="navigateRoute('audit-logs')" data-route="audit-logs" class="sidebar-link w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-semibold text-slate-600 hover:bg-slate-100/80 hover:text-[#10243A] transition-all cursor-pointer">
+              <span class="flex items-center gap-3">
+                <i class="fa-solid fa-clipboard-list text-sm w-4 text-center"></i>
+                <span>Nhật ký kiểm toán</span>
+              </span>
+              <span id="sidebar-audit-badge" class="text-[11px] font-bold text-slate-400">4</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Admin Profile + Logout ONLY -->
+      <div class="pt-4 border-t border-slate-100 space-y-2.5">
+        <div class="flex items-center gap-3 px-2">
+          <div class="relative shrink-0">
+            <img src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80" alt="Admin" class="size-9 rounded-full object-cover ring-2 ring-[#E8F4FD]">
+            <span class="absolute bottom-0 right-0 size-2.5 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="text-xs font-bold text-[#10243A] truncate">Master Admin</div>
+            <div class="text-[11px] text-slate-400 truncate">admin@tripgenie.vn</div>
+          </div>
+        </div>
+
+        <button onclick="showToast('Đã đăng xuất khỏi phiên Quản trị viên')" class="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-2xl bg-rose-50/80 hover:bg-rose-100 text-rose-600 text-xs font-bold transition-colors cursor-pointer">
+          <i class="fa-solid fa-right-from-bracket"></i>
+          <span>Đăng xuất</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- =================================================================== -->
+    <!-- MAIN SECTION (No Topbar Header, Direct Cards + Data Tables)         -->
+    <!-- =================================================================== -->
+    <main class="flex-1 min-w-0 overflow-y-auto custom-scroll pr-1 space-y-4">
+
+      <!-- ================================================================= -->
+      <!-- ROUTE 1: DASHBOARD                                                -->
+      <!-- ================================================================= -->
+      <section id="route-dashboard" class="route-page space-y-4">
+
+        <!-- Row 1: 4 KPI Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <!-- Priority Card -->
+          <div onclick="navigateRoute('moderation')" class="bg-white rounded-[24px] p-5 border border-sky-100 shadow-[0_14px_34px_rgba(1,148,243,0.10)] cursor-pointer transition-transform hover:-translate-y-0.5 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-slate-500">Hàng đợi kiểm duyệt</span>
+              <div class="size-10 rounded-full bg-[#E8F4FD] text-[#0194F3] flex items-center justify-center">
+                <i class="fa-solid fa-shield-halved text-sm"></i>
+              </div>
+            </div>
+            <div class="my-3 flex items-baseline gap-2.5">
+              <span id="kpi-mod-total" class="text-3xl font-extrabold tracking-tight text-[#10243A]">19</span>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-600">
+                <i class="fa-solid fa-fire text-[10px]"></i>25 Reports
+              </span>
+            </div>
+            <div class="text-[11px] font-medium text-slate-400">
+              Chờ duyệt: <b class="text-slate-700">12 bài</b> • AI gắn cờ: <b class="text-amber-600">6 bài</b>
+            </div>
+          </div>
+
+          <!-- Card 2: Users -->
+          <div onclick="navigateRoute('users')" class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)] cursor-pointer hover:border-slate-300 transition-all flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-slate-500">Người dùng hệ thống</span>
+              <div class="size-10 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center">
+                <i class="fa-solid fa-users text-sm"></i>
+              </div>
+            </div>
+            <div class="my-3 flex items-baseline gap-2.5">
+              <span class="text-3xl font-extrabold tracking-tight text-[#10243A]">1.420</span>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600">
+                1.412 hoạt động
+              </span>
+            </div>
+            <div class="text-[11px] font-medium text-slate-400">
+              Đang bị khóa: <b class="text-rose-600">8 tài khoản</b>
+            </div>
+          </div>
+
+          <!-- Card 3: Places -->
+          <div onclick="navigateRoute('places')" class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)] cursor-pointer hover:border-slate-300 transition-all flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-slate-500">Địa điểm du lịch</span>
+              <div class="size-10 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center">
+                <i class="fa-solid fa-map-location-dot text-sm"></i>
+              </div>
+            </div>
+            <div class="my-3 flex items-baseline gap-2.5">
+              <span class="text-3xl font-extrabold tracking-tight text-[#10243A]">3.842</span>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-[#0194F3]">
+                6 vùng du lịch
+              </span>
+            </div>
+            <div class="text-[11px] font-medium text-slate-400">
+              Đang hiển thị: <b class="text-slate-700">3.790</b> • Đã ẩn: <b class="text-slate-600">52</b>
+            </div>
+          </div>
+
+          <!-- Card 4: Community -->
+          <div onclick="navigateRoute('community')" class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)] cursor-pointer hover:border-slate-300 transition-all flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-semibold text-slate-500">Bài viết & Chủ đề</span>
+              <div class="size-10 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center">
+                <i class="fa-solid fa-layer-group text-sm"></i>
+              </div>
+            </div>
+            <div class="my-3 flex items-baseline gap-2.5">
+              <span class="text-3xl font-extrabold tracking-tight text-[#10243A]">648</span>
+              <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-600">
+                8 chủ đề mở
+              </span>
+            </div>
+            <div class="text-[11px] font-medium text-slate-400">
+              Đã duyệt hiển thị: <b class="text-slate-700">615 bài viết</b>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: Category Pill Chart (Finexy) + Dark Navy Spotlight (BRESS) -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          <div class="lg:col-span-7 bg-white rounded-[24px] p-6 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)] flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <h2 class="text-base font-extrabold text-[#10243A]">Phân bổ Địa điểm theo Danh mục</h2>
+              <span class="px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-xs font-bold">3.842 địa điểm</span>
+            </div>
+
+            <div class="mt-8 pt-6 pb-2 px-2">
+              <div class="grid grid-cols-6 gap-4 items-end h-48 border-b border-slate-100 pb-3">
+                <div class="flex flex-col items-center gap-2 h-full justify-end">
+                  <span class="text-[11px] font-bold text-slate-500">620</span>
+                  <div class="w-11 sm:w-12 rounded-t-full bar-hatched h-[48%]"></div>
+                </div>
+                <div class="flex flex-col items-center gap-2 h-full justify-end relative">
+                  <div class="absolute -top-9 px-2.5 py-1 rounded-xl bg-[#FF5E1A] text-white text-[11px] font-extrabold shadow-md whitespace-nowrap">
+                    1.280 địa điểm
+                  </div>
+                  <div class="w-11 sm:w-12 rounded-t-full bar-primary-hatched h-[92%] ring-4 ring-sky-100"></div>
+                </div>
+                <div class="flex flex-col items-center gap-2 h-full justify-end">
+                  <span class="text-[11px] font-bold text-slate-500">890</span>
+                  <div class="w-11 sm:w-12 rounded-t-full bar-hatched h-[68%]"></div>
+                </div>
+                <div class="flex flex-col items-center gap-2 h-full justify-end">
+                  <span class="text-[11px] font-bold text-slate-500">540</span>
+                  <div class="w-11 sm:w-12 rounded-t-full bar-hatched h-[42%]"></div>
+                </div>
+                <div class="flex flex-col items-center gap-2 h-full justify-end">
+                  <span class="text-[11px] font-bold text-slate-500">312</span>
+                  <div class="w-11 sm:w-12 rounded-t-full bar-hatched h-[28%]"></div>
+                </div>
+                <div class="flex flex-col items-center gap-2 h-full justify-end">
+                  <span class="text-[11px] font-bold text-slate-500">200</span>
+                  <div class="w-11 sm:w-12 rounded-t-full bar-hatched h-[20%]"></div>
+                </div>
+              </div>
+              <div class="grid grid-cols-6 gap-4 pt-3 text-center text-xs font-bold text-slate-500">
+                <div>Lưu trú</div>
+                <div class="text-[#0194F3]">Tham quan</div>
+                <div>Ẩm thực</div>
+                <div>Cafe</div>
+                <div>Giải trí</div>
+                <div>Mua sắm</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dark Navy Spotlight Card -->
+          <div class="lg:col-span-5 bg-[#10243A] text-white rounded-[24px] p-6 shadow-[0_14px_34px_rgba(16,36,58,0.18)] flex flex-col justify-between relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="size-2.5 rounded-full bg-rose-500 animate-pulse"></span>
+                <h2 class="text-base font-extrabold">Báo cáo khẩn cấp (&ge; 20 lượt)</h2>
+              </div>
+              <span class="px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 text-[11px] font-bold border border-rose-400/30">
+                Chống công kích hội đồng
+              </span>
+            </div>
+
+            <div class="my-4 relative">
+              <div class="bg-white text-[#10243A] rounded-2xl p-4 shadow-lg relative z-10 space-y-3">
+                <div class="flex items-center justify-between gap-2">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-600 text-[11px] font-extrabold">25 lượt báo cáo</span>
+                    <span class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[11px] font-bold">Vẫn đang hiển thị</span>
+                  </div>
+                  <span class="text-[11px] font-semibold text-slate-400">14 phút trước</span>
+                </div>
+                <div>
+                  <h3 class="text-sm font-extrabold text-[#10243A] line-clamp-1">
+                    Review quán hải sản Mũi Né giá bình dân, tươi sống không chặt chém
+                  </h3>
+                  <p class="text-xs text-slate-500 mt-0.5 line-clamp-1">
+                    Tác giả: Nguyễn Minh Tuấn • Nhóm: Ẩm thực Đường phố Việt Nam
+                  </p>
+                </div>
+                <div class="pt-2 border-t border-slate-100 flex items-center justify-between">
+                  <span class="text-[11px] font-semibold text-slate-500">
+                    <i class="fa-solid fa-comments text-[#0194F3] mr-1"></i>42 bình luận
+                  </span>
+                  <button onclick="openPostReviewSheet('rep-hot-1')" class="px-3.5 py-1.5 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] text-white text-xs font-bold transition-colors cursor-pointer">
+                    Phân xử ngay <i class="fa-solid fa-arrow-right ml-1"></i>
+                  </button>
+                </div>
+              </div>
+              <div class="h-3 mx-4 bg-white/20 rounded-b-2xl"></div>
+            </div>
+
+            <div class="flex items-center justify-between text-xs text-slate-300">
+              <span>Bài đã duyệt không tự động ẩn khi bị report hàng loạt</span>
+              <button onclick="navigateRoute('moderation')" class="font-bold text-sky-400 hover:underline cursor-pointer">
+                Mở hàng đợi &rarr;
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 3: Recent Audit Logs Table -->
+        <div class="bg-white rounded-[24px] p-6 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-base font-extrabold text-[#10243A]">Nhật ký Kiểm toán Gần nhất</h2>
+            <button onclick="navigateRoute('audit-logs')" class="px-3.5 py-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-bold text-slate-700 cursor-pointer">
+              Xem tất cả
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  <th class="py-3.5 pr-4">Thời gian</th>
+                  <th class="py-3.5 px-4">Quản trị viên</th>
+                  <th class="py-3.5 px-4">Hành động</th>
+                  <th class="py-3.5 px-4">Đối tượng</th>
+                  <th class="py-3.5 px-4">Ghi chú</th>
+                  <th class="py-3.5 pl-4 text-right w-14"></th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-audit-tbody" class="divide-y divide-slate-100 text-xs"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- ROUTE 2: MODERATION & REPORTS (With AI Auto-Moderation Toggle)    -->
+      <!-- ================================================================= -->
+      <section id="route-moderation" class="route-page hidden space-y-4">
+
+        <!-- Summary Cards + AI Auto-Moderation Switch inside Moderation Tab -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+            <div class="text-xs font-semibold text-slate-500">Báo cáo khẩn cấp (&ge; 20)</div>
+            <div class="text-2xl font-extrabold text-rose-600 mt-2">1 mục</div>
+            <div class="text-[11px] text-slate-400 mt-1">Cần Admin phân xử thủ công</div>
+          </div>
+
+          <div class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+            <div class="text-xs font-semibold text-slate-500">AI gắn cờ nghi vấn</div>
+            <div class="text-2xl font-extrabold text-amber-600 mt-2">1 bài viết</div>
+            <div class="text-[11px] text-slate-400 mt-1">Phát hiện từ khóa nhạy cảm</div>
+          </div>
+
+          <div class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+            <div class="text-xs font-semibold text-slate-500">Bài viết chờ duyệt</div>
+            <div class="text-2xl font-extrabold text-[#0194F3] mt-2">1 bài viết</div>
+            <div class="text-[11px] text-slate-400 mt-1">Chưa hiển thị trên Cộng đồng</div>
+          </div>
+
+          <!-- AI Auto-Moderation Control Card (Placed exclusively in Moderation Tab) -->
+          <div class="bg-white rounded-[24px] p-5 border border-sky-200 shadow-[0_4px_20px_rgba(1,148,243,0.06)] flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-[#10243A] flex items-center gap-1.5">
+                <i class="fa-solid fa-robot text-[#0194F3]"></i>
+                AI Auto-Moderation
+              </span>
+              <button
+                id="mod-ai-switch"
+                type="button"
+                role="switch"
+                aria-checked="true"
+                onclick="toggleAiConfig()"
+                class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-[#0194F3] transition-colors duration-200"
+              >
+                <span id="mod-ai-knob" class="pointer-events-none inline-block size-5 translate-x-5 transform rounded-full bg-white shadow-sm transition duration-200"></span>
+              </button>
+            </div>
+            <div class="mt-2">
+              <span id="mod-ai-status-badge" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700">
+                Đang bật duyệt tự động 3 tầng
+              </span>
+            </div>
+            <div id="mod-ai-desc" class="text-[11px] text-slate-400 mt-1">
+              Tự động lọc từ cấm & chấm điểm bài mới
+            </div>
+          </div>
+        </div>
+
+        <!-- Moderation Table Card -->
+        <div class="bg-white rounded-[24px] p-6 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)] space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="inline-flex p-1 rounded-2xl bg-[#F4F7FB] border border-slate-200/60">
+              <button onclick="filterModeration('ALL')" data-modfilter="ALL" class="mod-pill px-4 py-2 rounded-xl text-xs font-bold bg-[#10243A] text-white cursor-pointer">
+                Tất cả (3)
+              </button>
+              <button onclick="filterModeration('HIGH_REPORT')" data-modfilter="HIGH_REPORT" class="mod-pill px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer">
+                &ge; 20 Reports (1)
+              </button>
+              <button onclick="filterModeration('FLAGGED')" data-modfilter="FLAGGED" class="mod-pill px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer">
+                AI Nghi vấn (1)
+              </button>
+              <button onclick="filterModeration('PENDING')" data-modfilter="PENDING" class="mod-pill px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer">
+                Chờ duyệt (1)
+              </button>
+            </div>
+
+            <div class="relative w-72">
+              <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input id="mod-search" oninput="renderModerationPage()" type="text" placeholder="Tìm tiêu đề, tác giả..." class="w-full h-10 pl-9 pr-3 rounded-2xl bg-[#F8FAFC] border border-slate-200 text-xs font-medium focus:outline-none focus:border-[#0194F3] focus:bg-white">
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  <th class="py-3.5 pr-4">Bài viết & Chủ đề</th>
+                  <th class="py-3.5 px-4">Tác giả</th>
+                  <th class="py-3.5 px-4">Phân loại</th>
+                  <th class="py-3.5 px-4">Chẩn đoán</th>
+                  <th class="py-3.5 pl-4 text-right w-14"></th>
+                </tr>
+              </thead>
+              <tbody id="moderation-page-tbody" class="divide-y divide-slate-100 text-xs"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- ROUTE 3: USERS                                                    -->
+      <!-- ================================================================= -->
+      <section id="route-users" class="route-page hidden space-y-4">
+
+        <!-- User Summary Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+            <div class="text-xs font-semibold text-slate-500">Tổng người dùng</div>
+            <div class="text-2xl font-extrabold text-[#10243A] mt-2">1.420</div>
+          </div>
+          <div class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+            <div class="text-xs font-semibold text-slate-500">Đang hoạt động</div>
+            <div class="text-2xl font-extrabold text-emerald-600 mt-2">1.412</div>
+          </div>
+          <div class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+            <div class="text-xs font-semibold text-slate-500">Đã khóa</div>
+            <div class="text-2xl font-extrabold text-rose-600 mt-2">8</div>
+          </div>
+        </div>
+
+        <!-- Users Table Card -->
+        <div class="bg-white rounded-[24px] p-6 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)] space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-2">
+              <select id="users-status-filter" onchange="renderUsersPage()" class="h-10 px-3.5 rounded-2xl bg-[#F8FAFC] border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0194F3]">
+                <option value="ALL">Tất cả trạng thái</option>
+                <option value="ACTIVE">Đang hoạt động</option>
+                <option value="BANNED">Đã khóa</option>
+              </select>
+            </div>
+            <div class="relative w-72">
+              <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input id="users-page-search" oninput="renderUsersPage()" type="text" placeholder="Tìm họ tên, email, username..." class="w-full h-10 pl-9 pr-3 rounded-2xl bg-[#F8FAFC] border border-slate-200 text-xs font-medium focus:outline-none focus:border-[#0194F3] focus:bg-white">
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  <th class="py-3.5 pr-4">Người dùng</th>
+                  <th class="py-3.5 px-4">Trạng thái</th>
+                  <th class="py-3.5 px-4">Hoạt động</th>
+                  <th class="py-3.5 px-4">Ngày tham gia</th>
+                  <th class="py-3.5 pl-4 text-right w-14"></th>
+                </tr>
+              </thead>
+              <tbody id="users-page-tbody" class="divide-y divide-slate-100 text-xs"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- ROUTE 4: PLACES (Explore-style Filters + Server-Side Pagination)  -->
+      <!-- ================================================================= -->
+      <section id="route-places" class="route-page hidden space-y-4">
+
+        <!-- Places Summary Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+            <div class="text-xs font-semibold text-slate-500">Tổng kho địa điểm</div>
+            <div class="text-2xl font-extrabold text-[#10243A] mt-2">3.842</div>
+          </div>
+          <div class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+            <div class="text-xs font-semibold text-slate-500">Đang hiển thị (Active)</div>
+            <div class="text-2xl font-extrabold text-emerald-600 mt-2">3.790</div>
+          </div>
+          <div class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+            <div class="text-xs font-semibold text-slate-500">Đã xóa mềm (Inactive)</div>
+            <div class="text-2xl font-extrabold text-slate-500 mt-2">52</div>
+          </div>
+        </div>
+
+        <!-- Places Filter Toolbar (Like Explore Page) + Paginated Table -->
+        <div class="bg-white rounded-[24px] p-6 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)] space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <!-- Multi-criteria filters like /explore to prevent lag -->
+            <div class="flex flex-wrap items-center gap-2.5">
+              <div class="relative w-64">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <input id="places-page-search" oninput="resetPlacePageAndRender()" type="text" placeholder="Tìm tên địa điểm, địa chỉ..." class="w-full h-10 pl-9 pr-3 rounded-2xl bg-[#F8FAFC] border border-slate-200 text-xs font-medium focus:outline-none focus:border-[#0194F3] focus:bg-white">
+              </div>
+
+              <select id="places-area-filter" onchange="resetPlacePageAndRender()" class="h-10 px-3.5 rounded-2xl bg-[#F8FAFC] border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0194F3]">
+                <option value="ALL">Tất cả khu vực</option>
+                <option value="Đà Nẵng">Đà Nẵng</option>
+                <option value="Đà Lạt">Đà Lạt</option>
+                <option value="Phú Quốc">Phú Quốc</option>
+                <option value="Hội An">Hội An</option>
+                <option value="Sa Pa">Sa Pa</option>
+              </select>
+
+              <select id="places-cat-filter" onchange="resetPlacePageAndRender()" class="h-10 px-3.5 rounded-2xl bg-[#F8FAFC] border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0194F3]">
+                <option value="ALL">Tất cả danh mục</option>
+                <option value="Điểm tham quan">Điểm tham quan</option>
+                <option value="Ẩm thực">Ẩm thực</option>
+                <option value="Lưu trú">Lưu trú</option>
+                <option value="Cafe">Cafe</option>
+              </select>
+            </div>
+
+            <button onclick="openPlaceFormSheet(null)" class="h-10 px-4 rounded-2xl bg-[#0194F3] hover:bg-[#0084DE] text-white text-xs font-bold shadow-xs cursor-pointer flex items-center gap-2">
+              <i class="fa-solid fa-plus"></i>
+              <span>Thêm địa điểm</span>
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  <th class="py-3.5 pr-4">Địa điểm</th>
+                  <th class="py-3.5 px-4">Khu vực & Danh mục</th>
+                  <th class="py-3.5 px-4">Tọa độ (Lat, Lng)</th>
+                  <th class="py-3.5 px-4">Độ phổ biến</th>
+                  <th class="py-3.5 pl-4 text-right w-14"></th>
+                </tr>
+              </thead>
+              <tbody id="places-page-tbody" class="divide-y divide-slate-100 text-xs"></tbody>
+            </table>
+          </div>
+
+          <!-- Server-Side Pagination Footer (20 rows/page — Zero DOM lag) -->
+          <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+            <div id="places-pagination-info" class="font-medium">
+              Đang hiển thị <b class="text-[#10243A]">1–4</b> trên tổng <b class="text-[#10243A]">3.842</b> địa điểm (Tải phân trang 20 mục/lần)
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button onclick="changePlacePage(1)" id="page-btn-1" class="size-8 rounded-xl bg-[#0194F3] text-white font-bold text-xs cursor-pointer">1</button>
+              <button onclick="changePlacePage(2)" id="page-btn-2" class="size-8 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs cursor-pointer">2</button>
+              <button onclick="changePlacePage(3)" id="page-btn-3" class="size-8 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs cursor-pointer">3</button>
+              <span class="px-1 text-slate-400">...</span>
+              <button onclick="changePlacePage(192)" class="px-2.5 h-8 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs cursor-pointer">192</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- ROUTE 5: COMMUNITY GROUPS (No Slug Shown + Image Upload)          -->
+      <!-- ================================================================= -->
+      <section id="route-community" class="route-page hidden space-y-4">
+
+        <!-- Community Summary Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+            <div class="text-xs font-semibold text-slate-500">Chủ đề đang hoạt động</div>
+            <div id="groups-card-count" class="text-2xl font-extrabold text-[#10243A] mt-2">4</div>
+          </div>
+          <div class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+            <div class="text-xs font-semibold text-slate-500">Tổng bài viết cộng đồng</div>
+            <div class="text-2xl font-extrabold text-[#0194F3] mt-2">642</div>
+          </div>
+          <div class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+            <div class="text-xs font-semibold text-slate-500">Chủ đề mặc định</div>
+            <div class="text-2xl font-extrabold text-emerald-600 mt-2">Cộng đồng chung</div>
+          </div>
+        </div>
+
+        <!-- Community Groups Table Card (No Slug Column) -->
+        <div class="bg-white rounded-[24px] p-6 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)] space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div class="relative w-72">
+              <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input id="groups-search" oninput="renderGroupsPage()" type="text" placeholder="Tìm tên chủ đề, điểm đến..." class="w-full h-10 pl-9 pr-3 rounded-2xl bg-[#F8FAFC] border border-slate-200 text-xs font-medium focus:outline-none focus:border-[#0194F3] focus:bg-white">
+            </div>
+
+            <button onclick="openGroupFormDialog(null)" class="h-10 px-4 rounded-2xl bg-[#0194F3] hover:bg-[#0084DE] text-white text-xs font-bold shadow-xs cursor-pointer flex items-center gap-2">
+              <i class="fa-solid fa-plus"></i>
+              <span>Tạo chủ đề mới</span>
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  <th class="py-3.5 pr-4">Chủ đề cộng đồng</th>
+                  <th class="py-3.5 px-4">Điểm đến / Mô tả ngắn</th>
+                  <th class="py-3.5 px-4">Số bài viết</th>
+                  <th class="py-3.5 px-4">Trạng thái</th>
+                  <th class="py-3.5 pl-4 text-right w-14"></th>
+                </tr>
+              </thead>
+              <tbody id="groups-page-tbody" class="divide-y divide-slate-100 text-xs"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- ROUTE 6: AUDIT LOGS                                               -->
+      <!-- ================================================================= -->
+      <section id="route-audit-logs" class="route-page hidden space-y-4">
+
+        <!-- Audit Summary Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+            <div class="text-xs font-semibold text-slate-500">Tổng bản ghi kiểm toán</div>
+            <div id="audit-total-card" class="text-2xl font-extrabold text-[#10243A] mt-2">4</div>
+          </div>
+          <div class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+            <div class="text-xs font-semibold text-slate-500">Thao tác kiểm duyệt</div>
+            <div class="text-2xl font-extrabold text-[#0194F3] mt-2">2</div>
+          </div>
+          <div class="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+            <div class="text-xs font-semibold text-slate-500">Thao tác dữ liệu & tài khoản</div>
+            <div class="text-2xl font-extrabold text-emerald-600 mt-2">2</div>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-[24px] p-6 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)] space-y-5">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <select id="audit-action-filter" onchange="renderAuditTables()" class="h-10 px-3.5 rounded-2xl bg-[#F8FAFC] border border-slate-200 text-xs font-semibold text-slate-700 focus:outline-none focus:border-[#0194F3]">
+              <option value="ALL">Tất cả hành động</option>
+              <option value="CREATE">CREATE</option>
+              <option value="UPDATE">UPDATE</option>
+              <option value="DELETE">DELETE</option>
+              <option value="BAN">BAN</option>
+              <option value="APPROVE">APPROVE</option>
+              <option value="REJECT">REJECT</option>
+            </select>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                  <th class="py-3.5 pr-4">Thời gian</th>
+                  <th class="py-3.5 px-4">Quản trị viên</th>
+                  <th class="py-3.5 px-4">Hành động</th>
+                  <th class="py-3.5 px-4">Đối tượng</th>
+                  <th class="py-3.5 px-4">Ghi chú</th>
+                  <th class="py-3.5 pl-4 text-right w-14"></th>
+                </tr>
+              </thead>
+              <tbody id="audit-page-tbody" class="divide-y divide-slate-100 text-xs"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- ===================================================================== -->
+  <!-- FLOATING 3-DOTS DROPDOWN MENU PORTAL                                  -->
+  <!-- ===================================================================== -->
+  <div id="row-action-menu" class="fixed z-50 hidden w-48 rounded-2xl bg-white border border-slate-200 shadow-[0_12px_32px_rgba(16,36,58,0.14)] py-1.5 text-xs"></div>
+
+  <!-- ===================================================================== -->
+  <!-- SLIDE-OVER SHEET (PostReviewSheet, PlaceFormSheet, AuditDiffSheet)    -->
+  <!-- ===================================================================== -->
+  <div id="sheet-backdrop" onclick="closeSheet()" class="fixed inset-0 bg-slate-900/35 backdrop-blur-[2px] z-40 hidden transition-opacity"></div>
+  <aside id="slide-sheet" class="fixed top-3 bottom-3 right-3 w-full max-w-lg bg-white rounded-[26px] shadow-2xl border border-slate-200 z-50 translate-x-[110%] transition-transform duration-300 flex flex-col overflow-hidden">
+    <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+      <div>
+        <h3 id="sheet-title" class="text-sm font-extrabold text-[#10243A]">Chi tiết</h3>
+        <p id="sheet-subtitle" class="text-[11px] text-slate-400 mt-0.5"></p>
+      </div>
+      <button onclick="closeSheet()" class="size-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 cursor-pointer">
+        <i class="fa-solid fa-xmark text-xs"></i>
+      </button>
+    </div>
+    <div id="sheet-body" class="flex-1 overflow-y-auto custom-scroll p-6 space-y-5"></div>
+  </aside>
+
+  <!-- ===================================================================== -->
+  <!-- MODAL DIALOG (UserActionDialog, GroupFormDialog)                      -->
+  <!-- ===================================================================== -->
+  <div id="dialog-backdrop" onclick="closeDialog()" class="fixed inset-0 bg-slate-900/40 backdrop-blur-[2px] z-40 hidden flex items-center justify-center p-4">
+    <div onclick="event.stopPropagation()" class="bg-white rounded-[26px] max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 id="dialog-title" class="text-sm font-extrabold text-[#10243A]">Xác nhận</h3>
+        <button onclick="closeDialog()" class="size-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 cursor-pointer">
+          <i class="fa-solid fa-xmark text-xs"></i>
+        </button>
+      </div>
+      <div id="dialog-body"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 hidden flex items-center gap-2.5 px-4 py-3 rounded-2xl bg-[#10243A] text-white text-xs font-bold shadow-xl">
+    <i class="fa-solid fa-circle-check text-emerald-400"></i>
+    <span id="toast-text">Thao tác thành công</span>
+  </div>
+
+  <script>
+    // =========================================================================
+    // STATE & DATA
+    // =========================================================================
+    let aiEnabled = true;
+    let modFilter = 'ALL';
+    let currentPlacePage = 1;
+    let uploadedGroupCoverTemp = '';
+
+    const moderationData = [
+      {
+        id: 'rep-hot-1',
+        status: 'APPROVED',
+        reportCount: 25,
+        title: 'Review quán hải sản Mũi Né giá bình dân, tươi sống không chặt chém',
+        authorName: 'Nguyễn Minh Tuấn',
+        authorEmail: 'tuan.travel@gmail.com',
+        authorAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80',
+        cover: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=800&auto=format&fit=crop&q=80',
+        group: 'Ẩm thực Đường phố Việt Nam',
+        caption: 'Mình vừa đi Mũi Né 3N2Đ về, ghé quán Hải Sản Biển Xanh ở bờ kè. Giá niêm yết rõ ràng, tôm hùm tươi sống, nhân viên nhiệt tình không hề chặt chém như lời đồn!',
+        diagnosis: 'Cảnh báo >= 20 Reports (25 lượt báo cáo). Hệ thống giữ nguyên hiển thị để chống công kích hội đồng.',
+      },
+      {
+        id: 'post-flag-2',
+        status: 'FLAGGED',
+        reportCount: 0,
+        title: 'Cảnh báo lừa đảo đặt cọc homestay Đà Lạt qua số Zalo lạ',
+        authorName: 'Lê Thảo Vy',
+        authorEmail: 'thaovy99@gmail.com',
+        authorAvatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
+        cover: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80',
+        group: 'Săn Mây Đà Lạt',
+        caption: 'Mọi người đi Đà Lạt dịp lễ cẩn thận các trang giả mạo yêu cầu chuyển khoản cọc trước 50% qua Zalo nhé.',
+        diagnosis: 'Phễu AI Tầng 2 phát hiện từ nhạy cảm ("lừa đảo", "chuyển khoản", "cọc", "Zalo") -> Đưa vào FLAGGED.',
+      },
+      {
+        id: 'post-pend-3',
+        status: 'PENDING',
+        reportCount: 0,
+        title: 'Lịch trình khám phá Phú Quốc 4 Ngày 3 Đêm tự túc chi tiết',
+        authorName: 'Hoàng Gia Bảo',
+        authorEmail: 'baohg@gmail.com',
+        authorAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=120&auto=format&fit=crop&q=80',
+        cover: 'https://images.unsplash.com/photo-1540202404-a2f29016b523?w=800&auto=format&fit=crop&q=80',
+        group: 'Review Phú Quốc Tự Túc',
+        caption: 'Tổng hợp toàn bộ lịch trình đi Rạch Vẹm, Bãi Sao, Hòn Thơm và chợ đêm Dương Đông tiết kiệm nhất.',
+        diagnosis: 'Bài viết mới ở trạng thái PENDING — Chưa hiển thị trên Cộng đồng, chờ Admin phê duyệt.',
+      }
+    ];
+
+    const usersData = [
+      { id: 'u-101', fullName: 'Trần Quốc Khánh', username: '@khanh_wander', email: 'khanh.tran@gmail.com', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80', isActive: true, posts: 14, itineraries: 6, joined: '12/09/2026' },
+      { id: 'u-102', fullName: 'Phạm Thanh Hằng', username: '@hang_travel', email: 'hang.pham@gmail.com', avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=120&auto=format&fit=crop&q=80', isActive: true, posts: 29, itineraries: 11, joined: '03/10/2026' },
+      { id: 'u-103', fullName: 'Nguyễn Tuấn Anh', username: '@tuananh_dalat', email: 'tuananh.dl@gmail.com', avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=120&auto=format&fit=crop&q=80', isActive: true, posts: 8, itineraries: 4, joined: '21/10/2026' },
+      { id: 'u-104', fullName: 'Lê Văn Spam', username: '@spammer99', email: 'spammer99@yahoo.com', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=120&auto=format&fit=crop&q=80', isActive: false, posts: 1, itineraries: 0, joined: '10/11/2026' },
+    ];
+
+    const placesData = [
+      { id: 'pl-1', page: 1, name: 'Sun World Bà Nà Hills', address: 'Thôn An Sơn, Hòa Ninh, Hòa Vang, Đà Nẵng', area: 'Đà Nẵng', category: 'Điểm tham quan', lat: 15.9977, lng: 107.9881, refs: 48, image: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=200&auto=format&fit=crop&q=80' },
+      { id: 'pl-2', page: 1, name: 'Chợ Đêm Phú Quốc', address: '54 Đường Nguyễn Trãi, Dương Đông, Phú Quốc', area: 'Phú Quốc', category: 'Ẩm thực', lat: 10.2168, lng: 103.9593, refs: 36, image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200&auto=format&fit=crop&q=80' },
+      { id: 'pl-3', page: 1, name: 'Đồi Chè Cầu Đất Đà Lạt', address: 'QL20, Xuân Trường, Thành phố Đà Lạt, Lâm Đồng', area: 'Đà Lạt', category: 'Điểm tham quan', lat: 11.8842, lng: 108.5124, refs: 29, image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=200&auto=format&fit=crop&q=80' },
+      { id: 'pl-4', page: 1, name: 'Phố Cổ Hội An', address: 'Phường Minh An, Hội An, Quảng Nam', area: 'Hội An', category: 'Điểm tham quan', lat: 15.8801, lng: 108.3380, refs: 64, image: 'https://images.unsplash.com/photo-1528127269322-539801943592?w=200&auto=format&fit=crop&q=80' },
+      { id: 'pl-5', page: 2, name: 'Đỉnh Fansipan Sa Pa', address: 'Thị xã Sa Pa, Tỉnh Lào Cai', area: 'Sa Pa', category: 'Điểm tham quan', lat: 22.3033, lng: 103.7750, refs: 52, image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=200&auto=format&fit=crop&q=80' },
+      { id: 'pl-6', page: 2, name: 'Tiệm Cafe Túi Mơ To', address: 'Hẻm 31 Sào Nam, Phường 11, Đà Lạt', area: 'Đà Lạt', category: 'Cafe', lat: 11.9362, lng: 108.4791, refs: 41, image: 'https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=200&auto=format&fit=crop&q=80' },
+    ];
+
+    const groupsData = [
+      { id: 'gr-1', name: 'Cộng đồng chung', subtitle: 'Bảng tin chia sẻ hành trình toàn quốc', postCount: 340, isDefault: true, cover: 'https://images.unsplash.com/photo-1528127269322-539801943592?w=200&auto=format&fit=crop&q=80' },
+      { id: 'gr-2', name: 'Săn Mây Đà Lạt', subtitle: 'Đà Lạt, Cầu Đất, Tà Xùa, Bảo Lộc', postCount: 128, isDefault: false, cover: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=200&auto=format&fit=crop&q=80' },
+      { id: 'gr-3', name: 'Review Phú Quốc Tự Túc', subtitle: 'Dương Đông, Hòn Thơm, Rạch Vẹm, Bãi Sao', postCount: 95, isDefault: false, cover: 'https://images.unsplash.com/photo-1540202404-a2f29016b523?w=200&auto=format&fit=crop&q=80' },
+      { id: 'gr-4', name: 'Ẩm thực Đường phố Việt Nam', subtitle: 'Hội An, Đà Nẵng, Huế, Sài Gòn, Hà Nội', postCount: 79, isDefault: false, cover: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?w=200&auto=format&fit=crop&q=80' },
+    ];
+
+    const auditLogs = [
+      { id: 'au-1', time: '16/11/2026 20:15', actor: 'admin@tripgenie.vn', action: 'APPROVE', targetType: 'CONTENT_REPORT', targetLabel: 'Review quán hải sản Mũi Né (25 Reports)', notes: 'Bác bỏ 25 báo cáo ảo — Bảo vệ tác giả trước công kích hội đồng', ip: '113.161.72.14', ua: 'Chrome 130.0 / Windows 11', before: { reportStatus: 'PENDING', reportCount: 25 }, after: { reportStatus: 'DISMISSED', postModerationStatus: 'APPROVED' } },
+      { id: 'au-2', time: '16/11/2026 19:50', actor: 'admin@tripgenie.vn', action: 'BAN', targetType: 'USER', targetLabel: 'spammer99@yahoo.com', notes: 'Đăng bình luận quảng cáo cá độ trái phép', ip: '113.161.72.14', ua: 'Chrome 130.0 / Windows 11', before: { isActive: true, authVersion: 1 }, after: { isActive: false, authVersion: 2 } },
+      { id: 'au-3', time: '16/11/2026 19:30', actor: 'admin@tripgenie.vn', action: 'CREATE', targetType: 'PLACE', targetLabel: 'Sun World Bà Nà Hills', notes: 'Tạo mới địa điểm du lịch chuẩn WGS84', ip: '113.161.72.14', ua: 'Chrome 130.0 / Windows 11', before: null, after: { name: 'Sun World Bà Nà Hills', latitude: 15.9977, longitude: 107.9881, status: 'ACTIVE' } },
+      { id: 'au-4', time: '16/11/2026 19:10', actor: 'admin@tripgenie.vn', action: 'CREATE', targetType: 'COMMUNITY_GROUP', targetLabel: 'Săn Mây Đà Lạt', notes: 'Tạo chủ đề cộng đồng mới', ip: '113.161.72.14', ua: 'Chrome 130.0 / Windows 11', before: null, after: { name: 'Săn Mây Đà Lạt', isDefault: false, isActive: true } },
+    ];
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      document.getElementById('toast-text').textContent = msg;
+      t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 2800);
+    }
+
+    // =========================================================================
+    // MULTI-PAGE ROUTER
+    // =========================================================================
+    function navigateRoute(route) {
+      closeRowMenu();
+      document.querySelectorAll('.route-page').forEach(el => el.classList.add('hidden'));
+      document.getElementById('route-' + route).classList.remove('hidden');
+
+      document.querySelectorAll('.sidebar-link').forEach(btn => {
+        if (btn.dataset.route === route) {
+          btn.className = 'sidebar-link w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-bold transition-all cursor-pointer bg-[#0194F3] text-white shadow-[0_4px_12px_rgba(1,148,243,0.25)]';
+        } else {
+          btn.className = 'sidebar-link w-full flex items-center justify-between px-3.5 py-3 rounded-2xl text-xs font-semibold text-slate-600 hover:bg-slate-100/80 hover:text-[#10243A] transition-all cursor-pointer';
+        }
+      });
+    }
+
+    // =========================================================================
+    // 3-DOTS DROPDOWN MENU CONTROLLER
+    // =========================================================================
+    function openRowMenu(event, itemsHtml) {
+      event.stopPropagation();
+      const menu = document.getElementById('row-action-menu');
+      menu.innerHTML = itemsHtml;
+      menu.classList.remove('hidden');
+
+      const rect = event.currentTarget.getBoundingClientRect();
+      const menuWidth = 192;
+      const top = Math.min(window.innerHeight - 160, rect.bottom + 6);
+      const left = Math.max(12, rect.right - menuWidth);
+
+      menu.style.top = top + 'px';
+      menu.style.left = left + 'px';
+    }
+
+    function closeRowMenu() {
+      document.getElementById('row-action-menu')?.classList.add('hidden');
+    }
+
+    document.addEventListener('click', () => closeRowMenu());
+
+    // =========================================================================
+    // AI MODERATION SWITCH (Inside Moderation Tab Only)
+    // =========================================================================
+    function toggleAiConfig() {
+      aiEnabled = !aiEnabled;
+      const sw = document.getElementById('mod-ai-switch');
+      const knob = document.getElementById('mod-ai-knob');
+      const badge = document.getElementById('mod-ai-status-badge');
+      const desc = document.getElementById('mod-ai-desc');
+
+      if (aiEnabled) {
+        sw.className = 'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-[#0194F3] transition-colors duration-200';
+        knob.className = 'pointer-events-none inline-block size-5 translate-x-5 transform rounded-full bg-white shadow-sm transition duration-200';
+        badge.textContent = 'Đang bật duyệt tự động 3 tầng';
+        badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700';
+        desc.textContent = 'Tự động lọc từ cấm & chấm điểm bài mới';
+      } else {
+        sw.className = 'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-slate-300 transition-colors duration-200';
+        knob.className = 'pointer-events-none inline-block size-5 translate-x-0 transform rounded-full bg-white shadow-sm transition duration-200';
+        badge.textContent = 'Đang tắt — Duyệt thủ công 100%';
+        badge.className = 'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700';
+        desc.textContent = 'Mọi bài viết mới sẽ vào hàng đợi Chờ duyệt';
+      }
+
+      auditLogs.unshift({
+        id: 'au-' + Date.now(),
+        time: 'Vừa xong',
+        actor: 'admin@tripgenie.vn',
+        action: 'UPDATE',
+        targetType: 'SYSTEM_SETTING',
+        targetLabel: 'Cấu hình AI Auto-Moderation',
+        notes: aiEnabled ? 'Bật tự động kiểm duyệt bằng AI' : 'Tắt AI — Chuyển sang duyệt thủ công',
+        ip: '127.0.0.1',
+        ua: 'Chrome 130.0 / Windows 11',
+        before: { aiModerationEnabled: !aiEnabled },
+        after: { aiModerationEnabled: aiEnabled }
+      });
+      renderAllTables();
+      showToast(aiEnabled ? 'Đã BẬT AI Auto-Moderation' : 'Đã TẮT AI — Chuyển sang duyệt thủ công');
+    }
+
+    // =========================================================================
+    // SLIDE-OVER SHEET & DIALOG CONTROLLERS
+    // =========================================================================
+    function openSheet(title, subtitle, htmlContent) {
+      closeRowMenu();
+      document.getElementById('sheet-title').textContent = title;
+      document.getElementById('sheet-subtitle').textContent = subtitle;
+      document.getElementById('sheet-body').innerHTML = htmlContent;
+      document.getElementById('sheet-backdrop').classList.remove('hidden');
+      document.getElementById('slide-sheet').classList.remove('translate-x-[110%]');
+    }
+
+    function closeSheet() {
+      document.getElementById('sheet-backdrop').classList.add('hidden');
+      document.getElementById('slide-sheet').classList.add('translate-x-[110%]');
+    }
+
+    function openDialog(title, htmlContent) {
+      closeRowMenu();
+      document.getElementById('dialog-title').textContent = title;
+      document.getElementById('dialog-body').innerHTML = htmlContent;
+      document.getElementById('dialog-backdrop').classList.remove('hidden');
+    }
+
+    function closeDialog() {
+      document.getElementById('dialog-backdrop').classList.add('hidden');
+    }
+
+    // =========================================================================
+    // 1. MODERATION PAGE
+    // =========================================================================
+    function filterModeration(f) {
+      modFilter = f;
+      document.querySelectorAll('.mod-pill').forEach(btn => {
+        if (btn.dataset.modfilter === f) {
+          btn.className = 'mod-pill px-4 py-2 rounded-xl text-xs font-bold bg-[#10243A] text-white cursor-pointer';
+        } else {
+          btn.className = 'mod-pill px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-900 cursor-pointer';
+        }
+      });
+      renderModerationPage();
+    }
+
+    function renderModerationPage() {
+      const q = (document.getElementById('mod-search')?.value || '').toLowerCase();
+      const filtered = moderationData.filter(m => {
+        const matchQ = m.title.toLowerCase().includes(q) || m.authorName.toLowerCase().includes(q);
+        if (!matchQ) return false;
+        if (modFilter === 'ALL') return true;
+        if (modFilter === 'HIGH_REPORT') return m.reportCount >= 20;
+        return m.status === modFilter;
+      });
+
+      document.getElementById('sidebar-mod-count').textContent = moderationData.length;
+      document.getElementById('moderation-page-tbody').innerHTML = filtered.map(item => `
+        <tr onclick="openPostReviewSheet('${item.id}')" class="hover:bg-slate-50/90 transition-colors cursor-pointer">
+          <td class="py-4 pr-4">
+            <div class="flex items-center gap-3.5">
+              <img src="${item.cover}" alt="" loading="lazy" decoding="async" class="size-11 rounded-2xl object-cover shrink-0 border border-slate-200">
+              <div>
+                <div class="font-bold text-[#10243A] line-clamp-1">${item.title}</div>
+                <span class="text-[11px] font-medium text-slate-400">${item.group}</span>
+              </div>
+            </div>
+          </td>
+          <td class="py-4 px-4">
+            <div class="flex items-center gap-2.5">
+              <img src="${item.authorAvatar}" alt="" loading="lazy" class="size-7 rounded-full object-cover">
+              <div>
+                <div class="font-bold text-slate-800">${item.authorName}</div>
+                <div class="text-[11px] text-slate-400">${item.authorEmail}</div>
+              </div>
+            </div>
+          </td>
+          <td class="py-4 px-4 whitespace-nowrap">
+            ${item.reportCount >= 20
+              ? `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-200 font-bold text-[11px]"><i class="fa-solid fa-fire"></i>${item.reportCount} Reports</span>`
+              : item.status === 'FLAGGED'
+                ? `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-bold text-[11px]"><i class="fa-solid fa-triangle-exclamation"></i>AI Nghi vấn</span>`
+                : `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-50 text-[#0194F3] border border-sky-200 font-bold text-[11px]"><i class="fa-regular fa-clock"></i>Chờ duyệt</span>`
+            }
+          </td>
+          <td class="py-4 px-4 text-slate-600 max-w-xs">
+            <p class="line-clamp-2 text-xs">${item.diagnosis}</p>
+          </td>
+          <td class="py-4 pl-4 text-right whitespace-nowrap">
+            <button onclick="openModerationMenu(event, '${item.id}')" class="size-8 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-[#10243A] inline-flex items-center justify-center cursor-pointer">
+              <i class="fa-solid fa-ellipsis text-sm"></i>
+            </button>
+          </td>
+        </tr>
+      `).join('') || `<tr><td colspan="5" class="py-12 text-center text-slate-400 font-semibold">Hàng đợi kiểm duyệt trống.</td></tr>`;
+    }
+
+    function openModerationMenu(e, id) {
+      openRowMenu(e, `
+        <button onclick="openPostReviewSheet('${id}')" class="w-full px-3.5 py-2.5 text-left hover:bg-slate-50 flex items-center gap-2.5 font-semibold text-slate-700 cursor-pointer">
+          <i class="fa-regular fa-eye w-4 text-slate-400"></i>
+          <span>Xem chi tiết & Phân xử</span>
+        </button>
+        <button onclick="submitModerationDecision('${id}', 'APPROVE')" class="w-full px-3.5 py-2.5 text-left hover:bg-emerald-50 flex items-center gap-2.5 font-semibold text-emerald-600 cursor-pointer">
+          <i class="fa-solid fa-check w-4"></i>
+          <span>Phê duyệt nhanh</span>
+        </button>
+        <button onclick="submitModerationDecision('${id}', 'REJECT')" class="w-full px-3.5 py-2.5 text-left hover:bg-rose-50 flex items-center gap-2.5 font-semibold text-rose-600 cursor-pointer">
+          <i class="fa-solid fa-ban w-4"></i>
+          <span>Từ chối / Gỡ bài</span>
+        </button>
+      `);
+    }
+
+    function openPostReviewSheet(id) {
+      const item = moderationData.find(x => x.id === id);
+      if (!item) return;
+      openSheet('Chi tiết Bài viết & Phân xử', item.group, `
+        <div class="space-y-5">
+          <div class="rounded-2xl overflow-hidden border border-slate-200 h-52 bg-slate-900">
+            <img src="${item.cover}" alt="" class="w-full h-full object-cover">
+          </div>
+          <div class="flex items-center gap-3 pb-3 border-b border-slate-100">
+            <img src="${item.authorAvatar}" alt="" class="size-10 rounded-full object-cover">
+            <div>
+              <div class="text-xs font-extrabold text-[#10243A]">${item.authorName}</div>
+              <div class="text-[11px] text-slate-400">${item.authorEmail}</div>
+            </div>
+          </div>
+          <div class="space-y-2">
+            <h4 class="text-base font-extrabold text-[#10243A]">${item.title}</h4>
+            <p class="text-xs text-slate-700 leading-relaxed p-4 rounded-2xl bg-[#F8FAFC] border border-slate-200/80">${item.caption}</p>
+          </div>
+          <div class="p-4 rounded-2xl ${item.reportCount >= 20 ? 'bg-rose-50 border border-rose-200 text-rose-900' : 'bg-amber-50 border border-amber-200 text-amber-900'} text-xs space-y-1">
+            <div class="font-extrabold">Chẩn đoán hệ thống</div>
+            <p>${item.diagnosis}</p>
+          </div>
+          <div class="space-y-1.5">
+            <label class="text-xs font-bold text-slate-700">Ghi chú quyết định:</label>
+            <textarea id="sheet-mod-note" rows="2" placeholder="Nhập lý do phê duyệt hoặc từ chối..." class="w-full p-3 rounded-2xl border border-slate-200 text-xs focus:outline-none focus:border-[#0194F3]"></textarea>
+          </div>
+          <div class="grid grid-cols-2 gap-3 pt-2">
+            <button onclick="submitModerationDecision('${item.id}', 'APPROVE')" class="h-11 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold cursor-pointer">
+              <i class="fa-solid fa-check mr-1.5"></i>${item.reportCount >= 20 ? 'Bác bỏ Report ảo' : 'Phê duyệt bài'}
+            </button>
+            <button onclick="submitModerationDecision('${item.id}', 'REJECT')" class="h-11 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold cursor-pointer">
+              <i class="fa-solid fa-ban mr-1.5"></i>Từ chối / Gỡ bài
+            </button>
+          </div>
+        </div>
+      `);
+    }
+
+    function submitModerationDecision(id, decision) {
+      const idx = moderationData.findIndex(m => m.id === id);
+      if (idx === -1) return;
+      const item = moderationData[idx];
+      const note = document.getElementById('sheet-mod-note')?.value?.trim() || (decision === 'APPROVE' ? 'Phê duyệt hiển thị / Bác bỏ report ảo' : 'Từ chối bài viết vi phạm');
+      moderationData.splice(idx, 1);
+
+      auditLogs.unshift({
+        id: 'au-' + Date.now(),
+        time: 'Vừa xong',
+        actor: 'admin@tripgenie.vn',
+        action: decision === 'APPROVE' ? 'APPROVE' : 'REJECT',
+        targetType: 'COMMUNITY_POST',
+        targetLabel: item.title,
+        notes: note,
+        ip: '127.0.0.1',
+        ua: 'Chrome 130.0 / Windows 11',
+        before: { status: item.status, reportCount: item.reportCount },
+        after: { status: decision === 'APPROVE' ? 'APPROVED' : 'REJECTED', moderationNote: note }
+      });
+
+      closeSheet();
+      renderAllTables();
+      showToast(decision === 'APPROVE' ? `Đã phê duyệt "${item.title}"` : `Đã gỡ bài "${item.title}"`);
+    }
+
+    // =========================================================================
+    // 2. USERS PAGE (3-Dots Actions Menu)
+    // =========================================================================
+    function renderUsersPage() {
+      const q = (document.getElementById('users-page-search')?.value || '').toLowerCase();
+      const statusFilter = document.getElementById('users-status-filter')?.value || 'ALL';
+
+      const filtered = usersData.filter(u => {
+        const matchQ = u.fullName.toLowerCase().includes(q) || u.email.toLowerCase().includes(q) || u.username.toLowerCase().includes(q);
+        if (!matchQ) return false;
+        if (statusFilter === 'ACTIVE') return u.isActive;
+        if (statusFilter === 'BANNED') return !u.isActive;
+        return true;
+      });
+
+      document.getElementById('sidebar-users-badge').textContent = usersData.length;
+
+      document.getElementById('users-page-tbody').innerHTML = filtered.map(u => `
+        <tr class="hover:bg-slate-50/90 transition-colors">
+          <td class="py-4 pr-4">
+            <div class="flex items-center gap-3">
+              <img src="${u.avatar}" alt="" loading="lazy" class="size-10 rounded-full object-cover">
+              <div>
+                <div class="font-bold text-[#10243A]">${u.fullName}</div>
+                <div class="text-[11px] text-slate-400">${u.email} • ${u.username}</div>
+              </div>
+            </div>
+          </td>
+          <td class="py-4 px-4">
+            ${u.isActive
+              ? `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[11px]"><i class="fa-regular fa-circle-check"></i>Đang hoạt động</span>`
+              : `<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-700 font-bold text-[11px]"><i class="fa-solid fa-ban"></i>Đã khóa</span>`
+            }
+          </td>
+          <td class="py-4 px-4 font-semibold text-slate-600">${u.posts} bài viết • ${u.itineraries} lịch trình</td>
+          <td class="py-4 px-4 text-slate-500 font-medium">${u.joined}</td>
+          <td class="py-4 pl-4 text-right whitespace-nowrap">
+            <button onclick="openUserRowMenu(event, '${u.id}')" class="size-8 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-[#10243A] inline-flex items-center justify-center cursor-pointer">
+              <i class="fa-solid fa-ellipsis text-sm"></i>
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function openUserRowMenu(e, id) {
+      const u = usersData.find(x => x.id === id);
+      if (!u) return;
+      openRowMenu(e, `
+        ${u.isActive
+          ? `<button onclick="openUserActionDialog('${u.id}', 'BAN')" class="w-full px-3.5 py-2.5 text-left hover:bg-rose-50 flex items-center gap-2.5 font-semibold text-rose-600 cursor-pointer">
+              <i class="fa-solid fa-lock w-4"></i>
+              <span>Khóa tài khoản</span>
+            </button>`
+          : `<button onclick="unbanUser('${u.id}')" class="w-full px-3.5 py-2.5 text-left hover:bg-emerald-50 flex items-center gap-2.5 font-semibold text-emerald-600 cursor-pointer">
+              <i class="fa-solid fa-lock-open w-4"></i>
+              <span>Mở khóa tài khoản</span>
+            </button>`
+        }
+        <button onclick="openUserActionDialog('${u.id}', 'PROMOTE')" class="w-full px-3.5 py-2.5 text-left hover:bg-slate-50 flex items-center gap-2.5 font-semibold text-slate-700 cursor-pointer">
+          <i class="fa-solid fa-user-shield w-4 text-[#0194F3]"></i>
+          <span>Thăng quyền Admin</span>
+        </button>
+      `);
+    }
+
+    function openUserActionDialog(id, mode) {
+      const u = usersData.find(x => x.id === id);
+      if (!u) return;
+      if (mode === 'BAN') {
+        openDialog('Khóa Tài khoản Người dùng', `
+          <div class="space-y-4 text-xs">
+            <p class="text-slate-600">Khóa tài khoản <b>${u.fullName}</b> (${u.email}) và thu hồi toàn bộ phiên đăng nhập hiện tại.</p>
+            <div class="space-y-1.5">
+              <label class="font-bold text-slate-700">Lý do khóa tài khoản *</label>
+              <input id="dialog-ban-reason" type="text" placeholder="Nhập lý do vi phạm..." class="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs">
+            </div>
+            <div class="flex justify-end gap-2 pt-2">
+              <button onclick="closeDialog()" class="px-4 py-2 rounded-xl border border-slate-200 font-bold text-slate-600 cursor-pointer">Hủy</button>
+              <button onclick="confirmBanUser('${u.id}')" class="px-4 py-2 rounded-xl bg-rose-600 text-white font-bold cursor-pointer">Xác nhận Khóa</button>
+            </div>
+          </div>
+        `);
+      } else {
+        openDialog('Thăng quyền Quản trị viên', `
+          <div class="space-y-4 text-xs">
+            <p class="text-slate-600 leading-relaxed">Thăng cấp một chiều tài khoản <b>${u.fullName}</b> (${u.email}) lên <b>ADMIN</b>.</p>
+            <div class="flex justify-end gap-2 pt-2">
+              <button onclick="closeDialog()" class="px-4 py-2 rounded-xl border border-slate-200 font-bold text-slate-600 cursor-pointer">Hủy</button>
+              <button onclick="confirmPromoteUser('${u.id}')" class="px-4 py-2 rounded-xl bg-[#0194F3] text-white font-bold cursor-pointer">Xác nhận Thăng Admin</button>
+            </div>
+          </div>
+        `);
+      }
+    }
+
+    function confirmBanUser(id) {
+      const r = document.getElementById('dialog-ban-reason')?.value?.trim() || '';
+      if (r.length < 3) return showToast('Vui lòng nhập lý do tối thiểu 3 ký tự');
+      const u = usersData.find(x => x.id === id);
+      if (!u) return;
+      u.isActive = false;
+      closeDialog();
+      renderAllTables();
+      showToast(`Đã khóa tài khoản ${u.email}`);
+    }
+
+    function unbanUser(id) {
+      const u = usersData.find(x => x.id === id);
+      if (!u) return;
+      u.isActive = true;
+      renderAllTables();
+      showToast(`Đã mở khóa tài khoản ${u.email}`);
+    }
+
+    function confirmPromoteUser(id) {
+      const idx = usersData.findIndex(x => x.id === id);
+      if (idx === -1) return;
+      const u = usersData[idx];
+      usersData.splice(idx, 1);
+      closeDialog();
+      renderAllTables();
+      showToast(`Đã thăng quyền ${u.email} lên ADMIN`);
+    }
+
+    // =========================================================================
+    // 3. PLACES PAGE (Explore-like Filters + Server-Side Pagination + 3-Dots)
+    // =========================================================================
+    function resetPlacePageAndRender() {
+      currentPlacePage = 1;
+      renderPlacesPage();
+    }
+
+    function changePlacePage(page) {
+      currentPlacePage = page;
+      renderPlacesPage();
+    }
+
+    function renderPlacesPage() {
+      const q = (document.getElementById('places-page-search')?.value || '').toLowerCase();
+      const area = document.getElementById('places-area-filter')?.value || 'ALL';
+      const cat = document.getElementById('places-cat-filter')?.value || 'ALL';
+
+      const hasFilter = q.length > 0 || area !== 'ALL' || cat !== 'ALL';
+      const filtered = placesData.filter(p => {
+        const matchQ = p.name.toLowerCase().includes(q) || p.address.toLowerCase().includes(q);
+        const matchArea = area === 'ALL' || p.area === area;
+        const matchCat = cat === 'ALL' || p.category === cat;
+        const matchPage = hasFilter ? true : (p.page === currentPlacePage || currentPlacePage > 2);
+        return matchQ && matchArea && matchCat && matchPage;
+      });
+
+      [1, 2, 3].forEach(num => {
+        const btn = document.getElementById('page-btn-' + num);
+        if (btn) {
+          btn.className = (num === currentPlacePage)
+            ? 'size-8 rounded-xl bg-[#0194F3] text-white font-bold text-xs cursor-pointer'
+            : 'size-8 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs cursor-pointer';
+        }
+      });
+
+      document.getElementById('places-pagination-info').innerHTML =
+        `Trang <b class="text-[#10243A]">${currentPlacePage} / 192</b> • Hiển thị <b class="text-[#10243A]">${filtered.length}</b> mục trên trang này (Tổng <b class="text-[#10243A]">3.842</b> địa điểm)`;
+
+      document.getElementById('places-page-tbody').innerHTML = filtered.map(p => `
+        <tr class="hover:bg-slate-50/90 transition-colors">
+          <td class="py-4 pr-4">
+            <div class="flex items-center gap-3.5">
+              <img src="${p.image}" alt="" loading="lazy" decoding="async" class="size-10 rounded-xl object-cover shrink-0 border border-slate-200">
+              <div>
+                <div class="font-bold text-[#10243A]">${p.name}</div>
+                <div class="text-[11px] text-slate-400">${p.address}</div>
+              </div>
+            </div>
+          </td>
+          <td class="py-4 px-4">
+            <span class="px-2.5 py-1 rounded-lg bg-[#E8F4FD] text-[#0194F3] font-bold text-[11px]">${p.area}</span>
+            <span class="text-slate-600 font-semibold ml-1.5">${p.category}</span>
+          </td>
+          <td class="py-4 px-4 text-slate-600 font-medium">${p.lat}, ${p.lng}</td>
+          <td class="py-4 px-4 font-semibold text-slate-600">${p.refs} lịch trình</td>
+          <td class="py-4 pl-4 text-right whitespace-nowrap">
+            <button onclick="openPlaceRowMenu(event, '${p.id}')" class="size-8 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-[#10243A] inline-flex items-center justify-center cursor-pointer">
+              <i class="fa-solid fa-ellipsis text-sm"></i>
+            </button>
+          </td>
+        </tr>
+      `).join('') || `<tr><td colspan="5" class="py-12 text-center text-slate-400 font-semibold">Không tìm thấy địa điểm phù hợp bộ lọc.</td></tr>`;
+    }
+
+    function openPlaceRowMenu(e, id) {
+      openRowMenu(e, `
+        <button onclick="openPlaceFormSheet('${id}')" class="w-full px-3.5 py-2.5 text-left hover:bg-slate-50 flex items-center gap-2.5 font-semibold text-slate-700 cursor-pointer">
+          <i class="fa-regular fa-pen-to-square w-4 text-slate-400"></i>
+          <span>Chỉnh sửa địa điểm</span>
+        </button>
+        <button onclick="deletePlaceSafe('${id}')" class="w-full px-3.5 py-2.5 text-left hover:bg-rose-50 flex items-center gap-2.5 font-semibold text-rose-600 cursor-pointer">
+          <i class="fa-regular fa-trash-can w-4"></i>
+          <span>Xóa mềm địa điểm</span>
+        </button>
+      `);
+    }
+
+    function openPlaceFormSheet(id) {
+      const p = placesData.find(x => x.id === id) || { name: '', address: '', area: 'Đà Lạt', category: 'Điểm tham quan', lat: 11.9404, lng: 108.4583, image: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=600&auto=format&fit=crop&q=80' };
+      const isNew = !id;
+      openSheet(isNew ? 'Thêm Địa điểm Du lịch Mới' : 'Chỉnh sửa Địa điểm', isNew ? 'Tự động kiểm tra tọa độ vùng TravelArea' : p.area, `
+        <div class="space-y-4 text-xs">
+          <div class="rounded-2xl overflow-hidden border border-slate-200 h-40">
+            <img src="${p.image}" alt="" class="w-full h-full object-cover">
+          </div>
+          <div class="space-y-1.5">
+            <label class="font-bold text-slate-700">Tên địa điểm du lịch *</label>
+            <input value="${p.name}" placeholder="Nhập tên địa điểm..." class="w-full h-10 px-3.5 rounded-xl border border-slate-200 font-semibold">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1.5">
+              <label class="font-bold text-slate-700">Khu vực (TravelArea)</label>
+              <select class="w-full h-10 px-3 rounded-xl border border-slate-200 font-semibold">
+                <option ${p.area === 'Đà Lạt' ? 'selected' : ''}>Đà Lạt</option>
+                <option ${p.area === 'Đà Nẵng' ? 'selected' : ''}>Đà Nẵng</option>
+                <option ${p.area === 'Phú Quốc' ? 'selected' : ''}>Phú Quốc</option>
+                <option ${p.area === 'Hội An' ? 'selected' : ''}>Hội An</option>
+              </select>
+            </div>
+            <div class="space-y-1.5">
+              <label class="font-bold text-slate-700">Danh mục</label>
+              <select class="w-full h-10 px-3 rounded-xl border border-slate-200 font-semibold">
+                <option ${p.category === 'Điểm tham quan' ? 'selected' : ''}>Điểm tham quan</option>
+                <option ${p.category === 'Ẩm thực' ? 'selected' : ''}>Ẩm thực</option>
+                <option ${p.category === 'Lưu trú' ? 'selected' : ''}>Lưu trú</option>
+                <option ${p.category === 'Cafe' ? 'selected' : ''}>Cafe</option>
+              </select>
+            </div>
+          </div>
+          <div class="space-y-1.5">
+            <label class="font-bold text-slate-700">Địa chỉ chi tiết *</label>
+            <input value="${p.address}" placeholder="Số nhà, đường, phường/xã..." class="w-full h-10 px-3.5 rounded-xl border border-slate-200">
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div class="space-y-1.5">
+              <label class="font-bold text-slate-700">Vĩ độ (Latitude)</label>
+              <input type="number" step="0.0001" value="${p.lat}" class="w-full h-10 px-3.5 rounded-xl border border-slate-200 font-semibold">
+            </div>
+            <div class="space-y-1.5">
+              <label class="font-bold text-slate-700">Kinh độ (Longitude)</label>
+              <input type="number" step="0.0001" value="${p.lng}" class="w-full h-10 px-3.5 rounded-xl border border-slate-200 font-semibold">
+            </div>
+          </div>
+          <button onclick="closeSheet(); showToast('Đã lưu địa điểm & đồng bộ tọa độ!')" class="w-full h-11 rounded-2xl bg-[#0194F3] hover:bg-[#0084DE] text-white font-bold cursor-pointer mt-2">
+            ${isNew ? 'Tạo Địa điểm' : 'Lưu Thay đổi'}
+          </button>
+        </div>
+      `);
+    }
+
+    function deletePlaceSafe(id) {
+      const idx = placesData.findIndex(x => x.id === id);
+      if (idx === -1) return;
+      const p = placesData[idx];
+      placesData.splice(idx, 1);
+      renderAllTables();
+      showToast(`Đã xóa mềm "${p.name}" (Bảo toàn ${p.refs} lịch trình)`);
+    }
+
+    // =========================================================================
+    // 4. COMMUNITY GROUPS PAGE (No Slug + Image Upload + 3-Dots Menu)
+    // =========================================================================
+    function renderGroupsPage() {
+      const q = (document.getElementById('groups-search')?.value || '').toLowerCase();
+      const filtered = groupsData.filter(g => g.name.toLowerCase().includes(q) || g.subtitle.toLowerCase().includes(q));
+
+      document.getElementById('sidebar-groups-badge').textContent = groupsData.length;
+      document.getElementById('groups-card-count').textContent = groupsData.length;
+
+      document.getElementById('groups-page-tbody').innerHTML = filtered.map(g => `
+        <tr class="hover:bg-slate-50/90 transition-colors">
+          <td class="py-4 pr-4">
+            <div class="flex items-center gap-3.5">
+              <img src="${g.cover}" alt="" loading="lazy" class="size-11 rounded-2xl object-cover border border-slate-200">
+              <div class="font-bold text-[#10243A] flex items-center gap-2">
+                <span>${g.name}</span>
+                ${g.isDefault ? `<span class="px-2 py-0.5 rounded-md bg-[#10243A] text-white text-[10px] font-bold">Mặc định</span>` : ''}
+              </div>
+            </div>
+          </td>
+          <td class="py-4 px-4 text-slate-600 font-medium">${g.subtitle || '—'}</td>
+          <td class="py-4 px-4 font-bold text-slate-700">${g.postCount} bài viết</td>
+          <td class="py-4 px-4"><span class="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold text-[11px]">Đang mở</span></td>
+          <td class="py-4 pl-4 text-right whitespace-nowrap">
+            <button onclick="openGroupRowMenu(event, '${g.id}')" class="size-8 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-[#10243A] inline-flex items-center justify-center cursor-pointer">
+              <i class="fa-solid fa-ellipsis text-sm"></i>
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function openGroupRowMenu(e, id) {
+      const g = groupsData.find(x => x.id === id);
+      if (!g) return;
+      openRowMenu(e, `
+        <button onclick="openGroupFormDialog('${g.id}')" class="w-full px-3.5 py-2.5 text-left hover:bg-slate-50 flex items-center gap-2.5 font-semibold text-slate-700 cursor-pointer">
+          <i class="fa-regular fa-pen-to-square w-4 text-slate-400"></i>
+          <span>Chỉnh sửa chủ đề</span>
+        </button>
+        ${g.isDefault
+          ? `<div class="px-3.5 py-2 text-[11px] text-slate-300 font-semibold flex items-center gap-2.5 cursor-not-allowed">
+              <i class="fa-solid fa-shield w-4"></i>
+              <span>Nhóm mặc định (Khóa xóa)</span>
+            </div>`
+          : `<button onclick="deleteGroupItem('${g.id}')" class="w-full px-3.5 py-2.5 text-left hover:bg-rose-50 flex items-center gap-2.5 font-semibold text-rose-600 cursor-pointer">
+              <i class="fa-regular fa-trash-can w-4"></i>
+              <span>Xóa mềm chủ đề</span>
+            </button>`
+        }
+      `);
+    }
+
+    function handleGroupFileSelect(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        uploadedGroupCoverTemp = e.target.result;
+        const preview = document.getElementById('group-cover-preview');
+        const urlInput = document.getElementById('group-cover-url-input');
+        if (preview) preview.src = uploadedGroupCoverTemp;
+        if (urlInput) urlInput.value = file.name + ' (Đã tải lên)';
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function openGroupFormDialog(id) {
+      const g = groupsData.find(x => x.id === id) || {
+        name: '',
+        subtitle: '',
+        cover: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=200&auto=format&fit=crop&q=80'
+      };
+      uploadedGroupCoverTemp = g.cover;
+
+      openDialog(id ? 'Chỉnh sửa Chủ đề Cộng đồng' : 'Tạo Chủ đề Cộng đồng Mới', `
+        <div class="space-y-4 text-xs">
+          <!-- Image Upload + Preview (Like CreateGroupModal.tsx) -->
+          <div class="flex items-center gap-3.5 p-3 rounded-2xl bg-[#F8FAFC] border border-slate-200/80">
+            <img id="group-cover-preview" src="${g.cover}" alt="Preview" class="size-14 rounded-2xl object-cover border border-slate-200 shrink-0">
+            <div class="flex-1 min-w-0 space-y-2">
+              <div class="font-bold text-slate-700">Hình ảnh đại diện chủ đề</div>
+              <div class="flex items-center gap-2">
+                <label class="h-9 px-3 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] text-white font-bold inline-flex items-center gap-1.5 cursor-pointer shrink-0 transition-colors">
+                  <i class="fa-solid fa-cloud-arrow-up"></i>
+                  <span>Tải ảnh lên</span>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" onchange="handleGroupFileSelect(event)" class="hidden">
+                </label>
+                <input id="group-cover-url-input" type="text" value="${id ? g.cover : ''}" oninput="uploadedGroupCoverTemp = this.value; document.getElementById('group-cover-preview').src = this.value || '${g.cover}'" placeholder="Hoặc dán URL ảnh..." class="flex-1 min-w-0 h-9 px-3 rounded-xl border border-slate-200 bg-white text-xs">
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-1.5">
+            <label class="font-bold text-slate-700">Tên chủ đề cộng đồng *</label>
+            <input id="group-name-input" value="${g.name}" placeholder="VD: Săn Mây & Núi Rừng" class="w-full h-10 px-3.5 rounded-xl border border-slate-200 font-semibold">
+          </div>
+
+          <div class="space-y-1.5">
+            <label class="font-bold text-slate-700">Điểm đến tiêu biểu / Mô tả ngắn</label>
+            <input id="group-subtitle-input" value="${g.subtitle}" placeholder="VD: Đà Lạt, Tà Xùa, Hà Giang" class="w-full h-10 px-3.5 rounded-xl border border-slate-200">
+          </div>
+
+          <div class="flex justify-end gap-2 pt-2">
+            <button onclick="closeDialog()" class="px-4 py-2 rounded-xl border border-slate-200 font-bold text-slate-600 cursor-pointer">Hủy</button>
+            <button onclick="saveGroupDialog('${id || ''}')" class="px-4 py-2 rounded-xl bg-[#0194F3] text-white font-bold cursor-pointer">
+              ${id ? 'Lưu thay đổi' : 'Tạo chủ đề'}
+            </button>
+          </div>
+        </div>
+      `);
+    }
+
+    function saveGroupDialog(id) {
+      const name = document.getElementById('group-name-input')?.value?.trim();
+      const subtitle = document.getElementById('group-subtitle-input')?.value?.trim() || '';
+      if (!name) return showToast('Vui lòng nhập tên chủ đề cộng đồng!');
+
+      if (id) {
+        const g = groupsData.find(x => x.id === id);
+        if (g) {
+          g.name = name;
+          g.subtitle = subtitle;
+          g.cover = uploadedGroupCoverTemp || g.cover;
+        }
+        showToast(`Đã cập nhật chủ đề "${name}"`);
+      } else {
+        groupsData.push({
+          id: 'gr-' + Date.now(),
+          name,
+          subtitle,
+          postCount: 0,
+          isDefault: false,
+          cover: uploadedGroupCoverTemp || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=200&auto=format&fit=crop&q=80'
+        });
+        showToast(`Đã tạo chủ đề "${name}"`);
+      }
+
+      closeDialog();
+      renderAllTables();
+    }
+
+    function deleteGroupItem(id) {
+      const idx = groupsData.findIndex(x => x.id === id);
+      if (idx === -1) return;
+      const g = groupsData[idx];
+      groupsData.splice(idx, 1);
+      renderAllTables();
+      showToast(`Đã xóa mềm chủ đề "${g.name}"`);
+    }
+
+    // =========================================================================
+    // 5. AUDIT LOGS PAGE & DIFF SHEET (3-Dots Menu)
+    // =========================================================================
+    function renderAuditTables() {
+      const actionFilter = document.getElementById('audit-action-filter')?.value || 'ALL';
+      const filtered = auditLogs.filter(a => actionFilter === 'ALL' || a.action === actionFilter);
+
+      document.getElementById('sidebar-audit-badge').textContent = auditLogs.length;
+      const cardEl = document.getElementById('audit-total-card');
+      if (cardEl) cardEl.textContent = auditLogs.length;
+
+      const buildRows = (list) => list.map(a => `
+        <tr onclick="openAuditDiffSheet('${a.id}')" class="hover:bg-slate-50/90 transition-colors cursor-pointer">
+          <td class="py-4 pr-4 text-slate-500 font-medium">${a.time}</td>
+          <td class="py-4 px-4 font-bold text-[#10243A]">${a.actor}</td>
+          <td class="py-4 px-4">
+            <span class="px-2.5 py-1 rounded-full font-extrabold text-[10px] ${
+              a.action === 'BAN' || a.action === 'REJECT' || a.action === 'DELETE'
+                ? 'bg-rose-50 text-rose-600'
+                : 'bg-[#E8F4FD] text-[#0194F3]'
+            }">${a.action}</span>
+          </td>
+          <td class="py-4 px-4 font-bold text-slate-800">${a.targetLabel}</td>
+          <td class="py-4 px-4 text-slate-500 max-w-xs truncate">${a.notes}</td>
+          <td class="py-4 pl-4 text-right whitespace-nowrap">
+            <button onclick="openAuditRowMenu(event, '${a.id}')" class="size-8 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-[#10243A] inline-flex items-center justify-center cursor-pointer">
+              <i class="fa-solid fa-ellipsis text-sm"></i>
+            </button>
+          </td>
+        </tr>
+      `).join('');
+
+      document.getElementById('dashboard-audit-tbody').innerHTML = buildRows(auditLogs.slice(0, 4));
+      document.getElementById('audit-page-tbody').innerHTML = buildRows(filtered);
+    }
+
+    function openAuditRowMenu(e, id) {
+      openRowMenu(e, `
+        <button onclick="openAuditDiffSheet('${id}')" class="w-full px-3.5 py-2.5 text-left hover:bg-slate-50 flex items-center gap-2.5 font-semibold text-slate-700 cursor-pointer">
+          <i class="fa-solid fa-code-compare w-4 text-[#0194F3]"></i>
+          <span>Xem chi tiết thay đổi</span>
+        </button>
+      `);
+    }
+
+    function openAuditDiffSheet(id) {
+      const a = auditLogs.find(x => x.id === id) || auditLogs[0];
+      openSheet('Chi tiết Nhật ký Kiểm toán', `${a.action} • ${a.time}`, `
+        <div class="space-y-4 text-xs">
+          <div class="p-4 rounded-2xl bg-[#F8FAFC] border border-slate-200 space-y-2">
+            <div class="flex justify-between"><span class="text-slate-400">Quản trị viên:</span><span class="font-bold">${a.actor}</span></div>
+            <div class="flex justify-between"><span class="text-slate-400">Địa chỉ IP:</span><span class="font-bold text-[#0194F3]">${a.ip}</span></div>
+            <div class="flex justify-between"><span class="text-slate-400">Thiết bị:</span><span class="font-medium">${a.ua}</span></div>
+            <div class="flex justify-between"><span class="text-slate-400">Ghi chú:</span><span class="font-semibold">${a.notes}</span></div>
+          </div>
+          <div class="space-y-1.5">
+            <div class="font-bold text-slate-500">Dữ liệu trước thao tác:</div>
+            <pre class="p-4 rounded-2xl bg-slate-900 text-slate-200 text-xs overflow-x-auto">${JSON.stringify(a.before, null, 2)}</pre>
+          </div>
+          <div class="space-y-1.5">
+            <div class="font-bold text-emerald-700">Dữ liệu sau thao tác:</div>
+            <pre class="p-4 rounded-2xl bg-emerald-950 text-emerald-200 text-xs overflow-x-auto">${JSON.stringify(a.after, null, 2)}</pre>
+          </div>
+        </div>
+      `);
+    }
+
+    function renderAllTables() {
+      renderModerationPage();
+      renderUsersPage();
+      renderPlacesPage();
+      renderGroupsPage();
+      renderAuditTables();
+    }
+
+    renderAllTables();
+  </script>
+</body>
+</html>

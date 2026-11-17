@@ -186,7 +186,11 @@ function AvatarPickerContent({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={onOpenChange}
+      disablePointerDismissal={true}
+    >
       <DialogContent className="sm:max-w-[540px] p-6 rounded-3xl">
         <DialogHeader className="text-center sm:text-center pb-2">
           <DialogTitle className="text-lg font-bold font-heading text-center">

@@ -17,6 +17,7 @@ import type {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useAuthModalStore } from "@/features/auth/stores/auth-modal.store";
 import {
   usePostComments,
   useCommentContext,
@@ -229,12 +230,13 @@ function StickyCommentComposer({
         <p className="text-xs font-medium text-[#64748B]">
           Đăng nhập để tham gia bình luận và đặt câu hỏi cho tác giả bài viết.
         </p>
-        <Link
-          href="/login"
-          className="h-9 px-4 rounded-xl bg-[#0194F3] hover:bg-[#007FE3] text-white text-xs font-bold inline-flex items-center justify-center shrink-0 transition-colors"
+        <button
+          type="button"
+          onClick={() => useAuthModalStore.getState().openAuthModal("login")}
+          className="h-9 px-4 rounded-xl bg-[#0194F3] hover:bg-[#007FE3] text-white text-xs font-bold inline-flex items-center justify-center shrink-0 transition-colors cursor-pointer"
         >
           Đăng nhập
-        </Link>
+        </button>
       </div>
     );
   }

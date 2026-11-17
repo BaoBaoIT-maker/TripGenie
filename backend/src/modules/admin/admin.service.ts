@@ -1045,14 +1045,50 @@ export class AdminService {
         throw new BadRequestException(ADMIN_ERRORS.CANNOT_DELETE_DEFAULT_GROUP);
       }
 
+      // Reassign all posts in this sub-group to the default group so they are removed
+      // from the sub-topic but preserved in the general community feed.
+      const defaultGroup = await tx.communityGroup.findFirst({
+        where: { isDefault: true, deletedAt: null },
+      });
+
+      if (defaultGroup) {
+        await tx.communityPost.updateMany({
+          where: { groupId },
+          data: { groupId: defaultGroup.id },
+        });
+      } else {
+        await tx.communityPost.updateMany({
+          where: { groupId },
+          data: { groupId: null },
+        });
+      }
+
       const deletedAt = new Date();
       await tx.communityGroup.update({
         where: { id: groupId },
         data: {
           deletedAt,
           isActive: false,
+          postCount: 0,
         },
       });
+
+      // Recalculate post counts for all active groups
+      if (typeof tx.$executeRaw === 'function') {
+        await tx.$executeRaw`
+          UPDATE community_groups cg
+          SET post_count = CASE
+            WHEN cg.is_default = true THEN (
+              SELECT COUNT(*)::int FROM community_posts cp
+              WHERE cp.deleted_at IS NULL AND cp.moderation_status = 'APPROVED'
+            )
+            ELSE (
+              SELECT COUNT(*)::int FROM community_posts cp
+              WHERE cp.group_id = cg.id AND cp.deleted_at IS NULL AND cp.moderation_status = 'APPROVED'
+            )
+          END;
+        `;
+      }
 
       await this.logAudit(
         {

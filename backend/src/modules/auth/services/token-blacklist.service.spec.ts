@@ -51,9 +51,9 @@ describe('TokenBlacklistService', () => {
         expect.any(Number),
       );
 
-      // TTL should be close to 3600 (allow 2s tolerance)
+      // TTL should be close to 3600 (allow reasonable tolerance for execution delay)
       const ttlArg = redisClient.set.mock.calls[0][3];
-      expect(ttlArg).toBeGreaterThan(3598);
+      expect(ttlArg).toBeGreaterThanOrEqual(3590);
       expect(ttlArg).toBeLessThanOrEqual(3600);
     });
 

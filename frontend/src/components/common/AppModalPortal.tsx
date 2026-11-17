@@ -15,6 +15,8 @@ export interface AppModalPortalProps {
   maxWidthClass?: string;
   dialogClassName?: string;
   disableClose?: boolean;
+  /** Whether clicking the backdrop closes the modal. Defaults to true. */
+  closeOnBackdropClick?: boolean;
   /** Render bottom-aligned sheet on mobile viewports (<640px), centered dialog on sm+. */
   mobileBottomSheet?: boolean;
   children: React.ReactNode;
@@ -32,6 +34,7 @@ export function AppModalPortal({
   maxWidthClass = "max-w-2xl",
   dialogClassName,
   disableClose = false,
+  closeOnBackdropClick = true,
   mobileBottomSheet = false,
   children,
 }: AppModalPortalProps) {
@@ -58,7 +61,11 @@ export function AppModalPortal({
           : "items-center p-3 sm:p-4",
       )}
       onClick={(e) => {
-        if (e.target === e.currentTarget && !disableClose) {
+        if (
+          e.target === e.currentTarget &&
+          !disableClose &&
+          closeOnBackdropClick
+        ) {
           onClose();
         }
       }}

@@ -45,8 +45,9 @@ CREATE TYPE audit_action_enum     AS ENUM (
     'TRIGGER_CRAWL', 'CANCEL_CRAWL'
 );
 -- [HIGH] Enum cho content report
-CREATE TYPE report_type_enum      AS ENUM ('SPAM', 'INAPPROPRIATE', 'FALSE_INFO', 'COPYRIGHT', 'OTHER');
-CREATE TYPE report_status_enum    AS ENUM ('PENDING', 'REVIEWING', 'RESOLVED', 'DISMISSED');
+CREATE TYPE report_target_type_enum AS ENUM ('PLACE', 'REVIEW', 'POST', 'COMMENT', 'USER', 'COMMUNITY_GROUP');
+CREATE TYPE report_type_enum        AS ENUM ('SPAM', 'INAPPROPRIATE', 'FALSE_INFO', 'COPYRIGHT', 'OTHER');
+CREATE TYPE report_status_enum      AS ENUM ('PENDING', 'REVIEWING', 'RESOLVED', 'DISMISSED');
 
 -- =============================================================================
 -- 3. PHÂN HỆ QUẢN LÝ NGƯỜI DÙNG & XÁC THỰC (USER & AUTH)
@@ -465,10 +466,7 @@ CREATE TABLE content_reports (
 
     -- Polymorphic target: report cÃ³ thá»ƒ nháº¯m vÃ o post, comment, review, hoáº·c place
     -- CHECK constraint thay vÃ¬ FK vÃ¬ SQL khÃ´ng há»— trá»£ polymorphic FK
-    target_type     VARCHAR(50) NOT NULL,
-    CONSTRAINT chk_report_target_type CHECK (
-        target_type IN ('post', 'comment', 'review', 'place')
-    ),
+    target_type     report_target_type_enum NOT NULL,
     target_id       UUID NOT NULL,
 
     report_type     report_type_enum NOT NULL,
@@ -566,8 +564,9 @@ CREATE TABLE audit_logs (
     -- CHECK constraint thay vÃ¬ FK vÃ¬ SQL khÃ´ng há»— trá»£ polymorphic FK
     target_type   VARCHAR(50) NOT NULL,
     CONSTRAINT chk_audit_target_type CHECK (
-        target_type IN ('place', 'review', 'user', 'crawl_job',
-                        'itinerary', 'community_post', 'post_comment')
+        lower(target_type) IN ('place', 'review', 'user', 'crawl_job',
+                               'itinerary', 'community_post', 'post_comment',
+                               'community_group', 'content_report', 'travel_area', 'system_setting')
     ),
     target_id     UUID,                   -- NULL cho actions khÃ´ng cÃ³ entity cá»¥ thá»ƒ
     target_label  TEXT,                   -- Human-readable: "NhÃ  hÃ ng ABC" (snapshot tÃªn lÃºc Ä‘Ã³)

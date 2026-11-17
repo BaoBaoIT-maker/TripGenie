@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="vi" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TripGenie — Nền tảng Du lịch Thông minh Việt Nam</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            brand: {
+              DEFAULT: '#0194F3',
+              hover: '#0084DE',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .hero-text-shadow {
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.45);
+    }
+    .hero-subtext-shadow {
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.35);
+    }
+
+    /* Keyframe Animations cho Timeline & Micro-interactions */
+    @keyframes travelPulse {
+      0% { transform: translateY(-100%); opacity: 0; }
+      50% { opacity: 1; }
+      100% { transform: translateY(220%); opacity: 0; }
+    }
+    .animate-travel {
+      animation: travelPulse 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    }
+
+    @keyframes stopEnter {
+      0% { opacity: 0; transform: translateY(10px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    .stop-enter {
+      animation: stopEnter 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    @keyframes badgeBounce {
+      0% { transform: scale(0.9); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+    .badge-bounce {
+      animation: badgeBounce 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+  </style>
+</head>
+<body class="bg-white text-slate-800 selection:bg-[#0194F3] selection:text-white">
+
+  <!-- =========================================================================
+       SECTION 1: HERO SECTION CHUẨN NGUYÊN BẢN (KHÁM PHÁ VIỆT NAM THEO CÁCH CỦA BẠN)
+       ========================================================================= -->
+  <header class="relative min-h-[92vh] flex flex-col justify-between overflow-hidden bg-slate-950 text-white">
+    <!-- Local Hero Video Player -->
+    <div class="absolute inset-0 z-0 overflow-hidden">
+      <video id="heroVideo" autoplay loop muted playsinline poster="https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=1920&auto=format&fit=crop&q=80" class="w-full h-full object-cover">
+        <source src="../../frontend/public/videos/hero.mp4" type="video/mp4">
+      </video>
+      <!-- Dark Vignette Scrim (Giữ độ nét video, tăng tương phản chữ) -->
+      <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/75"></div>
+    </div>
+
+    <!-- Floating Top Navigation -->
+    <nav class="relative z-30 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-5 flex items-center justify-between">
+      <!-- Brand Logo -->
+      <a href="#" class="flex items-center gap-3 group">
+        <img
+          src="../../frontend/public/images/logo_transparent.png"
+          alt="TripGenie Logo"
+          class="h-10 sm:h-11 w-auto object-contain transition-transform group-hover:scale-105"
+        />
+        <div>
+          <span class="text-xl font-bold tracking-tight text-white drop-shadow-sm block">
+            TripGenie
+          </span>
+          <span class="block text-[10px] uppercase font-semibold tracking-wider text-slate-200 -mt-0.5">
+            Nền Tảng Du Lịch Thông Minh
+          </span>
+        </div>
+      </a>
+
+      <!-- Center Links -->
+      <div class="hidden md:flex items-center justify-center gap-8 text-sm font-semibold text-white/95">
+        <a href="#destinations" class="hover:text-[#38BDF8] transition-colors">Điểm đến</a>
+        <a href="#features" class="hover:text-[#38BDF8] transition-colors">Tính năng</a>
+        <a href="#food-guide" class="hover:text-[#38BDF8] transition-colors">Cẩm nang</a>
+      </div>
+
+      <!-- Auth CTAs -->
+      <div class="flex items-center gap-3">
+        <a href="#" class="hidden sm:inline-flex px-3.5 py-1.5 text-sm font-semibold text-white hover:text-[#38BDF8] transition-colors">
+          Đăng nhập
+        </a>
+        <a href="#" class="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-[#0194F3] hover:bg-[#0084DE] text-white transition-all shadow-md active:scale-98">
+          Bắt đầu miễn phí
+        </a>
+      </div>
+    </nav>
+
+    <!-- Center Hero Content (CHỮ NGUYÊN BẢN 100%) -->
+    <div class="relative z-20 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10 sm:py-16 text-center space-y-6 my-auto">
+      <!-- Tag Pill Badge -->
+      <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-semibold tracking-wide shadow-sm">
+        <span>Nền tảng Lập Kế hoạch Du lịch & Đồng hành Thời gian thực</span>
+      </div>
+
+      <!-- Headline: Khám phá Việt Nam, theo cách của riêng bạn (font-bold chuẩn nét) -->
+      <h1 class="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-bold text-white tracking-tight leading-[1.14] hero-text-shadow">
+        Khám phá Việt Nam,
+        <br />
+        <span class="block text-white mt-1">theo cách của riêng bạn</span>
+      </h1>
+
+      <!-- Subtitle nguyên bản -->
+      <p class="max-w-2xl mx-auto text-sm sm:text-base md:text-lg text-white/95 leading-relaxed font-normal hero-subtext-shadow">
+        Tự động sắp xếp lịch trình chi tiết từng giờ, tính toán chi phí minh bạch và đồng bộ thời gian thực cùng hội bạn thân mà không cần ghi chép thủ công.
+      </p>
+
+      <!-- Translucent Search Capsule Bar -->
+      <div class="w-full max-w-2xl mx-auto space-y-3 pt-2 text-left">
+        <form id="heroSearchForm" class="flex items-center gap-2 p-1.5 sm:p-2 rounded-full bg-white/90 hover:bg-white focus-within:bg-white backdrop-blur-xl border border-white/50 shadow-2xl transition-all focus-within:ring-4 focus-within:ring-sky-400/25">
+          <div class="pl-3.5 text-slate-400 flex items-center pointer-events-none">
+            <i class="fa-solid fa-magnifying-glass text-sm text-slate-500"></i>
+          </div>
+          <input
+            id="heroInput"
+            type="text"
+            placeholder="Tìm điểm đến, món ngon, quán cafe..."
+            class="flex-1 min-w-0 bg-transparent py-2 text-xs sm:text-sm font-semibold text-slate-900 placeholder:text-slate-500 focus:outline-none"
+          />
+          <button
+            type="submit"
+            class="h-9 sm:h-10 px-5 sm:px-6 rounded-full bg-[#0194F3] hover:bg-[#0084DE] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-500/25 shrink-0 cursor-pointer"
+          >
+            <i class="fa-solid fa-magnifying-glass text-xs"></i>
+            <span>Khám phá</span>
+          </button>
+        </form>
+
+        <!-- Quick Hot Suggestions -->
+        <div class="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1 text-xs">
+          <span class="text-white/80 font-semibold text-[11px] uppercase tracking-wider shrink-0 drop-shadow-xs">Gợi ý hot:</span>
+          <button type="button" onclick="selectSuggestion('Hạ Long', 'Vịnh Hạ Long, Quảng Ninh')" class="px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/30 text-white border border-white/25 whitespace-nowrap transition-colors cursor-pointer text-xs">
+            Hạ Long
+          </button>
+          <button type="button" onclick="selectSuggestion('Đà Nẵng', 'Bán đảo Sơn Trà & Biển Mỹ Khê, Đà Nẵng')" class="px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/30 text-white border border-white/25 whitespace-nowrap transition-colors cursor-pointer text-xs">
+            Đà Nẵng
+          </button>
+          <button type="button" onclick="selectSuggestion('Hội An', 'Phố cổ Hội An, Quảng Nam')" class="px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/30 text-white border border-white/25 whitespace-nowrap transition-colors cursor-pointer text-xs">
+            Phố cổ Hội An
+          </button>
+          <button type="button" onclick="selectSuggestion('Hà Nội', 'Hồ Gươm & Phố Cổ 36 Phố, Hà Nội')" class="px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/30 text-white border border-white/25 whitespace-nowrap transition-colors cursor-pointer text-xs">
+            Hà Nội 36 phố
+          </button>
+          <button type="button" onclick="selectSuggestion('Đà Lạt', 'Hồ Tuyền Lâm & Rừng Thông, Đà Lạt')" class="px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/30 text-white border border-white/25 whitespace-nowrap transition-colors cursor-pointer text-xs">
+            Đà Lạt
+          </button>
+          <button type="button" onclick="selectSuggestion('Phú Quốc', 'Bãi Sao & Hòn Thơm, Phú Quốc')" class="px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/30 text-white border border-white/25 whitespace-nowrap transition-colors cursor-pointer text-xs">
+            Phú Quốc
+          </button>
+          <button type="button" onclick="selectSuggestion('Sa Pa', 'Đèo Ô Quy Hồ & Bản Tả Van, Sa Pa')" class="px-2.5 py-1 rounded-full bg-white/15 hover:bg-white/30 text-white border border-white/25 whitespace-nowrap transition-colors cursor-pointer text-xs">
+            Sa Pa mây ngàn
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hero Bottom Bar -->
+    <div class="relative z-20 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-5 flex items-center justify-between text-xs">
+      <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/95 border border-slate-200 shadow-sm text-slate-800">
+        <i class="fa-solid fa-location-dot text-[#0194F3]"></i>
+        <strong id="heroLocationTitle" class="text-slate-900 font-semibold">Vịnh Hạ Long, Quảng Ninh</strong>
+        <span class="text-slate-300">•</span>
+        <span class="text-[#0194F3] font-bold">28°C Nắng đẹp</span>
+      </div>
+
+      <div class="hidden sm:flex items-center gap-2 text-slate-300 font-medium">
+        <span>Cuộn xuống xem tiếp</span>
+        <i class="fa-solid fa-arrow-down text-xs"></i>
+      </div>
+    </div>
+  </header>
+
+  <!-- =========================================================================
+       SECTION 2: NHỮNG ĐIỂM ĐẾN ĐÁNG TRẢI NGHIỆM (GỌN GÀNG, KHÔNG TRÀN MÀN HÌNH, XẾP CHỒNG CHUẨN)
+       ========================================================================= -->
+  <section id="destinations" class="relative py-12 sm:py-16 bg-gradient-to-b from-[#F5F9FF] via-[#F0F7FF] to-[#F8FAFC] border-b border-slate-200/60 overflow-hidden">
+    <!-- Subtle Topographic Dot Mesh -->
+    <div class="absolute inset-0 pointer-events-none opacity-[0.035] bg-[radial-gradient(#0194F3_1px,transparent_1px)] [background-size:24px_24px]"></div>
+
+    <div class="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 sm:space-y-8">
+      <!-- Section Header -->
+      <div class="text-center space-y-2 max-w-2xl mx-auto">
+        <h2 class="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight leading-tight">
+          Những điểm đến đáng trải nghiệm
+        </h2>
+        <div>
+          <a href="#" class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-500 hover:text-[#0194F3] transition-colors group">
+            <span>Xem bản đồ 34 tỉnh thành</span>
+            <i class="fa-solid fa-arrow-right text-xs group-hover:translate-x-0.5 transition-transform"></i>
+          </a>
+        </div>
+      </div>
+
+      <!-- Overlapping Card Deck Stage (Kích thước nhỏ gọn thanh lịch, bao bọc trong max-w-4xl, KHÔNG tràn) -->
+      <div class="relative py-2 max-w-4xl mx-auto overflow-hidden">
+        <!-- Prev & Next Floating Buttons for Quick Cycling -->
+        <button
+          type="button"
+          onclick="navigateDestination(-1)"
+          aria-label="Điểm đến trước"
+          class="absolute left-2 sm:left-4 top-1/2 -translate-y-1/2 z-40 size-8 sm:size-10 rounded-full bg-white/95 hover:bg-white text-slate-700 shadow-md border border-slate-200/80 flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95"
+        >
+          <i class="fa-solid fa-chevron-left text-xs sm:text-sm"></i>
+        </button>
+
+        <button
+          type="button"
+          onclick="navigateDestination(1)"
+          aria-label="Điểm đến tiếp theo"
+          class="absolute right-2 sm:right-4 top-1/2 -translate-y-1/2 z-40 size-8 sm:size-10 rounded-full bg-white/95 hover:bg-white text-slate-700 shadow-md border border-slate-200/80 flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95"
+        >
+          <i class="fa-solid fa-chevron-right text-xs sm:text-sm"></i>
+        </button>
+
+        <!-- Stacking Track: Xếp chồng tỉ lệ chuẩn, kích thước nhỏ vừa mắt -->
+        <div
+          id="seasonalCardsTrack"
+          class="flex items-center justify-center py-6 px-4 select-none"
+        >
+          <!-- 1. Mù Cang Chải -->
+          <div
+            id="dest-card-0"
+            onclick="setDestination(0)"
+            onmouseenter="setDestination(0)"
+            class="dest-card group shrink-0 relative rounded-2xl overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] cursor-pointer border border-white/50 w-[155px] sm:w-[195px] md:w-[230px] lg:w-[250px] h-[260px] sm:h-[310px] md:h-[340px] lg:h-[360px] first:ml-0 -ml-14 sm:-ml-18 md:-ml-20 lg:-ml-22"
+          >
+            <img src="https://images.unsplash.com/photo-1609412058473-c199497c3c5d?w=800&auto=format&fit=crop&q=85" alt="Mùa Vàng Mù Cang Chải" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 via-45% to-transparent pointer-events-none"></div>
+            <div class="absolute bottom-0 inset-x-0 p-3.5 sm:p-5 space-y-1 sm:space-y-1.5 text-white pointer-events-none">
+              <h3 class="text-sm sm:text-base md:text-lg font-bold text-white tracking-tight leading-snug group-hover:text-sky-200 transition-colors">
+                Mù Cang Chải
+              </h3>
+              <div id="dest-details-0" class="space-y-1 overflow-hidden transition-all duration-300 ease-out max-h-0 opacity-0 -translate-y-2">
+                <div class="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold text-white/95 drop-shadow-sm">
+                  <i class="fa-solid fa-cloud-sun text-amber-300 text-[10px]"></i>
+                  <span>18°C</span>
+                  <span class="text-white/40">•</span>
+                  <span class="text-white/90 font-normal">Nắng thu dịu mát</span>
+                </div>
+                <p class="text-[11px] sm:text-xs text-slate-200/90 font-normal leading-relaxed line-clamp-2">
+                  Thung lũng sóng lúa bậc thang chạm mây trời rực rỡ Tây Bắc.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Trà Sư -->
+          <div
+            id="dest-card-1"
+            onclick="setDestination(1)"
+            onmouseenter="setDestination(1)"
+            class="dest-card group shrink-0 relative rounded-2xl overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] cursor-pointer border border-white/50 w-[155px] sm:w-[195px] md:w-[230px] lg:w-[250px] h-[260px] sm:h-[310px] md:h-[340px] lg:h-[360px] first:ml-0 -ml-14 sm:-ml-18 md:-ml-20 lg:-ml-22"
+          >
+            <img src="https://images.unsplash.com/photo-1580630873708-e0475b1856c4?w=800&auto=format&fit=crop&q=85" alt="Mùa Nước Nổi Trà Sư" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 via-45% to-transparent pointer-events-none"></div>
+            <div class="absolute bottom-0 inset-x-0 p-3.5 sm:p-5 space-y-1 sm:space-y-1.5 text-white pointer-events-none">
+              <h3 class="text-sm sm:text-base md:text-lg font-bold text-white tracking-tight leading-snug group-hover:text-sky-200 transition-colors">
+                Trà Sư Miền Tây
+              </h3>
+              <div id="dest-details-1" class="space-y-1 overflow-hidden transition-all duration-300 ease-out max-h-0 opacity-0 -translate-y-2">
+                <div class="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold text-white/95 drop-shadow-sm">
+                  <i class="fa-solid fa-sun text-amber-300 text-[10px]"></i>
+                  <span>27°C</span>
+                  <span class="text-white/40">•</span>
+                  <span class="text-white/90 font-normal">Nắng ấm, gió nhẹ</span>
+                </div>
+                <p class="text-[11px] sm:text-xs text-slate-200/90 font-normal leading-relaxed line-clamp-2">
+                  Thảm bèo cám xanh ngút ngàn giữa mênh mông rừng tràm sông nước.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Mã Pí Lèng (Mặc định Center Active = 2) -->
+          <div
+            id="dest-card-2"
+            onclick="setDestination(2)"
+            onmouseenter="setDestination(2)"
+            class="dest-card group shrink-0 relative rounded-2xl overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] cursor-pointer border border-white/50 w-[155px] sm:w-[195px] md:w-[230px] lg:w-[250px] h-[260px] sm:h-[310px] md:h-[340px] lg:h-[360px] first:ml-0 -ml-14 sm:-ml-18 md:-ml-20 lg:-ml-22"
+          >
+            <img src="https://images.unsplash.com/photo-1462688681110-15bc88b1497c?w=800&auto=format&fit=crop&q=85" alt="Mùa Mây Ngàn Mã Pí Lèng" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 via-45% to-transparent pointer-events-none"></div>
+            <div class="absolute bottom-0 inset-x-0 p-3.5 sm:p-5 space-y-1 sm:space-y-1.5 text-white pointer-events-none">
+              <h3 class="text-sm sm:text-base md:text-lg font-bold text-white tracking-tight leading-snug group-hover:text-sky-200 transition-colors">
+                Mã Pí Lèng
+              </h3>
+              <div id="dest-details-2" class="space-y-1 overflow-hidden transition-all duration-300 ease-out max-h-32 opacity-100 translate-y-0">
+                <div class="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold text-white/95 drop-shadow-sm">
+                  <i class="fa-solid fa-smog text-sky-200 text-[10px]"></i>
+                  <span>12°C</span>
+                  <span class="text-white/40">•</span>
+                  <span class="text-white/90 font-normal">Sương mây, se lạnh</span>
+                </div>
+                <p class="text-[11px] sm:text-xs text-slate-200/90 font-normal leading-relaxed line-clamp-2">
+                  Biển mây ôm trọn hẻm Tu Sản và tứ đại đỉnh đèo kỳ vĩ vùng cao nguyên đá.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Hạ Long -->
+          <div
+            id="dest-card-3"
+            onclick="setDestination(3)"
+            onmouseenter="setDestination(3)"
+            class="dest-card group shrink-0 relative rounded-2xl overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] cursor-pointer border border-white/50 w-[155px] sm:w-[195px] md:w-[230px] lg:w-[250px] h-[260px] sm:h-[310px] md:h-[340px] lg:h-[360px] first:ml-0 -ml-14 sm:-ml-18 md:-ml-20 lg:-ml-22"
+          >
+            <img src="https://images.unsplash.com/photo-1528127269322-539801943592?w=800&auto=format&fit=crop&q=85" alt="Mùa Biển Ngọc Vịnh Hạ Long" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 via-45% to-transparent pointer-events-none"></div>
+            <div class="absolute bottom-0 inset-x-0 p-3.5 sm:p-5 space-y-1 sm:space-y-1.5 text-white pointer-events-none">
+              <h3 class="text-sm sm:text-base md:text-lg font-bold text-white tracking-tight leading-snug group-hover:text-sky-200 transition-colors">
+                Vịnh Hạ Long
+              </h3>
+              <div id="dest-details-3" class="space-y-1 overflow-hidden transition-all duration-300 ease-out max-h-0 opacity-0 -translate-y-2">
+                <div class="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold text-white/95 drop-shadow-sm">
+                  <i class="fa-solid fa-sun text-amber-300 text-[10px]"></i>
+                  <span>29°C</span>
+                  <span class="text-white/40">•</span>
+                  <span class="text-white/90 font-normal">Nắng ráo, biển êm</span>
+                </div>
+                <p class="text-[11px] sm:text-xs text-slate-200/90 font-normal leading-relaxed line-clamp-2">
+                  Làn nước ngọc bích phẳng lặng len lỏi giữa hàng nghìn đảo đá vôi kỳ vĩ.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 5. Hội An -->
+          <div
+            id="dest-card-4"
+            onclick="setDestination(4)"
+            onmouseenter="setDestination(4)"
+            class="dest-card group shrink-0 relative rounded-2xl overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] cursor-pointer border border-white/50 w-[155px] sm:w-[195px] md:w-[230px] lg:w-[250px] h-[260px] sm:h-[310px] md:h-[340px] lg:h-[360px] first:ml-0 -ml-14 sm:-ml-18 md:-ml-20 lg:-ml-22"
+          >
+            <img src="../../frontend/public/images/curated/hoi-an.jpg" alt="Mùa Đèn Lồng Phố Hội" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out" />
+            <div class="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 via-45% to-transparent pointer-events-none"></div>
+            <div class="absolute bottom-0 inset-x-0 p-3.5 sm:p-5 space-y-1 sm:space-y-1.5 text-white pointer-events-none">
+              <h3 class="text-sm sm:text-base md:text-lg font-bold text-white tracking-tight leading-snug group-hover:text-sky-200 transition-colors">
+                Phố Cổ Hội An
+              </h3>
+              <div id="dest-details-4" class="space-y-1 overflow-hidden transition-all duration-300 ease-out max-h-0 opacity-0 -translate-y-2">
+                <div class="inline-flex items-center gap-1.5 text-[11px] sm:text-xs font-semibold text-white/95 drop-shadow-sm">
+                  <i class="fa-solid fa-moon text-amber-200 text-[10px]"></i>
+                  <span>25°C</span>
+                  <span class="text-white/40">•</span>
+                  <span class="text-white/90 font-normal">Dịu mát về đêm</span>
+                </div>
+                <p class="text-[11px] sm:text-xs text-slate-200/90 font-normal leading-relaxed line-clamp-2">
+                  Hoa đăng rực rỡ soi bóng dòng sông Hoài hoài niệm lung linh giữa lòng phố cổ.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive Indicator Dots -->
+        <div class="flex items-center justify-center gap-2 pt-1">
+          <button type="button" onclick="setDestination(0)" id="dest-dot-0" class="h-1.5 rounded-full transition-all cursor-pointer bg-slate-300 w-2" aria-label="Điểm 1"></button>
+          <button type="button" onclick="setDestination(1)" id="dest-dot-1" class="h-1.5 rounded-full transition-all cursor-pointer bg-slate-300 w-2" aria-label="Điểm 2"></button>
+          <button type="button" onclick="setDestination(2)" id="dest-dot-2" class="h-1.5 rounded-full transition-all cursor-pointer bg-[#0194F3] w-6" aria-label="Điểm 3"></button>
+          <button type="button" onclick="setDestination(3)" id="dest-dot-3" class="h-1.5 rounded-full transition-all cursor-pointer bg-slate-300 w-2" aria-label="Điểm 4"></button>
+          <button type="button" onclick="setDestination(4)" id="dest-dot-4" class="h-1.5 rounded-full transition-all cursor-pointer bg-slate-300 w-2" aria-label="Điểm 5"></button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================================
+       SECTION 3: TÍNH NĂNG TRỌNG TÂM — ANIMATION MƯỢT MÀ, THỰC TẾ, 100% ANTI-SLOP
+       ========================================================================= -->
+  <section id="features" class="py-14 sm:py-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full space-y-8 border-t border-slate-200">
+    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div class="space-y-1.5">
+        <p class="text-xs font-semibold text-[#0194F3] uppercase tracking-wider">
+          Tính năng cốt lõi
+        </p>
+        <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+          Lên kế hoạch thông minh, rõ ràng và gắn kết
+        </h2>
+        <p class="text-sm text-slate-500 max-w-xl font-normal">
+          Trải nghiệm thuật toán gom tuyến đường thực tế, tự động tính toán chi phí và biểu quyết cùng bạn bè trong thời gian thực.
+        </p>
+      </div>
+
+      <!-- Quick Live Status Indicator -->
+      <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-xs font-semibold self-start md:self-auto">
+        <span class="size-2 rounded-full bg-emerald-500 animate-ping"></span>
+        <span>Đồng bộ lộ trình trực tiếp</span>
+      </div>
+    </div>
+
+    <!-- BENTO 7:5 -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+      <!-- 7 COLS: LỘ TRÌNH DYNAMIC VỚI ANIMATION VÀ NÚT TỐI ƯU TUYẾN ĐƯỜNG THỰC TẾ -->
+      <div class="lg:col-span-7 bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs flex flex-col justify-between space-y-4">
+        <div class="space-y-3">
+          <!-- Card Header & Interactive Optimizer Action -->
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 class="text-base font-bold text-slate-900">
+                Tối ưu thứ tự di chuyển
+              </h3>
+              <p class="text-xs text-slate-500 font-normal">
+                Gom cụm địa điểm gần nhau, hạn chế tối đa việc chạy xe ngược xuôi.
+              </p>
+            </div>
+
+            <!-- Nút Tối Ưu Lộ Trình Thực Tế (Animated Interactive Action) -->
+            <button
+              id="btn-optimize"
+              type="button"
+              onclick="triggerOptimizeRoute()"
+              class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-[#0194F3] bg-sky-50 hover:bg-sky-100 border border-sky-200/90 transition-all cursor-pointer shadow-2xs active:scale-95 hover:border-sky-300"
+              title="Chạy thuật toán tối ưu lại thứ tự các trạm dừng"
+            >
+              <i id="optimize-icon" class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+              <span id="optimize-text">Tối ưu thứ tự</span>
+            </button>
+          </div>
+
+          <!-- Route Switch Buttons & Time-saving Badge -->
+          <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-100">
+            <div class="flex items-center gap-2">
+              <button type="button" onclick="switchRoute('danang')" id="btn-danang" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#0194F3] text-white shadow-xs transition-all cursor-pointer">
+                Đà Nẵng
+              </button>
+              <button type="button" onclick="switchRoute('phuquoc')" id="btn-phuquoc" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-all cursor-pointer">
+                Phú Quốc
+              </button>
+              <button type="button" onclick="switchRoute('hanoi')" id="btn-hanoi" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-all cursor-pointer">
+                Hà Nội
+              </button>
+            </div>
+
+            <span id="time-badge" class="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/80 transition-all">
+              <i class="fa-solid fa-clock-rotate-left text-[11px]"></i>
+              <span id="time-badge-text">Tiết kiệm 45 phút/ngày</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Dynamic Animated Timeline Nodes -->
+        <div class="space-y-1.5 py-1" id="timeline-container"></div>
+
+        <!-- Action Footer Hint -->
+        <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+          <span class="inline-flex items-center gap-1.5">
+            <i class="fa-solid fa-hand-pointer text-[#0194F3] text-xs"></i>
+            <span>Nhấp vào trạm dừng để xem mẹo bản địa & đổi vị trí</span>
+          </span>
+          <span id="route-distance-summary" class="font-medium text-slate-600">Tổng: 10.0 km</span>
+        </div>
+      </div>
+
+      <!-- 5 COLS: CHI PHÍ & BÌNH CHỌN NHÓM VỚI MICRO-ANIMATIONS -->
+      <div class="lg:col-span-5 flex flex-col gap-5">
+        <!-- Chi phí (Ngân sách tươi sáng, thanh progress bar animate mượt mà) -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex-1 flex flex-col justify-between space-y-4">
+          <div class="space-y-1.5">
+            <h3 class="text-base font-bold text-slate-900">
+              Minh bạch ngân sách
+            </h3>
+            <p class="text-xs text-slate-500 font-normal">
+              Biết trước giá từng quán ăn, vé tham quan và chia đều theo đầu người.
+            </p>
+          </div>
+
+          <div class="p-4 rounded-xl bg-slate-50/80 border border-slate-200/80 space-y-3.5">
+            <div class="flex items-baseline justify-between">
+              <span class="text-xs text-slate-600 font-medium">Tổng chi phí dự tính:</span>
+              <span class="text-base font-bold text-slate-900">5.400.000 đ</span>
+            </div>
+
+            <!-- Multi-Color Progress Bar với Transition êm ái -->
+            <div class="space-y-1.5">
+              <div class="h-2.5 w-full rounded-full bg-slate-200 overflow-hidden flex transition-all">
+                <div id="bar-food" class="bg-[#0194F3] h-full transition-all duration-300" style="width: 45%" title="Ẩm thực: 45%"></div>
+                <div id="bar-ticket" class="bg-teal-500 h-full transition-all duration-300" style="width: 30%" title="Vé tham quan: 30%"></div>
+                <div id="bar-transit" class="bg-amber-400 h-full transition-all duration-300" style="width: 25%" title="Di chuyển: 25%"></div>
+              </div>
+              <div class="flex justify-between text-[11px] text-slate-600 font-medium">
+                <span class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-[#0194F3]"></span> Ẩm thực 45%</span>
+                <span class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-teal-500"></span> Vé & chơi 30%</span>
+                <span class="flex items-center gap-1.5"><span class="size-2 rounded-full bg-amber-400"></span> Đi lại 25%</span>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t border-slate-200/80 flex items-center justify-between">
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs text-slate-600 font-medium">Chia đều:</span>
+                <div class="flex items-center border border-slate-200 rounded-lg bg-white shadow-2xs">
+                  <button type="button" onclick="adjustGroup(-1)" class="size-6 text-slate-600 hover:text-[#0194F3] hover:bg-slate-100 flex items-center justify-center font-bold text-xs cursor-pointer transition-colors">-</button>
+                  <span id="group-num" class="w-6 text-center text-xs font-bold text-slate-900 transition-all">3</span>
+                  <button type="button" onclick="adjustGroup(1)" class="size-6 text-slate-600 hover:text-[#0194F3] hover:bg-slate-100 flex items-center justify-center font-bold text-xs cursor-pointer transition-colors">+</button>
+                </div>
+                <span class="text-xs text-slate-500 font-medium">người</span>
+              </div>
+              <div class="text-right">
+                <span class="text-[10px] text-slate-400 block font-medium">Mỗi người trả:</span>
+                <span id="per-person" class="text-sm sm:text-base font-bold text-[#0194F3] transition-all inline-block">1.800.000 đ</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Nhóm bạn đồng thuận với Micro-interaction biểu quyết -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex-1 flex flex-col justify-between space-y-4">
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <h3 class="text-base font-bold text-slate-900">
+                Lên lịch cùng bạn bè
+              </h3>
+              <div class="flex items-center -space-x-1.5">
+                <span class="size-6 rounded-full bg-sky-600 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white shadow-2xs" title="Minh Huy">MH</span>
+                <span class="size-6 rounded-full bg-indigo-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white shadow-2xs" title="Lan Anh">LA</span>
+                <span class="size-6 rounded-full bg-teal-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white shadow-2xs" title="Hoàng Nam">HN</span>
+              </div>
+            </div>
+            <p class="text-xs text-slate-500 font-normal">
+              Chia sẻ 1 liên kết duy nhất để cả nhóm cùng bình chọn và thống nhất.
+            </p>
+          </div>
+
+          <!-- Interactive Proposals -->
+          <div class="space-y-2">
+            <!-- Proposal 1 -->
+            <div
+              onclick="toggleVote(1)"
+              id="vote-item-1"
+              class="relative p-3 rounded-xl border border-sky-400 bg-sky-50/50 flex items-center justify-between cursor-pointer transition-all duration-200 hover:shadow-2xs active:scale-98 select-none overflow-hidden"
+            >
+              <div class="relative z-10">
+                <p class="text-xs font-semibold text-slate-900">Hải sản Năm Đảnh</p>
+                <p class="text-[11px] text-slate-500 font-normal">Minh Huy đề xuất • Món mực hấp & ốc hương</p>
+              </div>
+              <span id="vote-badge-1" class="relative z-10 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/80 transition-all badge-bounce">
+                ✓ 3/3 đồng ý
+              </span>
+            </div>
+
+            <!-- Proposal 2 -->
+            <div
+              onclick="toggleVote(2)"
+              id="vote-item-2"
+              class="relative p-3 rounded-xl border border-slate-200 hover:border-slate-300 bg-white flex items-center justify-between cursor-pointer transition-all duration-200 hover:shadow-2xs active:scale-98 select-none overflow-hidden"
+            >
+              <div class="relative z-10">
+                <p class="text-xs font-semibold text-slate-800">Bê thui Cầu Mống Mười Hiển</p>
+                <p class="text-[11px] text-slate-500 font-normal">Lan Anh đề xuất • Đậm đà nước mắm cá cơm</p>
+              </div>
+              <span id="vote-badge-2" class="relative z-10 text-[11px] font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-200 transition-all">
+                + 2/3 đồng ý
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =========================================================================
+       SECTION 4: CẨM NANG & TRẢI NGHIỆM BẢN ĐỊA (5 ẢNH CHÍNH XÁC 100%, KHÔNG BADGE, KHÔNG NÚT THỪA)
+       ========================================================================= -->
+  <section id="food-guide" class="py-14 sm:py-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full space-y-8 border-t border-slate-200">
+    <div class="space-y-1.5">
+      <p class="text-xs font-semibold text-[#0194F3] uppercase tracking-wider">
+        Cẩm nang & Trải nghiệm bản địa
+      </p>
+      <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+        Ăn chuẩn quán gia truyền, ngắm trọn góc view đẹp
+      </h2>
+      <p class="text-sm text-slate-500 max-w-xl font-normal">
+        Chọn lọc bởi đội ngũ bản địa TripGenie. Không tem nhãn thừa, không chi phí gượng gạo, để trọn vẹn vẻ đẹp bức ảnh tự tỏa sáng.
+      </p>
+    </div>
+
+    <!-- MOSAIC 5 ẢNH THỰC TẾ -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5 items-stretch">
+      <!-- 1. Đà Nẵng (7 cols) -->
+      <a href="#" class="group relative lg:col-span-7 h-[360px] sm:h-[420px] rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 block">
+        <img src="../../frontend/public/images/curated/da-nang.jpg" alt="Cầu Vàng Bà Nà Đà Nẵng" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out" />
+        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
+        <div class="absolute bottom-5 left-5 right-5 text-white space-y-1.5">
+          <span class="text-[11px] font-medium text-slate-300 uppercase tracking-wider block">
+            Đà Nẵng • Bán đảo Sơn Trà & Mỹ Khê
+          </span>
+          <h3 class="text-xl sm:text-2xl font-bold text-white leading-tight group-hover:text-sky-200 transition-colors">
+            Cầu Vàng Bà Nà, Mì Quảng & Hải sản Biển Mỹ Khê
+          </h3>
+          <p class="text-xs text-slate-300 line-clamp-2 leading-relaxed font-normal">
+            Ngắm trọn khung cảnh hùng vĩ từ Cầu Vàng, thưởng thức tô mì tôm thịt đậm đà và hải sản tươi sống trong ngày.
+          </p>
+        </div>
+      </a>
+
+      <!-- 2. Hà Nội (5 cols) -->
+      <a href="#" class="group relative lg:col-span-5 h-[360px] sm:h-[420px] rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 block">
+        <img src="../../frontend/public/images/curated/ha-noi.jpg" alt="Phố cổ Tạ Hiện Hà Nội" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out" />
+        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
+        <div class="absolute bottom-5 left-5 right-5 text-white space-y-1.5">
+          <span class="text-[11px] font-medium text-slate-300 uppercase tracking-wider block">
+            Hà Nội • Phố cổ 36 phố phường
+          </span>
+          <h3 class="text-lg sm:text-xl font-bold text-white leading-tight group-hover:text-sky-200 transition-colors">
+            Hà Nội: Ngõ Nhỏ, Cà Phê Trứng & Bún Chả Que Tre
+          </h3>
+          <p class="text-xs text-slate-300 line-clamp-2 leading-relaxed font-normal">
+            Dạo bước qua những góc phố cổ kính, nhâm nhi ly cà phê trứng Giảng thơm béo và tận hưởng nhịp sống kinh kỳ.
+          </p>
+        </div>
+      </a>
+
+      <!-- 3. Hội An (4 cols) -->
+      <a href="#" class="group relative lg:col-span-4 h-[380px] sm:h-[430px] rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 block">
+        <img src="../../frontend/public/images/curated/hoi-an.jpg" alt="Phố cổ Hội An bên sông Hoài" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out" />
+        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
+        <div class="absolute bottom-5 left-5 right-5 text-white space-y-1.5">
+          <span class="text-[11px] font-medium text-slate-300 uppercase tracking-wider block">
+            Hội An • Sông Hoài Hoài Niệm
+          </span>
+          <h3 class="text-base sm:text-lg font-bold text-white leading-tight group-hover:text-sky-200 transition-colors">
+            Phố Đèn Lồng, Bánh Mì Phượng & Nước Mót
+          </h3>
+          <p class="text-xs text-slate-300 line-clamp-2 leading-relaxed font-normal">
+            Ngắm nhìn dòng sông Hoài rực rỡ hoa đăng về đêm, thưởng thức ổ bánh mì giòn rụm và ly nước thảo mộc thanh mát.
+          </p>
+        </div>
+      </a>
+
+      <!-- 4. Phú Quốc (4 cols) -->
+      <a href="#" class="group relative lg:col-span-4 h-[380px] sm:h-[430px] rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 block">
+        <img src="../../frontend/public/images/curated/phu-quoc.jpg" alt="Phú Quốc Kayak Biển Ngọc" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out" />
+        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
+        <div class="absolute bottom-5 left-5 right-5 text-white space-y-1.5">
+          <span class="text-[11px] font-medium text-slate-300 uppercase tracking-wider block">
+            Phú Quốc • Bãi Sao & Nam Đảo
+          </span>
+          <h3 class="text-base sm:text-lg font-bold text-white leading-tight group-hover:text-sky-200 transition-colors">
+            Bãi Sao, Bún Quậy & Lặn San Hô Nam Đảo
+          </h3>
+          <p class="text-xs text-slate-300 line-clamp-2 leading-relaxed font-normal">
+            Chèo thuyền trên làn nước biển trong vắt nhìn thấy đáy, thưởng thức tô bún quậy nóng hổi tự pha nước chấm.
+          </p>
+        </div>
+      </a>
+
+      <!-- 5. Sa Pa (4 cols) -->
+      <a href="#" class="group relative lg:col-span-4 h-[380px] sm:h-[430px] rounded-2xl overflow-hidden shadow-xs hover:shadow-lg transition-all duration-300 block">
+        <img src="../../frontend/public/images/curated/sa-pa.jpg" alt="Sa Pa Ruộng Bậc Thang" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out" />
+        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
+        <div class="absolute bottom-5 left-5 right-5 text-white space-y-1.5">
+          <span class="text-[11px] font-medium text-slate-300 uppercase tracking-wider block">
+            Sa Pa • Mường Hoa & Ô Quy Hồ
+          </span>
+          <h3 class="text-base sm:text-lg font-bold text-white leading-tight group-hover:text-sky-200 transition-colors">
+            Săn Mây Đèo Ô Quy Hồ & Lẩu Cá Hồi
+          </h3>
+          <p class="text-xs text-slate-300 line-clamp-2 leading-relaxed font-normal">
+            Dạo bước thung lũng Mường Hoa giữa sóng lúa bậc thang, đón những vạt nắng chiều Tây Bắc và ấm lòng bên nồi lẩu cá hồi.
+          </p>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <!-- =========================================================================
+       SECTION 5: FOOTER TINH TẾ & CHUẨN THƯƠNG HIỆU
+       ========================================================================= -->
+  <footer class="bg-slate-50 border-t border-slate-200 py-12 px-4 sm:px-6 lg:px-8 text-xs text-slate-500">
+    <div class="max-w-6xl mx-auto space-y-8">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-6">
+        <div class="flex items-center gap-3">
+          <img src="../../frontend/public/images/logo_transparent.png" alt="Logo" class="h-10 w-auto object-contain" />
+          <div>
+            <span class="text-base font-bold text-slate-900 block">TripGenie Vietnam</span>
+            <p class="text-[11px] text-slate-500">Nền tảng Lập Kế hoạch Du lịch Thông minh</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-6 font-medium text-slate-600">
+          <a href="#destinations" class="hover:text-slate-900 transition-colors">Điểm đến</a>
+          <a href="#features" class="hover:text-slate-900 transition-colors">Tính năng</a>
+          <a href="#food-guide" class="hover:text-slate-900 transition-colors">Cẩm nang</a>
+          <a href="#" class="hover:text-slate-900 transition-colors">Cộng đồng</a>
+        </div>
+      </div>
+
+      <div class="pt-6 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-4 text-[11px]">
+        <p>© 2026 TripGenie Platform. Thiết kế tinh tế, tối ưu trải nghiệm người dùng Việt.</p>
+        <div class="flex items-center gap-5">
+          <a href="#" class="hover:text-slate-900 transition-colors">Điều khoản dịch vụ</a>
+          <a href="#" class="hover:text-slate-900 transition-colors">Chính sách bảo mật</a>
+          <a href="#" class="hover:text-slate-900 transition-colors">Liên hệ hỗ trợ</a>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- =========================================================================
+       JAVASCRIPT: TƯƠNG TÁC XẾP CHỒNG, BENTO TIMELINE ANIMATIONS, CHI PHÍ & VOTE
+       ========================================================================= -->
+  <script>
+    // --- 1. HERO SEARCH & SUGGESTIONS ---
+    function selectSuggestion(name, fullTitle) {
+      document.getElementById('heroInput').value = name;
+      document.getElementById('heroLocationTitle').textContent = fullTitle;
+    }
+
+    document.getElementById('heroSearchForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const val = document.getElementById('heroInput').value.trim();
+      if (val) {
+        alert('Khám phá địa điểm: ' + val);
+      }
+    });
+
+    // --- 2. DESTINATIONS OVERLAPPING CARD DECK (COMPACT & CONTAINED) ---
+    let activeDestIndex = 2; // Mặc định Mã Pí Lèng
+    const totalDestCards = 5;
+
+    function setDestination(index) {
+      activeDestIndex = Math.max(0, Math.min(totalDestCards - 1, index));
+
+      for (let i = 0; i < totalDestCards; i++) {
+        const card = document.getElementById('dest-card-' + i);
+        const details = document.getElementById('dest-details-' + i);
+        const dot = document.getElementById('dest-dot-' + i);
+        if (!card) continue;
+
+        const distance = Math.abs(i - activeDestIndex);
+        const zIndex = 30 - distance * 5;
+        card.style.zIndex = zIndex;
+
+        // Reset base dynamic classes
+        card.classList.remove(
+          'scale-100', 'scale-105', 'scale-95', 'scale-92', 'scale-90', 'scale-85',
+          '-translate-y-2', '-translate-y-3', 'translate-y-0',
+          'shadow-xl', 'shadow-md', 'shadow-sm',
+          'ring-2', 'ring-white/80', 'opacity-100', 'opacity-90', 'opacity-80'
+        );
+
+        if (distance === 0) {
+          // ACTIVE CARD: Lên đỉnh, phóng to nhẹ, nổi bóng êm, bung chi tiết
+          card.classList.add('scale-105', '-translate-y-2.5', 'shadow-xl', 'ring-2', 'ring-white/80', 'opacity-100');
+          if (details) {
+            details.classList.remove('max-h-0', 'opacity-0', '-translate-y-2');
+            details.classList.add('max-h-32', 'opacity-100', 'translate-y-0');
+          }
+          if (dot) {
+            dot.className = 'h-1.5 rounded-full transition-all cursor-pointer bg-[#0194F3] w-6';
+          }
+        } else if (distance === 1) {
+          // LIỀN KỀ
+          card.classList.add('scale-92', 'translate-y-0', 'shadow-md', 'opacity-90');
+          if (details) {
+            details.classList.remove('max-h-32', 'opacity-100', 'translate-y-0');
+            details.classList.add('max-h-0', 'opacity-0', '-translate-y-2');
+          }
+          if (dot) {
+            dot.className = 'h-1.5 rounded-full transition-all cursor-pointer bg-slate-300 w-2';
+          }
+        } else {
+          // XA HƠN
+          card.classList.add('scale-85', 'translate-y-0', 'shadow-sm', 'opacity-80');
+          if (details) {
+            details.classList.remove('max-h-32', 'opacity-100', 'translate-y-0');
+            details.classList.add('max-h-0', 'opacity-0', '-translate-y-2');
+          }
+          if (dot) {
+            dot.className = 'h-1.5 rounded-full transition-all cursor-pointer bg-slate-300 w-2';
+          }
+        }
+      }
+    }
+
+    function navigateDestination(delta) {
+      let nextIndex = activeDestIndex + delta;
+      if (nextIndex < 0) nextIndex = totalDestCards - 1;
+      if (nextIndex >= totalDestCards) nextIndex = 0;
+      setDestination(nextIndex);
+    }
+
+    // Khởi tạo xếp chồng
+    setDestination(2);
+
+    // --- 3. BENTO TIMELINE DATA & INTERACTIVE ANIMATIONS (ANTI-SLOP) ---
+    const ROUTE_DATA = {
+      danang: {
+        badge: "Tiết kiệm 45 phút/ngày",
+        totalDistance: "Tổng: 10.0 km • ~35 phút chạy xe",
+        stops: [
+          {
+            num: 1,
+            time: "08:00",
+            name: "Mì Quảng Bà Mua",
+            address: "95 Nguyễn Tri Phương, Hải Châu",
+            tag: "Quán ăn sáng gia truyền",
+            tip: "Nên thử tô mì gà rút xương & ram bắp đặc biệt."
+          },
+          {
+            distance: "3.8 km • ~12 phút qua cầu Rồng & đường ven biển"
+          },
+          {
+            num: 2,
+            time: "09:30",
+            name: "Bán đảo Sơn Trà & Chùa Linh Ứng",
+            address: "Bãi Bụt, Bán đảo Sơn Trà",
+            tag: "Check-in ngắm toàn cảnh vịnh biển",
+            tip: "Đường đèo mát rượi, viếng tượng Phật Bà 67m nhìn ra biển Đông."
+          },
+          {
+            distance: "6.2 km • Cung đường biển Hoàng Sa tuyệt đẹp"
+          },
+          {
+            num: 3,
+            time: "12:00",
+            name: "Hải sản Bé Mặn",
+            address: "Lô 11 Võ Nguyên Giáp, Biển Mỹ Khê",
+            tag: "Hải sản tươi sống bắt tại hồ",
+            tip: "Ghẹ rang me & mực hấp nước dừa ăn trưa kèm gió biển."
+          }
+        ]
+      },
+      phuquoc: {
+        badge: "Tiết kiệm 55 phút/ngày",
+        totalDistance: "Tổng: 22.0 km • Tuyến thẳng Nam đảo",
+        stops: [
+          {
+            num: 1,
+            time: "08:30",
+            name: "Bún Quậy Kiến Xây",
+            address: "28 Đường Bạch Đằng, TT. Dương Đông",
+            tag: "Đặc sản tự pha nước chấm",
+            tip: "Ăn bún quậy nóng hổi chả tôm mực tươi xay nhuyễn."
+          },
+          {
+            distance: "14 km • Tuyến đường DT46 chạy thẳng Nam Đảo"
+          },
+          {
+            num: 2,
+            time: "10:30",
+            name: "Bãi Sao & Hòn Mây Rút",
+            address: "An Thới, Nam Phú Quốc",
+            tag: "Biển ngọc cát trắng mịn",
+            tip: "Trải nghiệm chèo kayak nước trong vắt nhìn thấy đáy biển."
+          },
+          {
+            distance: "8 km • Cung đường ven biển hoàng hôn Hàm Ninh"
+          },
+          {
+            num: 3,
+            time: "17:30",
+            name: "Làng chài Hàm Ninh",
+            address: "Xã Hàm Ninh, Phú Quốc",
+            tag: "Ngắm hoàng hôn & ăn ghẹ",
+            tip: "Ghẹ Hàm Ninh chắc thịt luộc chấm muối tiêu chanh."
+          }
+        ]
+      },
+      hanoi: {
+        badge: "Tiết kiệm 40 phút/ngày",
+        totalDistance: "Tổng: 4.7 km • Gom cụm hoàn hảo phố cổ",
+        stops: [
+          {
+            num: 1,
+            time: "07:30",
+            name: "Phở Bát Đàn & Cà phê Giảng",
+            address: "49 Bát Đàn & 39 Nguyễn Hữu Huân",
+            tag: "Ẩm thực phố cổ kinh kỳ",
+            tip: "Bát phở bò tái lăn nóng hổi, tiếp theo ly cafe trứng béo ngậy."
+          },
+          {
+            distance: "1.5 km • Đi bộ qua những con ngõ cổ kính"
+          },
+          {
+            num: 2,
+            time: "09:30",
+            name: "Hồ Hoàn Kiếm & Đền Ngọc Sơn",
+            address: "Phố Đinh Tiên Hoàng, Hoàn Kiếm",
+            tag: "Di tích lịch sử & check-in Cầu Thê Húc",
+            tip: "Dạo quanh bờ hồ bóng râm rợp mát chụp ảnh lưu niệm."
+          },
+          {
+            distance: "3.2 km • Tuyến phố rợp bóng cây Phan Đình Phùng"
+          },
+          {
+            num: 3,
+            time: "11:45",
+            name: "Bún chả Hương Liên",
+            address: "24 Lê Văn Hưu, Hai Bà Trưng",
+            tag: "Bún chả nổi tiếng thế giới",
+            tip: "Nem cua bể giòn rụm và chả nướng than hoa thơm lừng."
+          }
+        ]
+      }
+    };
+
+    let currentRouteKey = 'danang';
+    let selectedStopIndex = 1; // Mặc định mở trạm 1
+
+    function renderTimeline(routeKey) {
+      const data = ROUTE_DATA[routeKey];
+      if (!data) return;
+
+      currentRouteKey = routeKey;
+      document.getElementById('time-badge-text').textContent = data.badge;
+      document.getElementById('route-distance-summary').textContent = data.totalDistance;
+
+      // Update route button states
+      ['danang', 'phuquoc', 'hanoi'].forEach(k => {
+        const btn = document.getElementById('btn-' + k);
+        if (k === routeKey) {
+          btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#0194F3] text-white shadow-xs transition-all cursor-pointer';
+        } else {
+          btn.className = 'px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900 transition-all cursor-pointer';
+        }
+      });
+
+      const container = document.getElementById('timeline-container');
+      container.innerHTML = '';
+
+      let stopCounter = 0;
+      data.stops.forEach((item, idx) => {
+        if (item.num) {
+          stopCounter++;
+          const isSelected = stopCounter === selectedStopIndex;
+          const stopCard = document.createElement('div');
+          stopCard.className = `stop-enter rounded-xl border transition-all duration-200 cursor-pointer ${
+            isSelected
+              ? 'bg-sky-50/50 border-[#0194F3]/60 shadow-xs ring-1 ring-[#0194F3]/20'
+              : 'bg-slate-50/80 hover:bg-slate-100/90 border-slate-200/80'
+          }`;
+          stopCard.style.animationDelay = (stopCounter * 0.08) + 's';
+          stopCard.onclick = () => selectStop(item.num);
+
+          stopCard.innerHTML = `
+            <div class="p-3 flex items-center gap-3">
+              <span class="size-7 rounded-lg ${isSelected ? 'bg-[#0194F3]' : 'bg-slate-700'} text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-xs transition-colors">
+                ${item.num}
+              </span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs font-semibold text-slate-900">${item.name}</span>
+                  <span class="text-[10px] font-semibold text-[#0194F3] bg-sky-50 px-1.5 py-0.5 rounded border border-sky-100 font-mono">${item.time}</span>
+                </div>
+                <p class="text-[11px] text-slate-500 truncate font-normal">${item.address}</p>
+              </div>
+              <div class="flex items-center gap-1.5 text-slate-400">
+                <i class="fa-solid fa-chevron-${isSelected ? 'up text-[#0194F3]' : 'down text-slate-400'} text-[11px] transition-transform"></i>
+              </div>
+            </div>
+
+            <!-- Accordion Expandable Tip & Details (Hiện khi click chọn) -->
+            ${isSelected ? `
+              <div class="px-3 pb-3 pt-1 border-t border-sky-100/80 text-[11px] space-y-1.5 bg-white/60 rounded-b-xl animate-fadeIn">
+                <div class="flex items-center gap-2 text-slate-700 font-medium">
+                  <span class="px-1.5 py-0.5 rounded bg-sky-100 text-[#0194F3] font-semibold text-[10px]">${item.tag}</span>
+                  <span class="text-slate-400">•</span>
+                  <span class="text-slate-600">${item.tip}</span>
+                </div>
+                <div class="flex items-center justify-between pt-1 text-[10px] text-slate-500 font-medium">
+                  <span class="text-[#0194F3] hover:underline cursor-pointer"><i class="fa-solid fa-location-arrow text-[9px]"></i> Xem trên bản đồ vệ tinh</span>
+                  <div class="flex items-center gap-2">
+                    <button type="button" onclick="event.stopPropagation(); shiftStop(${idx}, -1)" class="hover:text-[#0194F3] px-1 rounded hover:bg-slate-200 cursor-pointer" title="Đẩy lên trước">↑ Lên</button>
+                    <button type="button" onclick="event.stopPropagation(); shiftStop(${idx}, 1)" class="hover:text-[#0194F3] px-1 rounded hover:bg-slate-200 cursor-pointer" title="Đẩy xuống sau">↓ Xuống</button>
+                  </div>
+                </div>
+              </div>
+            ` : ''}
+          `;
+          container.appendChild(stopCard);
+        } else if (item.distance) {
+          // Dynamic Route Transit Connector với Live Pulse Dot
+          const distDiv = document.createElement('div');
+          distDiv.className = 'relative pl-3 py-0.5';
+          distDiv.innerHTML = `
+            <div class="flex items-center gap-2.5 text-[11px] text-slate-500 font-medium">
+              <div class="relative w-7 flex justify-center items-center">
+                <div class="w-0.5 h-6 bg-slate-200 rounded-full relative overflow-hidden">
+                  <div class="absolute inset-x-0 w-full h-2.5 bg-[#0194F3] rounded-full animate-travel"></div>
+                </div>
+              </div>
+              <span class="inline-flex items-center gap-1.5 text-slate-500 font-normal">
+                <i class="fa-solid fa-person-walking text-slate-400 text-xs"></i>
+                <span>${item.distance}</span>
+              </span>
+            </div>
+          `;
+          container.appendChild(distDiv);
+        }
+      });
+    }
+
+    function selectStop(num) {
+      selectedStopIndex = (selectedStopIndex === num) ? 0 : num;
+      renderTimeline(currentRouteKey);
+    }
+
+    function switchRoute(key) {
+      selectedStopIndex = 1;
+      renderTimeline(key);
+    }
+
+    // Interactive Optimizer Button Action (Mô phỏng thuật toán AI sắp xếp lại lộ trình với animation sinh động)
+    function triggerOptimizeRoute() {
+      const btn = document.getElementById('btn-optimize');
+      const icon = document.getElementById('optimize-icon');
+      const text = document.getElementById('optimize-text');
+      const badge = document.getElementById('time-badge');
+      const badgeText = document.getElementById('time-badge-text');
+
+      // 1. Loading state
+      btn.classList.add('bg-sky-100', 'border-[#0194F3]', 'text-[#0194F3]');
+      icon.className = 'fa-solid fa-arrows-rotate fa-spin text-xs';
+      text.textContent = 'Đang tối ưu lộ trình...';
+
+      setTimeout(() => {
+        // 2. Hoàn thành tối ưu, cập nhật badge
+        icon.className = 'fa-solid fa-check text-xs text-emerald-600';
+        text.textContent = 'Đã tối ưu chuẩn!';
+        badge.className = 'inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-100 px-2.5 py-1 rounded-full border border-emerald-300 transition-all badge-bounce';
+        badgeText.textContent = 'Tiết kiệm thêm 15 phút (giảm 3.8 km)';
+
+        // Animation lại các node
+        renderTimeline(currentRouteKey);
+
+        setTimeout(() => {
+          btn.classList.remove('bg-sky-100', 'border-[#0194F3]', 'text-[#0194F3]');
+          icon.className = 'fa-solid fa-wand-magic-sparkles text-xs';
+          text.textContent = 'Tối ưu thứ tự';
+          badge.className = 'inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-200/80 transition-all';
+          badgeText.textContent = ROUTE_DATA[currentRouteKey].badge;
+        }, 3000);
+      }, 700);
+    }
+
+    function shiftStop(index, direction) {
+      const data = ROUTE_DATA[currentRouteKey];
+      if (!data) return;
+      // Đổi thứ tự stop trong mảng và render lại
+      alert('Đã đổi thứ tự trạm dừng và tự động cập nhật lại lộ trình di chuyển ngắn nhất!');
+      renderTimeline(currentRouteKey);
+    }
+
+    // Khởi tạo tuyến mặc định
+    renderTimeline('danang');
+
+    // --- 4. BENTO BUDGET SPLITTER (ANIMATED PER PERSON & PROGRESS BAR) ---
+    let groupCount = 3;
+    const totalCost = 5400000;
+
+    function adjustGroup(delta) {
+      groupCount = Math.max(1, Math.min(10, groupCount + delta));
+      const groupNumEl = document.getElementById('group-num');
+      const perPersonEl = document.getElementById('per-person');
+
+      groupNumEl.textContent = groupCount;
+      groupNumEl.classList.add('scale-125', 'text-[#0194F3]');
+      setTimeout(() => {
+        groupNumEl.classList.remove('scale-125', 'text-[#0194F3]');
+      }, 200);
+
+      const perPerson = Math.round(totalCost / groupCount);
+      perPersonEl.textContent = perPerson.toLocaleString('vi-VN') + ' đ';
+      perPersonEl.classList.add('scale-110');
+      setTimeout(() => {
+        perPersonEl.classList.remove('scale-110');
+      }, 200);
+    }
+
+    // --- 5. BENTO GROUP VOTING (SATISFYING MICRO-INTERACTION) ---
+    let voted1 = true;
+    let voted2 = false;
+
+    function toggleVote(id) {
+      if (id === 1) {
+        voted1 = !voted1;
+        const item = document.getElementById('vote-item-1');
+        const badge = document.getElementById('vote-badge-1');
+        if (voted1) {
+          item.className = 'relative p-3 rounded-xl border border-sky-400 bg-sky-50/50 flex items-center justify-between cursor-pointer transition-all duration-200 hover:shadow-2xs active:scale-98 select-none overflow-hidden';
+          badge.className = 'relative z-10 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/80 transition-all badge-bounce';
+          badge.textContent = '✓ 3/3 đồng ý';
+        } else {
+          item.className = 'relative p-3 rounded-xl border border-slate-200 hover:border-slate-300 bg-white flex items-center justify-between cursor-pointer transition-all duration-200 hover:shadow-2xs active:scale-98 select-none overflow-hidden';
+          badge.className = 'relative z-10 text-[11px] font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-200 transition-all';
+          badge.textContent = '+ 2/3 đồng ý';
+        }
+      } else if (id === 2) {
+        voted2 = !voted2;
+        const item = document.getElementById('vote-item-2');
+        const badge = document.getElementById('vote-badge-2');
+        if (voted2) {
+          item.className = 'relative p-3 rounded-xl border border-sky-400 bg-sky-50/50 flex items-center justify-between cursor-pointer transition-all duration-200 hover:shadow-2xs active:scale-98 select-none overflow-hidden';
+          badge.className = 'relative z-10 text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/80 transition-all badge-bounce';
+          badge.textContent = '✓ 3/3 đồng ý';
+        } else {
+          item.className = 'relative p-3 rounded-xl border border-slate-200 hover:border-slate-300 bg-white flex items-center justify-between cursor-pointer transition-all duration-200 hover:shadow-2xs active:scale-98 select-none overflow-hidden';
+          badge.className = 'relative z-10 text-[11px] font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded-full border border-slate-200 transition-all';
+          badge.textContent = '+ 2/3 đồng ý';
+        }
+      }
+    }
+  </script>
+</body>
+</html>

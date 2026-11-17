@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TripGenie — Demo Bento Grid Features & Clean Editorial Showcase</title>
+  <title>TripGenie — Demo Bento Grid & Cẩm nang Ẩm thực (Bản Tinh Chỉnh)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" />
   <script>
     tailwind.config = {
@@ -20,9 +20,6 @@
             brand: {
               DEFAULT: '#0194F3',
               hover: '#0084DE',
-              dark: '#10243A',
-              light: '#F0F7FF',
-              accent: '#E8F4FD',
             }
           }
         }
@@ -34,406 +31,328 @@
       font-family: 'Inter', sans-serif;
       -webkit-font-smoothing: antialiased;
     }
-    .custom-shadow {
-      box-shadow: 0 10px 30px -10px rgba(1, 148, 243, 0.12), 0 4px 12px -2px rgba(16, 36, 58, 0.05);
-    }
-    .glow-blue {
-      box-shadow: 0 4px 14px 0 rgba(1, 148, 243, 0.25);
-    }
   </style>
 </head>
-<body class="bg-[#F8FAFC] text-slate-900 selection:bg-[#0194F3] selection:text-white">
+<body class="bg-white text-slate-800 selection:bg-[#0194F3] selection:text-white">
 
   <!-- Demo Top Bar -->
-  <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-3 shadow-xs">
-    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-      <div class="flex items-center gap-3">
-        <div class="size-8 rounded-xl bg-[#0194F3] text-white flex items-center justify-center font-black text-sm shadow-sm">
-          TG
-        </div>
-        <div>
-          <span class="font-black text-slate-900 text-sm tracking-tight">TripGenie Demo Bản Thử</span>
-          <span class="hidden sm:inline-block text-xs text-slate-500 font-medium ml-2">• Mô hình A: Bento Grid & Cẩm nang Tinh chỉnh</span>
-        </div>
+  <header class="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-2.5">
+    <div class="max-w-6xl mx-auto flex items-center justify-between gap-3 text-xs">
+      <div class="flex items-center gap-2.5">
+        <span class="font-bold text-slate-900">TripGenie</span>
+        <span class="text-slate-400">•</span>
+        <span class="text-slate-600 font-medium">Bản tinh chỉnh: Chuẩn phong cách Cộng đồng & 5 ảnh thực tế</span>
       </div>
       <div class="flex items-center gap-2">
-        <a href="#bento-features" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-blue-50 text-[#0194F3] hover:bg-blue-100 transition-colors">
-          1. Bento Grid Tính năng
+        <a href="#features" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">
+          1. Tính năng Bento
         </a>
-        <a href="#food-guide" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors">
-          2. Cẩm nang Ẩm thực
+        <a href="#curated" class="px-2.5 py-1 rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors">
+          2. Cẩm nang (5 ảnh mới)
         </a>
       </div>
     </div>
   </header>
 
   <!-- ========================================================================= -->
-  <!-- SECTION 1: INTERACTIVE BENTO GRID (MÔ HÌNH A - HIỆN ĐẠI, GỌN GÀNG, CHỐNG SLOP) -->
+  <!-- SECTION 1: TÍNH NĂNG TRỌNG TÂM (BENTO GRID TINH GIẢN NHƯ TRANG CỘNG ĐỒNG) -->
   <!-- ========================================================================= -->
-  <section id="bento-features" class="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-12">
+  <section id="features" class="py-14 sm:py-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full space-y-10">
     
-    <!-- Header Section -->
-    <div class="text-center max-w-3xl mx-auto space-y-4">
-      <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-blue-50 border border-blue-200/80 text-[#0194F3] text-xs font-bold tracking-wider uppercase">
-        <i class="fa-solid fa-sparkles text-[11px]"></i>
-        <span>Nền tảng Du lịch Thông minh</span>
-      </div>
-      <h2 class="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight">
-        Lên kế hoạch dứt khoát.
-        <br />
-        <span class="text-[#0194F3]">Không còn bối rối</span> giữa ma trận thông tin.
+    <!-- Header: Gọn gàng, font-bold tự nhiên, không to quá đà -->
+    <div class="space-y-2">
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+        Tính năng cốt lõi
+      </p>
+      <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+        Lên kế hoạch thông minh, rõ ràng và gắn kết
       </h2>
-      <p class="text-slate-600 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto">
-        Bỏ qua những chuỗi tin nhắn trôi tuột hay việc tra cứu Google Maps thủ công. Toàn bộ công cụ bạn cần được gom gọn trong một hệ thống trực quan.
+      <p class="text-sm text-slate-500 max-w-xl">
+        Tối ưu tuyến đường di chuyển, tự động tính toán chi phí và cùng bạn bè hoàn thiện lịch trình.
       </p>
     </div>
 
-    <!-- BENTO GRID CONTAINER -->
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+    <!-- BENTO GRID (7:5) -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
 
       <!-- =================================================================== -->
-      <!-- BENTO CARD 1 (HERO BLOCK - 7 COLS): TỐI ƯU CUNG ĐƯỜNG & TIMELINE -->
+      <!-- BENTO 1: LỘ TRÌNH TỐI ƯU (7 COLS) -->
       <!-- =================================================================== -->
-      <div class="lg:col-span-7 bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 custom-shadow flex flex-col justify-between relative overflow-hidden group">
-        
-        <!-- Background Ambient Accent -->
-        <div class="absolute -top-24 -right-24 size-72 rounded-full bg-blue-100/40 blur-3xl pointer-events-none"></div>
-
-        <div class="space-y-4 relative z-10">
-          <div class="flex items-center justify-between flex-wrap gap-2">
-            <span class="text-xs font-black tracking-widest uppercase text-[#0194F3] flex items-center gap-1.5">
-              <i class="fa-solid fa-route"></i>
-              01 / Gom Tuyến Thông Minh
-            </span>
-            <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-bold border border-emerald-200/80">
-              <i class="fa-solid fa-bolt text-emerald-600 text-[10px]"></i>
-              <span id="time-saved-badge">Tiết kiệm 45 phút/ngày</span>
+      <div class="lg:col-span-7 bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 shadow-xs flex flex-col justify-between space-y-5">
+        <div class="space-y-2.5">
+          <div class="flex items-center justify-between">
+            <h3 class="text-base font-bold text-slate-900">
+              Tối ưu thứ tự di chuyển
+            </h3>
+            <span id="time-badge" class="text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
+              Tiết kiệm 45 phút/ngày
             </span>
           </div>
-
-          <h3 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight leading-snug">
-            Tự động sắp xếp chặng ngắn nhất. Không còn chạy ngược xuôi.
-          </h3>
-          <p class="text-slate-600 text-sm leading-relaxed">
-            TripGenie tự động gom cụm quán ăn và điểm check-in trên cùng cung đường theo thời gian thực.
+          <p class="text-xs text-slate-500 leading-relaxed">
+            Tự động gom cụm các địa điểm gần nhau, hạn chế tối đa việc chạy xe ngược xuôi.
           </p>
 
-          <!-- Interactive Destination Switcher -->
-          <div class="pt-2 flex items-center gap-2 flex-wrap">
-            <span class="text-xs font-bold text-slate-500">Xem thử chặng:</span>
-            <button type="button" onclick="switchRoute('danang')" id="btn-danang" class="route-btn px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-[#0194F3] text-white shadow-xs">
+          <!-- Minimal city selector tabs -->
+          <div class="flex items-center gap-1.5 pt-1">
+            <button type="button" onclick="switchRoute('danang')" id="btn-danang" class="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-900 text-white transition-colors cursor-pointer">
               Đà Nẵng
             </button>
-            <button type="button" onclick="switchRoute('phuquoc')" id="btn-phuquoc" class="route-btn px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-700 hover:bg-slate-200">
+            <button type="button" onclick="switchRoute('phuquoc')" id="btn-phuquoc" class="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer">
               Phú Quốc
             </button>
-            <button type="button" onclick="switchRoute('hanoi')" id="btn-hanoi" class="route-btn px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-700 hover:bg-slate-200">
+            <button type="button" onclick="switchRoute('hanoi')" id="btn-hanoi" class="px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer">
               Hà Nội
             </button>
           </div>
         </div>
 
-        <!-- Visual Timeline Stage (Interactive Mock) -->
-        <div class="mt-6 pt-5 border-t border-slate-100 relative z-10 space-y-3" id="timeline-container">
-          <!-- Dynamic nodes rendered by JS -->
+        <!-- Timeline items container -->
+        <div class="space-y-2.5 pt-2" id="timeline-container">
+          <!-- Rendered by JS -->
         </div>
 
-        <!-- Micro Footer Tip -->
-        <div class="mt-4 pt-3 flex items-center justify-between text-xs text-slate-400">
-          <span class="flex items-center gap-1.5">
-            <i class="fa-regular fa-lightbulb text-amber-500"></i>
-            Tự động đồng bộ với Google Maps & VietMap
-          </span>
-          <span class="font-semibold text-[#0194F3] hidden sm:inline">Kéo thả để đổi thứ tự</span>
-        </div>
-      </div>
-
-      <!-- =================================================================== -->
-      <!-- BENTO RIGHT COLUMN (5 COLS): 2 SATELLITE WIDGETS XẾP CHỒNG -->
-      <!-- =================================================================== -->
-      <div class="lg:col-span-5 flex flex-col gap-6">
-
-        <!-- WIDGET 1: MINH BẠCH TÀI CHÍNH & CHIA TIỀN NHÓM TỰ ĐỘNG -->
-        <div class="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 custom-shadow flex-1 flex flex-col justify-between relative overflow-hidden">
-          <div class="space-y-3.5">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-black tracking-widest uppercase text-[#0194F3] flex items-center gap-1.5">
-                <i class="fa-solid fa-wallet"></i>
-                02 / Minh Bạch Tài Chính
-              </span>
-              <span class="text-[11px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-[#0194F3]">
-                Xác thực 100%
-              </span>
-            </div>
-
-            <h3 class="text-xl font-extrabold text-slate-900 tracking-tight">
-              Biết trước giá từng món. Chia tiền sòng phẳng.
-            </h3>
-
-            <!-- Interactive Split Simulator -->
-            <div class="p-4 rounded-2xl bg-[#F0F7FF] border border-blue-100/80 space-y-3.5">
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-semibold text-slate-600">Tổng chi phí dự kiến:</span>
-                <span class="text-base font-black text-slate-900" id="total-display">5.400.000 đ</span>
-              </div>
-
-              <!-- Visual Cost Category Breakdown Bar -->
-              <div class="space-y-1">
-                <div class="h-2 w-full rounded-full bg-slate-200 overflow-hidden flex">
-                  <div class="bg-[#0194F3] h-full" style="width: 45%" title="Ẩm thực: 45%"></div>
-                  <div class="bg-amber-400 h-full" style="width: 30%" title="Vé & Vui chơi: 30%"></div>
-                  <div class="bg-indigo-500 h-full" style="width: 25%" title="Di chuyển: 25%"></div>
-                </div>
-                <div class="flex justify-between text-[10px] text-slate-500 font-medium">
-                  <span class="text-[#0194F3]">Ẩm thực 45%</span>
-                  <span class="text-amber-600">Vé chơi 30%</span>
-                  <span class="text-indigo-600">Đi lại 25%</span>
-                </div>
-              </div>
-
-              <!-- Interactive Counter -->
-              <div class="pt-2 border-t border-blue-200/50 flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <span class="text-xs font-bold text-slate-700">Chia nhóm:</span>
-                  <div class="flex items-center gap-1 bg-white rounded-lg p-0.5 border border-slate-200 shadow-2xs">
-                    <button type="button" onclick="adjustGroup(-1)" class="size-6 rounded-md bg-slate-50 hover:bg-slate-100 font-bold text-xs text-slate-700 flex items-center justify-center transition-colors">
-                      -
-                    </button>
-                    <span id="group-count-display" class="w-6 text-center text-xs font-black text-slate-900">3</span>
-                    <button type="button" onclick="adjustGroup(1)" class="size-6 rounded-md bg-slate-50 hover:bg-slate-100 font-bold text-xs text-slate-700 flex items-center justify-center transition-colors">
-                      +
-                    </button>
-                  </div>
-                  <span class="text-xs text-slate-500">người</span>
-                </div>
-
-                <div class="text-right">
-                  <span class="text-[10px] text-slate-500 block -mb-0.5">Mỗi người chỉ trả:</span>
-                  <span class="text-base font-black text-[#0194F3]" id="per-person-display">1.800.000 đ</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- WIDGET 2: CỘNG TÁC THỜI GIAN THỰC & BÌNH CHỌN QUÁN ĂN -->
-        <div class="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 custom-shadow flex-1 flex flex-col justify-between relative overflow-hidden">
-          <div class="space-y-3.5">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-black tracking-widest uppercase text-[#0194F3] flex items-center gap-1.5">
-                <i class="fa-solid fa-users"></i>
-                03 / Cộng Tác Thời Gian Thực
-              </span>
-              
-              <!-- Active Presence Avatars -->
-              <div class="flex items-center -space-x-1.5">
-                <div class="size-6 rounded-full bg-[#0194F3] text-white text-[10px] font-bold flex items-center justify-center border-2 border-white ring-1 ring-blue-400/30" title="Minh Huy">
-                  MH
-                </div>
-                <div class="size-6 rounded-full bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white" title="Lan Anh">
-                  LA
-                </div>
-                <div class="size-6 rounded-full bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white" title="Hoàng Nam">
-                  HN
-                </div>
-                <div class="size-2 rounded-full bg-emerald-500 ring-2 ring-white ml-1 animate-pulse" title="3 bạn đang online"></div>
-              </div>
-            </div>
-
-            <h3 class="text-xl font-extrabold text-slate-900 tracking-tight">
-              Cả nhóm cùng chốt lịch qua 1 link. Không chat trôi tin.
-            </h3>
-
-            <!-- Interactive Voting Cards -->
-            <div class="space-y-2 pt-1">
-              <!-- Vote Option 1 -->
-              <div onclick="toggleVote(1)" id="vote-card-1" class="p-3 rounded-2xl border-2 border-[#0194F3] bg-blue-50/50 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.01]">
-                <div class="flex items-center gap-2.5">
-                  <div id="vote-check-1" class="size-5 rounded-md bg-[#0194F3] text-white flex items-center justify-center text-xs">
-                    <i class="fa-solid fa-check text-[10px]"></i>
-                  </div>
-                  <div>
-                    <p class="text-xs font-bold text-slate-900">Hải sản Năm Đảnh (Trần Cảo)</p>
-                    <p class="text-[11px] text-slate-500">Minh Huy & Lan Anh đề xuất</p>
-                  </div>
-                </div>
-                <span id="vote-count-1" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white text-[#0194F3] border border-blue-200">
-                  3/3 Đồng ý
-                </span>
-              </div>
-
-              <!-- Vote Option 2 -->
-              <div onclick="toggleVote(2)" id="vote-card-2" class="p-3 rounded-2xl border border-slate-200 bg-slate-50/70 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.01]">
-                <div class="flex items-center gap-2.5">
-                  <div id="vote-check-2" class="size-5 rounded-md bg-slate-200 text-slate-600 flex items-center justify-center text-xs">
-                    <i class="fa-solid fa-plus text-[10px]"></i>
-                  </div>
-                  <div>
-                    <p class="text-xs font-bold text-slate-900">Bê thui Cầu Mống Mười Hiển</p>
-                    <p class="text-[11px] text-slate-500">Đặc sản gia truyền</p>
-                  </div>
-                </div>
-                <span id="vote-count-2" class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white text-slate-600 border border-slate-200">
-                  2/3 Đồng ý
-                </span>
-              </div>
-            </div>
-
-            <p class="text-[11px] text-slate-500 text-center pt-0.5">
-              *Nhấp trực tiếp vào từng quán ăn để trải nghiệm tính năng vote nhóm
-            </p>
-          </div>
-        </div>
-
-      </div>
-
-    </div>
-  </section>
-
-  <!-- ========================================================================= -->
-  <!-- SECTION 2: CLEAN EDITORIAL MOSAIC (CẨM NANG & TRẢI NGHIỆM BẢN ĐỊA ĐÃ LÀM SẠCH) -->
-  <!-- ========================================================================= -->
-  <section id="food-guide" class="py-16 sm:py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-10 border-t border-slate-200/80">
-    
-    <!-- Section Header -->
-    <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
-      <div class="space-y-3 max-w-2xl">
-        <span class="text-xs font-black uppercase tracking-widest text-[#0194F3] flex items-center gap-2">
-          <i class="fa-solid fa-utensils"></i>
-          CẨM NANG & TRẢI NGHIỆM BẢN ĐỊA
-        </span>
-        <h2 class="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight">
-          Ăn chuẩn quán gia truyền, ngắm trọn góc view đẹp
-        </h2>
-        <p class="text-slate-600 text-base sm:text-lg leading-relaxed">
-          Được tuyển chọn kỹ lưỡng bởi đội ngũ người bản địa TripGenie. Tôn vinh nét đẹp văn hóa, ẩm thực chân thật và những góc chụp ảnh đắt giá nhất Việt Nam.
+        <p class="text-[11px] text-slate-400 pt-2 border-t border-slate-100">
+          Dễ dàng kéo thả thay đổi thứ tự theo thời gian thực
         </p>
       </div>
 
-      <div class="flex items-center gap-2">
-        <span class="text-xs font-bold px-3.5 py-1.5 rounded-full bg-white text-slate-700 border border-slate-200 shadow-2xs">
-          5 Điểm đến tuyển chọn
-        </span>
+      <!-- =================================================================== -->
+      <!-- BENTO RIGHT: CHI PHÍ & NHÓM BẠN (5 COLS) -->
+      <!-- =================================================================== -->
+      <div class="lg:col-span-5 flex flex-col gap-5">
+
+        <!-- WIDGET 1: MINH BẠCH CHI PHÍ -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex-1 flex flex-col justify-between space-y-4">
+          <div class="space-y-2">
+            <h3 class="text-base font-bold text-slate-900">
+              Minh bạch ngân sách
+            </h3>
+            <p class="text-xs text-slate-500">
+              Biết trước giá từng quán ăn, vé tham quan và chia đều theo đầu người.
+            </p>
+          </div>
+
+          <!-- Cost Card -->
+          <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/70 space-y-3">
+            <div class="flex items-baseline justify-between">
+              <span class="text-xs text-slate-600 font-medium">Tổng chi phí dự tính:</span>
+              <span class="text-base font-bold text-slate-900">5.400.000 đ</span>
+            </div>
+
+            <!-- Monochrome bar -->
+            <div class="space-y-1">
+              <div class="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden flex">
+                <div class="bg-slate-800 h-full" style="width: 45%" title="Ẩm thực: 45%"></div>
+                <div class="bg-slate-500 h-full" style="width: 30%" title="Vé tham quan: 30%"></div>
+                <div class="bg-slate-300 h-full" style="width: 25%" title="Di chuyển: 25%"></div>
+              </div>
+              <div class="flex justify-between text-[10px] text-slate-500 font-normal">
+                <span>Ẩm thực 45%</span>
+                <span>Vé & chơi 30%</span>
+                <span>Đi lại 25%</span>
+              </div>
+            </div>
+
+            <!-- Stepper -->
+            <div class="pt-2 border-t border-slate-200/80 flex items-center justify-between">
+              <div class="flex items-center gap-1.5">
+                <span class="text-xs text-slate-600">Chia:</span>
+                <div class="flex items-center border border-slate-200 rounded-md bg-white">
+                  <button type="button" onclick="adjustGroup(-1)" class="size-6 text-slate-600 hover:bg-slate-100 flex items-center justify-center font-bold text-xs cursor-pointer">
+                    -
+                  </button>
+                  <span id="group-num" class="w-6 text-center text-xs font-bold text-slate-900">3</span>
+                  <button type="button" onclick="adjustGroup(1)" class="size-6 text-slate-600 hover:bg-slate-100 flex items-center justify-center font-bold text-xs cursor-pointer">
+                    +
+                  </button>
+                </div>
+                <span class="text-xs text-slate-500">người</span>
+              </div>
+
+              <div class="text-right">
+                <span class="text-[10px] text-slate-400 block">Mỗi người trả:</span>
+                <span id="per-person" class="text-sm font-bold text-slate-900">1.800.000 đ</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- WIDGET 2: CỘNG TÁC NHÓM -->
+        <div class="bg-white rounded-2xl p-5 border border-slate-200/90 shadow-xs flex-1 flex flex-col justify-between space-y-4">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <h3 class="text-base font-bold text-slate-900">
+                Lên lịch cùng bạn bè
+              </h3>
+              <div class="flex items-center -space-x-1.5">
+                <span class="size-5 rounded-full bg-slate-700 text-white text-[9px] font-bold flex items-center justify-center border border-white">MH</span>
+                <span class="size-5 rounded-full bg-slate-500 text-white text-[9px] font-bold flex items-center justify-center border border-white">LA</span>
+                <span class="size-5 rounded-full bg-slate-400 text-white text-[9px] font-bold flex items-center justify-center border border-white">HN</span>
+              </div>
+            </div>
+            <p class="text-xs text-slate-500">
+              Chia sẻ 1 liên kết duy nhất để cả nhóm cùng bình chọn và thống nhất.
+            </p>
+          </div>
+
+          <!-- Simple Vote Items -->
+          <div class="space-y-2">
+            <div onclick="toggleVote(1)" id="vote-item-1" class="p-2.5 rounded-xl border border-slate-900 bg-slate-50 flex items-center justify-between cursor-pointer transition-colors">
+              <div>
+                <p class="text-xs font-semibold text-slate-900">Hải sản Năm Đảnh</p>
+                <p class="text-[11px] text-slate-500">Minh Huy đề xuất</p>
+              </div>
+              <span id="vote-badge-1" class="text-[11px] font-medium text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
+                ✓ 3/3 đồng ý
+              </span>
+            </div>
+
+            <div onclick="toggleVote(2)" id="vote-item-2" class="p-2.5 rounded-xl border border-slate-200 hover:border-slate-300 flex items-center justify-between cursor-pointer transition-colors">
+              <div>
+                <p class="text-xs font-semibold text-slate-800">Bê thui Cầu Mống Mười Hiển</p>
+                <p class="text-[11px] text-slate-500">Lan Anh đề xuất</p>
+              </div>
+              <span id="vote-badge-2" class="text-[11px] font-normal text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200">
+                + 2/3 đồng ý
+              </span>
+            </div>
+          </div>
+        </div>
+
       </div>
+
+    </div>
+  </section>
+
+  <!-- ========================================================================= -->
+  <!-- SECTION 2: CẨM NANG & TRẢI NGHIỆM BẢN ĐỊA (SỬ DỤNG 5 ẢNH CHÍNH XÁC 100%) -->
+  <!-- ========================================================================= -->
+  <section id="curated" class="py-14 sm:py-20 px-4 sm:px-6 lg:px-8 max-w-6xl mx-auto w-full space-y-8 border-t border-slate-200">
+    
+    <!-- Header -->
+    <div class="space-y-2">
+      <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+        Cẩm nang & Trải nghiệm bản địa
+      </p>
+      <h2 class="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+        Ăn chuẩn quán gia truyền, ngắm trọn góc view đẹp
+      </h2>
+      <p class="text-sm text-slate-500 max-w-xl">
+        Chọn lọc bởi đội ngũ bản địa TripGenie. Không tem nhãn thừa, không chi phí gượng gạo, để trọn vẹn vẻ đẹp bức ảnh tự tỏa sáng.
+      </p>
     </div>
 
-    <!-- CLEAN ASYMMETRIC MOSAIC GRID -->
-    <!-- (Loại bỏ hoàn toàn badge nền xanh đè góc, bỏ chi phí ước tính, bỏ nút 'Xem ->', dùng ảnh chuẩn 100% Việt Nam) -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 items-stretch">
+    <!-- MOSAIC GRID WITH 5 REAL LOCAL PHOTOS -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5 items-stretch">
 
-      <!-- ITEM 1: ĐÀ NẴNG (7 COLS) -->
-      <a href="#" class="group relative lg:col-span-7 h-[380px] sm:h-[440px] rounded-3xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-500 cursor-pointer block">
+      <!-- 1. ĐÀ NẴNG (7 COLS) - ẢNH CẦU VÀNG BÀ NÀ HILLS MỚI -->
+      <a href="#" class="group relative lg:col-span-7 h-[360px] sm:h-[420px] rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 block">
         <img
-          src="https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=1200&auto=format&fit=crop&q=85"
-          alt="Đà Nẵng"
-          class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-          loading="lazy"
+          src="../../frontend/public/images/curated/da-nang.jpg"
+          alt="Cầu Vàng Bà Nà Hills Đà Nẵng"
+          class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
         />
-        <!-- Bottom Dark Gradient Scrim -->
-        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent"></div>
+        <!-- Smooth Scrim at bottom -->
+        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
 
-        <!-- Content Overlay at Bottom -->
-        <div class="absolute bottom-6 left-6 right-6 text-white space-y-2">
-          <span class="text-xs font-semibold text-sky-300 uppercase tracking-wider block">
-            Đặc sản Miền Trung • Tuyển chọn 7 quán gia truyền
+        <!-- Typography Overlay at bottom -->
+        <div class="absolute bottom-5 left-5 right-5 text-white space-y-1.5">
+          <span class="text-[11px] font-medium text-slate-300 uppercase tracking-wider block">
+            Đà Nẵng • Bán đảo Sơn Trà & Mỹ Khê
           </span>
-          <h3 class="text-2xl sm:text-3xl font-extrabold text-white leading-tight drop-shadow-sm group-hover:text-sky-200 transition-colors">
-            Bản đồ Ẩm thực Đà Nẵng: Mì Quảng, Hải sản Bé Mặn & Chè Sầu Liên
+          <h3 class="text-xl sm:text-2xl font-bold text-white leading-tight group-hover:text-sky-200 transition-colors">
+            Cầu Vàng Bà Nà, Mì Quảng & Hải sản Biển Mỹ Khê
           </h3>
-          <p class="text-xs sm:text-sm text-slate-200 line-clamp-2 leading-relaxed">
-            Thưởng thức tô mì tôm thịt cắn ớt xanh thơm nức tại 95 Nguyễn Tri Phương, hải sản tươi sống đánh bắt trong ngày tại Mỹ Khê và ly chè sầu đậm đà.
+          <p class="text-xs text-slate-300 line-clamp-2 leading-relaxed">
+            Ngắm trọn khung cảnh hùng vĩ từ Cầu Vàng, thưởng thức tô mì tôm thịt đậm đà và hải sản tươi sống trong ngày.
           </p>
         </div>
       </a>
 
-      <!-- ITEM 2: HÀ NỘI (5 COLS) -->
-      <a href="#" class="group relative lg:col-span-5 h-[380px] sm:h-[440px] rounded-3xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-500 cursor-pointer block">
+      <!-- 2. HÀ NỘI (5 COLS) - ẢNH PHỐ CỔ TẠ HIỆN MỚI -->
+      <a href="#" class="group relative lg:col-span-5 h-[360px] sm:h-[420px] rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 block">
         <img
-          src="https://images.unsplash.com/photo-1509023464722-18d996393ca8?w=1000&auto=format&fit=crop&q=85"
-          alt="Hà Nội"
-          class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-          loading="lazy"
+          src="../../frontend/public/images/curated/ha-noi.jpg"
+          alt="Phố cổ Tạ Hiện Hà Nội"
+          class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
         />
-        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
 
-        <div class="absolute bottom-6 left-6 right-6 text-white space-y-2">
-          <span class="text-xs font-semibold text-sky-300 uppercase tracking-wider block">
-            Thủ đô nghìn năm • 36 Phố phường
+        <div class="absolute bottom-5 left-5 right-5 text-white space-y-1.5">
+          <span class="text-[11px] font-medium text-slate-300 uppercase tracking-wider block">
+            Hà Nội • Phố cổ 36 phố phường
           </span>
-          <h3 class="text-xl sm:text-2xl font-extrabold text-white leading-tight drop-shadow-sm group-hover:text-sky-200 transition-colors">
-            Hà Nội: Ngõ Nhỏ, Cà Phê Trứng Giảng & Bún Chả Que Tre
+          <h3 class="text-lg sm:text-xl font-bold text-white leading-tight group-hover:text-sky-200 transition-colors">
+            Hà Nội: Ngõ Nhỏ, Cà Phê Trứng & Bún Chả Que Tre
           </h3>
-          <p class="text-xs sm:text-sm text-slate-200 line-clamp-2 leading-relaxed">
-            Dạo quanh bờ hồ Hoàn Kiếm lúc sáng sớm, nhâm nhi ly cà phê trứng Giảng ấm nồng và thưởng thức bún chả que tre nướng than hoa thơm lừng.
+          <p class="text-xs text-slate-300 line-clamp-2 leading-relaxed">
+            Dạo bước qua những góc phố cổ kính, nhâm nhi ly cà phê trứng Giảng thơm béo và tận hưởng nhịp sống kinh kỳ.
           </p>
         </div>
       </a>
 
-      <!-- ITEM 3: HỘI AN (4 COLS - ẢNH ĐÈN LỒNG SÔNG HOÀI CHUẨN XÁC) -->
-      <a href="#" class="group relative lg:col-span-4 h-[400px] sm:h-[450px] rounded-3xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-500 cursor-pointer block">
+      <!-- 3. HỘI AN (4 COLS) - ẢNH SÔNG HOÀI HOÀNG HÔN & HOA ĐĂNG MỚI -->
+      <a href="#" class="group relative lg:col-span-4 h-[380px] sm:h-[430px] rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 block">
         <img
-          src="https://images.unsplash.com/photo-1583417319070-4a69db38a482?w=1000&auto=format&fit=crop&q=85"
-          alt="Hội An Phố Đèn Lồng"
-          class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-          loading="lazy"
+          src="../../frontend/public/images/curated/hoi-an.jpg"
+          alt="Phố cổ Hội An bên sông Hoài"
+          class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
         />
-        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
 
-        <div class="absolute bottom-6 left-6 right-6 text-white space-y-2">
-          <span class="text-xs font-semibold text-sky-300 uppercase tracking-wider block">
-            Quảng Nam • Phố Hội Hoài Niệm
+        <div class="absolute bottom-5 left-5 right-5 text-white space-y-1.5">
+          <span class="text-[11px] font-medium text-slate-300 uppercase tracking-wider block">
+            Hội An • Sông Hoài Hoài Niệm
           </span>
-          <h3 class="text-xl sm:text-2xl font-extrabold text-white leading-tight drop-shadow-sm group-hover:text-sky-200 transition-colors">
-            Hội An: Phố Đèn Lồng, Bánh Mì Phượng & Nước Mót
+          <h3 class="text-base sm:text-lg font-bold text-white leading-tight group-hover:text-sky-200 transition-colors">
+            Phố Đèn Lồng, Bánh Mì Phượng & Nước Mót
           </h3>
-          <p class="text-xs sm:text-sm text-slate-200 line-clamp-2 leading-relaxed">
-            Thả hoa đăng trên sông Hoài thơ mộng, thưởng thức đĩa cao lầu sợi dai giòn và ổ bánh mì Phượng ngập nhân.
+          <p class="text-xs text-slate-300 line-clamp-2 leading-relaxed">
+            Ngắm nhìn dòng sông Hoài rực rỡ hoa đăng về đêm, thưởng thức ổ bánh mì giòn rụm và ly nước thảo mộc thanh mát.
           </p>
         </div>
       </a>
 
-      <!-- ITEM 4: PHÚ QUỐC (4 COLS) -->
-      <a href="#" class="group relative lg:col-span-4 h-[400px] sm:h-[450px] rounded-3xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-500 cursor-pointer block">
+      <!-- 4. PHÚ QUỐC (4 COLS) - ẢNH CHÈO KAYAK BIỂN TRONG XANH MỚI -->
+      <a href="#" class="group relative lg:col-span-4 h-[380px] sm:h-[430px] rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 block">
         <img
-          src="https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=1000&auto=format&fit=crop&q=85"
-          alt="Phú Quốc Bãi Sao"
-          class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-          loading="lazy"
+          src="../../frontend/public/images/curated/phu-quoc.jpg"
+          alt="Phú Quốc Kayak Biển Ngọc"
+          class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
         />
-        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
 
-        <div class="absolute bottom-6 left-6 right-6 text-white space-y-2">
-          <span class="text-xs font-semibold text-sky-300 uppercase tracking-wider block">
-            Kiên Giang • Bãi Sao & Hòn Mây Rút
+        <div class="absolute bottom-5 left-5 right-5 text-white space-y-1.5">
+          <span class="text-[11px] font-medium text-slate-300 uppercase tracking-wider block">
+            Phú Quốc • Bãi Sao & Nam Đảo
           </span>
-          <h3 class="text-xl sm:text-2xl font-extrabold text-white leading-tight drop-shadow-sm group-hover:text-sky-200 transition-colors">
-            Phú Quốc: Bãi Sao, Bún Quậy & Hoàng Hôn Hàm Ninh
+          <h3 class="text-base sm:text-lg font-bold text-white leading-tight group-hover:text-sky-200 transition-colors">
+            Bãi Sao, Bún Quậy & Lặn San Hô Nam Đảo
           </h3>
-          <p class="text-xs sm:text-sm text-slate-200 line-clamp-2 leading-relaxed">
-            Lặn ngắm rạn san hô Nam đảo, tự tay khuấy tô bún quậy Kiến Xây và ngắm hoàng hôn đỏ rực tại làng chài Hàm Ninh.
+          <p class="text-xs text-slate-300 line-clamp-2 leading-relaxed">
+            Chèo thuyền trên làn nước biển trong vắt nhìn thấy đáy, thưởng thức tô bún quậy nóng hổi tự pha nước chấm.
           </p>
         </div>
       </a>
 
-      <!-- ITEM 5: SA PA (4 COLS) -->
-      <a href="#" class="group relative lg:col-span-4 h-[400px] sm:h-[450px] rounded-3xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-500 cursor-pointer block">
+      <!-- 5. SA PA (4 COLS) - ẢNH RUỘNG BẬC THANG NẮNG CHIẾU MỚI -->
+      <a href="#" class="group relative lg:col-span-4 h-[380px] sm:h-[430px] rounded-2xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 block">
         <img
-          src="https://images.unsplash.com/photo-1528127269322-539801943592?w=1000&auto=format&fit=crop&q=85"
-          alt="Sa Pa Ruộng Bậc Thang"
-          class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
-          loading="lazy"
+          src="../../frontend/public/images/curated/sa-pa.jpg"
+          alt="Sa Pa Ruộng Bậc Thang Mường Hoa"
+          class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
         />
-        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent"></div>
+        <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent"></div>
 
-        <div class="absolute bottom-6 left-6 right-6 text-white space-y-2">
-          <span class="text-xs font-semibold text-sky-300 uppercase tracking-wider block">
-            Lào Cai • Tây Bắc Hùng Vĩ
+        <div class="absolute bottom-5 left-5 right-5 text-white space-y-1.5">
+          <span class="text-[11px] font-medium text-slate-300 uppercase tracking-wider block">
+            Sa Pa • Mường Hoa & Ô Quy Hồ
           </span>
-          <h3 class="text-xl sm:text-2xl font-extrabold text-white leading-tight drop-shadow-sm group-hover:text-sky-200 transition-colors">
-            Sa Pa: Săn Biển Mây Đèo Ô Quy Hồ & Lẩu Cá Hồi
+          <h3 class="text-base sm:text-lg font-bold text-white leading-tight group-hover:text-sky-200 transition-colors">
+            Săn Mây Đèo Ô Quy Hồ & Lẩu Cá Hồi
           </h3>
-          <p class="text-xs sm:text-sm text-slate-200 line-clamp-2 leading-relaxed">
-            Săn mây lúc hoàng hôn trên đỉnh Ô Quy Hồ, dạo bước bản Tả Van giữa thung lũng ruộng bậc thang và thưởng thức nồi lẩu cá hồi măng chua.
+          <p class="text-xs text-slate-300 line-clamp-2 leading-relaxed">
+            Dạo bước thung lũng Mường Hoa giữa sóng lúa bậc thang, đón những vạt nắng chiều Tây Bắc và ấm lòng bên nồi lẩu cá hồi.
           </p>
         </div>
       </a>
@@ -441,38 +360,37 @@
     </div>
   </section>
 
-  <!-- Interactive JavaScript Logic -->
+  <!-- Interactive JS -->
   <script>
-    // 1. ROUTE SWITCHER DATA
     const ROUTE_DATA = {
       danang: {
         badge: "Tiết kiệm 45 phút/ngày",
         stops: [
-          { num: 1, time: "08:00", name: "Mì Quảng Bà Mua (Ăn sáng)", address: "95 Nguyễn Tri Phương, Hải Châu", color: "bg-[#0194F3]" },
-          { distance: "Di chuyển 3.8 km • Khoảng 12 phút qua đường ven biển" },
-          { num: 2, time: "09:30", name: "Bán đảo Sơn Trà & Chùa Linh Ứng", address: "Tượng Phật Bà 67m hướng biển Đông", color: "bg-blue-600" },
-          { distance: "Di chuyển 6.2 km • Cung đường biển Hoàng Sa thoáng đãng" },
-          { num: 3, time: "12:00", name: "Hải sản Bé Mặn (Ăn trưa)", address: "Bờ biển Mỹ Khê — Tôm sú sốt bơ tỏi, mực hấp hành", color: "bg-indigo-600" }
+          { num: 1, time: "08:00", name: "Mì Quảng Bà Mua", address: "95 Nguyễn Tri Phương" },
+          { distance: "3.8 km • ~12 phút qua đường ven biển" },
+          { num: 2, time: "09:30", name: "Bán đảo Sơn Trà & Chùa Linh Ứng", address: "Tượng Phật Bà 67m" },
+          { distance: "6.2 km • Cung đường biển Hoàng Sa" },
+          { num: 3, time: "12:00", name: "Hải sản Bé Mặn", address: "Bờ biển Mỹ Khê" }
         ]
       },
       phuquoc: {
         badge: "Tiết kiệm 55 phút/ngày",
         stops: [
-          { num: 1, time: "08:30", name: "Bún Quậy Kiến Xây (Ăn sáng)", address: "Đường Trần Phú, Dương Đông", color: "bg-[#0194F3]" },
-          { distance: "Di chuyển 14 km • Tuyến thẳng đường Nam đảo thoáng đãng" },
-          { num: 2, time: "10:00", name: "Bãi Sao & Hòn Mây Rút", address: "Cát trắng mịn, nước trong ngọc bích", color: "bg-blue-600" },
-          { distance: "Di chuyển 8 km • Đường ven biển ngắm hoàng hôn" },
-          { num: 3, time: "17:30", name: "Làng chài Hàm Ninh (Ăn chiều)", address: "Thưởng thức ghẹ Hàm Ninh & ngắm hoàng hôn đỏ rực", color: "bg-indigo-600" }
+          { num: 1, time: "08:30", name: "Bún Quậy Kiến Xây", address: "Đường Trần Phú, Dương Đông" },
+          { distance: "14 km • Đường Nam đảo thoáng đãng" },
+          { num: 2, time: "10:00", name: "Bãi Sao & Hòn Mây Rút", address: "Cát trắng, biển ngọc" },
+          { distance: "8 km • Đường ven biển hoàng hôn" },
+          { num: 3, time: "17:30", name: "Làng chài Hàm Ninh", address: "Thưởng thức ghẹ Hàm Ninh" }
         ]
       },
       hanoi: {
         badge: "Tiết kiệm 40 phút/ngày",
         stops: [
-          { num: 1, time: "07:30", name: "Phở Bát Đàn & Cà phê Giảng", address: "49 Bát Đàn & 39 Nguyễn Hữu Huân", color: "bg-[#0194F3]" },
-          { distance: "Di chuyển 1.5 km • Dạo bộ ngắm 36 phố phường" },
-          { num: 2, time: "09:00", name: "Hồ Hoàn Kiếm & Đền Ngọc Sơn", address: "Cầu Thê Húc, Tháp Rùa cổ kính", color: "bg-blue-600" },
-          { distance: "Di chuyển 3.2 km • Qua đường Phan Đình Phùng rợp bóng cây" },
-          { num: 3, time: "11:30", name: "Bún chả Hương Liên (Ăn trưa)", address: "24 Lê Văn Hưu, Hai Bà Trưng", color: "bg-indigo-600" }
+          { num: 1, time: "07:30", name: "Phở Bát Đàn & Cà phê Giảng", address: "Phố cổ Hoàn Kiếm" },
+          { distance: "1.5 km • Đi bộ ngắm 36 phố phường" },
+          { num: 2, time: "09:00", name: "Hồ Hoàn Kiếm & Đền Ngọc Sơn", address: "Cầu Thê Húc" },
+          { distance: "3.2 km • Đường Phan Đình Phùng rợp bóng cây" },
+          { num: 3, time: "11:30", name: "Bún chả Hương Liên", address: "24 Lê Văn Hưu" }
         ]
       }
     };
@@ -481,108 +399,84 @@
       const data = ROUTE_DATA[key];
       if (!data) return;
 
-      // Update badge
-      document.getElementById('time-saved-badge').textContent = data.badge;
+      document.getElementById('time-badge').textContent = data.badge;
 
-      // Update buttons
       ['danang', 'phuquoc', 'hanoi'].forEach(k => {
         const btn = document.getElementById('btn-' + k);
         if (k === key) {
-          btn.className = 'route-btn px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-[#0194F3] text-white shadow-xs';
+          btn.className = 'px-3 py-1 rounded-lg text-xs font-semibold bg-slate-900 text-white transition-colors cursor-pointer';
         } else {
-          btn.className = 'route-btn px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all bg-slate-100 text-slate-700 hover:bg-slate-200';
+          btn.className = 'px-3 py-1 rounded-lg text-xs font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer';
         }
       });
 
-      // Render timeline
       const container = document.getElementById('timeline-container');
       container.innerHTML = '';
 
       data.stops.forEach(item => {
         if (item.num) {
           const div = document.createElement('div');
-          div.className = 'flex items-center gap-3.5 p-3 rounded-2xl bg-slate-50 border border-slate-100/90 transition-all hover:bg-white hover:shadow-xs';
+          div.className = 'flex items-center gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-100';
           div.innerHTML = `
-            <span class="size-7 rounded-xl ${item.color} text-white text-xs font-black flex items-center justify-center shrink-0">
+            <span class="size-6 rounded-lg bg-slate-800 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
               ${item.num}
             </span>
             <div class="min-w-0 flex-1">
-              <p class="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                ${item.time} — ${item.name}
-              </p>
-              <p class="text-[11px] text-slate-500 truncate">
-                ${item.address}
-              </p>
+              <p class="text-xs font-semibold text-slate-800 truncate">${item.time} — ${item.name}</p>
+              <p class="text-[11px] text-slate-400 truncate">${item.address}</p>
             </div>
-            <i class="fa-solid fa-chevron-right text-[10px] text-slate-300"></i>
           `;
           container.appendChild(div);
         } else {
           const div = document.createElement('div');
-          div.className = 'ml-4 pl-4 border-l-2 border-dashed border-blue-200 text-[11px] text-slate-500 py-0.5 flex items-center gap-2';
-          div.innerHTML = `
-            <i class="fa-solid fa-arrow-down text-[9px] text-[#0194F3]"></i>
-            <span>${item.distance}</span>
-          `;
+          div.className = 'ml-3 pl-3.5 border-l border-dashed border-slate-300 text-[10px] text-slate-400 py-0.5';
+          div.textContent = item.distance;
           container.appendChild(div);
         }
       });
     }
 
-    // Initialize with Da Nang
     switchRoute('danang');
 
-    // 2. BUDGET SPLIT CALCULATOR
     let groupCount = 3;
     const totalCost = 5400000;
 
     function adjustGroup(delta) {
       groupCount = Math.max(1, Math.min(8, groupCount + delta));
-      document.getElementById('group-count-display').textContent = groupCount;
+      document.getElementById('group-num').textContent = groupCount;
       const perPerson = Math.round(totalCost / groupCount);
-      document.getElementById('per-person-display').textContent = perPerson.toLocaleString('vi-VN') + ' đ';
+      document.getElementById('per-person').textContent = perPerson.toLocaleString('vi-VN') + ' đ';
     }
 
-    // 3. INTERACTIVE GROUP VOTING
     let vote1 = true;
     let vote2 = false;
 
     function toggleVote(id) {
       if (id === 1) {
         vote1 = !vote1;
-        const card = document.getElementById('vote-card-1');
-        const check = document.getElementById('vote-check-1');
-        const count = document.getElementById('vote-count-1');
+        const item = document.getElementById('vote-item-1');
+        const badge = document.getElementById('vote-badge-1');
         if (vote1) {
-          card.className = 'p-3 rounded-2xl border-2 border-[#0194F3] bg-blue-50/50 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.01]';
-          check.className = 'size-5 rounded-md bg-[#0194F3] text-white flex items-center justify-center text-xs';
-          check.innerHTML = '<i class="fa-solid fa-check text-[10px]"></i>';
-          count.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-white text-[#0194F3] border border-blue-200';
-          count.textContent = '3/3 Đồng ý';
+          item.className = 'p-2.5 rounded-xl border border-slate-900 bg-slate-50 flex items-center justify-between cursor-pointer transition-colors';
+          badge.className = 'text-[11px] font-medium text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200';
+          badge.textContent = '✓ 3/3 đồng ý';
         } else {
-          card.className = 'p-3 rounded-2xl border border-slate-200 bg-slate-50/70 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.01]';
-          check.className = 'size-5 rounded-md bg-slate-200 text-slate-600 flex items-center justify-center text-xs';
-          check.innerHTML = '<i class="fa-solid fa-plus text-[10px]"></i>';
-          count.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-white text-slate-600 border border-slate-200';
-          count.textContent = '2/3 Đồng ý';
+          item.className = 'p-2.5 rounded-xl border border-slate-200 hover:border-slate-300 flex items-center justify-between cursor-pointer transition-colors';
+          badge.className = 'text-[11px] font-normal text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200';
+          badge.textContent = '+ 2/3 đồng ý';
         }
       } else {
         vote2 = !vote2;
-        const card = document.getElementById('vote-card-2');
-        const check = document.getElementById('vote-check-2');
-        const count = document.getElementById('vote-count-2');
+        const item = document.getElementById('vote-item-2');
+        const badge = document.getElementById('vote-badge-2');
         if (vote2) {
-          card.className = 'p-3 rounded-2xl border-2 border-[#0194F3] bg-blue-50/50 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.01]';
-          check.className = 'size-5 rounded-md bg-[#0194F3] text-white flex items-center justify-center text-xs';
-          check.innerHTML = '<i class="fa-solid fa-check text-[10px]"></i>';
-          count.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-white text-[#0194F3] border border-blue-200';
-          count.textContent = '3/3 Đồng ý';
+          item.className = 'p-2.5 rounded-xl border border-slate-900 bg-slate-50 flex items-center justify-between cursor-pointer transition-colors';
+          badge.className = 'text-[11px] font-medium text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200';
+          badge.textContent = '✓ 3/3 đồng ý';
         } else {
-          card.className = 'p-3 rounded-2xl border border-slate-200 bg-slate-50/70 flex items-center justify-between cursor-pointer transition-all hover:scale-[1.01]';
-          check.className = 'size-5 rounded-md bg-slate-200 text-slate-600 flex items-center justify-center text-xs';
-          check.innerHTML = '<i class="fa-solid fa-plus text-[10px]"></i>';
-          count.className = 'text-[11px] font-bold px-2 py-0.5 rounded-full bg-white text-slate-600 border border-slate-200';
-          count.textContent = '2/3 Đồng ý';
+          item.className = 'p-2.5 rounded-xl border border-slate-200 hover:border-slate-300 flex items-center justify-between cursor-pointer transition-colors';
+          badge.className = 'text-[11px] font-normal text-slate-500 bg-slate-50 px-2 py-0.5 rounded border border-slate-200';
+          badge.textContent = '+ 2/3 đồng ý';
         }
       }
     }

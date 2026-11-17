@@ -36,10 +36,10 @@ export function LandingNavbar() {
             priority
           />
           <div className="hidden sm:block">
-            <span className="text-xl font-black tracking-tight text-white drop-shadow-sm">
+            <span className="text-xl font-bold tracking-tight text-white drop-shadow-sm">
               TripGenie
             </span>
-            <span className="block text-[10px] uppercase font-bold tracking-wider text-slate-200 -mt-0.5">
+            <span className="block text-[10px] uppercase font-semibold tracking-wider text-slate-200 -mt-0.5">
               Nền Tảng Du Lịch Thông Minh
             </span>
           </div>

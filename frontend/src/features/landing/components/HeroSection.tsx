@@ -26,8 +26,8 @@ export function HeroSection() {
           {LANDING_CONFIG.hero.badgeText}
         </div>
 
-        {/* Headline: Đậm nét, dứt khoát, không gạch chân rác */}
-        <h1 className="text-4xl sm:text-6xl md:text-7xl font-black text-white tracking-tight leading-[1.12] hero-text-shadow">
+        {/* Headline: Chuẩn font-bold tinh tế */}
+        <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold text-white tracking-tight leading-[1.12] hero-text-shadow">
           {LANDING_CONFIG.hero.headlineLine1}
           <br />
           <span className="block text-white mt-1">

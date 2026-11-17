@@ -5,48 +5,47 @@ export function EditorialMosaicSection() {
   return (
     <section
       id="food-guide"
-      className="py-14 sm:py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-10"
+      className="py-14 sm:py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full space-y-8"
     >
       {/* Section Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-3 max-w-2xl">
-          <span className="text-xs font-bold uppercase tracking-widest text-[#0194F3]">
+        <div className="space-y-2 max-w-2xl">
+          <span className="text-xs font-semibold uppercase tracking-wider text-[#0194F3]">
             CẨM NANG &amp; TRẢI NGHIỆM BẢN ĐỊA
           </span>
-          <h2 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-tight">
+          <h2 className="text-2xl sm:text-4xl font-bold text-slate-900 tracking-tight leading-tight">
             Ăn chuẩn quán gia truyền, ngắm trọn góc view đẹp
           </h2>
-          <p className="text-slate-600 text-base sm:text-lg leading-relaxed">
-            Được chọn lọc kỹ lưỡng bởi đội ngũ bản địa TripGenie. Tôn vinh nét đẹp văn hóa, ẩm thực chân thật và những góc chụp ảnh đắt giá nhất Việt Nam.
+          <p className="text-slate-500 text-sm sm:text-base leading-relaxed font-normal">
+            Chọn lọc bởi đội ngũ bản địa TripGenie. Không tem nhãn thừa, không chi phí gượng gạo, để trọn vẹn vẻ đẹp bức ảnh tự tỏa sáng.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs font-bold px-3.5 py-1.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+          <span className="text-xs font-semibold px-3 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
             5 Điểm đến tiêu biểu
           </span>
         </div>
       </div>
 
-      {/* GOOGLE ARTS & CULTURE ASYMMETRIC MOSAIC GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-6 items-stretch">
+      {/* ASYMMETRIC MOSAIC GRID */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-12 gap-5 sm:gap-6 items-stretch">
         {CURATED_STORIES.map((story, index) => {
           const isLarge = index === 0;
           const isMedium = index === 1;
           const titleSizeClass = isLarge
-            ? "text-2xl sm:text-3xl"
+            ? "text-xl sm:text-2xl"
             : isMedium
-            ? "text-2xl"
-            : "text-xl sm:text-2xl";
-          const actionText = isLarge || isMedium ? "Khám phá chi tiết →" : "Xem →";
+            ? "text-lg sm:text-xl"
+            : "text-base sm:text-lg";
 
           return (
             <Link
               key={story.id}
               href={story.targetUrl}
-              className={`group relative ${story.gridSpan.lgCol} ${story.gridSpan.height} rounded-3xl overflow-hidden shadow-md hover:shadow-2xl transition-all duration-500 cursor-pointer block`}
+              className={`group relative ${story.gridSpan.lgCol} ${story.gridSpan.height} rounded-2xl overflow-hidden shadow-xs hover:shadow-xl transition-all duration-500 cursor-pointer block border border-slate-200/40`}
             >
-              {/* Background Image with Hover Zoom */}
+              {/* Authentic Vietnam Photography */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={story.imageUrl}
@@ -55,41 +54,22 @@ export function EditorialMosaicSection() {
                 loading="lazy"
               />
 
-              {/* Google Arts Bottom Scrim */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/10"></div>
-
-              {/* Category Pill Badge (Google Arts & Culture style) */}
-              <div className="absolute top-5 left-5">
-                <span className="px-3.5 py-1.5 rounded-lg bg-[#0194F3] text-white text-xs font-bold tracking-wide shadow-sm">
-                  {story.categoryBadge}
-                </span>
-              </div>
+              {/* Scrim Gradient mờ nhẹ nâng chữ ở đáy, không che mất chi tiết ảnh */}
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/35 via-45% to-transparent pointer-events-none" />
 
               {/* Content Overlay */}
-              <div className="absolute bottom-6 left-6 right-6 text-white space-y-2">
-                <span className="text-xs font-semibold text-sky-200 uppercase tracking-wider block">
+              <div className="absolute bottom-5 left-5 right-5 text-white space-y-1.5 pointer-events-none">
+                <span className="text-[11px] font-medium text-slate-300 uppercase tracking-wider block">
                   {story.subtitle}
                 </span>
                 <h3
-                  className={`${titleSizeClass} font-extrabold text-white leading-tight drop-shadow-sm group-hover:text-sky-200 transition-colors`}
+                  className={`${titleSizeClass} font-bold text-white leading-tight drop-shadow-xs group-hover:text-sky-200 transition-colors`}
                 >
                   {story.title}
                 </h3>
-                <p className="text-xs sm:text-sm text-slate-200 line-clamp-2 leading-relaxed">
+                <p className="text-xs text-slate-200/90 line-clamp-2 leading-relaxed font-normal">
                   {story.description}
                 </p>
-                <div className="pt-2 flex items-center justify-between text-xs text-slate-300 border-t border-white/20">
-                  <span>
-                    Chi phí ước tính:{" "}
-                    <strong className="text-white font-bold">
-                      {story.estimatedCost}
-                    </strong>{" "}
-                    ({story.duration})
-                  </span>
-                  <span className="text-sky-300 font-bold group-hover:translate-x-1 transition-transform inline-flex items-center gap-1">
-                    {actionText}
-                  </span>
-                </div>
               </div>
             </Link>
           );

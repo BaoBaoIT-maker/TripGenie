@@ -8,50 +8,6 @@ interface HeroSearchBarProps {
   onDestinationChange?: (locationName: string) => void;
 }
 
-interface SuggestionItem {
-  label: string;
-  query: string;
-  locationTitle: string;
-}
-
-const POPULAR_SUGGESTIONS: SuggestionItem[] = [
-  {
-    label: "Hạ Long",
-    query: "Hạ Long",
-    locationTitle: "Vịnh Hạ Long, Quảng Ninh",
-  },
-  {
-    label: "Đà Nẵng",
-    query: "Đà Nẵng",
-    locationTitle: "Bán đảo Sơn Trà & Biển Mỹ Khê, Đà Nẵng",
-  },
-  {
-    label: "Phố cổ Hội An",
-    query: "Hội An",
-    locationTitle: "Phố cổ Hội An, Quảng Nam",
-  },
-  {
-    label: "Hà Nội 36 phố",
-    query: "Hà Nội",
-    locationTitle: "Hồ Gươm & Phố Cổ 36 Phố, Hà Nội",
-  },
-  {
-    label: "Đà Lạt",
-    query: "Đà Lạt",
-    locationTitle: "Hồ Tuyền Lâm & Rừng Thông, Đà Lạt",
-  },
-  {
-    label: "Phú Quốc",
-    query: "Phú Quốc",
-    locationTitle: "Bãi Sao & Hòn Thơm, Phú Quốc",
-  },
-  {
-    label: "Sa Pa mây ngàn",
-    query: "Sa Pa",
-    locationTitle: "Đèo Ô Quy Hồ & Bản Tả Van, Sa Pa",
-  },
-];
-
 export function HeroSearchBar({ onDestinationChange }: HeroSearchBarProps) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -59,6 +15,9 @@ export function HeroSearchBar({ onDestinationChange }: HeroSearchBarProps) {
   const executeSearch = (searchQuery: string) => {
     const trimmed = searchQuery.trim();
     if (trimmed) {
+      if (onDestinationChange) {
+        onDestinationChange(trimmed);
+      }
       router.push(`/explore?keyword=${encodeURIComponent(trimmed)}`);
     } else {
       router.push("/explore");
@@ -70,16 +29,8 @@ export function HeroSearchBar({ onDestinationChange }: HeroSearchBarProps) {
     executeSearch(query);
   };
 
-  const handleSuggestionClick = (item: SuggestionItem) => {
-    setQuery(item.query);
-    if (onDestinationChange) {
-      onDestinationChange(item.locationTitle);
-    }
-    executeSearch(item.query);
-  };
-
   return (
-    <div className="w-full max-w-3xl mx-auto space-y-3.5 text-left">
+    <div className="w-full max-w-3xl mx-auto text-left">
       {/* Google-inspired Translucent Search Capsule Bar */}
       <form
         onSubmit={handleSubmit}
@@ -122,23 +73,6 @@ export function HeroSearchBar({ onDestinationChange }: HeroSearchBarProps) {
           <span className="hidden sm:inline">Khám phá</span>
         </button>
       </form>
-
-      {/* Suggestion Pills: Translucent, Clean, Responsive Touch Scroll on Mobile */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 -mx-2 px-2 sm:mx-0 sm:px-0 sm:flex-wrap sm:justify-center text-xs">
-        <span className="text-white/80 font-bold text-[11px] uppercase tracking-wider drop-shadow-xs shrink-0">
-          Gợi ý hot:
-        </span>
-        {POPULAR_SUGGESTIONS.map((s) => (
-          <button
-            key={s.label}
-            type="button"
-            onClick={() => handleSuggestionClick(s)}
-            className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-white/15 hover:bg-white/30 backdrop-blur-md border border-white/25 hover:border-white/50 text-white text-xs font-semibold transition-all hover:scale-105 cursor-pointer shadow-2xs drop-shadow-xs shrink-0 whitespace-nowrap"
-          >
-            <span>{s.label}</span>
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

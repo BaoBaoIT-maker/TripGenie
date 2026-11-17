@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/features/auth/hooks/use-auth';
+import { apiClient } from '@/lib/api-client';
 
 import {
   consumeOAuthReturnUrl,
@@ -16,6 +17,8 @@ function SafeCallbackHandler() {
   const searchParams = useSearchParams();
   const error = searchParams.get('error');
   const rawNext = searchParams.get('next');
+  const accessToken = searchParams.get('accessToken');
+  const refreshToken = searchParams.get('refreshToken');
 
   const { refetchUser } = useAuth();
 
@@ -26,6 +29,20 @@ function SafeCallbackHandler() {
         toast.error('Đăng nhập với Google không thành công.');
         router.push('/login');
         return;
+      }
+
+      if (accessToken && refreshToken) {
+        try {
+          await apiClient('/auth/session', {
+            method: 'POST',
+            body: JSON.stringify({ accessToken, refreshToken }),
+          });
+          if (typeof window !== 'undefined') {
+            window.history.replaceState({}, '', window.location.pathname);
+          }
+        } catch {
+          // fallback to refetchUser
+        }
       }
 
       try {
@@ -50,7 +67,7 @@ function SafeCallbackHandler() {
     }
 
     handleCallback();
-  }, [error, rawNext, refetchUser, router]);
+  }, [error, rawNext, accessToken, refreshToken, refetchUser, router]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background text-foreground space-y-4">

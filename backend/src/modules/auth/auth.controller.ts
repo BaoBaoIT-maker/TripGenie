@@ -189,11 +189,29 @@ export class AuthController {
     try {
       const result = await this.authService.handleOAuthCallback(req.user);
       this.setAuthCookies(res, result.authResponse.tokens);
-      return res.redirect(`${frontendUrl}/auth/callback?success=true`);
+      const { accessToken, refreshToken } = result.authResponse.tokens;
+      return res.redirect(
+        `${frontendUrl}/auth/callback?success=true&accessToken=${encodeURIComponent(accessToken)}&refreshToken=${encodeURIComponent(refreshToken)}`,
+      );
     } catch (err: any) {
       const errorCode =
         err?.status === 409 ? 'account_collision' : 'oauth_failed';
       return res.redirect(`${frontendUrl}/login?error=${errorCode}`);
     }
+  }
+
+  @Post('session')
+  @HttpCode(HttpStatus.OK)
+  async establishSession(
+    @Body() body: { accessToken: string; refreshToken: string },
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    if (!body?.accessToken || !body?.refreshToken) {
+      throw new UnauthorizedException('Thiếu token xác thực');
+    }
+    const payload = await this.authService.verifyAccessToken(body.accessToken);
+    this.setAuthCookies(res, body);
+    const user = await this.authService.getProfile(payload.sub);
+    return user;
   }
 }

@@ -542,6 +542,18 @@ export class AuthService {
     }
   }
 
+  async verifyAccessToken(
+    token: string,
+  ): Promise<{ sub: string; email: string; role: string }> {
+    try {
+      return await this.jwtService.verifyAsync(token, {
+        secret: this.configService.getOrThrow<string>('JWT_SECRET'),
+      });
+    } catch {
+      throw new UnauthorizedException('Token không hợp lệ hoặc đã hết hạn');
+    }
+  }
+
   async logout(options: {
     accessToken?: string;
     refreshToken?: string;

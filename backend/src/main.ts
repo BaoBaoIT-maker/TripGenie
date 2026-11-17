@@ -55,7 +55,10 @@ async function bootstrap() {
     ]),
   );
   app.enableCors({
-    origin: (origin, callback) => {
+    origin: (
+      origin: string | undefined,
+      callback: (err: Error | null, allow?: boolean) => void,
+    ) => {
       if (!origin) return callback(null, true);
       const isExplicitlyAllowed = allowedOrigins.includes(origin);
       const isVercelDomain = /^https:\/\/[a-zA-Z0-9_-]+\.vercel\.app$/.test(origin);

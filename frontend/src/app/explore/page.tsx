@@ -37,7 +37,6 @@ import { ExploreCardListSkeleton } from "@/components/place/ExploreListSkeleton"
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { EmptyState } from "@/components/common/EmptyState";
-import { TripGenieMark } from "@/components/common/TripGenieMark";
 import { VietMapLoader } from "@/components/map/VietMapLoader";
 import { PhotoContributeModal } from "@/components/place/PhotoContributeModal";
 import {
@@ -369,18 +368,6 @@ function ExploreContent() {
 
   // Mobile map view toggle (Airbnb-style floating toggle for mobile devices)
   const [showMobileMap, setShowMobileMap] = useState(false);
-
-  // Sync body class when mobile map is active to safely dock global floating widgets
-  useEffect(() => {
-    if (showMobileMap) {
-      document.body.classList.add("mobile-map-active");
-    } else {
-      document.body.classList.remove("mobile-map-active");
-    }
-    return () => {
-      document.body.classList.remove("mobile-map-active");
-    };
-  }, [showMobileMap]);
 
   // Selection & Interactivity for Split Map
   const [selectedPlaceId, setSelectedPlaceId] = useState<string | null>(initialSelectedId || null);
@@ -1548,21 +1535,6 @@ function ExploreContent() {
                 onSearchThisArea={handleSearchThisArea}
                 travelAreas={travelAreas}
               />
-
-              {/* Mobile Top-Right AI Advisor Button (Docked safely at top-right, away from carousel) */}
-              {showMobileMap && (
-                <div className="absolute top-3.5 right-3.5 z-20 lg:hidden">
-                  <button
-                    type="button"
-                    onClick={() => window.dispatchEvent(new CustomEvent("tripgenie:open-advisor"))}
-                    className="flex min-h-[44px] items-center gap-2 rounded-full border border-border bg-card px-3.5 py-2 text-xs font-bold text-foreground shadow-md transition-all hover:border-primary/50 active:scale-95 cursor-pointer"
-                    title="Hỏi cố vấn du lịch TripGenie về khu vực này"
-                  >
-                    <TripGenieMark className="size-4.5" />
-                    <span>Hỏi cố vấn</span>
-                  </button>
-                </div>
-              )}
             </div>
           </div>
 

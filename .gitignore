@@ -58,3 +58,6 @@ tripgenie_backup.*
 
 # Local uploaded media
 backend/uploads/
+
+# Generated crawler datasets and local backups
+backend/src/modules/crawler/data/

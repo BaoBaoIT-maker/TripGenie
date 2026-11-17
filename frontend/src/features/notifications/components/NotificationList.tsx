@@ -71,8 +71,8 @@ function NotificationRow({
         return (
           <>
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
-            đã thích bài viết:{" "}
-            <span className="font-medium text-foreground line-clamp-1 italic">
+            đã thích bài viết{" "}
+            <span className="font-medium text-foreground italic">
               &ldquo;{postTitle}&rdquo;
             </span>
           </>
@@ -81,8 +81,8 @@ function NotificationRow({
         return (
           <>
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
-            đã bình luận về bài viết:{" "}
-            <span className="font-medium text-foreground line-clamp-1 italic">
+            đã bình luận về bài viết{" "}
+            <span className="font-medium text-foreground italic">
               &ldquo;{postTitle}&rdquo;
             </span>
           </>
@@ -91,8 +91,8 @@ function NotificationRow({
         return (
           <>
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
-            đã trả lời bình luận của bạn trong:{" "}
-            <span className="font-medium text-foreground line-clamp-1 italic">
+            đã trả lời bình luận của bạn trong{" "}
+            <span className="font-medium text-foreground italic">
               &ldquo;{postTitle}&rdquo;
             </span>
           </>
@@ -101,8 +101,8 @@ function NotificationRow({
         return (
           <>
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
-            đã mời bạn cùng tham gia chuyến đi:{" "}
-            <span className="font-medium text-foreground line-clamp-1 italic">
+            đã mời bạn cùng tham gia chuyến đi{" "}
+            <span className="font-medium text-foreground italic">
               &ldquo;{tripTitle}&rdquo;
             </span>
           </>
@@ -111,8 +111,8 @@ function NotificationRow({
         return (
           <>
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
-            đã đồng ý tham gia chuyến đi:{" "}
-            <span className="font-medium text-foreground line-clamp-1 italic">
+            đã đồng ý tham gia chuyến đi{" "}
+            <span className="font-medium text-foreground italic">
               &ldquo;{tripTitle}&rdquo;
             </span>
           </>
@@ -121,8 +121,8 @@ function NotificationRow({
         return (
           <>
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
-            đã từ chối lời mời tham gia chuyến đi:{" "}
-            <span className="font-medium text-foreground line-clamp-1 italic">
+            đã từ chối lời mời tham gia chuyến đi{" "}
+            <span className="font-medium text-foreground italic">
               &ldquo;{tripTitle}&rdquo;
             </span>
           </>
@@ -139,43 +139,43 @@ function NotificationRow({
 
   const renderBadgeIcon = () => {
     const baseBadge =
-      "absolute -bottom-1 -right-1 z-10 size-5 rounded-full flex items-center justify-center shadow-xs ring-2 ring-white dark:ring-slate-900";
+      "absolute -bottom-0.5 -right-0.5 z-10 size-4 sm:size-5 rounded-full flex items-center justify-center shadow-xs ring-2 ring-white dark:ring-slate-900";
 
     switch (item.type) {
       case "POST_LIKED":
         return (
           <div className={cn(baseBadge, "bg-rose-500 text-white")}>
-            <Heart className="size-3 fill-white" />
+            <Heart className="size-2.5 sm:size-3 fill-white" />
           </div>
         );
       case "POST_COMMENTED":
         return (
           <div className={cn(baseBadge, "bg-primary text-primary-foreground")}>
-            <MessageSquare className="size-3 fill-current" />
+            <MessageSquare className="size-2.5 sm:size-3 fill-current" />
           </div>
         );
       case "COMMENT_REPLIED":
         return (
           <div className={cn(baseBadge, "bg-[#0068B8] text-white")}>
-            <Reply className="size-3" />
+            <Reply className="size-2.5 sm:size-3" />
           </div>
         );
       case "TRIP_INVITED":
         return (
           <div className={cn(baseBadge, "bg-primary text-primary-foreground")}>
-            <UserPlus className="size-3" />
+            <UserPlus className="size-2.5 sm:size-3" />
           </div>
         );
       case "TRIP_INVITATION_ACCEPTED":
         return (
           <div className={cn(baseBadge, "bg-emerald-600 text-white")}>
-            <Check className="size-3 stroke-[3]" />
+            <Check className="size-2.5 sm:size-3 stroke-[3]" />
           </div>
         );
       case "TRIP_INVITATION_DECLINED":
         return (
           <div className={cn(baseBadge, "bg-muted-foreground text-background")}>
-            <X className="size-3 stroke-[2.5]" />
+            <X className="size-2.5 sm:size-3 stroke-[2.5]" />
           </div>
         );
       default:
@@ -187,36 +187,38 @@ function NotificationRow({
     <Link
       href={targetUrl}
       onClick={() => onClick(item)}
-      className={`group flex items-start gap-3 p-3.5 transition-colors rounded-xl ${
+      className={`group flex items-start gap-2.5 sm:gap-3 p-2.5 sm:p-3.5 transition-colors rounded-xl ${
         isUnread
           ? "bg-sky-100/75 hover:bg-sky-100 dark:bg-sky-950/50 dark:hover:bg-sky-900/60"
           : "hover:bg-muted/60"
       }`}
     >
       <div className="relative shrink-0">
-        <Avatar className="size-11 ring-1 ring-border">
+        <Avatar className="size-9.5 sm:size-11 ring-1 ring-border">
           <AvatarImage
             src={item.actor?.avatarUrl || undefined}
             alt={actorName}
             className="object-cover"
           />
-          <AvatarFallback className="bg-primary/10 text-primary font-bold text-sm">
+          <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs sm:text-sm">
             {actorName.charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
         {renderBadgeIcon()}
       </div>
 
-      <div className="flex-1 min-w-0 pr-1 text-sm leading-snug">
-        <p className="text-foreground/90">{renderContent()}</p>
-        <span className="text-xs text-muted-foreground mt-1 inline-block">
+      <div className="flex-1 min-w-0 pr-1 text-xs sm:text-sm leading-snug">
+        <p className="text-foreground/90 line-clamp-2 sm:line-clamp-3 break-words">
+          {renderContent()}
+        </p>
+        <span className="text-[11px] sm:text-xs text-muted-foreground mt-1 inline-block">
           {formatRelativeTime(item.createdAt)}
         </span>
       </div>
 
       {isUnread && (
         <span
-          className="size-2.5 rounded-full bg-[#0194F3] shrink-0 mt-2 shadow-xs"
+          className="size-2 sm:size-2.5 rounded-full bg-[#0194F3] shrink-0 mt-1.5 shadow-xs"
           aria-label="Chưa đọc"
         />
       )}

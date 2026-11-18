@@ -25,7 +25,8 @@ const resolveApiBaseUrl = (): string => {
     process.env.BACKEND_API_URL ||
     process.env.NEXT_PUBLIC_API_URL ||
     'http://localhost:3000';
-  const cleanBase = backend.replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '');
+  const clean = backend.replace(/\/api\/v1\/?$/, '').replace(/\/+$/, '');
+  const cleanBase = clean.startsWith('http') ? clean : 'http://localhost:3000';
   return `${cleanBase}/api/v1`;
 };
 

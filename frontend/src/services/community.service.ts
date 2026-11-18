@@ -341,8 +341,10 @@ export const communityService = {
 
   getCreatorProfile: async (
     identifier: string
-  ): Promise<{ profile: CreatorProfileData }> =>
-    apiClient<{ profile: CreatorProfileData }>(
-      `/community/creators/${encodeURIComponent(identifier)}`
-    ),
+  ): Promise<{ profile: CreatorProfileData }> => {
+    const cleanId = identifier.replace(/^@/, "").trim();
+    return apiClient<{ profile: CreatorProfileData }>(
+      `/community/creators/${encodeURIComponent(cleanId)}`
+    );
+  },
 };

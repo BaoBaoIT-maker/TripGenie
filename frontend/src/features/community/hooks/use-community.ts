@@ -26,6 +26,7 @@ import type {
   CreatorProfileData,
 } from "@/types/community";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { ApiClientError } from "@/lib/api-client";
 
 export const COMMUNITY_QUERY_KEYS = {
   all: ["community"] as const,
@@ -164,6 +165,13 @@ export function useCreatorProfile(
     },
     enabled: Boolean(identifier),
     initialData,
+    staleTime: 60 * 1000,
+    retry: (failureCount, error) => {
+      if (error instanceof ApiClientError && error.statusCode === 404) {
+        return false;
+      }
+      return failureCount < 2;
+    },
   });
 }
 

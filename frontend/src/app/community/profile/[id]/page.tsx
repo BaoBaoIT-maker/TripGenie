@@ -1,8 +1,6 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
 import { CreatorProfileClientShell } from "@/components/community/CreatorProfileClientShell";
 import CreatorProfileLoading from "./loading";
 import type { CreatorProfileData } from "@/types/community";
@@ -12,10 +10,17 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-const SERVER_API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
+function resolveServerApiBaseUrl(): string {
+  const rawTarget =
+    process.env.BACKEND_API_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:3000";
+  const clean = rawTarget.replace(/\/api\/v1\/?$/, "").replace(/\/+$/, "");
+  const base = clean.startsWith("http") ? clean : "http://localhost:3000";
+  return `${base}/api/v1`;
+}
 
-const SSR_FETCH_TIMEOUT_MS = 3000;
+const SSR_FETCH_TIMEOUT_MS = 5000;
 
 async function fetchServerProfile(
   identifier: string,
@@ -26,8 +31,9 @@ async function fetchServerProfile(
     const timer = setTimeout(() => controller.abort(), SSR_FETCH_TIMEOUT_MS);
 
     const cleanId = identifier.replace(/^@/, "").trim();
+    const baseUrl = resolveServerApiBaseUrl();
     const response = await fetch(
-      `${SERVER_API_BASE_URL}/community/creators/${encodeURIComponent(cleanId)}`,
+      `${baseUrl}/community/creators/${encodeURIComponent(cleanId)}`,
       {
         method: "GET",
         headers: {
@@ -115,33 +121,6 @@ export default async function CreatorProfilePage({ params }: PageProps) {
   const cookieHeader = cookieStore.toString();
 
   const profile = await fetchServerProfile(identifier, cookieHeader);
-
-  if (!profile || !profile.user) {
-    return (
-      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6 text-center">
-        <div className="bg-white border border-[#E2E8F0] rounded-[20px] p-8 sm:p-10 max-w-md w-full shadow-sm space-y-4">
-          <div className="size-16 rounded-full bg-[#F1F5F9] text-[#94A3B8] inline-flex items-center justify-center text-2xl mx-auto">
-            <i className="fa-solid fa-user-slash" aria-hidden="true" />
-          </div>
-          <h1 className="text-lg font-bold text-[#0F172A]">
-            Không tìm thấy trang cá nhân
-          </h1>
-          <p className="text-[13px] text-[#64748B] leading-relaxed">
-            Tài khoản <span className="font-semibold text-[#0F172A]">@{identifier}</span> không tồn tại hoặc đã ngừng hoạt động.
-          </p>
-          <div className="pt-2">
-            <Link
-              href="/community"
-              className="inline-flex items-center gap-2 h-10 px-5 rounded-[10px] bg-[#0F172A] hover:bg-[#1E293B] text-white text-[13px] font-semibold transition-colors"
-            >
-              <ArrowLeft className="size-4" />
-              <span>Quay lại Cộng đồng</span>
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <Suspense fallback={<CreatorProfileLoading />}>

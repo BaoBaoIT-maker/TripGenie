@@ -49,9 +49,10 @@ import { CreatePostModal } from "./CreatePostModal";
 import { PostDetailModal } from "./PostDetailModal";
 import { CloneItineraryPreviewModal } from "./CloneItineraryPreviewModal";
 import { PostCard } from "./PostCard";
+import { CreatorProfileSkeleton } from "./CreatorProfileSkeleton";
 
 interface CreatorProfileClientShellProps {
-  initialProfile: CreatorProfileData;
+  initialProfile?: CreatorProfileData | null;
   identifier: string;
 }
 
@@ -60,31 +61,36 @@ export function CreatorProfileClientShell({
   identifier,
 }: CreatorProfileClientShellProps) {
   const { user: currentUser } = useAuth();
-  const { data: liveProfile } = useCreatorProfile(identifier, initialProfile);
+  const { data: liveProfile, isLoading } = useCreatorProfile(
+    identifier,
+    initialProfile || undefined
+  );
   const [overrideUser, setOverrideUser] = useState<Partial<
     CreatorProfileData["user"]
   > | null>(null);
 
   const profile = liveProfile || initialProfile;
-  const targetUser = useMemo(
-    () => ({
+  const targetUser = useMemo(() => {
+    if (!profile?.user) return null;
+    return {
       ...profile.user,
       ...(overrideUser || {}),
-    }),
-    [profile.user, overrideUser]
-  );
-  const stats = profile.stats;
-  const posts = profile.posts || [];
-  const publicItineraries = profile.publicItineraries || [];
+    };
+  }, [profile?.user, overrideUser]);
+
+  const stats = profile?.stats;
+  const posts = profile?.posts || [];
+  const publicItineraries = profile?.publicItineraries || [];
 
   const displayHandle = useMemo(() => {
+    if (!targetUser) return `@${identifier.replace(/^@/, "")}`;
     if (targetUser.username) return `@${targetUser.username}`;
     return deriveHandleFromFullName(targetUser.fullName);
-  }, [targetUser.username, targetUser.fullName]);
+  }, [targetUser, identifier]);
 
   // Determine if viewing own profile
   const isMe = useMemo(() => {
-    if (!currentUser) return false;
+    if (!currentUser || !targetUser) return false;
     if (currentUser.id === targetUser.id) return true;
     if (
       currentUser.username &&
@@ -123,6 +129,7 @@ export function CreatorProfileClientShell({
 
   // Share profile handler
   const handleShareProfile = useCallback(() => {
+    if (!targetUser) return;
     const currentUrl = typeof window !== "undefined" ? window.location.href : "";
     if (navigator.share) {
       navigator
@@ -136,7 +143,39 @@ export function CreatorProfileClientShell({
       navigator.clipboard.writeText(currentUrl);
       toast.success("Đã sao chép liên kết trang cá nhân vào bộ nhớ tạm!");
     }
-  }, [targetUser]);
+  }, [targetUser, displayHandle]);
+
+  if (!profile || !targetUser || !stats) {
+    if (isLoading) {
+      return <CreatorProfileSkeleton />;
+    }
+
+    const cleanIdentifier = identifier.replace(/^@/, "").trim();
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center p-6 text-center">
+        <div className="bg-white border border-[#E2E8F0] rounded-[20px] p-8 sm:p-10 max-w-md w-full shadow-sm space-y-4">
+          <div className="size-16 rounded-full bg-[#F1F5F9] text-[#94A3B8] inline-flex items-center justify-center text-2xl mx-auto">
+            <i className="fa-solid fa-user-slash" aria-hidden="true" />
+          </div>
+          <h1 className="text-lg font-bold text-[#0F172A]">
+            Không tìm thấy trang cá nhân
+          </h1>
+          <p className="text-[13px] text-[#64748B] leading-relaxed">
+            Tài khoản <span className="font-semibold text-[#0F172A]">@{cleanIdentifier}</span> không tồn tại hoặc đã ngừng hoạt động.
+          </p>
+          <div className="pt-2">
+            <Link
+              href="/community"
+              className="inline-flex items-center gap-2 h-10 px-5 rounded-[10px] bg-[#0F172A] hover:bg-[#1E293B] text-white text-[13px] font-semibold transition-colors"
+            >
+              <ArrowLeft className="size-4" />
+              <span>Quay lại Cộng đồng</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] text-[#0F172A] font-sans flex flex-col">

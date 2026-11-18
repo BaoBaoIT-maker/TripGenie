@@ -14,10 +14,9 @@ describe('AppController', () => {
     appController = app.get<AppController>(AppController);
   });
 
-  describe('health (HEAD)', () => {
-    it('should be defined and return void', () => {
-      expect(appController.checkHealth).toBeDefined();
-      expect(appController.checkHealth()).toBeUndefined();
+  describe('health', () => {
+    it('should return "ok"', () => {
+      expect(appController.checkHealth()).toBe('ok');
     });
   });
 });

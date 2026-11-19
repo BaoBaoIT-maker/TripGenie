@@ -57,24 +57,28 @@ type TargetSelectionMode = 'all' | number;
 const GROUP_TABS: ReadonlyArray<{
   key: SuggestionGroupKey;
   label: string;
+  shortLabel: string;
   icon: string;
   desc: string;
 }> = [
   {
     key: 'nearest',
-    label: 'Gần lịch trình nhất',
+    label: 'Gần lịch trình',
+    shortLabel: 'Gần nhất',
     icon: 'fa-solid fa-location-crosshairs',
     desc: 'Tối ưu quãng đường di chuyển tới các điểm trong ngày đang chọn',
   },
   {
     key: 'bestValue',
     label: 'Đáng tiền nhất',
+    shortLabel: 'Giá tốt',
     icon: 'fa-solid fa-scale-balanced',
     desc: 'Cân bằng giữa ngân sách, chất lượng và vị trí',
   },
   {
     key: 'topRated',
     label: 'Đánh giá cao',
+    shortLabel: 'Đánh giá cao',
     icon: 'fa-solid fa-award',
     desc: 'Điểm đánh giá thực tế và lượt nhận xét nổi bật',
   },
@@ -277,12 +281,12 @@ export function LodgingPickerDialog({
         toast.success(
           `Đã áp dụng chỗ lưu trú cho toàn bộ chuyến đi (${clampedTotalNights} đêm) và tối ưu lại lộ trình!`,
         );
-        onClose();
       } else {
         toast.success(
           `Đã cập nhật chỗ lưu trú cho Đêm ${validSelected} (Ngày ${validSelected}) và tối ưu lại lộ trình!`,
         );
       }
+      onClose();
     } catch (err) {
       toast.error(
         err instanceof Error
@@ -299,8 +303,8 @@ export function LodgingPickerDialog({
   const isSearchMode = searchQuery.trim().length >= 2;
   const actionButtonLabel =
     targetMode === 'all' || clampedTotalNights === 1
-      ? 'Áp dụng toàn bộ'
-      : `Chọn cho Đêm ${selectedNight}`;
+      ? 'Áp dụng'
+      : 'Chọn';
 
   return (
     <AppModalPortal
@@ -312,27 +316,20 @@ export function LodgingPickerDialog({
       maxWidthClass="max-w-xl"
     >
       {/* Header */}
-      <div className="px-6 py-4 border-b border-slate-200/80 bg-[#F8FAFC] flex items-center justify-between gap-3">
-        <div>
-          <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0194F3]">
-            Chỗ lưu trú &amp; Điểm neo lộ trình
-          </span>
-          <h2
-            id="lodging-picker-title"
-            className="text-base font-black text-[#10243A] tracking-tight mt-0.5"
-          >
-            {targetMode === 'all'
-              ? `Đổi khách sạn toàn chuyến (${clampedTotalNights} đêm)`
-              : `Đổi khách sạn · Đêm ${selectedNight} (Ngày ${selectedNight}/${clampedTotalNights})`}
-          </h2>
-        </div>
+      <div className="px-5 sm:px-6 py-3.5 sm:py-4 border-b border-slate-200/80 bg-white flex items-center justify-between gap-3">
+        <h2
+          id="lodging-picker-title"
+          className="text-base sm:text-lg font-bold text-slate-900 tracking-tight"
+        >
+          Chỗ lưu trú
+        </h2>
 
         <button
           type="button"
           onClick={onClose}
           disabled={updateLodgingMutation.isPending}
           aria-label="Đóng hộp thoại chọn chỗ ở"
-          className="size-8 rounded-xl text-slate-400 hover:bg-slate-200/60 hover:text-[#10243A] flex items-center justify-center transition-colors cursor-pointer"
+          className="size-8 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-[#10243A] flex items-center justify-center transition-colors cursor-pointer"
         >
           <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
         </button>
@@ -340,75 +337,50 @@ export function LodgingPickerDialog({
 
       {/* Body */}
       <div className="p-5 space-y-4 max-h-[75vh] overflow-y-auto text-[#10243A]">
-        {/* Option 1: Per-Day / Per-Night Selector Bar + Apply-All Button */}
+        {/* Sleek Night Selection Filter Pills */}
         {clampedTotalNights > 1 && (
-          <div className="rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] p-3 space-y-2.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Chọn đêm lưu trú hoặc áp dụng toàn bộ
-              </span>
-              <button
-                type="button"
-                onClick={handleChooseApplyAllMode}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 transition-all cursor-pointer ${
-                  targetMode === 'all'
-                    ? 'bg-[#0194F3] text-white shadow-[0_2px_8px_rgba(1,148,243,0.25)]'
-                    : 'bg-white text-[#0194F3] border border-[#D0E7FF] hover:border-[#0194F3]'
-                }`}
-              >
-                <i
-                  className="fa-solid fa-layer-group text-[11px]"
-                  aria-hidden="true"
-                />
-                <span>Áp dụng toàn bộ (Đêm 1–{clampedTotalNights})</span>
-              </button>
-            </div>
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
+            <button
+              type="button"
+              onClick={handleChooseApplyAllMode}
+              className={`h-9 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+                targetMode === 'all'
+                  ? 'bg-[#0194F3] text-white shadow-sm'
+                  : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700'
+              }`}
+            >
+              <i className="fa-solid fa-layer-group text-[11px]" aria-hidden="true" />
+              <span>Tất cả</span>
+            </button>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-              {nightList.map((nightNum) => {
-                const isNightSelected =
-                  targetMode === nightNum ||
-                  (targetMode === 'all' && selectedNight === nightNum);
-                const isExplicitSingleNight = targetMode === nightNum;
-                const assigned = lodgingByNight.get(nightNum);
+            {nightList.map((nightNum) => {
+              const isExplicitSingleNight = targetMode === nightNum;
+              const assigned = lodgingByNight.get(nightNum);
 
-                return (
-                  <button
-                    key={nightNum}
-                    type="button"
-                    onClick={() => handleChooseNightButton(nightNum)}
-                    className={`px-3 py-2 rounded-xl text-left transition-all cursor-pointer border ${
-                      isExplicitSingleNight
-                        ? 'bg-[#E8F4FD] border-[#0194F3] ring-2 ring-[#0194F3]/15'
-                        : isNightSelected
-                          ? 'bg-white border-[#0194F3]/60'
-                          : 'bg-white border-[#E2E8F0] hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-1">
-                      <span
-                        className={`text-xs font-extrabold ${
-                          isExplicitSingleNight
-                            ? 'text-[#0194F3]'
-                            : 'text-[#10243A]'
-                        }`}
-                      >
-                        Đêm {nightNum} · Ngày {nightNum}
-                      </span>
-                      {isExplicitSingleNight && (
-                        <i
-                          className="fa-solid fa-circle-check text-[11px] text-[#0194F3]"
-                          aria-hidden="true"
-                        />
-                      )}
-                    </div>
-                    <div className="text-[11px] text-slate-500 truncate mt-0.5">
-                      {assigned ? assigned.name : 'Chưa chọn chỗ ở'}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+              return (
+                <button
+                  key={nightNum}
+                  type="button"
+                  onClick={() => handleChooseNightButton(nightNum)}
+                  className={`h-9 px-3.5 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+                    isExplicitSingleNight
+                      ? 'bg-[#0194F3] text-white shadow-sm'
+                      : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700'
+                  }`}
+                  title={assigned ? `Đã chọn: ${assigned.name}` : `Đêm ${nightNum}`}
+                >
+                  <span>Đêm {nightNum}</span>
+                  {assigned && (
+                    <span
+                      className={`size-1.5 rounded-full ${
+                        isExplicitSingleNight ? 'bg-white' : 'bg-[#0194F3]'
+                      }`}
+                      aria-hidden="true"
+                    />
+                  )}
+                </button>
+              );
+            })}
           </div>
         )}
 
@@ -422,7 +394,7 @@ export function LodgingPickerDialog({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Tìm khách sạn/homestay bạn đã đặt trước..."
+            placeholder="Tìm khách sạn, homestay..."
             className="w-full h-10 pl-9 pr-8 rounded-xl border border-[#CBD5E1] bg-white text-xs font-medium text-[#10243A] placeholder:text-slate-400 focus:outline-none focus:border-[#0194F3] focus:ring-2 focus:ring-[#0194F3]/20"
           />
           {searchQuery && (
@@ -462,14 +434,14 @@ export function LodgingPickerDialog({
                   return (
                     <div
                       key={place.id}
-                      className="rounded-2xl border border-[#E2E8F0] bg-white p-3.5 flex items-center justify-between gap-3 hover:border-[#0194F3]/50 transition-colors"
+                      className="rounded-2xl border border-[#E2E8F0] bg-white p-3 sm:p-3.5 flex items-center justify-between gap-2.5 sm:gap-3 hover:border-[#0194F3]/50 transition-colors"
                     >
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="text-sm font-bold text-[#10243A] truncate">
+                      <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
+                        <div className="text-xs sm:text-sm font-bold text-[#10243A] truncate">
                           {place.name}
                         </div>
                         {place.address && (
-                          <div className="text-xs text-slate-600 truncate">
+                          <div className="text-[11px] sm:text-xs text-slate-600 truncate">
                             {place.address}
                           </div>
                         )}
@@ -478,7 +450,7 @@ export function LodgingPickerDialog({
                         type="button"
                         disabled={updateLodgingMutation.isPending}
                         onClick={() => handleSelectPlace(place)}
-                        className="px-3.5 py-2 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] disabled:opacity-50 text-white text-xs font-bold shrink-0 cursor-pointer transition-colors"
+                        className="h-8 sm:h-9 px-3 sm:px-3.5 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] disabled:opacity-50 text-white text-xs font-bold shrink-0 cursor-pointer transition-colors"
                       >
                         {isBusy ? 'Đang lưu...' : actionButtonLabel}
                       </button>
@@ -491,7 +463,7 @@ export function LodgingPickerDialog({
         ) : (
           <>
             {/* 3 Curated Group Tabs */}
-            <div className="grid grid-cols-3 gap-1.5 p-1 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
+            <div className="grid grid-cols-3 gap-1 sm:gap-1.5 p-1 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
               {GROUP_TABS.map((tab) => {
                 const isSelected = activeGroup === tab.key;
                 return (
@@ -499,14 +471,15 @@ export function LodgingPickerDialog({
                     key={tab.key}
                     type="button"
                     onClick={() => setActiveGroup(tab.key)}
-                    className={`py-2 px-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    className={`py-2 px-1 sm:px-2 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 min-w-0 ${
                       isSelected
                         ? 'bg-white text-[#0194F3] shadow-2xs border border-[#D0E7FF]'
                         : 'text-slate-600 hover:text-[#10243A]'
                     }`}
                   >
-                    <i className={`${tab.icon} text-[11px]`} aria-hidden="true" />
-                    <span className="truncate">{tab.label}</span>
+                    <i className={`${tab.icon} text-[11px] shrink-0`} aria-hidden="true" />
+                    <span className="sm:hidden text-[11px] whitespace-nowrap">{tab.shortLabel}</span>
+                    <span className="hidden sm:inline truncate">{tab.label}</span>
                   </button>
                 );
               })}
@@ -550,16 +523,17 @@ export function LodgingPickerDialog({
                   return (
                     <div
                       key={item.placeId}
-                      className="rounded-2xl border border-[#E2E8F0] bg-white p-3.5 flex items-center justify-between gap-3 hover:border-[#0194F3]/50 transition-all shadow-2xs"
+                      className="rounded-2xl border border-[#E2E8F0] bg-white p-3 sm:p-3.5 flex items-center justify-between gap-2.5 sm:gap-3 hover:border-[#0194F3]/50 transition-all shadow-2xs"
                     >
-                      <div className="flex items-start gap-3 min-w-0 flex-1">
-                        <div className="size-14 rounded-xl bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200/70">
+                      <div className="flex items-start gap-2.5 sm:gap-3 min-w-0 flex-1">
+                        <div className="size-13 sm:size-14 rounded-xl bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center border border-slate-200/70">
                           {item.imageUrl ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={item.imageUrl}
                               alt={item.name}
                               loading="lazy"
+                              referrerPolicy="no-referrer"
                               className="w-full h-full object-cover"
                             />
                           ) : (
@@ -570,12 +544,12 @@ export function LodgingPickerDialog({
                           )}
                         </div>
 
-                        <div className="min-w-0 flex-1 space-y-1">
-                          <div className="text-sm font-bold text-[#10243A] truncate">
+                        <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
+                          <div className="text-xs sm:text-sm font-bold text-[#10243A] truncate">
                             {item.name}
                           </div>
 
-                          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[11px] sm:text-xs">
                             {item.ratingAvg != null && item.ratingAvg > 0 && (
                               <span className="inline-flex items-center gap-1 font-semibold text-amber-700 tabular-nums">
                                 <i
@@ -584,7 +558,7 @@ export function LodgingPickerDialog({
                                 />
                                 <span>{item.ratingAvg.toFixed(1)}</span>
                                 {item.reviewCount != null && item.reviewCount > 0 && (
-                                  <span className="text-slate-500 font-normal">
+                                  <span className="text-slate-400 font-normal">
                                     ({item.reviewCount})
                                   </span>
                                 )}
@@ -594,7 +568,7 @@ export function LodgingPickerDialog({
                               ·
                             </span>
                             <span className="font-semibold text-[#0194F3] tabular-nums">
-                              Cách tâm ngày {selectedNight} ~{item.distanceKm} km
+                              Cách tâm ~{item.distanceKm} km
                             </span>
                             {item.pricePerNight != null && item.pricePerNight > 0 && (
                               <>
@@ -620,7 +594,7 @@ export function LodgingPickerDialog({
                         type="button"
                         disabled={updateLodgingMutation.isPending}
                         onClick={() => handleSelectPlace(item)}
-                        className="px-3.5 py-2 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] disabled:opacity-50 text-white text-xs font-bold shrink-0 cursor-pointer transition-colors shadow-[0_2px_8px_rgba(1,148,243,0.25)]"
+                        className="h-8 sm:h-9 px-3 sm:px-3.5 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] disabled:opacity-50 text-white text-xs font-bold shrink-0 cursor-pointer transition-colors shadow-[0_2px_8px_rgba(1,148,243,0.25)]"
                       >
                         {isBusy ? 'Đang lưu...' : actionButtonLabel}
                       </button>

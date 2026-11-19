@@ -457,20 +457,21 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
             isLongMotorbikeWarning ? 'border-amber-300' : 'border-slate-200'
           }`}
         >
-          <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-2.5 text-xs">
-            <div className="flex flex-wrap items-center gap-2 min-w-0">
+          <div className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+            {/* Left: Icon & Transit Name on the same row (no wrap below icon) */}
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <div className="size-8 rounded-xl bg-[#F0F7FF] text-[#0194F3] flex items-center justify-center shrink-0">
                 <i className={`${transitVisual.iconClass} text-xs`} aria-hidden="true" />
               </div>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-1.5 font-bold text-[#10243A]">
-                  <span>{transitVisual.label}:</span>
-                  <span className="truncate">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5 font-bold text-[#10243A] text-xs sm:text-[13px] min-w-0">
+                  <span className="shrink-0">{transitVisual.label}:</span>
+                  <span className="truncate text-slate-800 font-semibold">
                     {cleanHubName(transit.originHub?.name || transit.originName)} →{' '}
                     {cleanHubName(transit.destHub?.name || transit.destName)}
                   </span>
                 </div>
-                <div className="text-[11px] text-slate-500 tabular-nums">
+                <div className="text-[11px] text-slate-500 tabular-nums truncate">
                   {transitVisual.summary}
                   {' · '}
                   Khứ hồi ~{formatVnd(transit.estimatedPriceRoundTrip)}
@@ -478,7 +479,8 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 shrink-0">
+            {/* Right: Actions */}
+            <div className="flex items-center justify-end gap-1.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-slate-100">
               <button
                 type="button"
                 aria-expanded={isTransitDetailsOpen}
@@ -818,7 +820,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
               );
             })()}
 
-            {day.lodging && (
+            {day.lodging && !day.lodging.isCheckOutDay && (
               <LodgingAnchorBar
                 dayNumber={day.dayNumber}
                 lodging={day.lodging}

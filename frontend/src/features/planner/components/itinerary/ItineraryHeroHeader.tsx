@@ -145,48 +145,49 @@ export function ItineraryHeroHeader({
             )}
           </div>
 
-          {/* Action Bar + Overflow Menu */}
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {/* Action Bar + Overflow Menu: Fixed 1 row on mobile, fluid on desktop */}
+          <div className="flex items-center gap-1.5 sm:gap-2 w-full lg:w-auto shrink-0 justify-between sm:justify-start">
             <button
               type="button"
               onClick={onShare}
-              className="h-9 px-3.5 rounded-xl border border-slate-200 bg-white hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#D0E7FF] text-xs font-bold text-[#10243A] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Chia sẻ lịch trình"
+              aria-label="Chia sẻ lịch trình"
+              className="size-9 rounded-xl border border-slate-200 bg-white hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#D0E7FF] text-[#10243A] flex items-center justify-center transition-colors cursor-pointer shrink-0"
             >
-              <i className="fa-solid fa-share-nodes text-xs" aria-hidden="true" />
-              <span>Chia sẻ</span>
+              <i className="fa-solid fa-share text-xs" aria-hidden="true" />
             </button>
 
             <button
               type="button"
               onClick={onOpenPrintModal}
-              className="h-9 px-3.5 rounded-xl border border-slate-200 bg-white hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#D0E7FF] text-xs font-bold text-[#10243A] inline-flex items-center gap-1.5 transition-colors cursor-pointer"
+              className="flex-1 sm:flex-initial h-9 px-2 sm:px-3.5 rounded-xl border border-slate-200 bg-white hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#D0E7FF] text-xs font-bold text-[#10243A] inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer min-w-0"
             >
-              <i className="fa-solid fa-print text-xs" aria-hidden="true" />
-              <span>Xuất PDF</span>
+              <i className="fa-solid fa-print text-xs shrink-0" aria-hidden="true" />
+              <span>In</span>
             </button>
 
             <button
               type="button"
               disabled={isCloning}
               onClick={onClone}
-              className="h-9 px-3.5 rounded-xl bg-[#0194F3] hover:bg-[#007AD0] text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+              className="flex-1 sm:flex-initial h-9 px-2 sm:px-3.5 rounded-xl bg-[#0194F3] hover:bg-[#007AD0] text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 min-w-0"
             >
               {isCloning ? (
-                <i className="fa-solid fa-circle-notch fa-spin text-xs" aria-hidden="true" />
+                <i className="fa-solid fa-circle-notch fa-spin text-xs shrink-0" aria-hidden="true" />
               ) : (
-                <i className="fa-regular fa-clone text-xs" aria-hidden="true" />
+                <i className="fa-regular fa-clone text-xs shrink-0" aria-hidden="true" />
               )}
-              <span>{isCloning ? 'Đang sao chép...' : 'Sao chép'}</span>
+              <span className="truncate">{isCloning ? 'Đang chép...' : 'Sao chép'}</span>
             </button>
 
             {(canEdit || isMemberOrOwner || isOwner) && (
-              <div className="relative">
+              <div className="relative shrink-0">
                 <button
                   type="button"
                   aria-label="Tùy chọn thêm"
                   aria-expanded={isOverflowOpen}
                   onClick={() => setIsOverflowOpen((v) => !v)}
-                  className="size-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+                  className="size-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 >
                   <i className="fa-solid fa-ellipsis text-sm" aria-hidden="true" />
                 </button>
@@ -247,36 +248,42 @@ export function ItineraryHeroHeader({
         </div>
 
         {/* Inline Metadata Strip + Party Size Stepper + Member Stack */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3 text-xs text-slate-600 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 pt-1">
+          {/* Row 1 on mobile: Calendar (flex-1 min-w-0 expands) + Duration badge (shrink-0 w-auto compact) */}
+          <div className="flex items-center gap-2 text-xs text-slate-600 w-full sm:w-auto">
             {canEdit ? (
               <button
                 type="button"
                 onClick={onOpenEditMetaModal}
                 title="Bấm để chỉnh sửa ngày chuyến đi"
-                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 hover:bg-[#F0F7FF] hover:border-[#0194F3]/40 hover:text-[#0194F3] border border-slate-200/80 font-semibold text-slate-700 tabular-nums transition-colors cursor-pointer group text-left"
+                className="flex-1 sm:flex-initial inline-flex items-center justify-between sm:justify-start gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 hover:bg-[#F0F7FF] hover:border-[#0194F3]/40 hover:text-[#0194F3] border border-slate-200/80 font-semibold text-slate-700 tabular-nums transition-colors cursor-pointer group text-left min-w-0"
               >
-                <i className="fa-regular fa-calendar text-[#0194F3]" aria-hidden="true" />
-                <span>{formatTripDates(data.startDate, data.endDate)}</span>
-                <i className="fa-solid fa-pen text-[9px] text-slate-400 group-hover:text-[#0194F3] transition-colors ml-0.5" aria-hidden="true" />
+                <div className="inline-flex items-center gap-1.5 min-w-0 truncate">
+                  <i className="fa-regular fa-calendar text-[#0194F3] shrink-0" aria-hidden="true" />
+                  <span className="truncate">{formatTripDates(data.startDate, data.endDate)}</span>
+                </div>
+                <i className="fa-solid fa-pen text-[9px] text-slate-400 group-hover:text-[#0194F3] transition-colors ml-0.5 shrink-0" aria-hidden="true" />
               </button>
             ) : (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 font-semibold text-slate-700 tabular-nums">
-                <i className="fa-regular fa-calendar text-[#0194F3]" aria-hidden="true" />
-                <span>{formatTripDates(data.startDate, data.endDate)}</span>
+              <span className="flex-1 sm:flex-initial inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 font-semibold text-slate-700 tabular-nums min-w-0">
+                <i className="fa-regular fa-calendar text-[#0194F3] shrink-0" aria-hidden="true" />
+                <span className="truncate">{formatTripDates(data.startDate, data.endDate)}</span>
               </span>
             )}
 
-            <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 font-semibold text-slate-700 tabular-nums">
+            <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 font-semibold text-slate-700 tabular-nums">
               <i className="fa-regular fa-clock text-[#0194F3]" aria-hidden="true" />
               <span>
                 {totalDays}N{totalNights}Đ
               </span>
             </span>
+          </div>
 
+          {/* Row 2 on mobile: Party Size Stepper & Member Avatar Stack on 1 single row */}
+          <div className="flex items-center justify-between sm:justify-end gap-2 text-xs text-slate-600 w-full sm:w-auto">
             {/* Inline Party Size Stepper (Owner edits, others view) */}
             {isOwner ? (
-              <div className="col-span-2 sm:col-span-1 inline-flex items-center justify-between gap-1 rounded-xl border border-slate-200 bg-slate-50 px-1.5 py-0.5">
+              <div className="inline-flex items-center justify-between gap-1 rounded-xl border border-slate-200 bg-slate-50 px-1.5 py-0.5 shrink-0">
                 <button
                   type="button"
                   aria-label="Giảm số người dự kiến"
@@ -286,7 +293,7 @@ export function ItineraryHeroHeader({
                 >
                   <i className="fa-solid fa-minus text-[10px]" aria-hidden="true" />
                 </button>
-                <span className="px-2 text-xs font-bold text-[#10243A] tabular-nums inline-flex items-center gap-1">
+                <span className="px-1.5 text-xs font-bold text-[#10243A] tabular-nums inline-flex items-center gap-1">
                   <i className="fa-solid fa-user-group text-[11px] text-[#0194F3]" aria-hidden="true" />
                   <span>{partySize} người</span>
                 </span>
@@ -301,41 +308,41 @@ export function ItineraryHeroHeader({
                 </button>
               </div>
             ) : (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 font-medium tabular-nums">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 font-medium tabular-nums shrink-0">
                 <i className="fa-solid fa-user-group text-[#0194F3]" aria-hidden="true" />
                 <span>{partySize} người</span>
               </span>
             )}
-          </div>
 
-          {/* Clickable Companion Stack */}
-          {isMemberOrOwner && (
-            <button
-              type="button"
-              onClick={onOpenCompanionsModal}
-              className="inline-flex items-center gap-2 px-2.5 py-1 rounded-xl hover:bg-[#F5F9FF] border border-transparent hover:border-[#D0E7FF] transition-colors cursor-pointer"
-              title="Quản lý thành viên chuyến đi"
-            >
-              <div className="flex items-center -space-x-2">
-                {members.slice(0, 4).map((m) => (
-                  <Avatar key={m.userId} className="size-7 border-2 border-white ring-1 ring-slate-200">
-                    <AvatarImage src={m.avatarUrl || undefined} alt={m.fullName || 'Thành viên'} />
-                    <AvatarFallback className="text-[10px] font-bold bg-[#10243A] text-white">
-                      {(m.fullName || 'TV').slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                ))}
-                {memberCount > 4 && (
-                  <span className="size-7 rounded-full bg-slate-100 border-2 border-white text-[10px] font-bold text-slate-600 flex items-center justify-center tabular-nums">
-                    +{memberCount - 4}
-                  </span>
-                )}
-              </div>
-              <span className="text-xs font-semibold text-[#0194F3] tabular-nums">
-                {memberCount} thành viên
-              </span>
-            </button>
-          )}
+            {/* Clickable Companion Stack */}
+            {isMemberOrOwner && (
+              <button
+                type="button"
+                onClick={onOpenCompanionsModal}
+                className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-1 rounded-xl bg-slate-50/60 sm:bg-transparent hover:bg-[#F5F9FF] border border-slate-200/60 sm:border-transparent hover:border-[#D0E7FF] transition-colors cursor-pointer shrink-0"
+                title="Quản lý thành viên chuyến đi"
+              >
+                <div className="flex items-center -space-x-2">
+                  {members.slice(0, 4).map((m) => (
+                    <Avatar key={m.userId} className="size-6 sm:size-7 border-2 border-white ring-1 ring-slate-200">
+                      <AvatarImage src={m.avatarUrl || undefined} alt={m.fullName || 'Thành viên'} />
+                      <AvatarFallback className="text-[9px] sm:text-[10px] font-bold bg-[#10243A] text-white">
+                        {(m.fullName || 'TV').slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  ))}
+                  {memberCount > 4 && (
+                    <span className="size-6 sm:size-7 rounded-full bg-slate-100 border-2 border-white text-[9px] sm:text-[10px] font-bold text-slate-600 flex items-center justify-center tabular-nums">
+                      +{memberCount - 4}
+                    </span>
+                  )}
+                </div>
+                <span className="text-xs font-semibold text-[#0194F3] tabular-nums whitespace-nowrap">
+                  {memberCount} thành viên
+                </span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Soft Sync-Member Banner */}

@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Sparkles,
-  MapPin,
   Plus,
   ArrowRight,
   Compass,
@@ -307,29 +306,29 @@ export default function PlannerListPage() {
                   router.push(`/itineraries/${spotlightTrip.id}`);
                 }
               }}
-              className={`relative w-full rounded-3xl overflow-hidden bg-slate-900 border transition-all cursor-pointer ${
+              className={`relative w-full rounded-3xl overflow-hidden bg-slate-900 border transition-all cursor-pointer min-h-[350px] sm:min-h-[310px] flex flex-col justify-between ${
                 isSelectMode && selectedIds.includes(spotlightTrip.id)
                   ? 'border-[#0194F3] ring-2 ring-[#0194F3] shadow-lg'
                   : 'border-white/10 shadow-lg'
               }`}
             >
-              {/* Cinematic Banner Image */}
-              <div className="relative h-[280px] sm:h-[310px] w-full overflow-hidden">
+              {/* Cinematic Banner Image with deeper gradient for WCAG 2.2 AA contrast on mobile */}
+              <div className="absolute inset-0 w-full h-full overflow-hidden pointer-events-none">
                 <img
                   src={spotlightTrip.coverPhoto || getDestinationCover(spotlightTrip.destination)}
                   alt={spotlightTrip.title}
                   className="w-full h-full object-cover object-center group-hover:scale-102 transition-transform duration-700 ease-out"
                 />
-                {/* Natural, breathable scrim gradient: Keeps photos vibrant while guaranteeing WCAG 2.2 text contrast */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-black/10 pointer-events-none" />
-                <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent pointer-events-none" />
+                {/* Natural, breathable scrim gradient: deeper on mobile to guarantee crystal-clear text readability */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-black/30" />
+                <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/25 to-transparent" />
               </div>
 
-              {/* Spotlight Content Overlay */}
-              <div className="absolute inset-0 p-6 sm:p-8 flex flex-col justify-between text-white z-10">
+              {/* Spotlight Content Container (Relative z-10 for natural flex flow without height-clipping) */}
+              <div className="relative z-10 p-5 sm:p-8 flex flex-col justify-between flex-1 gap-5 sm:gap-6 text-white">
                 {/* Top Row: Duration Pill + Semantic Dynamic Weather + 3-dots */}
                 <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-2.5 flex-wrap">
+                  <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
                     {isSelectMode && (
                       <button
                         type="button"
@@ -381,7 +380,7 @@ export default function PlannerListPage() {
                   </div>
 
                   {/* 3-dots dropdown */}
-                  <div className="relative">
+                  <div className="relative shrink-0">
                     <button
                       type="button"
                       onClick={(e) => {
@@ -443,32 +442,30 @@ export default function PlannerListPage() {
                   </div>
                 </div>
 
-                {/* Bottom Row: Location, Title, Date, Budget, Landmarks, Action CTA */}
-                <div className="space-y-3.5 max-w-2xl">
-                  <div className="space-y-1.5">
-                    {spotlightTrip.destination && (
-                      <div className="flex items-center gap-2 text-white/90 font-medium text-xs sm:text-sm">
-                        <MapPin className="size-3.5 text-sky-400" />
-                        <span>{spotlightTrip.destination}</span>
-                      </div>
-                    )}
-
-                    <h2 className="text-xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-md leading-tight">
+                {/* Bottom Section: Title, Date, Budget, Landmarks, Action CTA & Companions */}
+                <div className="space-y-4 max-w-3xl">
+                  <div className="space-y-2">
+                    <h2 className="text-xl sm:text-3xl font-extrabold tracking-tight text-white drop-shadow-md leading-snug line-clamp-2">
                       {spotlightTrip.title}
                     </h2>
 
-                    <p className="text-xs sm:text-sm text-slate-200 font-normal">
-                      Thời gian:{' '}
-                      <span className="text-white font-medium">
-                        {formatTripDates(spotlightTrip.startDate, spotlightTrip.endDate)}
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs sm:text-sm text-slate-200">
+                      <span>
+                        Thời gian:{' '}
+                        <span className="text-white font-medium">
+                          {formatTripDates(spotlightTrip.startDate, spotlightTrip.endDate)}
+                        </span>
                       </span>
-                      {' • '}Dự toán:{' '}
-                      <span className="text-white font-medium">
-                        {spotlightTrip.budgetBreakdown?.totalEstimated
-                          ? formatVnd(spotlightTrip.budgetBreakdown.totalEstimated)
-                          : DEFAULT_BUDGET_FALLBACK_TEXT}
+                      <span className="text-white/40 hidden sm:inline">•</span>
+                      <span>
+                        Dự toán:{' '}
+                        <span className="text-white font-medium">
+                          {spotlightTrip.budgetBreakdown?.totalEstimated
+                            ? formatVnd(spotlightTrip.budgetBreakdown.totalEstimated)
+                            : DEFAULT_BUDGET_FALLBACK_TEXT}
+                        </span>
                       </span>
-                    </p>
+                    </div>
 
                     {/* Tourist attractions */}
                     {(() => {
@@ -484,12 +481,12 @@ export default function PlannerListPage() {
                       if (totalActivities === 0) return null;
                       return (
                         <div className="flex items-center gap-2 text-xs text-slate-300 pt-0.5">
-                          <Landmark className="size-3.5 text-white/80 shrink-0" />
-                          <span className="font-medium text-white">
-                            {totalActivities} điểm tham quan nổi bật:
+                          <Landmark className="size-3.5 text-sky-400 shrink-0" />
+                          <span className="font-semibold text-white shrink-0">
+                            {totalActivities} điểm tham quan:
                           </span>
                           {samplePlaces.length > 0 && (
-                            <span className="text-slate-200 truncate max-w-md">
+                            <span className="text-slate-200 truncate">
                               {samplePlaces.join(', ')}...
                             </span>
                           )}
@@ -498,17 +495,8 @@ export default function PlannerListPage() {
                     })()}
                   </div>
 
-                  {/* Action CTA & Companions */}
-                  <div className="flex flex-wrap items-center gap-4 pt-1">
-                    <Link
-                      href={`/itineraries/${spotlightTrip.id}`}
-                      onClick={(e) => e.stopPropagation()}
-                      className="inline-flex items-center gap-2 px-5 py-2.5 bg-[#0194F3] hover:bg-[#007FE3] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-500/25 cursor-pointer"
-                    >
-                      <span>Xem lịch trình chi tiết</span>
-                      <ArrowRight className="size-3.5" />
-                    </Link>
-
+                  {/* Action CTA & Companions: Stacked thumb-friendly on mobile, side-by-side on desktop */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 sm:pt-1 border-t border-white/10 sm:border-0">
                     {/* Companions Badge */}
                     {(() => {
                       const isSharedRole =
@@ -522,7 +510,7 @@ export default function PlannerListPage() {
 
                       if (isShared) {
                         return (
-                          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/15">
+                          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/15 self-start sm:self-auto">
                             {members.length > 0 ? (
                               <div className="flex -space-x-1.5 overflow-hidden">
                                 {members.slice(0, 3).map((m, idx) => (
@@ -557,7 +545,7 @@ export default function PlannerListPage() {
                       }
 
                       return (
-                        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/15">
+                        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/15 self-start sm:self-auto">
                           <User className="size-3.5 text-white/80" />
                           <span className="text-xs font-medium text-slate-200">
                             Chuyến đi cá nhân
@@ -565,6 +553,16 @@ export default function PlannerListPage() {
                         </div>
                       );
                     })()}
+
+                    {/* Action CTA Button */}
+                    <Link
+                      href={`/itineraries/${spotlightTrip.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center justify-center gap-2 h-11 sm:h-10 px-5 bg-[#0194F3] hover:bg-[#007FE3] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-500/25 cursor-pointer w-full sm:w-auto shrink-0"
+                    >
+                      <span>Xem lịch trình chi tiết</span>
+                      <ArrowRight className="size-3.5" />
+                    </Link>
                   </div>
                 </div>
               </div>

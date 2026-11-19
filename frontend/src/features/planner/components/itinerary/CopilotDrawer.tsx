@@ -269,6 +269,7 @@ function CopilotRecommendationCard({
               alt={rec.name}
               loading="lazy"
               decoding="async"
+              referrerPolicy="no-referrer"
               onError={() => setImgError(true)}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
             />
@@ -283,88 +284,90 @@ function CopilotRecommendationCard({
           </span>
         </div>
 
-        {/* Place Information & Action Toolbar */}
-        <div className="flex-1 min-w-0 flex flex-col justify-between self-stretch">
-          <div className="space-y-1">
-            <div className="flex items-start justify-between gap-1.5">
-              <h4 className="text-xs sm:text-[13px] font-semibold text-slate-900 group-hover:text-[#0194F3] transition-colors leading-snug truncate">
-                {rec.name}
-              </h4>
-              {resolvedInfo?.categoryLabel && (
-                <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
-                  {resolvedInfo.categoryLabel}
-                </span>
-              )}
-            </div>
-
-            {rec.description && (
-              <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
-                {rec.description}
-              </p>
+        {/* Place Information */}
+        <div className="flex-1 min-w-0 space-y-1">
+          <div className="flex items-start justify-between gap-1.5">
+            <h4 className="text-xs sm:text-[13px] font-semibold text-slate-900 group-hover:text-[#0194F3] transition-colors leading-snug truncate">
+              {rec.name}
+            </h4>
+            {resolvedInfo?.categoryLabel && (
+              <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded shrink-0">
+                {resolvedInfo.categoryLabel}
+              </span>
             )}
           </div>
 
-          {/* Harmonized Action Toolbar */}
-          <div className="flex items-center gap-1.5 pt-2 flex-wrap sm:flex-nowrap justify-end sm:justify-start">
-            {onLocatePlaceOnMap && (
-              <button
-                type="button"
-                onClick={() =>
-                  onLocatePlaceOnMap({
-                    id: resolvedInfo?.id,
-                    name: rec.name,
-                    latitude: resolvedInfo?.latitude,
-                    longitude: resolvedInfo?.longitude,
-                    address: resolvedInfo?.address,
-                    rating: resolvedInfo?.rating,
-                    categoryName: resolvedInfo?.categoryLabel,
-                    imageUrl: resolvedInfo?.imageUrl,
-                  })
-                }
-                className="px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors shadow-2xs flex items-center gap-1 cursor-pointer"
-                title="Xem vị trí trên bản đồ"
-              >
-                <i className="fa-solid fa-location-dot text-[10px] text-[#0194F3]" aria-hidden="true" />
-                <span>Bản đồ</span>
-              </button>
-            )}
+          {rec.description && (
+            <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed">
+              {rec.description}
+            </p>
+          )}
+        </div>
+      </div>
 
-            {/* [+ Thêm] Button - Refined TripGenie Style */}
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => {
-                onToggleActionMenu(isAddOpen ? null : { msgIndex, recIndex: recIdx, type: 'add' });
-              }}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-50 ${
-                isAddOpen
-                  ? 'bg-[#0194F3] text-white border border-[#0194F3] ring-2 ring-sky-200'
-                  : 'bg-sky-50 hover:bg-sky-100/90 border border-sky-200/90 text-sky-800'
-              }`}
-              title="Thêm địa điểm này vào lịch trình"
-            >
-              <i className={`fa-solid fa-plus text-[10px] ${isAddOpen ? 'text-white' : 'text-[#0194F3]'}`} aria-hidden="true" />
-              <span>Thêm</span>
-            </button>
+      {/* Full-width Action Toolbar: Guaranteed 1 single row on all widths */}
+      <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-slate-100/90 w-full">
+        {onLocatePlaceOnMap ? (
+          <button
+            type="button"
+            onClick={() =>
+              onLocatePlaceOnMap({
+                id: resolvedInfo?.id,
+                name: rec.name,
+                latitude: resolvedInfo?.latitude,
+                longitude: resolvedInfo?.longitude,
+                address: resolvedInfo?.address,
+                rating: resolvedInfo?.rating,
+                categoryName: resolvedInfo?.categoryLabel,
+                imageUrl: resolvedInfo?.imageUrl,
+              })
+            }
+            className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer shrink-0"
+            title="Xem vị trí trên bản đồ"
+          >
+            <i className="fa-solid fa-location-dot text-[10px] text-[#0194F3]" aria-hidden="true" />
+            <span>Bản đồ</span>
+          </button>
+        ) : (
+          <div />
+        )}
 
-            {/* [⇄ Đổi] Button */}
-            <button
-              type="button"
-              disabled={isPending}
-              onClick={() => {
-                onToggleActionMenu(isSwapOpen ? null : { msgIndex, recIndex: recIdx, type: 'swap' });
-              }}
-              className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-50 border ${
-                isSwapOpen
-                  ? 'bg-sky-50 border-[#0194F3] text-sky-950 ring-2 ring-sky-200'
-                  : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:text-slate-900'
-              }`}
-              title="Đổi một địa điểm có sẵn thành điểm này"
-            >
-              <i className="fa-solid fa-right-left text-[10px] text-slate-400" aria-hidden="true" />
-              <span>Đổi</span>
-            </button>
-          </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* [+ Thêm] Button - Refined TripGenie Style */}
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => {
+              onToggleActionMenu(isAddOpen ? null : { msgIndex, recIndex: recIdx, type: 'add' });
+            }}
+            className={`h-8 px-2.5 rounded-lg text-xs font-semibold transition-all shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-50 shrink-0 ${
+              isAddOpen
+                ? 'bg-[#0194F3] text-white border border-[#0194F3] ring-2 ring-sky-200'
+                : 'bg-sky-50 hover:bg-sky-100/90 border border-sky-200/90 text-sky-800'
+            }`}
+            title="Thêm địa điểm này vào lịch trình"
+          >
+            <i className={`fa-solid fa-plus text-[10px] ${isAddOpen ? 'text-white' : 'text-[#0194F3]'}`} aria-hidden="true" />
+            <span>Thêm</span>
+          </button>
+
+          {/* [⇄ Đổi] Button */}
+          <button
+            type="button"
+            disabled={isPending}
+            onClick={() => {
+              onToggleActionMenu(isSwapOpen ? null : { msgIndex, recIndex: recIdx, type: 'swap' });
+            }}
+            className={`h-8 px-2.5 rounded-lg text-xs font-medium transition-all shadow-2xs flex items-center gap-1 cursor-pointer disabled:opacity-50 border shrink-0 ${
+              isSwapOpen
+                ? 'bg-sky-50 border-[#0194F3] text-sky-950 ring-2 ring-sky-200'
+                : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:text-slate-900'
+            }`}
+            title="Đổi một địa điểm có sẵn thành điểm này"
+          >
+            <i className="fa-solid fa-right-left text-[10px] text-slate-400" aria-hidden="true" />
+            <span>Đổi</span>
+          </button>
         </div>
       </div>
 

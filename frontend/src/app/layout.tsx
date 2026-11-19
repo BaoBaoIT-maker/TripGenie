@@ -23,11 +23,66 @@ const playfair = Playfair_Display({
   display: "swap",
 });
 
+const APP_URL =
+  process.env.NEXT_PUBLIC_APP_URL || "https://tripgenie-vn.vercel.app";
+
 export const metadata: Metadata = {
-  title: "TripGenie - Khám phá và lập kế hoạch du lịch cá nhân hóa",
-  description: "Hệ thống khám phá địa điểm du lịch và hỗ trợ lập kế hoạch trải nghiệm cá nhân hóa",
+  metadataBase: new URL(APP_URL),
+  title: {
+    default: "TripGenie — Nền tảng Du lịch Thông minh Việt Nam",
+    template: "%s | TripGenie",
+  },
+  description:
+    "Hệ thống khám phá địa điểm du lịch và tự động tối ưu hóa lộ trình trải nghiệm cá nhân hóa cùng AI.",
+  keywords: [
+    "TripGenie",
+    "du lịch Việt Nam",
+    "lập kế hoạch du lịch",
+    "AI du lịch",
+    "tạo lịch trình tự động",
+    "Đà Lạt",
+    "Đà Nẵng",
+    "Phú Quốc",
+    "Hội An",
+    "Sa Pa",
+  ],
+  authors: [{ name: "TripGenie Team" }],
+  creator: "TripGenie",
+  publisher: "TripGenie",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
   icons: {
     icon: { url: "/images/logo_transparent.png", type: "image/png" },
+    shortcut: "/images/logo_transparent.png",
+    apple: "/images/logo_transparent.png",
+  },
+  openGraph: {
+    type: "website",
+    locale: "vi_VN",
+    url: APP_URL,
+    siteName: "TripGenie Vietnam",
+    title: "TripGenie — Nền tảng Du lịch Thông minh Việt Nam",
+    description:
+      "Tự động sắp xếp lịch trình chi tiết từng giờ, tính toán chi phí minh bạch và đồng bộ thời gian thực cùng hội bạn thân.",
+    images: [
+      {
+        url: "/images/curated/da-nang.jpg",
+        width: 1200,
+        height: 630,
+        alt: "TripGenie Vietnam - Nền tảng Du lịch Thông minh",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "TripGenie — Nền tảng Du lịch Thông minh Việt Nam",
+    description:
+      "Tự động sắp xếp lịch trình chi tiết từng giờ, tính toán chi phí minh bạch và đồng bộ thời gian thực cùng hội bạn thân.",
+    images: ["/images/curated/da-nang.jpg"],
+    creator: "@tripgenie_vn",
   },
 };
 

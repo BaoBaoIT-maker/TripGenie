@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import { HeroSection } from "@/features/landing/components/HeroSection";
 import { DestinationsSection } from "@/features/landing/components/DestinationsSection";
 import { CoreFeaturesSection } from "@/features/landing/components/CoreFeaturesSection";
@@ -6,12 +5,6 @@ import { EditorialMosaicSection } from "@/features/landing/components/EditorialM
 import { Footer } from "@/components/common/Footer";
 
 export const revalidate = 3600;
-
-export const metadata: Metadata = {
-  title: "TripGenie — Nền tảng Du lịch Thông minh Việt Nam",
-  description:
-    "Tự động sắp xếp lịch trình chi tiết từng giờ, tính toán chi phí minh bạch và đồng bộ thời gian thực cùng hội bạn thân mà không cần ghi chép thủ công.",
-};
 
 export default function HomePage() {
   return (
@@ -28,7 +21,7 @@ export default function HomePage() {
       {/* Section 3: Editorial Showcase (Google Arts & Culture Asymmetric Mosaic Grid) */}
       <EditorialMosaicSection />
 
-      {/* Modern Footer đồng bộ toàn hệ thống */}
+      {/* Global Footer */}
       <Footer />
     </div>
   );

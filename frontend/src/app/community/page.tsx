@@ -10,9 +10,31 @@ import type {
 } from "@/types/community";
 
 export const metadata: Metadata = {
-  title: "Cộng đồng Du lịch & Chia sẻ Lịch trình | TripGenie Vietnam",
+  title: "Cộng đồng Du lịch & Chia sẻ Lịch trình",
   description:
-    "Khám phá kinh nghiệm du lịch thực tế, check-in 9:16 mới nhất từ các Thổ địa xác thực và nhân bản lịch trình thông minh chỉ với 1 chạm.",
+    "Khám phá kinh nghiệm du lịch thực tế, check-in mới nhất từ các Thổ địa xác thực và nhân bản lịch trình thông minh chỉ với 1 chạm.",
+  openGraph: {
+    title: "Cộng đồng Du lịch & Chia sẻ Lịch trình | TripGenie Vietnam",
+    description:
+      "Khám phá kinh nghiệm du lịch thực tế, check-in mới nhất từ các Thổ địa xác thực và nhân bản lịch trình thông minh chỉ với 1 chạm.",
+    type: "website",
+    locale: "vi_VN",
+    images: [
+      {
+        url: "/images/curated/hoi-an.jpg",
+        width: 1200,
+        height: 630,
+        alt: "Cộng đồng Du lịch TripGenie",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Cộng đồng Du lịch & Chia sẻ Lịch trình | TripGenie Vietnam",
+    description:
+      "Khám phá kinh nghiệm du lịch thực tế, check-in mới nhất từ các Thổ địa xác thực và nhân bản lịch trình thông minh chỉ với 1 chạm.",
+    images: ["/images/curated/hoi-an.jpg"],
+  },
 };
 
 const SERVER_API_BASE_URL =

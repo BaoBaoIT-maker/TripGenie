@@ -12,7 +12,7 @@ import { useUserPreferences } from '@/features/preferences/hooks/use-user-prefer
 import TransitRouteBreakdown from './itinerary/TransitRouteBreakdown';
 import type { TransitMode, IntracityMode, BudgetLevel, TravelPace } from '@/types/itinerary';
 import { getTourDates, getTourPrompt, type TourTemplate } from '../config/tour-templates';
-import { PACE_OPTIONS } from '../config/itinerary-wizard-options';
+import { PACE_OPTIONS, MAX_TRIP_DAYS } from '../config/itinerary-wizard-options';
 import {
   WIZARD_DEFAULTS,
   VEHICLE_OPTIONS,
@@ -208,6 +208,50 @@ export default function ItineraryWizardModal({
   const endD = new Date(endDate);
   const totalDays = Math.max(1, Math.round((endD.getTime() - startD.getTime()) / 86_400_000) + 1);
   const totalNights = Math.max(0, totalDays - 1);
+  const maxEndDate = useMemo(() => {
+    const d = new Date(startDate);
+    if (isNaN(d.getTime())) return undefined;
+    d.setDate(d.getDate() + (MAX_TRIP_DAYS - 1));
+    return d.toISOString().slice(0, 10);
+  }, [startDate]);
+
+  const handleStartDateChange = useCallback(
+    (newStart: string) => {
+      setStartDate(newStart);
+      const s = new Date(newStart);
+      const e = new Date(endDate);
+      if (isNaN(s.getTime()) || isNaN(e.getTime())) return;
+      const diffDays = Math.round((e.getTime() - s.getTime()) / 86_400_000) + 1;
+      if (diffDays < 1) {
+        setEndDate(newStart);
+      } else if (diffDays > MAX_TRIP_DAYS) {
+        const clamped = new Date(s);
+        clamped.setDate(clamped.getDate() + (MAX_TRIP_DAYS - 1));
+        setEndDate(clamped.toISOString().slice(0, 10));
+        toast.info(`AI hỗ trợ lập lịch trình tối đa ${MAX_TRIP_DAYS} ngày.`);
+      }
+    },
+    [endDate]
+  );
+
+  const handleEndDateChange = useCallback(
+    (newEnd: string) => {
+      const s = new Date(startDate);
+      const e = new Date(newEnd);
+      if (!isNaN(s.getTime()) && !isNaN(e.getTime())) {
+        const diffDays = Math.round((e.getTime() - s.getTime()) / 86_400_000) + 1;
+        if (diffDays > MAX_TRIP_DAYS) {
+          const clamped = new Date(s);
+          clamped.setDate(clamped.getDate() + (MAX_TRIP_DAYS - 1));
+          setEndDate(clamped.toISOString().slice(0, 10));
+          toast.info(`AI hỗ trợ lập lịch trình tối đa ${MAX_TRIP_DAYS} ngày.`);
+          return;
+        }
+      }
+      setEndDate(newEnd);
+    },
+    [startDate]
+  );
 
   // Debounced input to avoid triggering transit engine requests on every keystroke
   const [debouncedOrigin, setDebouncedOrigin] = useState<string>(originCity);
@@ -286,6 +330,11 @@ export default function ItineraryWizardModal({
         return;
       }
 
+      if (totalDays > MAX_TRIP_DAYS) {
+        toast.error(`AI hỗ trợ tạo lịch trình tối đa ${MAX_TRIP_DAYS} ngày`);
+        return;
+      }
+
       setServerError(null);
 
       generate.mutate(
@@ -327,6 +376,7 @@ export default function ItineraryWizardModal({
       destinationCity,
       startDate,
       endDate,
+      totalDays,
       transitMode,
       intracityMode,
       budgetLevel,
@@ -388,8 +438,11 @@ export default function ItineraryWizardModal({
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0194F3]">
                 Tuyến đường &amp; Lịch trình
               </span>
-              <span className="text-xs font-bold text-[#0194F3] bg-[#E8F4FD] px-2.5 py-0.5 rounded-full border border-[#D0E7FF]">
-                {totalDays} ngày {totalNights} đêm
+              <span
+                className="text-xs font-bold text-[#0194F3] bg-[#E8F4FD] px-2.5 py-0.5 rounded-full border border-[#D0E7FF]"
+                title={`AI hỗ trợ lập lịch trình tối đa ${MAX_TRIP_DAYS} ngày`}
+              >
+                {totalDays} ngày {totalNights} đêm (Tối đa {MAX_TRIP_DAYS}N)
               </span>
             </div>
 
@@ -518,7 +571,7 @@ export default function ItineraryWizardModal({
                 <input
                   type="date"
                   value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
                   className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                 />
               </div>
@@ -535,7 +588,9 @@ export default function ItineraryWizardModal({
                 <input
                   type="date"
                   value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
+                  min={startDate}
+                  max={maxEndDate}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
                   className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                 />
               </div>

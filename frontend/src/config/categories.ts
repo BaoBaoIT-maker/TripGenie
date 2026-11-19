@@ -7,7 +7,7 @@ export interface SuperCategory {
   id: string;
   label: string;
   slugs: string[];
-  count: number;
+  count?: number;
   amenities: AmenityFilter[];
 }
 
@@ -16,7 +16,6 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     id: "all",
     label: "Tất cả",
     slugs: [],
-    count: 3197,
     amenities: [
       { id: "gan-bien", label: "Gần biển / View biển" },
       { id: "may-lanh", label: "Có máy lạnh" },
@@ -28,8 +27,7 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
   {
     id: "luu-tru",
     label: "Lưu trú & Nghỉ dưỡng",
-    slugs: ["khach-san", "homestay", "spa"],
-    count: 680,
+    slugs: ["khach-san", "homestay"],
     amenities: [
       { id: "ho-boi", label: "Có hồ bơi" },
       { id: "gan-bien", label: "Gần biển / View biển" },
@@ -42,7 +40,6 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     id: "am-thuc",
     label: "Ẩm thực & Quán ăn",
     slugs: ["nha-hang", "an-vat-via-he"],
-    count: 1111,
     amenities: [
       { id: "hai-san", label: "Hải sản tươi sống" },
       { id: "dac-san", label: "Đặc sản Đà Nẵng" },
@@ -55,7 +52,6 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     id: "ca-phe",
     label: "Cà phê & Tráng miệng",
     slugs: ["ca-phe"],
-    count: 1119,
     amenities: [
       { id: "may-lanh", label: "Phòng máy lạnh" },
       { id: "wifi-manh", label: "Wifi làm việc" },
@@ -69,7 +65,6 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     id: "tham-quan",
     label: "Tham quan & Di tích",
     slugs: ["diem-tham-quan", "di-tich-lich-su", "thien-nhien"],
-    count: 92,
     amenities: [
       { id: "mien-phi", label: "Miễn phí vé" },
       { id: "check-in", label: "Check-in chụp hình" },
@@ -81,7 +76,6 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     id: "giai-tri",
     label: "Vui chơi & Về đêm",
     slugs: ["bar-pub", "vui-choi"],
-    count: 131,
     amenities: [
       { id: "nhac-song", label: "Nhạc sống / Acoustic" },
       { id: "cocktail", label: "Cocktail / Bia thủ công" },
@@ -92,7 +86,6 @@ export const SUPER_CATEGORIES: SuperCategory[] = [
     id: "mua-sam",
     label: "Chợ & Mua sắm",
     slugs: ["cho-sieu-thi"],
-    count: 64,
     amenities: [
       { id: "dac-san-qua", label: "Đặc sản làm quà" },
       { id: "hai-san-kho", label: "Hải sản khô" },

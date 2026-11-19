@@ -94,9 +94,13 @@ export class CommunityController {
   @UseGuards(OptionalJwtAuthGuard)
   async getFeed(
     @Query() query: QueryCommunityFeedDto,
-    @CurrentUser('id') viewerId?: string,
+    @CurrentUser() viewer?: AuthenticatedUser,
   ) {
-    const result = await this.communityService.getFeed(query, viewerId);
+    const result = await this.communityService.getFeed(
+      query,
+      viewer?.id,
+      viewer?.role,
+    );
     return {
       message: 'Lấy bảng tin cộng đồng thành công',
       ...result,
@@ -107,9 +111,13 @@ export class CommunityController {
   @UseGuards(OptionalJwtAuthGuard)
   async getPostById(
     @Param('id', ParseUUIDPipe) id: string,
-    @CurrentUser('id') viewerId?: string,
+    @CurrentUser() viewer?: AuthenticatedUser,
   ) {
-    const post = await this.communityService.getPostById(id, viewerId);
+    const post = await this.communityService.getPostById(
+      id,
+      viewer?.id,
+      viewer?.role,
+    );
     return {
       message: 'Lấy chi tiết bài viết thành công',
       post,
@@ -262,11 +270,12 @@ export class CommunityController {
   @UseGuards(OptionalJwtAuthGuard)
   async getCreatorProfile(
     @Param('identifier') identifier: string,
-    @CurrentUser('id') viewerId?: string,
+    @CurrentUser() viewer?: AuthenticatedUser,
   ) {
     const profile = await this.communityService.getCreatorProfile(
       identifier,
-      viewerId,
+      viewer?.id,
+      viewer?.role,
     );
     return {
       message: 'Lấy thông tin trang cá nhân thành công',

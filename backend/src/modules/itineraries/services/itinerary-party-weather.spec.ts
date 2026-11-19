@@ -361,7 +361,7 @@ describe('Itinerary partySize scaling, LLM weather prompt, and weather retrieval
       travelStyles: ['FOOD'],
       places: samplePlaces,
     });
-    expect(packedPrompt).toContain('Khám phá nhiều (6–7 điểm/ngày)');
+    expect(packedPrompt).toContain('Khám phá nhiều (7–8 điểm/ngày)');
     expect(packedPrompt).toContain('MẬT ĐỘ HOẠT ĐỘNG (PACKED)');
 
     const relaxedPlan = (gemini as any).buildFallbackPlan({
@@ -383,9 +383,9 @@ describe('Itinerary partySize scaling, LLM weather prompt, and weather retrieval
       places: samplePlaces,
     });
 
-    expect(relaxedPlan.days[0].activities).toHaveLength(3);
-    expect(balancedPlan.days[0].activities).toHaveLength(4);
-    expect(packedPlan.days[0].activities).toHaveLength(6);
+    expect(relaxedPlan.days[0].activities).toHaveLength(4);
+    expect(balancedPlan.days[0].activities).toHaveLength(6);
+    expect(packedPlan.days[0].activities).toHaveLength(7);
   });
 
   it('updateItineraryMeta lets EDITOR update title/description, requires OWNER for partySize, and rejects empty payload', async () => {
@@ -452,5 +452,210 @@ describe('Itinerary partySize scaling, LLM weather prompt, and weather retrieval
     await expect(
       planner.updateItineraryMeta('itin-meta-1', {}, 'owner-1'),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('updateLodging updates night range, recalculates accommodation cost from hotel priceRange.min, and re-optimizes affected day stops', async () => {
+    const newHotel = {
+      id: 'hotel-new-1',
+      name: 'Ana Mandara Villas Dalat',
+      address: 'Lê Lai, Đà Lạt',
+      latitude: 11.94,
+      longitude: 108.44,
+      ratingAvg: 4.8,
+      reviewCount: 220,
+      priceLevel: 'HIGH',
+      priceRange: { min: 1_500_000, max: 3_000_000 },
+      category: { slug: 'khach-san', nameVi: 'Khách sạn' },
+      images: [],
+    };
+
+    const destUpdates: any[] = [];
+    let lodgingRows: any[] = [
+      {
+        nightNumber: 1,
+        placeId: 'hotel-old',
+        isAutoSuggested: true,
+        place: {
+          ...newHotel,
+          id: 'hotel-old',
+          name: 'Khách Sạn Cũ',
+          priceRange: { min: 700_000 },
+        },
+      },
+      {
+        nightNumber: 2,
+        placeId: 'hotel-old',
+        isAutoSuggested: true,
+        place: {
+          ...newHotel,
+          id: 'hotel-old',
+          name: 'Khách Sạn Cũ',
+          priceRange: { min: 700_000 },
+        },
+      },
+    ];
+
+    let rowState: any = {
+      id: 'itin-lodging-1',
+      creatorId: 'owner-1',
+      title: 'Đà Lạt 3N2Đ',
+      description: 'Test',
+      destination: 'Đà Lạt',
+      startDate: new Date('2026-11-12T00:00:00.000Z'),
+      endDate: new Date('2026-11-14T00:00:00.000Z'),
+      budgetLevel: 'MEDIUM',
+      isPublic: false,
+      partySize: 2,
+      updatedAt: new Date('2026-11-11T00:00:00.000Z'),
+      area: null,
+      lodgings: lodgingRows,
+      destinations: [
+        {
+          id: 'dest-1',
+          placeId: 'p-far',
+          dayNumber: 2,
+          visitOrder: 1,
+          startTime: new Date('1970-01-01T08:30:00.000Z'),
+          endTime: new Date('1970-01-01T10:00:00.000Z'),
+          estimatedDurationMinutes: 90,
+          estimatedCost: 50000,
+          notes: '',
+          place: {
+            id: 'p-far',
+            name: 'Đỉnh Langbiang',
+            address: 'Lạc Dương',
+            latitude: 12.02,
+            longitude: 108.44,
+            ratingAvg: 4.7,
+            reviewCount: 100,
+            priceLevel: 'MEDIUM',
+            priceRange: { min: 50000 },
+            openingHours: null,
+            category: { slug: 'thien-nhien', nameVi: 'Thiên nhiên' },
+            images: [],
+          },
+        },
+        {
+          id: 'dest-2',
+          placeId: 'p-near',
+          dayNumber: 2,
+          visitOrder: 2,
+          startTime: new Date('1970-01-01T10:15:00.000Z'),
+          endTime: new Date('1970-01-01T11:30:00.000Z'),
+          estimatedDurationMinutes: 75,
+          estimatedCost: 0,
+          notes: '',
+          place: {
+            id: 'p-near',
+            name: 'Hồ Xuân Hương',
+            address: 'Đà Lạt',
+            latitude: 11.942,
+            longitude: 108.44,
+            ratingAvg: 4.8,
+            reviewCount: 200,
+            priceLevel: 'LOW',
+            priceRange: { min: 0 },
+            openingHours: null,
+            category: { slug: 'thien-nhien', nameVi: 'Thiên nhiên' },
+            images: [],
+          },
+        },
+      ],
+      tripGroup: {
+        id: 'grp-1',
+        members: [{ userId: 'owner-1', role: 'OWNER', user: { id: 'owner-1' } }],
+      },
+      aiPreferences: {
+        intracityMode: 'MOTORBIKE_RENTAL',
+        intercityTransit: {
+          mode: 'SLEEPER_BUS',
+          originName: 'SGN',
+          destName: 'Đà Lạt',
+          estimatedPriceRoundTrip: 600000,
+          details: {},
+        },
+        baseBudgetBreakdown: {
+          transitRoundTrip: 600000,
+          accommodation: 1400000,
+          food: 500000,
+          tickets: 50000,
+          localTransit: 300000,
+        },
+      },
+    };
+
+    const txMock = {
+      itineraryLodging: {
+        upsert: jest.fn(async ({ where, update }: any) => {
+          const n = where.itineraryId_nightNumber.nightNumber;
+          lodgingRows = lodgingRows.map((r) =>
+            r.nightNumber === n
+              ? { ...r, ...update, place: newHotel }
+              : r,
+          );
+          rowState.lodgings = lodgingRows;
+        }),
+        deleteMany: jest.fn(async ({ where }: any) => {
+          const toDelete = new Set(where.nightNumber.in);
+          lodgingRows = lodgingRows.filter((r) => !toDelete.has(r.nightNumber));
+          rowState.lodgings = lodgingRows;
+        }),
+        createMany: jest.fn(async ({ data }: any) => {
+          for (const item of data) {
+            lodgingRows.push({ ...item, place: newHotel });
+          }
+          rowState.lodgings = lodgingRows;
+        }),
+        findMany: jest.fn(async () => lodgingRows),
+      },
+      itineraryDestination: {
+        update: jest.fn(async ({ where, data }: any) => {
+          destUpdates.push({ id: where.id, data });
+        }),
+      },
+      itinerary: {
+        update: jest.fn(async ({ data }: any) => {
+          rowState = { ...rowState, ...data };
+          return rowState;
+        }),
+      },
+    };
+
+    const prismaMock = {
+      itinerary: {
+        findFirst: jest.fn(async () => rowState),
+      },
+      place: {
+        findFirst: jest.fn(async () => newHotel),
+      },
+      $transaction: jest.fn(async (cb: any) => cb(txMock)),
+    };
+
+    const planner = new ItineraryPlannerService(
+      prismaMock as unknown as PrismaService,
+      {
+        computeHaversineDistance: jest.fn(
+          (lat1: number, _lon1: number, lat2: number) =>
+            Math.abs(lat1 - lat2) * 111,
+        ),
+      } as unknown as TransitService,
+      {} as GeminiPlannerService,
+      new ItineraryAccessService(prismaMock as unknown as PrismaService),
+    );
+
+    const updated = await planner.updateLodging(
+      'itin-lodging-1',
+      { placeId: 'hotel-new-1', fromNight: 2, toNight: 2 },
+      'owner-1',
+    );
+
+    // Night 1 stays 700k, Night 2 becomes 1,500,000 -> total 1-room accommodation = 2,200,000
+    expect(updated.budgetBreakdown?.accommodation).toBe(2_200_000);
+    expect(updated.days[1].lodging?.name).toBe('Ana Mandara Villas Dalat');
+    expect(updated.days[1].lodging?.isAutoSuggested).toBe(false);
+    // Day 3 (checkout day) also references Night 2's lodging
+    expect(updated.days[2].lodging?.name).toBe('Ana Mandara Villas Dalat');
+    expect(updated.days[2].lodging?.isCheckOutDay).toBe(true);
+    expect(destUpdates.length).toBeGreaterThan(0);
   });
 });

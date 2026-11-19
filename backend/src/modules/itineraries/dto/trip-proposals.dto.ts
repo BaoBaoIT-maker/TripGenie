@@ -11,7 +11,7 @@ import {
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import type { ProposalStatus } from '@prisma/client';
-import { WEATHER_THRESHOLDS } from '../../weather/weather.constants';
+import { ITINERARY_PLANNING_CONFIG } from '../../../config/itinerary-planning.config';
 import { TIME_OF_DAY_REGEX } from '../../../common/utils/time-of-day.util';
 import {
   PROPOSAL_LIMITS,
@@ -30,7 +30,7 @@ export class CreateGroupProposalDto {
   @IsOptional()
   @IsInt({ message: 'dayNumber phải là số nguyên' })
   @Min(PROPOSAL_LIMITS.MIN_DAY_NUMBER)
-  @Max(WEATHER_THRESHOLDS.MAX_TRIP_DAYS)
+  @Max(ITINERARY_PLANNING_CONFIG.LIMITS.MANUAL_MAX_TRIP_DAYS)
   dayNumber?: number;
 
   @IsOptional()

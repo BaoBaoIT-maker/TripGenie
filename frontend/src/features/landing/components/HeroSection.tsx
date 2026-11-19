@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { LandingNavbar } from "./LandingNavbar";
 import { HeroVideoPlayer } from "./HeroVideoPlayer";
 import { HeroSearchBar } from "./HeroSearchBar";
@@ -12,35 +13,52 @@ export function HeroSection() {
   );
 
   return (
-    <header className="relative min-h-[92vh] flex flex-col justify-between overflow-hidden bg-slate-950 text-white">
+    <header className="relative min-h-[84vh] sm:min-h-[90vh] flex flex-col justify-between overflow-hidden bg-slate-950 text-white">
       {/* Video Nền Sắc Nét */}
       <HeroVideoPlayer />
 
       {/* Floating Header Navbar */}
       <LandingNavbar />
 
-      {/* Hero Content */}
-      <div className="relative z-10 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 sm:py-14 text-center space-y-6 my-auto">
-        {/* Tag badge */}
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/20 backdrop-blur-md border border-white/30 text-white text-xs font-bold tracking-wide shadow-sm">
-          {LANDING_CONFIG.hero.badgeText}
+      {/* Cụm Trung tâm: Badge + Headline + Search Bar nâng cao liền khối */}
+      <div className="relative z-10 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 my-auto py-2 text-center space-y-5 sm:space-y-7 -translate-y-3 sm:-translate-y-5">
+        {/* Inspiration Block: Badge + Headline nâng cao độc lập */}
+        <div className="space-y-2.5 sm:space-y-3.5 -translate-y-3 sm:-translate-y-5">
+          {/* Badge Subtitle: Kính mờ thanh lịch nằm ngay TRÊN Headline */}
+          <div>
+            <div className="inline-flex items-center px-3.5 sm:px-4 py-1 sm:py-1.5 rounded-full bg-white/15 hover:bg-white/20 backdrop-blur-md border border-white/25 text-white/95 text-xs sm:text-sm font-medium tracking-wide shadow-xs transition-colors">
+              {LANDING_CONFIG.hero.badgeText}
+            </div>
+          </div>
+
+          {/* Headline: Ngắt 2 nhịp tự nhiên, không dấu phẩy, cân đối */}
+          <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-white tracking-tight leading-[1.18] hero-text-shadow max-w-3xl mx-auto">
+            {LANDING_CONFIG.hero.headlineLine1}
+            <span className="block text-white mt-1 sm:mt-1.5">
+              {LANDING_CONFIG.hero.headlineLine2}
+            </span>
+          </h1>
         </div>
 
-        {/* Headline: Chuẩn font-bold tinh tế */}
-        <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold text-white tracking-tight leading-[1.12] hero-text-shadow">
-          {LANDING_CONFIG.hero.headlineLine1}
-          <br />
-          <span className="block text-white mt-1">
-            {LANDING_CONFIG.hero.headlineLine2}
-          </span>
-        </h1>
+        {/* Action Block: Search Bar & Gợi ý trượt ngang gần ngay dưới Headline */}
+        <div className="max-w-3xl mx-auto w-full space-y-2.5 sm:space-y-3">
+          {/* Google-inspired Translucent Search Bar */}
+          <HeroSearchBar onDestinationChange={setCurrentLocationTitle} />
 
-        <p className="max-w-2xl mx-auto text-base sm:text-lg text-white/95 leading-relaxed font-medium hero-subtext-shadow">
-          {LANDING_CONFIG.hero.subtitle}
-        </p>
-
-        {/* Google-inspired Translucent Search Bar with AI Mode & Hot Suggestions */}
-        <HeroSearchBar onDestinationChange={setCurrentLocationTitle} />
+          {/* Quick Destination Chips (Trượt ngang mượt mà trên mobile, ẩn chữ "Gợi ý" để chip không bị chật) */}
+          <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto sm:overflow-visible sm:flex-wrap sm:justify-center no-scrollbar py-0.5 px-0.5 touch-pan-x">
+            <span className="text-white/60 font-medium text-xs shrink-0 hidden sm:inline">Gợi ý:</span>
+            {LANDING_CONFIG.hero.quickSuggestions.map((item) => (
+              <Link
+                key={item.label}
+                href={item.href}
+                className="shrink-0 px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 backdrop-blur-sm border border-white/20 text-white/90 hover:text-white text-xs font-medium transition-all"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Location Pill Footer */}

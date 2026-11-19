@@ -15,8 +15,8 @@ import {
   Matches,
 } from 'class-validator';
 import { PRICING_CONFIG } from '../../../config/pricing.config';
+import { ITINERARY_PLANNING_CONFIG } from '../../../config/itinerary-planning.config';
 import { TIME_OF_DAY_REGEX } from '../../../common/utils/time-of-day.util';
-import { WEATHER_THRESHOLDS } from '../../weather/weather.constants';
 
 export enum TransitModeEnum {
   FLIGHT = 'FLIGHT',
@@ -40,9 +40,9 @@ export enum BudgetLevelEnum {
 }
 
 export enum TravelPaceEnum {
-  RELAXED = 'RELAXED', // 2-3 stops/day
-  BALANCED = 'BALANCED', // 4-5 stops/day
-  PACKED = 'PACKED', // 6-7 stops/day
+  RELAXED = 'RELAXED', // 4-5 stops/day
+  BALANCED = 'BALANCED', // 6-7 stops/day
+  PACKED = 'PACKED', // 7-8 stops/day
 }
 
 export interface TravelPaceFallbackSlot {
@@ -50,6 +50,7 @@ export interface TravelPaceFallbackSlot {
   end: string;
   dur: number;
   note: string;
+  isMeal?: boolean;
 }
 
 export interface TravelPaceSpec {
@@ -68,10 +69,10 @@ export const TRAVEL_PACE_CONFIG: Readonly<
   [TravelPaceEnum.RELAXED]: {
     value: TravelPaceEnum.RELAXED,
     labelVi: 'Thư thả',
-    minStopsPerDay: 2,
-    maxStopsPerDay: 3,
+    minStopsPerDay: 4,
+    maxStopsPerDay: 5,
     promptRule:
-      'Mức Thư thả (RELAXED): sắp xếp CHÍNH XÁC 2–3 hoạt động/ngày (ưu tiên nhịp chậm rãi, có khoảng nghỉ giữa các buổi, không chạy sô).',
+      'Mức Thư thả (RELAXED): sắp xếp CHÍNH XÁC 4–5 hoạt động/ngày (bao gồm các bữa ăn chính, ưu tiên nhịp chậm rãi, có khoảng nghỉ giữa các buổi, không chạy sô).',
     fallbackSlots: [
       {
         start: '09:00',
@@ -84,52 +85,87 @@ export const TRAVEL_PACE_CONFIG: Readonly<
         end: '13:15',
         dur: 90,
         note: 'Ăn trưa đặc sản và nghỉ trưa',
+        isMeal: true,
       },
       {
-        start: '15:30',
-        end: '18:00',
-        dur: 150,
+        start: '15:00',
+        end: '17:00',
+        dur: 120,
         note: 'Dạo cảnh hoặc cà phê thư giãn buổi chiều',
+      },
+      {
+        start: '18:30',
+        end: '20:00',
+        dur: 90,
+        note: 'Thưởng thức bữa tối đặc sản địa phương',
+        isMeal: true,
       },
     ],
   },
   [TravelPaceEnum.BALANCED]: {
     value: TravelPaceEnum.BALANCED,
     labelVi: 'Cân bằng',
-    minStopsPerDay: 4,
-    maxStopsPerDay: 5,
+    minStopsPerDay: 6,
+    maxStopsPerDay: 7,
     promptRule:
-      'Mức Cân bằng (BALANCED): sắp xếp CHÍNH XÁC 4–5 hoạt động/ngày (hài hòa tham quan sáng/chiều, ăn trưa và dạo tối).',
+      'Mức Cân bằng (BALANCED): sắp xếp CHÍNH XÁC 6–7 hoạt động/ngày (bao gồm 3 bữa ăn và các điểm tham quan sáng/chiều/tối hài hòa).',
     fallbackSlots: [
-      { start: '08:30', end: '10:30', dur: 120, note: 'Khám phá buổi sáng' },
-      { start: '11:30', end: '13:00', dur: 90, note: 'Ăn trưa đặc sản' },
-      { start: '14:00', end: '16:30', dur: 150, note: 'Tham quan chiều' },
+      {
+        start: '07:30',
+        end: '08:30',
+        dur: 60,
+        note: 'Ăn sáng đặc sản truyền thống',
+        isMeal: true,
+      },
+      { start: '09:00', end: '11:00', dur: 120, note: 'Khám phá buổi sáng' },
+      {
+        start: '11:30',
+        end: '13:00',
+        dur: 90,
+        note: 'Ăn trưa đặc sản',
+        isMeal: true,
+      },
+      { start: '14:00', end: '16:00', dur: 120, note: 'Tham quan chiều' },
+      {
+        start: '16:30',
+        end: '17:45',
+        dur: 75,
+        note: 'Cà phê thư giãn & ngắm hoàng hôn',
+      },
       {
         start: '18:30',
         end: '20:30',
         dur: 120,
-        note: 'Dạo phố và ngắm cảnh đêm',
+        note: 'Ăn tối và dạo phố đêm',
+        isMeal: true,
       },
     ],
   },
   [TravelPaceEnum.PACKED]: {
     value: TravelPaceEnum.PACKED,
     labelVi: 'Khám phá nhiều',
-    minStopsPerDay: 6,
-    maxStopsPerDay: 7,
+    minStopsPerDay: 7,
+    maxStopsPerDay: 8,
     promptRule:
-      'Mức Khám phá nhiều (PACKED): sắp xếp CHÍNH XÁC 6–7 hoạt động/ngày (tối ưu từ sáng sớm tới tối muộn, bổ sung café, check-in và ẩm thực tối hợp tuyến).',
+      'Mức Khám phá nhiều (PACKED): sắp xếp CHÍNH XÁC 7–8 hoạt động/ngày (tối ưu từ sáng sớm tới tối muộn, bao gồm 3 bữa ăn, điểm tham quan, café check-in và trải nghiệm đêm hợp tuyến).',
     fallbackSlots: [
       {
-        start: '07:30',
-        end: '09:00',
-        dur: 90,
-        note: 'Đón bình minh & điểm tham quan sớm',
+        start: '07:15',
+        end: '08:15',
+        dur: 60,
+        note: 'Ăn sáng đặc sản địa phương',
+        isMeal: true,
       },
       {
-        start: '09:30',
-        end: '11:15',
-        dur: 105,
+        start: '08:30',
+        end: '10:00',
+        dur: 90,
+        note: 'Điểm tham quan buổi sáng sớm',
+      },
+      {
+        start: '10:15',
+        end: '11:30',
+        dur: 75,
         note: 'Khám phá điểm nổi bật buổi sáng',
       },
       {
@@ -137,6 +173,7 @@ export const TRAVEL_PACE_CONFIG: Readonly<
         end: '13:00',
         dur: 75,
         note: 'Ăn trưa đặc sản địa phương',
+        isMeal: true,
       },
       {
         start: '13:45',
@@ -146,15 +183,16 @@ export const TRAVEL_PACE_CONFIG: Readonly<
       },
       {
         start: '16:00',
-        end: '18:00',
-        dur: 120,
+        end: '17:30',
+        dur: 90,
         note: 'Cà phê check-in & ngắm hoàng hôn',
       },
       {
-        start: '19:00',
-        end: '21:00',
+        start: '18:30',
+        end: '20:30',
         dur: 120,
         note: 'Ăn tối, chợ đêm và dạo phố',
+        isMeal: true,
       },
     ],
   },
@@ -366,7 +404,7 @@ export class AddDestinationDto {
 
   @IsInt()
   @Min(1)
-  @Max(WEATHER_THRESHOLDS.MAX_TRIP_DAYS)
+  @Max(ITINERARY_PLANNING_CONFIG.LIMITS.MANUAL_MAX_TRIP_DAYS)
   dayNumber: number;
 
   @IsOptional()
@@ -395,7 +433,7 @@ export class UpdateDestinationDto {
   @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(WEATHER_THRESHOLDS.MAX_TRIP_DAYS)
+  @Max(ITINERARY_PLANNING_CONFIG.LIMITS.MANUAL_MAX_TRIP_DAYS)
   dayNumber?: number;
 
   @IsOptional()
@@ -414,4 +452,21 @@ export class UpdateDestinationDto {
   @IsString()
   @MaxLength(DESTINATION_LIMITS.MAX_NOTES_LENGTH)
   notes?: string;
+}
+
+export class UpdateItineraryLodgingDto {
+  @IsUUID('all')
+  @IsNotEmpty()
+  placeId: string;
+
+  @IsInt()
+  @Min(1)
+  @Max(ITINERARY_PLANNING_CONFIG.LIMITS.MANUAL_MAX_TRIP_DAYS)
+  fromNight: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(ITINERARY_PLANNING_CONFIG.LIMITS.MANUAL_MAX_TRIP_DAYS)
+  toNight?: number;
 }

@@ -47,6 +47,61 @@ interface PostCardProps {
 const DEFAULT_AVATAR =
   "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop&crop=face";
 
+type ModerationStatus = "PENDING" | "FLAGGED" | "REJECTED";
+
+const MODERATION_BANNER_CONFIG: Record<
+  ModerationStatus,
+  { icon: string; label: string; note: string; className: string }
+> = {
+  PENDING: {
+    icon: "fa-regular fa-clock",
+    label: "Đang chờ kiểm duyệt (Chỉ bạn & Quản trị viên thấy)",
+    note: "AI đang xem xét bài viết trước khi hiển thị công khai trên cộng đồng.",
+    className:
+      "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/40 dark:border-amber-800/60 dark:text-amber-300",
+  },
+  FLAGGED: {
+    icon: "fa-solid fa-flag",
+    label: "Chưa thể duyệt tự động (Chỉ bạn & Quản trị viên thấy)",
+    note: "Bài viết đang chờ Quản trị viên xem xét thủ công.",
+    className:
+      "bg-orange-50 border-orange-200 text-orange-800 dark:bg-orange-950/40 dark:border-orange-800/60 dark:text-orange-300",
+  },
+  REJECTED: {
+    icon: "fa-solid fa-ban",
+    label: "Không được duyệt (Chỉ bạn & Quản trị viên thấy)",
+    note: "Bài viết vi phạm tiêu chuẩn cộng đồng. Bạn có thể chỉnh sửa để gửi duyệt lại hoặc xóa bài.",
+    className:
+      "bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:border-rose-800/60 dark:text-rose-300",
+  },
+};
+
+function ModerationStatusBanner({
+  status,
+  note,
+}: {
+  status: ModerationStatus;
+  note?: string | null;
+}) {
+  const config = MODERATION_BANNER_CONFIG[status];
+  return (
+    <div
+      className={`mx-5 mb-3 flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl border text-xs font-medium ${config.className}`}
+      role="status"
+      aria-live="polite"
+    >
+      <i
+        className={`${config.icon} mt-0.5 shrink-0 text-[13px]`}
+        aria-hidden="true"
+      />
+      <div className="min-w-0">
+        <span className="font-bold">{config.label}.</span>{" "}
+        <span className="opacity-80">{note || config.note}</span>
+      </div>
+    </div>
+  );
+}
+
 export function MediaGridTileContent({
   url,
   alt,
@@ -441,6 +496,18 @@ function PostCardComponent({
           )}
         </div>
       </div>
+
+      {/* Content Title, Caption & Hashtags */}
+      {/* Moderation Status Banner — chỉ chủ bài và admin thấy khi bài chưa APPROVED */}
+      {post.moderationStatus &&
+        post.moderationStatus !== "APPROVED" &&
+        user &&
+        (user.id === post.userId || user.role === "ADMIN") && (
+          <ModerationStatusBanner
+            status={post.moderationStatus}
+            note={post.moderationNote}
+          />
+        )}
 
       {/* Content Title, Caption & Hashtags */}
       <div className="px-5 pb-3.5 flex flex-col gap-2">

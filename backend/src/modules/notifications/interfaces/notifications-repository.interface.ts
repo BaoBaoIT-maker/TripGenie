@@ -10,6 +10,7 @@ export interface NotificationActor {
 export interface NotificationPost {
   id: string;
   title: string;
+  moderationNote?: string | null;
 }
 
 export interface NotificationItinerary {

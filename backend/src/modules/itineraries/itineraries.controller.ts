@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Put,
   Patch,
   Delete,
   Body,
@@ -37,6 +38,7 @@ import {
   AddDestinationDto,
   UpdateDestinationDto,
   MoveDestinationDto,
+  UpdateItineraryLodgingDto,
 } from './dto/generate-itinerary.dto';
 
 @Controller('itineraries')
@@ -85,6 +87,43 @@ export class ItinerariesController {
     @CurrentUser('id') userId?: string,
   ) {
     return this.plannerService.getWeatherById(id, userId);
+  }
+
+  /**
+   * Retrieve 3 curated groups of lodging suggestions for a specific night.
+   * GET /api/v1/itineraries/:id/lodging-suggestions?night=&budget=
+   */
+  @UseGuards(OptionalJwtAuthGuard)
+  @Get(':id/lodging-suggestions')
+  getLodgingSuggestions(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query('night') night?: string,
+    @Query('budget') budget?: string,
+    @CurrentUser('id') userId?: string,
+  ) {
+    return this.plannerService.getLodgingSuggestions(
+      id,
+      {
+        night: night ? Number(night) : undefined,
+        budget,
+      },
+      userId,
+    );
+  }
+
+  /**
+   * Update lodging for a night range [fromNight..toNight] and re-optimize affected day routes.
+   * PUT /api/v1/itineraries/:id/lodging
+   */
+  @UseGuards(JwtAuthGuard)
+  @Put(':id/lodging')
+  @HttpCode(HttpStatus.OK)
+  updateLodging(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateItineraryLodgingDto,
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.plannerService.updateLodging(id, dto, userId);
   }
 
   /**

@@ -7,6 +7,7 @@ export type ExploreView = "grid" | "split";
 export interface ExploreQuery {
   keyword?: string;
   areaId?: number;
+  areaSlug?: string;
   category?: string;
   suitableFor?: SuitableAudience;
   sort?: ExploreSort;
@@ -52,12 +53,14 @@ export function parseExploreQuery(params: URLSearchParams): ExploreQuery {
     query.keyword = rawKeyword;
   }
 
-  // 2. Area ID (supports areaId or fallback area, must be positive integer)
-  const rawArea = params.get("areaId") || params.get("area");
+  // 2. Area ID or Slug (supports areaId or fallback area: positive integer or slug string)
+  const rawArea = (params.get("areaId") || params.get("area"))?.trim();
   if (rawArea) {
     const parsedNum = Number(rawArea);
     if (Number.isInteger(parsedNum) && parsedNum > 0) {
       query.areaId = parsedNum;
+    } else {
+      query.areaSlug = rawArea.toLowerCase();
     }
   }
 
@@ -103,7 +106,9 @@ export function buildExploreHref(filters: Partial<ExploreQuery>): string {
     params.set("keyword", filters.keyword.trim());
   }
 
-  if (filters.areaId && Number.isInteger(filters.areaId) && filters.areaId > 0) {
+  if (filters.areaSlug) {
+    params.set("area", filters.areaSlug);
+  } else if (filters.areaId && Number.isInteger(filters.areaId) && filters.areaId > 0) {
     params.set("areaId", String(filters.areaId));
   }
 

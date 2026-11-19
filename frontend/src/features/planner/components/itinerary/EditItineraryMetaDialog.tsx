@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { AppModalPortal } from '@/components/common/AppModalPortal';
 import { ITINERARY_META_LIMITS } from '../../constants/itinerary.constants';
+import { MANUAL_MAX_TRIP_DAYS } from '../../config/itinerary-wizard-options';
 import type { UpdateItineraryMetaRequest } from '@/types/itinerary';
 
 interface EditItineraryMetaDialogProps {
@@ -91,8 +92,8 @@ function EditMetaForm({
         return;
       }
       const days = calculateSpanDays(startDate, endDate) || 1;
-      if (days > 30) {
-        setErrorMsg('Thời gian chuyến đi tối đa là 30 ngày.');
+      if (days > MANUAL_MAX_TRIP_DAYS) {
+        setErrorMsg(`Thời gian chuyến đi tối đa là ${MANUAL_MAX_TRIP_DAYS} ngày.`);
         return;
       }
 

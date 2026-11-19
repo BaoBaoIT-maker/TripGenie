@@ -3,6 +3,7 @@ import {
   PostModerationStatus,
   ReportStatus,
   ReportType,
+  UserRole,
 } from '@prisma/client';
 import { CommunitySortMode } from '../community.constants';
 
@@ -58,6 +59,7 @@ export interface CommunityPostView {
   cloneCount: number;
   isLiked: boolean;
   moderationStatus: PostModerationStatus;
+  moderationNote?: string | null;
   editedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -109,6 +111,7 @@ export interface FindFeedParams {
   tag?: string;
   search?: string;
   viewerId?: string;
+  viewerRole?: UserRole;
 }
 
 export interface FeedPageResult {
@@ -117,7 +120,13 @@ export interface FeedPageResult {
   matchedCreators?: MatchedCreatorSummary[];
 }
 
-export interface CreatePostData {
+export interface PostModerationFields {
+  moderationStatus?: PostModerationStatus;
+  moderationNote?: string | null;
+  moderatedAt?: Date | null;
+}
+
+export interface CreatePostData extends PostModerationFields {
   userId: string;
   groupId?: string | null;
   title: string;
@@ -125,9 +134,6 @@ export interface CreatePostData {
   mediaUrls: string[];
   tags: string[];
   itineraryId?: string | null;
-  moderationStatus?: PostModerationStatus;
-  moderationNote?: string | null;
-  moderatedAt?: Date | null;
 }
 
 export interface CreateCommentData {
@@ -218,7 +224,7 @@ export interface ICommunityRepository {
       caption?: string | null;
       tags: string[];
       groupId?: string | null;
-    },
+    } & PostModerationFields,
     viewerId?: string,
   ): Promise<CommunityPostView>;
   softDeletePost(postId: string): Promise<void>;
@@ -246,5 +252,6 @@ export interface ICommunityRepository {
   getCreatorProfile(
     targetUserIdOrUsername: string,
     viewerId?: string,
+    viewerRole?: UserRole,
   ): Promise<CreatorProfileData | null>;
 }

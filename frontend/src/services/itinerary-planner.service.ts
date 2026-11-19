@@ -12,6 +12,8 @@ import type {
   AddDestinationRequest,
   UpdateDestinationRequest,
   UpdateItineraryMetaRequest,
+  UpdateItineraryLodgingRequest,
+  ItineraryLodgingSuggestionsResponse,
   MoveDirection,
   TripWeatherResponse,
 } from '@/types/itinerary';
@@ -107,4 +109,25 @@ export const itineraryService = {
     apiClient<ItineraryDetail>(`/itineraries/${id}/destinations/${destinationId}`, {
       method: 'DELETE',
     }),
+
+  getLodgingSuggestions: (
+    id: string,
+    params?: { night?: number; budget?: string },
+  ) => {
+    const qs = new URLSearchParams();
+    if (params?.night != null) qs.set('night', String(params.night));
+    if (params?.budget) qs.set('budget', params.budget);
+    const query = qs.toString();
+    return apiClient<ItineraryLodgingSuggestionsResponse>(
+      `/itineraries/${id}/lodging-suggestions${query ? `?${query}` : ''}`,
+    );
+  },
+
+  updateLodging: (id: string, dto: UpdateItineraryLodgingRequest) => {
+    const { placeId, fromNight, toNight } = dto;
+    return apiClient<ItineraryDetail>(`/itineraries/${id}/lodging`, {
+      method: 'PUT',
+      body: JSON.stringify({ placeId, fromNight, toNight }),
+    });
+  },
 };

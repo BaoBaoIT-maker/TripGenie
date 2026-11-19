@@ -4,25 +4,59 @@ import { useRef, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { SEASONAL_DESTINATIONS } from "../config/seasonal-destinations.config";
 
+const CENTER_INDEX = Math.floor(SEASONAL_DESTINATIONS.length / 2);
+
 export function DestinationsSection() {
   const trackRef = useRef<HTMLDivElement>(null);
-  // Mặc định chọn thẻ số 2 (chính giữa trong 5 thẻ: Mã Pí Lèng) làm tâm điểm
-  const [activeIndex, setActiveIndex] = useState(2);
+  // Mặc định chọn thẻ chính giữa (Mã Pí Lèng) làm tâm điểm
+  const [activeIndex, setActiveIndex] = useState(CENTER_INDEX);
 
-  // Cuộn thẻ vào tâm màn hình khi chạm vào trên di động
-  const scrollToCard = useCallback((index: number) => {
+  // Cuộn thẻ vào tâm màn hình một cách chính xác mà không gây giật cuộn dọc của trang
+  const scrollToCard = useCallback((index: number, smooth = true) => {
     const track = trackRef.current;
     if (!track) return;
 
     const cards = track.children;
-    if (cards[index]) {
-      (cards[index] as HTMLElement).scrollIntoView({
-        behavior: "smooth",
-        block: "nearest",
-        inline: "center",
-      });
-    }
+    const card = cards[index] as HTMLElement | undefined;
+    if (!card) return;
+
+    const cardCenter = card.offsetLeft + card.offsetWidth / 2;
+    const targetScrollLeft = cardCenter - track.clientWidth / 2;
+
+    track.scrollTo({
+      left: Math.max(0, targetScrollLeft),
+      behavior: smooth ? "smooth" : "instant",
+    });
   }, []);
+
+  // Aim vào card ở giữa trên di động khi load trang hoặc khi resize màn hình
+  useEffect(() => {
+    const aimCenter = (smooth = false) => {
+      if (window.innerWidth < 768) {
+        scrollToCard(CENTER_INDEX, smooth);
+      }
+    };
+
+    const rafId = requestAnimationFrame(() => {
+      aimCenter(false);
+    });
+
+    // Thêm một timeout nhỏ phụ trợ phòng trường hợp web fonts / ảnh làm thay đổi layout
+    const timerId = setTimeout(() => {
+      aimCenter(false);
+    }, 150);
+
+    const handleResize = () => {
+      aimCenter(false);
+    };
+
+    window.addEventListener("resize", handleResize, { passive: true });
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timerId);
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [scrollToCard]);
 
   // Cập nhật trạng thái cuộn trên di động (Mobile snap)
   const updateScrollState = useCallback(() => {
@@ -118,8 +152,8 @@ export function DestinationsSection() {
           <div
             ref={trackRef}
             id="seasonalCardsTrack"
-            onMouseLeave={() => setActiveIndex(2)}
-            className="flex items-center justify-start sm:justify-center overflow-x-auto sm:overflow-visible scroll-smooth snap-x snap-mandatory touch-pan-x no-scrollbar py-6 px-6 sm:px-12 select-none"
+            onMouseLeave={() => setActiveIndex(CENTER_INDEX)}
+            className="flex items-center justify-start sm:justify-center overflow-x-auto sm:overflow-visible scroll-smooth snap-x snap-mandatory touch-pan-x no-scrollbar py-6 px-[calc(50vw-95px)] sm:px-12 select-none"
           >
             {SEASONAL_DESTINATIONS.map((item, index) => {
               const distance = Math.abs(index - activeIndex);

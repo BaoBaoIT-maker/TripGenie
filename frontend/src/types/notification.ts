@@ -4,7 +4,10 @@ export type NotificationType =
   | 'COMMENT_REPLIED'
   | 'TRIP_INVITED'
   | 'TRIP_INVITATION_ACCEPTED'
-  | 'TRIP_INVITATION_DECLINED';
+  | 'TRIP_INVITATION_DECLINED'
+  | 'POST_APPROVED'
+  | 'POST_FLAGGED'
+  | 'POST_REJECTED';
 
 export type NotificationFilter = 'ALL' | 'UNREAD';
 
@@ -17,6 +20,7 @@ export interface NotificationActor {
 export interface NotificationPost {
   id: string;
   title: string;
+  moderationNote?: string | null;
 }
 
 export interface NotificationItinerary {

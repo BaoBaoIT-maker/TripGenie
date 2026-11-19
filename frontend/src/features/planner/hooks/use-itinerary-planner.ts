@@ -11,17 +11,22 @@ import type {
   AddDestinationRequest,
   UpdateDestinationRequest,
   UpdateItineraryMetaRequest,
+  UpdateItineraryLodgingRequest,
+  ItineraryDayLodging,
   MoveDirection,
 } from '@/types/itinerary';
 
 const TRANSIT_STALE_MS = 10 * 60 * 1000; // 10 min — pricing rarely changes mid-session
 const WEATHER_STALE_MS = 10 * 60 * 1000;
+const LODGING_SUGGESTIONS_STALE_MS = 5 * 60 * 1000;
 
 export const itineraryKeys = {
   all: ['itineraries'] as const,
   lists: () => ['itineraries', 'list'] as const,
   detail: (id: string) => ['itineraries', 'detail', id] as const,
   weather: (id: string) => ['itineraries', 'weather', id] as const,
+  lodgingSuggestions: (id: string, night: number, budget?: string) =>
+    ['itineraries', 'lodging-suggestions', id, night, budget ?? ''] as const,
 };
 
 type ListInvalidation = 'none' | 'lists' | 'all';
@@ -332,4 +337,153 @@ export function useRemoveDestination(itineraryId: string) {
     (destinationId: string) => itineraryService.removeDestination(itineraryId, destinationId),
     'lists',
   );
+}
+
+/** Fetch 3 curated groups of lodging suggestions for a specific night. */
+export function useLodgingSuggestionsQuery(
+  itineraryId: string,
+  nightNumber: number | null,
+  budgetLevel?: string,
+) {
+  return useQuery({
+    queryKey: itineraryKeys.lodgingSuggestions(
+      itineraryId,
+      nightNumber ?? 1,
+      budgetLevel,
+    ),
+    queryFn:
+      nightNumber != null
+        ? () =>
+            itineraryService.getLodgingSuggestions(itineraryId, {
+              night: nightNumber,
+              budget: budgetLevel,
+            })
+        : skipToken,
+    enabled: Boolean(itineraryId && nightNumber != null),
+    staleTime: LODGING_SUGGESTIONS_STALE_MS,
+    placeholderData: (prev) => prev,
+  });
+}
+
+/** Prefetch lodging suggestions for one or more nights into React Query cache. */
+export function usePrefetchLodgingSuggestions(
+  itineraryId: string,
+  budgetLevel?: string,
+) {
+  const queryClient = useQueryClient();
+  return (nightNumber: number) => {
+    if (!itineraryId || nightNumber < 1) return;
+    void queryClient.prefetchQuery({
+      queryKey: itineraryKeys.lodgingSuggestions(
+        itineraryId,
+        nightNumber,
+        budgetLevel,
+      ),
+      queryFn: () =>
+        itineraryService.getLodgingSuggestions(itineraryId, {
+          night: nightNumber,
+          budget: budgetLevel,
+        }),
+      staleTime: LODGING_SUGGESTIONS_STALE_MS,
+    });
+  };
+}
+
+/** Update lodging for a night range and re-optimize affected day routes. */
+export function useUpdateLodging(itineraryId: string) {
+  const queryClient = useQueryClient();
+  const detailKey = itineraryKeys.detail(itineraryId);
+
+  return useMutation({
+    mutationFn: (dto: UpdateItineraryLodgingRequest) =>
+      itineraryService.updateLodging(itineraryId, dto),
+    onMutate: async (dto) => {
+      // 1. Cancel outgoing queries so they do not overwrite optimistic data
+      await queryClient.cancelQueries({ queryKey: detailKey });
+
+      // 2. Snapshot current state for rollback
+      const previousDetail =
+        queryClient.getQueryData<ItineraryDetail>(detailKey);
+
+      // 3. Optimistically update displayed lodging in cache immediately (< 0.1ms)
+      if (previousDetail?.days && dto.optimisticLodging) {
+        const { fromNight } = dto;
+        const toNight = dto.toNight ?? fromNight;
+        const totalDays = previousDetail.days.length;
+
+        queryClient.setQueryData<ItineraryDetail>(detailKey, (old) => {
+          if (!old?.days) return old;
+
+          const updatedDays = old.days.map((day) => {
+            const isCheckOut = totalDays > 1 && day.dayNumber === totalDays;
+            const targetNight = isCheckOut ? totalDays - 1 : day.dayNumber;
+
+            if (targetNight >= fromNight && targetNight <= toNight) {
+              const prevLodging = day.lodging;
+              const nextLodging: ItineraryDayLodging = {
+                nightNumber: targetNight,
+                isCheckOutDay: isCheckOut,
+                isAutoSuggested: false,
+                placeId: dto.placeId,
+                name:
+                  dto.optimisticLodging?.name ??
+                  prevLodging?.name ??
+                  'Đang cập nhật chỗ ở...',
+                address:
+                  dto.optimisticLodging?.address ??
+                  prevLodging?.address ??
+                  null,
+                latitude:
+                  dto.optimisticLodging?.latitude ??
+                  prevLodging?.latitude ??
+                  0,
+                longitude:
+                  dto.optimisticLodging?.longitude ??
+                  prevLodging?.longitude ??
+                  0,
+                ratingAvg:
+                  dto.optimisticLodging?.ratingAvg ??
+                  prevLodging?.ratingAvg ??
+                  null,
+                reviewCount: prevLodging?.reviewCount ?? null,
+                priceLevel: prevLodging?.priceLevel ?? null,
+                priceRange: prevLodging?.priceRange ?? null,
+                pricePerNight:
+                  dto.optimisticLodging?.pricePerNight ??
+                  prevLodging?.pricePerNight ??
+                  null,
+                imageUrl:
+                  dto.optimisticLodging?.imageUrl ??
+                  prevLodging?.imageUrl ??
+                  null,
+                distanceToFirstStopKm:
+                  prevLodging?.distanceToFirstStopKm ?? null,
+              };
+              return { ...day, lodging: nextLodging };
+            }
+            return day;
+          });
+
+          return { ...old, days: updatedDays };
+        });
+      }
+
+      return { previousDetail };
+    },
+    onError: (_err, _dto, context) => {
+      if (context?.previousDetail) {
+        queryClient.setQueryData(detailKey, context.previousDetail);
+      }
+    },
+    onSettled: (updated) => {
+      if (updated) {
+        queryClient.setQueryData(detailKey, updated);
+      } else {
+        void queryClient.invalidateQueries({ queryKey: detailKey });
+      }
+      void queryClient.invalidateQueries({
+        queryKey: ['itineraries', 'lodging-suggestions', itineraryId],
+      });
+    },
+  });
 }

@@ -10,7 +10,6 @@ datasource db {
 // ENUMS
 // =============================================================================
 
-
 enum NotificationType {
   POST_LIKED
   POST_COMMENTED
@@ -18,6 +17,9 @@ enum NotificationType {
   TRIP_INVITED
   TRIP_INVITATION_ACCEPTED
   TRIP_INVITATION_DECLINED
+  POST_APPROVED
+  POST_FLAGGED
+  POST_REJECTED
 
   @@map("notification_type_enum")
 }
@@ -197,51 +199,62 @@ enum PostModerationStatus {
   @@map("post_moderation_status_enum")
 }
 
+enum BannedWordCategory {
+  PROFANITY
+  ADULT
+  SCAM
+  GAMBLING
+  OTHER
+
+  @@map("banned_word_category_enum")
+}
+
 // =============================================================================
 // MODELS
 // =============================================================================
 
 model User {
-  id           String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  username     String?   @unique @db.VarChar(50)
-  email        String?   @unique
-  passwordHash String?   @map("password_hash") @db.VarChar(255)
-  fullName     String    @map("full_name") @db.VarChar(255)
-  avatarUrl    String?   @map("avatar_url")
-  bio          String?   @db.VarChar(300)
-  phoneNumber  String?   @map("phone_number") @db.VarChar(20)
-  role         UserRole  @default(USER)
-  isActive     Boolean   @default(true) @map("is_active")
+  id                String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  username          String?   @unique @db.VarChar(50)
+  email             String?   @unique
+  passwordHash      String?   @map("password_hash") @db.VarChar(255)
+  fullName          String    @map("full_name") @db.VarChar(255)
+  avatarUrl         String?   @map("avatar_url")
+  bio               String?   @db.VarChar(300)
+  phoneNumber       String?   @map("phone_number") @db.VarChar(20)
+  role              UserRole  @default(USER)
+  isActive          Boolean   @default(true) @map("is_active")
   isVerified        Boolean   @default(false) @map("is_verified")
   isVerifiedCreator Boolean   @default(false) @map("is_verified_creator")
-  authVersion  Int       @default(0) @map("auth_version")
-  verifiedAt   DateTime? @map("verified_at") @db.Timestamptz
-  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  authVersion       Int       @default(0) @map("auth_version")
+  verifiedAt        DateTime? @map("verified_at") @db.Timestamptz
+  deletedAt         DateTime? @map("deleted_at") @db.Timestamptz
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  identities      UserIdentity[]
-  preferences     UserPreference?
-  createdPlaces   Place[]              @relation("UserCreatedPlaces")
-  reviews         PlaceReview[]
-  collections     Collection[]
-  itineraries     Itinerary[]
-  groupMembers    GroupMember[]
-  proposals       GroupPlaceProposal[]
-  votes           GroupPlaceVote[]
-  chatSessions    AiChatSession[]
-  createdCommunityGroups CommunityGroup[] @relation("AdminCreatedCommunityGroups")
-  posts           CommunityPost[]
-  postLikes       PostLike[]
-  postComments    PostComment[]
-  contentReports  ContentReport[]      @relation("UserReported")
-  reviewedReports ContentReport[]      @relation("AdminReviewedReports")
-  auditLogs       AuditLog[]
-  crawlJobs       CrawlJob[]           @relation("UserCrawlJobs")
-  receivedNotifications  Notification[]  @relation("ReceivedNotifications")
-  triggeredNotifications Notification[] @relation("TriggeredNotifications")
-  sentTripInvitations    TripInvitation[] @relation("SentTripInvitations")
-  receivedTripInvitations TripInvitation[] @relation("ReceivedTripInvitations")
+  identities              UserIdentity[]
+  preferences             UserPreference?
+  createdPlaces           Place[]              @relation("UserCreatedPlaces")
+  reviews                 PlaceReview[]
+  collections             Collection[]
+  itineraries             Itinerary[]
+  groupMembers            GroupMember[]
+  proposals               GroupPlaceProposal[]
+  votes                   GroupPlaceVote[]
+  chatSessions            AiChatSession[]
+  createdCommunityGroups  CommunityGroup[]     @relation("AdminCreatedCommunityGroups")
+  posts                   CommunityPost[]
+  postLikes               PostLike[]
+  postComments            PostComment[]
+  contentReports          ContentReport[]      @relation("UserReported")
+  reviewedReports         ContentReport[]      @relation("AdminReviewedReports")
+  auditLogs               AuditLog[]
+  crawlJobs               CrawlJob[]           @relation("UserCrawlJobs")
+  receivedNotifications   Notification[]       @relation("ReceivedNotifications")
+  triggeredNotifications  Notification[]       @relation("TriggeredNotifications")
+  sentTripInvitations     TripInvitation[]     @relation("SentTripInvitations")
+  receivedTripInvitations TripInvitation[]     @relation("ReceivedTripInvitations")
+  createdBannedWords      BannedWord[]         @relation("AdminCreatedBannedWords")
 
   @@map("users")
 }
@@ -276,20 +289,20 @@ model UserPreference {
 }
 
 model TravelArea {
-  id         Int      @id @default(autoincrement())
-  name       String   @db.VarChar(100)
-  nameVi     String?  @map("name_vi") @db.VarChar(100)
-  slug       String   @unique @db.VarChar(100)
+  id         Int                                           @id @default(autoincrement())
+  name       String                                        @db.VarChar(100)
+  nameVi     String?                                       @map("name_vi") @db.VarChar(100)
+  slug       String                                        @unique @db.VarChar(100)
   type       AreaType
-  parentId   Int?     @map("parent_id")
-  bboxMinLat Float?   @map("bbox_min_lat")
-  bboxMaxLat Float?   @map("bbox_max_lat")
-  bboxMinLng Float?   @map("bbox_min_lng")
-  bboxMaxLng Float?   @map("bbox_max_lng")
-  code       String?  @db.VarChar(20)
-  oldNames   String[] @default([]) @map("old_names")
+  parentId   Int?                                          @map("parent_id")
+  bboxMinLat Float?                                        @map("bbox_min_lat")
+  bboxMaxLat Float?                                        @map("bbox_max_lat")
+  bboxMinLng Float?                                        @map("bbox_min_lng")
+  bboxMaxLng Float?                                        @map("bbox_max_lng")
+  code       String?                                       @db.VarChar(20)
+  oldNames   String[]                                      @default([]) @map("old_names")
   boundary   Unsupported("geography(MultiPolygon, 4326)")?
-  isActive   Boolean  @default(true) @map("is_active")
+  isActive   Boolean                                       @default(true) @map("is_active")
 
   parent      TravelArea?         @relation("TravelAreaParent", fields: [parentId], references: [id])
   children    TravelArea[]        @relation("TravelAreaParent")
@@ -304,15 +317,15 @@ model TravelArea {
 }
 
 model TransitHub {
-  id        String     @id // "SGN", "HAN", "DAD", "BX_MIENDONG", "GA_SAIGON"
-  name      String     @db.VarChar(255)
-  hubType   String     @map("hub_type") @db.VarChar(50) // "AIRPORT", "BUS_TERMINAL", "TRAIN_STATION"
+  id        String  @id // "SGN", "HAN", "DAD", "BX_MIENDONG", "GA_SAIGON"
+  name      String  @db.VarChar(255)
+  hubType   String  @map("hub_type") @db.VarChar(50) // "AIRPORT", "BUS_TERMINAL", "TRAIN_STATION"
   latitude  Float
   longitude Float
-  areaId    Int        @map("area_id")
-  isActive  Boolean    @default(true) @map("is_active")
+  areaId    Int     @map("area_id")
+  isActive  Boolean @default(true) @map("is_active")
 
-  area      TravelArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
+  area TravelArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
 
   @@index([areaId])
   @@index([hubType])
@@ -336,33 +349,33 @@ model Category {
 }
 
 model Place {
-  id             String       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  name           String       @db.VarChar(255)
-  nameNormalized String?      @map("name_normalized") @db.VarChar(255)
+  id             String                                 @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  name           String                                 @db.VarChar(255)
+  nameNormalized String?                                @map("name_normalized") @db.VarChar(255)
   description    String?
-  categoryId     Int?         @map("category_id")
-  areaId         Int?         @map("area_id")
-  address           String
-  latitude          Float
-  longitude         Float
-  priceRange     Json?        @map("price_range")
-  priceLevel     BudgetLevel? @map("price_level")
-  openingHours   Json?        @map("opening_hours")
-  phone          String?      @db.VarChar(30)
+  categoryId     Int?                                   @map("category_id")
+  areaId         Int?                                   @map("area_id")
+  address        String
+  latitude       Float
+  longitude      Float
+  priceRange     Json?                                  @map("price_range")
+  priceLevel     BudgetLevel?                           @map("price_level")
+  openingHours   Json?                                  @map("opening_hours")
+  phone          String?                                @db.VarChar(30)
   website        String?
-  ratingAvg      Float        @default(0.0) @map("rating_avg")
-  reviewCount    Int          @default(0) @map("review_count")
-  imageCount     Int          @default(0) @map("image_count")
-  tags           String[]     @default([])
-  attributes     Json         @default("{}")
+  ratingAvg      Float                                  @default(0.0) @map("rating_avg")
+  reviewCount    Int                                    @default(0) @map("review_count")
+  imageCount     Int                                    @default(0) @map("image_count")
+  tags           String[]                               @default([])
+  attributes     Json                                   @default("{}")
   // Spatial point geography(Point, 4326) managed via PostGIS and init.sql triggers
   location       Unsupported("geography(Point, 4326)")?
-  status         PlaceStatus  @default(ACTIVE)
-  mergedInto     String?      @map("merged_into") @db.Uuid
-  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz
-  createdBy      String?      @map("created_by") @db.Uuid
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  status         PlaceStatus                            @default(ACTIVE)
+  mergedInto     String?                                @map("merged_into") @db.Uuid
+  deletedAt      DateTime?                              @map("deleted_at") @db.Timestamptz
+  createdBy      String?                                @map("created_by") @db.Uuid
+  createdAt      DateTime                               @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime                               @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   category         Category?              @relation(fields: [categoryId], references: [id])
   area             TravelArea?            @relation(fields: [areaId], references: [id])
@@ -375,6 +388,7 @@ model Place {
   reviews          PlaceReview[]
   collectionPlaces CollectionPlace[]
   destinations     ItineraryDestination[]
+  lodgings         ItineraryLodging[]
   proposals        GroupPlaceProposal[]
   crawlJobs        CrawlJob[]
 
@@ -395,20 +409,20 @@ model PlaceImage {
   source       String?  @db.VarChar(50)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  place    Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
 
   @@index([placeId])
   @@map("place_images")
 }
 
 model PlaceEmbedding {
-  id           String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  placeId      String   @unique @map("place_id") @db.Uuid
-  contentText  String   @map("content_text")
+  id          String                       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  placeId     String                       @unique @map("place_id") @db.Uuid
+  contentText String                       @map("content_text")
   // Vector 1536 dims managed via pgvector extension and init.sql; indexed via HNSW
-  embedding    Unsupported("vector(1536)")?
-  modelName    String?  @map("model_name") @db.VarChar(100)
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  embedding   Unsupported("vector(1536)")?
+  modelName   String?                      @map("model_name") @db.VarChar(100)
+  updatedAt   DateTime                     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
 
@@ -511,15 +525,16 @@ model Itinerary {
   createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz
   updatedAt     DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  creator      User                   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
-  area         TravelArea?            @relation(fields: [areaId], references: [id])
-  clonedFrom   Itinerary?             @relation("ItineraryCloned", fields: [clonedFromId], references: [id])
-  clones       Itinerary[]            @relation("ItineraryCloned")
-  destinations ItineraryDestination[]
-  tripGroup    TripGroup?
-  posts        CommunityPost[]
+  creator       User                   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  area          TravelArea?            @relation(fields: [areaId], references: [id])
+  clonedFrom    Itinerary?             @relation("ItineraryCloned", fields: [clonedFromId], references: [id])
+  clones        Itinerary[]            @relation("ItineraryCloned")
+  destinations  ItineraryDestination[]
+  lodgings      ItineraryLodging[]
+  tripGroup     TripGroup?
+  posts         CommunityPost[]
   notifications Notification[]
-  chatSessions AiChatSession[]
+  chatSessions  AiChatSession[]
 
   @@index([creatorId])
   @@index([areaId])
@@ -549,6 +564,22 @@ model ItineraryDestination {
   @@map("itinerary_destinations")
 }
 
+model ItineraryLodging {
+  id              String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  itineraryId     String   @map("itinerary_id") @db.Uuid
+  nightNumber     Int      @map("night_number")
+  placeId         String   @map("place_id") @db.Uuid
+  isAutoSuggested Boolean  @default(true) @map("is_auto_suggested")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  itinerary Itinerary @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  place     Place     @relation(fields: [placeId], references: [id], onDelete: Restrict)
+
+  @@unique([itineraryId, nightNumber])
+  @@index([placeId])
+  @@map("itinerary_lodgings")
+}
+
 model TripGroup {
   id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   itineraryId String   @unique @map("itinerary_id") @db.Uuid
@@ -557,7 +588,7 @@ model TripGroup {
   maxMembers  Int      @default(20) @map("max_members")
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  itinerary Itinerary            @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
+  itinerary   Itinerary            @relation(fields: [itineraryId], references: [id], onDelete: Cascade)
   members     GroupMember[]
   proposals   GroupPlaceProposal[]
   invitations TripInvitation[]
@@ -750,16 +781,16 @@ model PostComment {
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz
 
-  post CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  user User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post          CommunityPost  @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentId      String?        @map("parent_id") @db.Uuid
+  replyToName   String?        @map("reply_to_name") @db.VarChar(150)
+  parent        PostComment?   @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies       PostComment[]  @relation("CommentReplies")
+  notifications Notification[]
 
   @@index([postId])
   @@index([userId])
-  parentId    String?   @map("parent_id") @db.Uuid
-  replyToName String?   @map("reply_to_name") @db.VarChar(150)
-  parent      PostComment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies     PostComment[] @relation("CommentReplies")
-  notifications Notification[]
   @@index([parentId])
   @@map("post_comments")
 }
@@ -785,13 +816,30 @@ model ContentReport {
   @@map("content_reports")
 }
 
+model BannedWord {
+  id        String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  word      String             @unique @db.VarChar(100)
+  category  BannedWordCategory @default(PROFANITY)
+  isActive  Boolean            @default(true) @map("is_active")
+  notes     String?            @db.VarChar(255)
+  createdBy String?            @map("created_by") @db.Uuid
+  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+
+  creator User? @relation("AdminCreatedBannedWords", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([isActive])
+  @@index([category])
+  @@map("banned_words")
+}
+
 model DataCoverage {
-  areaId         Int            @id @map("area_id")
-  placeCount     Int            @default(0) @map("place_count")
-  status         CoverageStatus @default(NOT_COVERED)
-  lastCrawledAt  DateTime?      @map("last_crawled_at") @db.Timestamptz
+  areaId         Int                      @id @map("area_id")
+  placeCount     Int                      @default(0) @map("place_count")
+  status         CoverageStatus           @default(NOT_COVERED)
+  lastCrawledAt  DateTime?                @map("last_crawled_at") @db.Timestamptz
   staleThreshold Unsupported("interval")? @default(dbgenerated("'7 days'::interval")) @map("stale_threshold")
-  updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
+  updatedAt      DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   area TravelArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
 
@@ -850,15 +898,15 @@ model KnowledgeDocument {
 }
 
 model KnowledgeChunk {
-  id          String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  documentId  String   @map("document_id") @db.Uuid
-  chunkIndex  Int      @map("chunk_index")
+  id          String                       @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  documentId  String                       @map("document_id") @db.Uuid
+  chunkIndex  Int                          @map("chunk_index")
   content     String
   // Vector 1536 dims managed via pgvector extension for RAG retrieval
   embedding   Unsupported("vector(1536)")?
   // "Doc title > H2 > H3" citation label
   breadcrumbs String
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  createdAt   DateTime                     @default(now()) @map("created_at") @db.Timestamptz
 
   document KnowledgeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 

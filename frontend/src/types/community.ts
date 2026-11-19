@@ -53,6 +53,8 @@ export interface CommunityPostItem {
   cloneCount: number;
   isLiked: boolean;
   isBookmarked?: boolean;
+  moderationStatus?: "PENDING" | "APPROVED" | "FLAGGED" | "REJECTED";
+  moderationNote?: string | null;
   editedAt: string | null;
   createdAt: string;
   updatedAt: string;

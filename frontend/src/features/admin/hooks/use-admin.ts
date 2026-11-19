@@ -9,9 +9,11 @@ import {
 import { toast } from "sonner";
 import { adminService } from "@/services/admin.service";
 import type {
+  CreateBannedWordPayload,
   CreateOrUpdateAdminGroupPayload,
   CreateOrUpdateAdminPlacePayload,
   QueryAdminAuditLogsParams,
+  QueryAdminBannedWordsParams,
   QueryAdminCommunityGroupsParams,
   QueryAdminModerationPostsParams,
   QueryAdminPlacesParams,
@@ -35,6 +37,8 @@ export const ADMIN_QUERY_KEYS = {
     ["admin", "moderation-posts", params ?? {}] as const,
   moderationReports: (params?: QueryAdminReportsParams) =>
     ["admin", "moderation-reports", params ?? {}] as const,
+  bannedWords: (params?: QueryAdminBannedWordsParams) =>
+    ["admin", "banned-words", params ?? {}] as const,
 };
 
 function getErrorMessage(err: unknown, fallback: string): string {
@@ -293,7 +297,14 @@ export function useApproveAdminPost() {
       qc.invalidateQueries({ queryKey: ["community"] });
     },
     onError: (err) => {
-      toast.error(getErrorMessage(err, "Không thể phê duyệt bài viết"));
+      toast.error(
+        getErrorMessage(
+          err,
+          "Bài viết đã bị xóa hoặc không thể kiểm duyệt được nữa"
+        )
+      );
+      qc.invalidateQueries({ queryKey: ["admin", "moderation-posts"] });
+      qc.invalidateQueries({ queryKey: ADMIN_QUERY_KEYS.dashboardStats });
     },
   });
 }
@@ -311,7 +322,14 @@ export function useRejectAdminPost() {
       qc.invalidateQueries({ queryKey: ["community"] });
     },
     onError: (err) => {
-      toast.error(getErrorMessage(err, "Không thể từ chối bài viết"));
+      toast.error(
+        getErrorMessage(
+          err,
+          "Bài viết đã bị xóa hoặc không thể kiểm duyệt được nữa"
+        )
+      );
+      qc.invalidateQueries({ queryKey: ["admin", "moderation-posts"] });
+      qc.invalidateQueries({ queryKey: ADMIN_QUERY_KEYS.dashboardStats });
     },
   });
 }
@@ -353,6 +371,63 @@ export function useResolveAdminReport() {
     },
     onError: (err) => {
       toast.error(getErrorMessage(err, "Không thể xử lý báo cáo"));
+    },
+  });
+}
+
+export function useAdminBannedWords(params?: QueryAdminBannedWordsParams) {
+  return useQuery({
+    queryKey: ADMIN_QUERY_KEYS.bannedWords(params),
+    queryFn: () => adminService.getBannedWords(params),
+    placeholderData: keepPreviousData,
+  });
+}
+
+export function useCreateAdminBannedWord() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: CreateBannedWordPayload) =>
+      adminService.createBannedWord(payload),
+    onSuccess: (res) => {
+      toast.success(`Đã thêm từ cấm: "${res.word}"`);
+      qc.invalidateQueries({ queryKey: ["admin", "banned-words"] });
+      qc.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
+    },
+    onError: (err) => {
+      toast.error(getErrorMessage(err, "Không thể thêm từ cấm"));
+    },
+  });
+}
+
+export function useToggleAdminBannedWord() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      adminService.toggleBannedWord(id, isActive),
+    onSuccess: (res) => {
+      toast.success(
+        `${res.isActive ? "Đã kích hoạt" : "Đã vô hiệu hóa"} từ cấm: "${res.word}"`
+      );
+      qc.invalidateQueries({ queryKey: ["admin", "banned-words"] });
+      qc.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
+    },
+    onError: (err) => {
+      toast.error(getErrorMessage(err, "Không thể cập nhật từ cấm"));
+    },
+  });
+}
+
+export function useDeleteAdminBannedWord() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminService.deleteBannedWord(id),
+    onSuccess: (res) => {
+      toast.success(res.message || "Đã xóa từ cấm");
+      qc.invalidateQueries({ queryKey: ["admin", "banned-words"] });
+      qc.invalidateQueries({ queryKey: ["admin", "audit-logs"] });
+    },
+    onError: (err) => {
+      toast.error(getErrorMessage(err, "Không thể xóa từ cấm"));
     },
   });
 }

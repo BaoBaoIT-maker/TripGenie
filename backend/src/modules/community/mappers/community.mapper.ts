@@ -190,6 +190,7 @@ export function mapPostView(row: RawCommunityPostRow): CommunityPostView {
     cloneCount: row.cloneCount ?? 0,
     isLiked: Array.isArray(row.likes) && row.likes.length > 0,
     moderationStatus: row.moderationStatus ?? PostModerationStatus.APPROVED,
+    moderationNote: row.moderationNote ?? null,
     editedAt: row.editedAt ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,

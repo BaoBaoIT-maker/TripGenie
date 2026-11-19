@@ -20,6 +20,7 @@ import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '@/common/types';
 import { AdminService } from './admin.service';
 import { AdminModerationService } from './admin-moderation.service';
+import { BannedWordsService } from './banned-words.service';
 import { QueryAuditLogsDto } from './dto/admin-audit.dto';
 import {
   AdminBanUserDto,
@@ -44,6 +45,11 @@ import {
   QueryAdminModerationPostsDto,
   QueryAdminReportsDto,
 } from './dto/admin-moderation.dto';
+import {
+  CreateBannedWordDto,
+  QueryBannedWordsDto,
+  ToggleBannedWordDto,
+} from './dto/admin-banned-words.dto';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -52,6 +58,7 @@ export class AdminController {
   constructor(
     private readonly adminService: AdminService,
     private readonly adminModerationService: AdminModerationService,
+    private readonly bannedWordsService: BannedWordsService,
   ) {}
 
   private extractMeta(req: Request): AdminRequestMeta {
@@ -269,5 +276,43 @@ export class AdminController {
       dto,
       this.extractMeta(req),
     );
+  }
+
+  @Get('banned-words')
+  async getBannedWords(@Query() query: QueryBannedWordsDto) {
+    return this.bannedWordsService.findAll(query);
+  }
+
+  @Post('banned-words')
+  async createBannedWord(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Body() dto: CreateBannedWordDto,
+    @Req() req: Request,
+  ) {
+    return this.bannedWordsService.create(admin, dto, this.extractMeta(req));
+  }
+
+  @Patch('banned-words/:id/toggle')
+  async toggleBannedWord(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: ToggleBannedWordDto,
+    @Req() req: Request,
+  ) {
+    return this.bannedWordsService.toggleActive(
+      admin,
+      id,
+      dto.isActive,
+      this.extractMeta(req),
+    );
+  }
+
+  @Delete('banned-words/:id')
+  async deleteBannedWord(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Req() req: Request,
+  ) {
+    return this.bannedWordsService.delete(admin, id, this.extractMeta(req));
   }
 }

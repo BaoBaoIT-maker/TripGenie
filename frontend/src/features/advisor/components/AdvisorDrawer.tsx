@@ -9,6 +9,7 @@ import {
   AdvisorQuickPromptItem,
 } from '@/types/advisor';
 import { AdvisorMessageBubble } from './AdvisorMessageBubble';
+import { AiThinkingIndicator } from '@/features/planner/components/itinerary/AiThinkingIndicator';
 
 interface AdvisorDrawerProps {
   isOpen: boolean;
@@ -206,13 +207,7 @@ export function AdvisorDrawer({
                   />
                 ))}
                 {isLoading && (
-                  <div className="flex max-w-[85%] items-center gap-2.5 rounded-2xl border border-border bg-card px-4 py-3 text-xs font-medium text-muted-foreground shadow-2xs">
-                    <i
-                      className="fa-solid fa-circle-notch fa-spin text-sm text-primary"
-                      aria-hidden="true"
-                    />
-                    <span>Genie đang soạn câu trả lời cho bạn...</span>
-                  </div>
+                  <AiThinkingIndicator context="advisor" />
                 )}
                 <div ref={messagesEndRef} />
               </>

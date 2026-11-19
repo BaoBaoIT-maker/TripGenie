@@ -128,6 +128,23 @@ describe('PlacesService', () => {
       expect(result.meta.totalPages).toBe(1);
     });
 
+    it('should forward categoryCounts from repository when available', async () => {
+      repository.searchPlaces.mockResolvedValue({
+        items: [mockRawPlaceRow],
+        total: 1,
+        categoryCounts: { 'ca-phe': 237, 'khach-san': 177 },
+      });
+
+      const result = await service.searchPlaces({
+        areaId: 5,
+      });
+
+      expect(result.categoryCounts).toEqual({
+        'ca-phe': 237,
+        'khach-san': 177,
+      });
+    });
+
     it('should perform 2-stage spatial search when query contains landmark anchor', async () => {
       (repository.findLandmarkCoords as jest.Mock).mockResolvedValue({
         lat: 16.0592,
@@ -198,6 +215,29 @@ describe('PlacesService', () => {
           areaId: 5,
           categorySlugs: ['ca-phe'],
           keyword: undefined,
+        }),
+      );
+      expect(result.items).toHaveLength(1);
+    });
+
+    it('should resolve areaSlug directly to effectiveAreaId', async () => {
+      (repository.findAreaByName as jest.Mock).mockResolvedValue({
+        id: 5,
+        name: 'Đà Nẵng',
+      });
+      repository.searchPlaces.mockResolvedValue({
+        items: [mockRawPlaceRow],
+        total: 1,
+      });
+
+      const result = await service.searchPlaces({
+        areaSlug: 'da-nang',
+      });
+
+      expect(repository.findAreaByName).toHaveBeenCalledWith('da-nang');
+      expect(repository.searchPlaces).toHaveBeenCalledWith(
+        expect.objectContaining({
+          areaId: 5,
         }),
       );
       expect(result.items).toHaveLength(1);

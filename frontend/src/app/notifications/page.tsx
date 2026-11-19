@@ -2,7 +2,6 @@
 
 import { useState, useMemo, Suspense } from "react";
 import Link from "next/link";
-import { Bell, CheckCheck, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import type { NotificationFilter, NotificationItem } from "@/types/notification";
@@ -49,6 +48,7 @@ function NotificationsPageContent() {
 
   const handleMarkAll = () => {
     if (unreadCount > 0 && !markAllMutation.isPending) {
+      setFilter("ALL");
       markAllMutation.mutate();
     }
   };
@@ -71,7 +71,7 @@ function NotificationsPageContent() {
       <div className="max-w-md mx-auto w-full px-4 py-16 text-center space-y-5">
         <div className="rounded-3xl border border-border bg-card p-8 space-y-4 shadow-xs">
           <div className="size-12 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mx-auto">
-            <Bell className="size-6" />
+            <i className="fa-regular fa-bell text-xl" aria-hidden="true" />
           </div>
           <h1 className="text-xl font-bold font-heading text-foreground">
             Vui lòng đăng nhập để xem thông báo
@@ -82,7 +82,7 @@ function NotificationsPageContent() {
           <div className="pt-2">
             <Link href="/login?next=/notifications">
               <Button className="rounded-xl font-semibold gap-2 px-6 h-10 text-xs cursor-pointer">
-                <LogIn className="size-4" />
+                <i className="fa-solid fa-right-to-bracket text-xs" aria-hidden="true" />
                 <span>Đăng nhập ngay</span>
               </Button>
             </Link>
@@ -134,7 +134,7 @@ function NotificationsPageContent() {
           disabled={unreadCount === 0 || markAllMutation.isPending}
           className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
         >
-          <CheckCheck className="size-4" />
+          <i className="fa-solid fa-check-double text-xs" aria-hidden="true" />
           <span className="hidden sm:inline">Đánh dấu tất cả đã đọc</span>
           <span className="sm:hidden">Đã đọc tất cả</span>
         </button>

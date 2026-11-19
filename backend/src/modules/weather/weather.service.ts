@@ -3,6 +3,7 @@ import type { ConfigType } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import type Redis from 'ioredis';
 import { WEATHER_DEFAULTS, weatherConfig } from '../../config/weather.config';
+import { ITINERARY_PLANNING_CONFIG } from '../../config/itinerary-planning.config';
 import {
   DayWeather,
   TripWeatherResponse,
@@ -187,7 +188,7 @@ export class WeatherService {
     const safeTotalDays = Math.max(
       1,
       Math.min(
-        WEATHER_THRESHOLDS.MAX_TRIP_DAYS,
+        ITINERARY_PLANNING_CONFIG.LIMITS.MANUAL_MAX_TRIP_DAYS,
         Math.trunc(params.totalDays || 1),
       ),
     );

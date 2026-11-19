@@ -42,6 +42,7 @@ import {
   TravelPaceEnum,
   UpdateTourBriefingDto,
   UpdateItineraryDto,
+  UpdateItineraryLodgingDto,
   getTravelPaceSpec,
 } from '../dto/generate-itinerary.dto';
 import {
@@ -55,9 +56,33 @@ import {
   formatTimeOfDay,
   parseTimeOfDay,
 } from '../../../common/utils/time-of-day.util';
+import {
+  ActivityRole,
+  ITINERARY_PLANNING_CONFIG,
+  computeCandidateLimit,
+} from '../../../config/itinerary-planning.config';
+import {
+  classifyActivityRole,
+  isLodgingCategory,
+  selectBalancedCandidatePool,
+} from '../../../common/utils/brand-key.util';
+import { computeCentroid, GeoCoord } from '../../../common/utils/geo.util';
+import {
+  clusterPlacesByDay,
+  isDiningCandidate,
+  toCoord,
+} from './route-optimizer/day-clustering';
+import {
+  optimizeDayRoute,
+  resolveDayTimeWindow,
+} from './route-optimizer/day-route-optimizer';
+import {
+  selectDefaultLodging,
+  buildLodgingSuggestions,
+  ScoredLodgingCandidate,
+} from './lodging-selector';
 
 const MS_PER_DAY = 86_400_000;
-const MAX_TRIP_DAYS = 30;
 
 /** One planned day while the plan is being assembled (before persistence). */
 interface PlannedDay {
@@ -118,9 +143,53 @@ export interface ItineraryActivity {
   openingStatus?: OpeningStatus | null;
 }
 
+export interface ItineraryDayLodging {
+  nightNumber: number;
+  isCheckOutDay?: boolean;
+  isAutoSuggested: boolean;
+  placeId: string;
+  name: string;
+  address: string | null;
+  latitude: number;
+  longitude: number;
+  ratingAvg: number | null;
+  reviewCount: number | null;
+  priceLevel: string | null;
+  priceRange: unknown;
+  pricePerNight: number | null;
+  imageUrl: string | null;
+  distanceToFirstStopKm: number | null;
+}
+
+export interface ItineraryLodgingSuggestionItem {
+  placeId: string;
+  name: string;
+  address: string | null;
+  latitude: number;
+  longitude: number;
+  ratingAvg: number | null;
+  reviewCount: number | null;
+  priceLevel: string | null;
+  priceRange: unknown;
+  pricePerNight: number | null;
+  imageUrl: string | null;
+  distanceKm: number;
+  score: number;
+}
+
+export interface ItineraryLodgingSuggestionsResponse {
+  nightNumber: number;
+  totalNights: number;
+  currentPlaceId: string | null;
+  nearest: ItineraryLodgingSuggestionItem[];
+  bestValue: ItineraryLodgingSuggestionItem[];
+  topRated: ItineraryLodgingSuggestionItem[];
+}
+
 export interface ItineraryDay {
   dayNumber: number;
   theme: string;
+  lodging?: ItineraryDayLodging | null;
   activities: ItineraryActivity[];
 }
 
@@ -212,6 +281,30 @@ const DETAIL_INCLUDE = {
           priceLevel: true,
           priceRange: true,
           openingHours: true,
+          category: { select: { name: true, nameVi: true, slug: true } },
+          images: {
+            where: { isPrimary: true },
+            take: 1,
+            select: { imageUrl: true, thumbnailUrl: true },
+          },
+        },
+      },
+    },
+  },
+  lodgings: {
+    orderBy: [{ nightNumber: 'asc' }],
+    include: {
+      place: {
+        select: {
+          id: true,
+          name: true,
+          address: true,
+          latitude: true,
+          longitude: true,
+          ratingAvg: true,
+          reviewCount: true,
+          priceLevel: true,
+          priceRange: true,
           category: { select: { name: true, nameVi: true, slug: true } },
           images: {
             where: { isPrimary: true },
@@ -372,20 +465,44 @@ function computeRowTotalDays(
   );
 }
 
+export function resolveNightlyHotelRate(params: {
+  lodgingPlace?: { priceRange?: any } | null;
+  budgetLevel?: string | null;
+  destinationCity?: string | null;
+}): number {
+  const minPrice =
+    params.lodgingPlace?.priceRange?.min != null
+      ? Number(params.lodgingPlace.priceRange.min)
+      : NaN;
+  if (Number.isFinite(minPrice) && minPrice > 0) {
+    return Math.round(minPrice);
+  }
+  const levelKey = (params.budgetLevel ||
+    'MEDIUM') as keyof typeof PRICING_CONFIG.LIVING_EXPENSES.HOTEL_PER_NIGHT;
+  const dailyHotel =
+    PRICING_CONFIG.LIVING_EXPENSES.HOTEL_PER_NIGHT[levelKey] ||
+    PRICING_CONFIG.LIVING_EXPENSES.HOTEL_PER_NIGHT.MEDIUM;
+  const tierMultiplier = getDestinationTierMultiplier(
+    params.destinationCity || '',
+  );
+  return Math.round(dailyHotel * tierMultiplier);
+}
+
 function computeUnitLivingExpenses(
   totalDays: number,
   budgetLevel?: string | null,
   destinationCity?: string | null,
   intracityMode?: string | null,
+  lodgingPlace?: { priceRange?: any } | null,
 ): { accommodation: number; localTransit: number } {
-  const levelKey = (budgetLevel ||
-    'MEDIUM') as keyof typeof PRICING_CONFIG.LIVING_EXPENSES.HOTEL_PER_NIGHT;
-  const dailyHotel =
-    PRICING_CONFIG.LIVING_EXPENSES.HOTEL_PER_NIGHT[levelKey] ||
-    PRICING_CONFIG.LIVING_EXPENSES.HOTEL_PER_NIGHT.MEDIUM;
   const nights = Math.max(1, totalDays - 1);
   const tierMultiplier = getDestinationTierMultiplier(destinationCity || '');
-  const accommodation = Math.round(dailyHotel * nights * tierMultiplier);
+  const nightlyRate = resolveNightlyHotelRate({
+    lodgingPlace,
+    budgetLevel,
+    destinationCity,
+  });
+  const accommodation = Math.round(nightlyRate * nights);
 
   let dailyLocalTransit =
     PRICING_CONFIG.INTRACITY.MOTORBIKE_RENTAL_PER_DAY +
@@ -464,8 +581,32 @@ function computeScaledPartyBudget(params: {
   return { unitBase, scaled };
 }
 
+interface CachedLodgingPlace {
+  id: string;
+  name: string;
+  address: string | null;
+  latitude: number;
+  longitude: number;
+  ratingAvg: number | null;
+  reviewCount: number | null;
+  priceLevel: string | null;
+  priceRange: unknown;
+  category: {
+    name: string | null;
+    nameVi: string | null;
+    slug: string | null;
+  } | null;
+  imageUrl?: string | null;
+}
+
 @Injectable()
 export class ItineraryPlannerService {
+  // ponytail: process-local TTL cache for city bbox lodging candidates (ceiling: single-node memory; upgrade path: Redis cache key when horizontally scaled).
+  private readonly lodgingCandidateCache = new Map<
+    string,
+    { expiresAt: number; items: CachedLodgingPlace[] }
+  >();
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly transitService: TransitService,
@@ -495,9 +636,9 @@ export class ItineraryPlannerService {
     );
     const totalDays = Math.max(1, dayDiff + 1);
 
-    if (totalDays > MAX_TRIP_DAYS) {
+    if (totalDays > ITINERARY_PLANNING_CONFIG.LIMITS.AI_MAX_TRIP_DAYS) {
       throw new BadRequestException(
-        `Hệ thống hỗ trợ tạo lịch trình tối đa ${MAX_TRIP_DAYS} ngày`,
+        `Hệ thống hỗ trợ tạo lịch trình AI tối đa ${ITINERARY_PLANNING_CONFIG.LIMITS.AI_MAX_TRIP_DAYS} ngày`,
       );
     }
 
@@ -560,7 +701,7 @@ export class ItineraryPlannerService {
       area.bboxMaxLat !== null &&
       area.bboxMinLng !== null &&
       area.bboxMaxLng !== null &&
-      area.bboxMaxLat - area.bboxMinLat < 2.0 // ensure it's a local city/province bbox
+      area.bboxMaxLat - area.bboxMinLat < ITINERARY_PLANNING_CONFIG.GEO.LOCAL_AREA_MAX_LAT_SPAN_DEG
     ) {
       bbox = {
         minLat: area.bboxMinLat,
@@ -569,9 +710,11 @@ export class ItineraryPlannerService {
         maxLng: area.bboxMaxLng,
       };
     } else {
-      const radiusKm = 45;
-      const deltaLat = radiusKm / 111;
-      const deltaLng = radiusKm / (111 * Math.cos((destLat * Math.PI) / 180));
+      const GEO = ITINERARY_PLANNING_CONFIG.GEO;
+      const deltaLat = GEO.FALLBACK_BBOX_RADIUS_KM / GEO.KM_PER_DEG_LAT;
+      const deltaLng =
+        GEO.FALLBACK_BBOX_RADIUS_KM /
+        (GEO.KM_PER_DEG_LAT * Math.cos((destLat * Math.PI) / 180));
       bbox = {
         minLat: destLat - deltaLat,
         maxLat: destLat + deltaLat,
@@ -594,10 +737,28 @@ export class ItineraryPlannerService {
       : [];
 
     const paceSpec = getTravelPaceSpec(dto.pace);
-    const candidateLimit = Math.min(
-      45,
-      Math.max(25, totalDays * (paceSpec.maxStopsPerDay + 1)),
+    const { candidateLimit, queryLimit } = computeCandidateLimit(
+      totalDays,
+      paceSpec.maxStopsPerDay,
     );
+
+    const candidateSelect = {
+      id: true,
+      name: true,
+      nameNormalized: true,
+      address: true,
+      latitude: true,
+      longitude: true,
+      priceLevel: true,
+      priceRange: true,
+      openingHours: true,
+      ratingAvg: true,
+      reviewCount: true,
+      category: {
+        select: { name: true, nameVi: true, slug: true },
+      },
+      tags: true,
+    } satisfies Prisma.PlaceSelect;
 
     const candidateWhere: Prisma.PlaceWhereInput = {
       status: 'ACTIVE',
@@ -608,30 +769,48 @@ export class ItineraryPlannerService {
       ...(dto.budgetLevel === BudgetLevelEnum.LOW
         ? { priceLevel: { in: [BudgetLevel.LOW, BudgetLevel.MEDIUM] } }
         : {}),
+      category: {
+        slug: {
+          notIn: [
+            ...ITINERARY_PLANNING_CONFIG.LODGING.CATEGORY_SLUGS,
+            ...ITINERARY_PLANNING_CONFIG.LODGING.EXCLUDED_CATEGORY_SLUGS,
+          ],
+        },
+      },
     };
 
-    const candidatePlaces = await this.prisma.place.findMany({
-      where: candidateWhere,
-      select: {
-        id: true,
-        name: true,
-        address: true,
-        latitude: true,
-        longitude: true,
-        priceLevel: true,
-        priceRange: true,
-        ratingAvg: true,
-        category: {
-          select: { name: true, nameVi: true, slug: true },
-        },
-        tags: true,
-      },
-      orderBy: [{ ratingAvg: 'desc' }, { reviewCount: 'desc' }],
-      take: candidateLimit,
-    });
+    const [rawActivityPlaces, lodgingCandidates] = await Promise.all([
+      this.prisma.place.findMany({
+        where: candidateWhere,
+        select: candidateSelect,
+        orderBy: [{ reviewCount: 'desc' }, { ratingAvg: 'desc' }],
+        take: queryLimit,
+      }),
+      totalDays > 1
+        ? this.prisma.place.findMany({
+            where: {
+              status: 'ACTIVE',
+              deletedAt: null,
+              latitude: { gte: bbox.minLat, lte: bbox.maxLat },
+              longitude: { gte: bbox.minLng, lte: bbox.maxLng },
+              category: {
+                slug: {
+                  in: [...ITINERARY_PLANNING_CONFIG.LODGING.CATEGORY_SLUGS],
+                },
+              },
+            },
+            select: candidateSelect,
+            orderBy: [{ reviewCount: 'desc' }, { ratingAvg: 'desc' }],
+            take: ITINERARY_PLANNING_CONFIG.LIMITS.CANDIDATE_MAX,
+          })
+        : Promise.resolve([]),
+    ]);
 
-    // If candidate count is low, expand to all places in the destination Bounding Box
-    if (candidatePlaces.length < 10) {
+    // If activity candidate count is low, expand to all non-lodging places in the destination Bounding Box
+    if (
+      rawActivityPlaces.length <
+      ITINERARY_PLANNING_CONFIG.LIMITS.BBOX_EXPAND_THRESHOLD
+    ) {
       const bboxPlaces = await this.prisma.place.findMany({
         where: {
           status: 'ACTIVE',
@@ -639,32 +818,28 @@ export class ItineraryPlannerService {
           latitude: { gte: bbox.minLat, lte: bbox.maxLat },
           longitude: { gte: bbox.minLng, lte: bbox.maxLng },
         },
-        select: {
-          id: true,
-          name: true,
-          address: true,
-          latitude: true,
-          longitude: true,
-          priceLevel: true,
-          priceRange: true,
-          ratingAvg: true,
-          category: {
-            select: { name: true, nameVi: true, slug: true },
-          },
-          tags: true,
-        },
-        orderBy: [{ ratingAvg: 'desc' }, { reviewCount: 'desc' }],
-        take: candidateLimit,
+        select: candidateSelect,
+        orderBy: [{ reviewCount: 'desc' }, { ratingAvg: 'desc' }],
+        take: queryLimit,
       });
 
-      const existingIds = new Set(candidatePlaces.map((p) => p.id));
+      const existingIds = new Set(rawActivityPlaces.map((p) => p.id));
       for (const p of bboxPlaces) {
-        if (!existingIds.has(p.id)) {
-          candidatePlaces.push(p);
+        if (
+          !existingIds.has(p.id) &&
+          !isLodgingCategory(p.category, p.name)
+        ) {
+          rawActivityPlaces.push(p);
           existingIds.add(p.id);
         }
       }
     }
+
+    // Stratified popularity ranking + brand deduplication + balanced role quotas
+    const candidatePlaces = selectBalancedCandidatePool(
+      rawActivityPlaces,
+      candidateLimit,
+    );
 
     // 3 & 4. Compute Intercity Transit, User Preferences, and Trip Weather in parallel
     const partySize = Math.max(
@@ -717,6 +892,33 @@ export class ItineraryPlannerService {
           ? userPref.travelStyle
           : ['CULTURE', 'FOOD'];
 
+    const fallbackCoord: GeoCoord = { lat: destLat, lng: destLng };
+    const candidateCentroid =
+      computeCentroid(
+        candidatePlaces.map((p) => toCoord(p, fallbackCoord)),
+      ) ?? fallbackCoord;
+
+    // 4b. Select default lodging (1 hotel for all nights when totalDays > 1)
+    const selectedLodging =
+      totalDays > 1
+        ? selectDefaultLodging(lodgingCandidates, {
+            budgetLevel,
+            referenceCoord: candidateCentroid,
+          })
+        : null;
+    const lodgingCoord: GeoCoord | null = selectedLodging
+      ? toCoord(selectedLodging.place, fallbackCoord)
+      : null;
+
+    // 4c. Geographic clustering into K = totalDays pools ordered from lodgingCoord
+    const dayClusters = clusterPlacesByDay({
+      places: candidatePlaces,
+      totalDays,
+      maxStopsPerDay: paceSpec.maxStopsPerDay,
+      fallbackCoord,
+      anchorCoord: lodgingCoord ?? candidateCentroid,
+    });
+
     const {
       accommodation: totalHotelCost,
       localTransit: totalLocalTransitCost,
@@ -725,15 +927,24 @@ export class ItineraryPlannerService {
       budgetLevel,
       dto.destinationCity,
       dto.intracityMode,
+      selectedLodging?.place ?? null,
     );
 
-    // 5. Build Compact Gemini Prompt
-    const placesContext = candidatePlaces.map((p) => ({
+    // 5. Build Compact Gemini Prompt with per-day pools
+    const toPlannerPlace = (p: (typeof candidatePlaces)[number]) => ({
       id: p.id,
       name: p.name,
       cat: p.category?.nameVi || p.category?.name || 'Điểm tham quan',
       rating: p.ratingAvg,
-      tags: p.tags?.slice(0, 3) || [],
+      tags: p.tags?.slice(0, 2) || [],
+      isDining: isDiningCandidate(p),
+      role: classifyActivityRole(p),
+    });
+
+    const placesContext = candidatePlaces.map(toPlannerPlace);
+    const dayPools = dayClusters.map((dc) => ({
+      dayNumber: dc.dayNumber,
+      places: dc.places.map(toPlannerPlace),
     }));
 
     const planJson = await this.geminiPlanner.plan({
@@ -750,89 +961,141 @@ export class ItineraryPlannerService {
       preferredCategories: userPref?.preferredCategories || [],
       customPrompt: dto.customPrompt,
       dailyWeather: tripWeather?.days,
+      lodgingName: selectedLodging?.place.name ?? null,
       places: placesContext,
+      dayPools,
     });
 
-    // 6. Assemble Full Day Plans & Map Coordinates
+    // 6. Validate LLM placeIds against day pools (placeId: null strictly banned) & optimize in-day route
     const days: PlannedDay[] = [];
-    const placeMap = new Map(candidatePlaces.map((p) => [p.id, p]));
+    const globalPlaceMap = new Map(candidatePlaces.map((p) => [p.id, p]));
+    const usedPlaceIds = new Set<string>();
+    const optCfg = ITINERARY_PLANNING_CONFIG.ROUTE_OPTIMIZER;
+    const mismatchThreshold = optCfg.PENALTIES.MEAL_MISMATCH_METERS;
+    const forbiddenThreshold = optCfg.PENALTIES.FORBIDDEN_ROLE_METERS;
 
     for (let d = 1; d <= totalDays; d++) {
+      const dayCluster = dayClusters[d - 1];
+      const dayPool = dayCluster?.places ?? candidatePlaces;
+      const dayPoolMap = new Map(dayPool.map((p) => [p.id, p]));
+
       const dayRaw = planJson.days?.find((item) => item.dayNumber === d) || {
         dayNumber: d,
         theme: `Khám phá ${dto.destinationCity} - Ngày ${d}`,
         activities: [],
       };
 
-      const activities: PlannedDay['activities'] = [];
-      let order = 1;
+      const rawActivities =
+        dayRaw.activities && dayRaw.activities.length > 0
+          ? dayRaw.activities
+          : paceSpec.fallbackSlots.map((slot) => ({
+              placeId: null as string | null,
+              placeName: '',
+              startTime: slot.start,
+              endTime: slot.end,
+              durationMinutes: slot.dur,
+              notes: slot.note,
+            }));
 
-      for (const act of dayRaw.activities || []) {
-        // Trust boundary: accept only IDs from our candidate set (LLM may hallucinate UUIDs)
-        const placeDetails = act.placeId
-          ? placeMap.get(act.placeId)
-          : undefined;
+      const validatedActivities: Array<
+        PlannedDay['activities'][number] & {
+          openingHours?: unknown;
+          activityRole?: ActivityRole;
+        }
+      > = [];
+
+      for (const act of rawActivities) {
+        const slotWindow = resolveDayTimeWindow(act.startTime);
+        const rolePenalties = optCfg.SLOT_ROLE_PENALTIES[slotWindow];
+
+        // Strict pool validation: prefer dayPool match, then globalPool match
+        const llmCandidate =
+          act.placeId && !usedPlaceIds.has(act.placeId)
+            ? (dayPoolMap.get(act.placeId) ?? globalPlaceMap.get(act.placeId))
+            : undefined;
+
+        // Guardrail: reject LLM pick if its ActivityRole violates the slot window (e.g. attraction in dinner or restaurant in morning sightseeing)
+        let resolvedPlace =
+          llmCandidate &&
+          rolePenalties[classifyActivityRole(llmCandidate)] < mismatchThreshold
+            ? llmCandidate
+            : undefined;
+
+        if (!resolvedPlace) {
+          const isCompatible = (
+            p: (typeof candidatePlaces)[number],
+            maxPen: number,
+          ) =>
+            !usedPlaceIds.has(p.id) &&
+            rolePenalties[classifyActivityRole(p)] <= maxPen;
+
+          resolvedPlace =
+            dayPool.find((p) => isCompatible(p, 0)) ??
+            dayPool.find((p) => isCompatible(p, mismatchThreshold - 1)) ??
+            candidatePlaces.find((p) => isCompatible(p, 0)) ??
+            candidatePlaces.find((p) =>
+              isCompatible(p, mismatchThreshold - 1),
+            ) ??
+            (llmCandidate &&
+            rolePenalties[classifyActivityRole(llmCandidate)] <
+              forbiddenThreshold
+              ? llmCandidate
+              : undefined) ??
+            dayPool.find((p) => isCompatible(p, forbiddenThreshold - 1)) ??
+            candidatePlaces.find((p) =>
+              isCompatible(p, forbiddenThreshold - 1),
+            ) ??
+            dayPool.find((p) => !usedPlaceIds.has(p.id)) ??
+            candidatePlaces.find((p) => !usedPlaceIds.has(p.id));
+        }
+
+        // Ban placeId: null — if pool is completely exhausted, skip slot rather than fabricating a DB Place
+        if (!resolvedPlace) {
+          continue;
+        }
+        usedPlaceIds.add(resolvedPlace.id);
+
         const placeCostInfo = calculatePlaceEstimatedCost({
-          category: placeDetails?.category,
-          priceRange: placeDetails?.priceRange,
-          priceLevel: placeDetails?.priceLevel || budgetLevel,
-          placeName: placeDetails?.name || act.placeName,
+          category: resolvedPlace.category,
+          priceRange: resolvedPlace.priceRange,
+          priceLevel: resolvedPlace.priceLevel || budgetLevel,
+          placeName: resolvedPlace.name,
         });
 
-        let actLat = placeDetails?.latitude
-          ? Number(placeDetails.latitude)
-          : act.latitude
-            ? Number(act.latitude)
-            : destLat;
-        let actLng = placeDetails?.longitude
-          ? Number(placeDetails.longitude)
-          : act.longitude
-            ? Number(act.longitude)
-            : destLng;
-
-        // Bounding Box verification: if coordinates fall outside destination bbox, reset to dest center
-        if (
-          actLat < bbox.minLat ||
-          actLat > bbox.maxLat ||
-          actLng < bbox.minLng ||
-          actLng > bbox.maxLng
-        ) {
-          actLat = destLat;
-          actLng = destLng;
-        }
-
-        let actAddress = placeDetails?.address || act.address;
-        if (
-          !placeDetails &&
-          (!actAddress ||
-            !actAddress
-              .toLowerCase()
-              .includes(dto.destinationCity.toLowerCase()))
-        ) {
-          actAddress = `${act.placeName || 'Điểm đến'}, ${dto.destinationCity}, Việt Nam`;
-        }
-
-        activities.push({
-          placeId: placeDetails?.id ?? null,
-          placeName: placeDetails?.name || act.placeName || 'Điểm tham quan',
+        validatedActivities.push({
+          placeId: resolvedPlace.id,
+          placeName: resolvedPlace.name,
           startTime: act.startTime || '08:30',
           endTime: act.endTime || '10:30',
           durationMinutes: act.durationMinutes || 90,
-          visitOrder: order++,
+          visitOrder: validatedActivities.length + 1,
           notes: act.notes || '',
-          latitude: actLat,
-          longitude: actLng,
-          address: actAddress,
+          latitude: Number(resolvedPlace.latitude),
+          longitude: Number(resolvedPlace.longitude),
+          address: resolvedPlace.address,
           estimatedCost: placeCostInfo.cost,
           isDining: placeCostInfo.isDining,
           isFree: placeCostInfo.isFree,
+          openingHours: resolvedPlace.openingHours,
+          activityRole: classifyActivityRole(resolvedPlace),
         });
       }
+
+      // 7. Exhaustive branch-and-bound route optimization anchored at lodging
+      const dayDateIso = computeDayDateIso(startDate, d);
+      const startAnchor = totalDays > 1 ? lodgingCoord : null;
+      const endAnchor = d < totalDays ? lodgingCoord : null;
+      const optimizedActivities = optimizeDayRoute({
+        activities: validatedActivities,
+        startAnchor,
+        endAnchor,
+        dayDate: dayDateIso,
+      }).map(({ openingHours: _oh, activityRole: _ar, ...rest }) => rest);
 
       days.push({
         dayNumber: d,
         theme: dayRaw.theme || `Ngày ${d}`,
-        activities,
+        activities: optimizedActivities,
       });
     }
 
@@ -859,7 +1122,7 @@ export class ItineraryPlannerService {
     });
     const { totalEstimated } = budgetBreakdown;
 
-    // 7. Persist to Database (Itinerary & ItineraryDestination in an Atomic Transaction)
+    // 8. Persist to Database (Itinerary, ItineraryDestination & ItineraryLodging in an Atomic Transaction)
     if (!creatorId) {
       throw new UnauthorizedException(
         'Vui lòng đăng nhập để tạo lịch trình du lịch.',
@@ -868,41 +1131,6 @@ export class ItineraryPlannerService {
     const effectiveCreatorId = creatorId;
 
     const savedItinerary = await this.prisma.$transaction(async (tx) => {
-      // Ensure all activities have a valid placeId in database within the destination Bounding Box
-      for (const day of days) {
-        for (const act of day.activities) {
-          if (!act.placeId) {
-            let existingPlace = await tx.place.findFirst({
-              where: {
-                name: { equals: act.placeName, mode: 'insensitive' },
-                deletedAt: null,
-                latitude: { gte: bbox.minLat, lte: bbox.maxLat },
-                longitude: { gte: bbox.minLng, lte: bbox.maxLng },
-              },
-              select: { id: true },
-            });
-            if (!existingPlace) {
-              existingPlace = await tx.place.create({
-                data: {
-                  name: act.placeName,
-                  address:
-                    act.address ||
-                    `${act.placeName}, ${dto.destinationCity}, Việt Nam`,
-                  latitude: act.latitude ?? destLat,
-                  longitude: act.longitude ?? destLng,
-                  areaId: areaId || undefined,
-                  status: 'ACTIVE',
-                  ratingAvg: 0,
-                  reviewCount: 0,
-                },
-                select: { id: true },
-              });
-            }
-            act.placeId = existingPlace.id;
-          }
-        }
-      }
-
       const itin = await tx.itinerary.create({
         data: {
           creatorId: effectiveCreatorId,
@@ -966,6 +1194,21 @@ export class ItineraryPlannerService {
       if (destinationsToCreate.length > 0) {
         await tx.itineraryDestination.createMany({
           data: destinationsToCreate,
+        });
+      }
+
+      // Persist N - 1 nights of default lodging if trip has >= 1 night
+      if (totalDays > 1 && selectedLodging) {
+        const totalNights = totalDays - 1;
+        const lodgingsToCreate: Prisma.ItineraryLodgingCreateManyInput[] =
+          Array.from({ length: totalNights }, (_, idx) => ({
+            itineraryId: itin.id,
+            nightNumber: idx + 1,
+            placeId: selectedLodging.place.id,
+            isAutoSuggested: true,
+          }));
+        await tx.itineraryLodging.createMany({
+          data: lodgingsToCreate,
         });
       }
 
@@ -1260,11 +1503,77 @@ export class ItineraryPlannerService {
       byDay.keys(),
     );
 
-    const days: ItineraryDay[] = Array.from({ length: totalDays }, (_, i) => ({
-      dayNumber: i + 1,
-      theme: stored.dayThemes?.[i] ?? `Ngày ${i + 1}`,
-      activities: byDay.get(i + 1) ?? [],
-    }));
+    const lodgingRows = row.lodgings ?? [];
+    const lodgingByNight = new Map(
+      lodgingRows.map((l) => [l.nightNumber, l]),
+    );
+
+    const days: ItineraryDay[] = Array.from({ length: totalDays }, (_, i) => {
+      const dayNumber = i + 1;
+      const dayActivities = byDay.get(dayNumber) ?? [];
+      const isCheckOutDay = totalDays > 1 && dayNumber === totalDays;
+      const targetNight = isCheckOutDay ? totalDays - 1 : dayNumber;
+      const lodgingRow =
+        totalDays > 1 ? lodgingByNight.get(targetNight) : undefined;
+
+      let lodging: ItineraryDayLodging | null = null;
+      if (lodgingRow && lodgingRow.place) {
+        const lp = lodgingRow.place;
+        const firstStop = dayActivities[0];
+        const distanceToFirstStopKm =
+          firstStop &&
+          Number.isFinite(Number(lp.latitude)) &&
+          Number.isFinite(Number(lp.longitude)) &&
+          Number.isFinite(Number(firstStop.latitude)) &&
+          Number.isFinite(Number(firstStop.longitude))
+            ? Math.round(
+                this.transitService.computeHaversineDistance(
+                  Number(lp.latitude),
+                  Number(lp.longitude),
+                  Number(firstStop.latitude),
+                  Number(firstStop.longitude),
+                ) * 10,
+              ) / 10
+            : null;
+        const img = lp.images?.[0];
+        const pricePerNight = resolveNightlyHotelRate({
+          lodgingPlace: lp,
+          budgetLevel: row.budgetLevel,
+          destinationCity: row.destination,
+        });
+
+        lodging = {
+          nightNumber: lodgingRow.nightNumber,
+          isCheckOutDay,
+          isAutoSuggested: Boolean(lodgingRow.isAutoSuggested),
+          placeId: lp.id,
+          name: lp.name,
+          address: lp.address ?? null,
+          latitude: Number(lp.latitude),
+          longitude: Number(lp.longitude),
+          ratingAvg:
+            lp.ratingAvg != null && Number(lp.ratingAvg) > 0
+              ? Number(lp.ratingAvg)
+              : null,
+          reviewCount:
+            lp.reviewCount != null && Number(lp.reviewCount) > 0
+              ? Number(lp.reviewCount)
+              : null,
+          priceLevel: lp.priceLevel ?? null,
+          priceRange: lp.priceRange ?? null,
+          pricePerNight,
+          imageUrl: img?.imageUrl ?? img?.thumbnailUrl ?? null,
+          distanceToFirstStopKm,
+        };
+      }
+
+      return {
+        dayNumber,
+        theme: stored.dayThemes?.[i] ?? `Ngày ${dayNumber}`,
+        lodging,
+        activities: dayActivities,
+      };
+    });
 
     const isOwner = Boolean(requesterId && row.creatorId === requesterId);
     const memberRole = requesterId
@@ -1390,7 +1699,7 @@ export class ItineraryPlannerService {
       where,
       include: DETAIL_INCLUDE,
       orderBy: { createdAt: 'desc' },
-      take: 30,
+      take: ITINERARY_PLANNING_CONFIG.LIMITS.LIST_ITINERARIES_MAX,
     });
     return rows.map((r) => this.toDetail(r, userId));
   }
@@ -1517,6 +1826,17 @@ export class ItineraryPlannerService {
             estimatedDurationMinutes: d.estimatedDurationMinutes,
             estimatedCost: d.estimatedCost,
             notes: d.notes,
+          })),
+        });
+      }
+
+      if (source.lodgings && source.lodgings.length > 0) {
+        await tx.itineraryLodging.createMany({
+          data: source.lodgings.map((l) => ({
+            itineraryId: newItin.id,
+            nightNumber: l.nightNumber,
+            placeId: l.placeId,
+            isAutoSuggested: l.isAutoSuggested,
           })),
         });
       }
@@ -1752,9 +2072,9 @@ export class ItineraryPlannerService {
       newSpanDays =
         Math.round((parsedEnd.getTime() - parsedStart.getTime()) / MS_PER_DAY) +
         1;
-      if (newSpanDays > WEATHER_THRESHOLDS.MAX_TRIP_DAYS) {
+      if (newSpanDays > ITINERARY_PLANNING_CONFIG.LIMITS.MANUAL_MAX_TRIP_DAYS) {
         throw new BadRequestException(
-          `Thời gian chuyến đi tối đa là ${WEATHER_THRESHOLDS.MAX_TRIP_DAYS} ngày.`,
+          `Thời gian chuyến đi tối đa là ${ITINERARY_PLANNING_CONFIG.LIMITS.MANUAL_MAX_TRIP_DAYS} ngày.`,
         );
       }
     }
@@ -1965,6 +2285,519 @@ export class ItineraryPlannerService {
       startDate: row.startDate,
       totalDays,
     });
+  }
+
+  private async getCachedLodgingCandidates(bbox: {
+    minLat: number;
+    maxLat: number;
+    minLng: number;
+    maxLng: number;
+  }): Promise<CachedLodgingPlace[]> {
+    const key = `${bbox.minLat.toFixed(2)}:${bbox.maxLat.toFixed(2)}:${bbox.minLng.toFixed(2)}:${bbox.maxLng.toFixed(2)}`;
+    const now = Date.now();
+    const hit = this.lodgingCandidateCache.get(key);
+    if (hit && hit.expiresAt > now) {
+      return hit.items;
+    }
+
+    const rows = await this.prisma.place.findMany({
+      where: {
+        status: 'ACTIVE',
+        deletedAt: null,
+        latitude: { gte: bbox.minLat, lte: bbox.maxLat },
+        longitude: { gte: bbox.minLng, lte: bbox.maxLng },
+        category: {
+          slug: {
+            in: [...ITINERARY_PLANNING_CONFIG.LODGING.CATEGORY_SLUGS],
+          },
+        },
+      },
+      select: {
+        id: true,
+        name: true,
+        address: true,
+        latitude: true,
+        longitude: true,
+        ratingAvg: true,
+        reviewCount: true,
+        priceLevel: true,
+        priceRange: true,
+        category: { select: { name: true, nameVi: true, slug: true } },
+      },
+      orderBy: [{ reviewCount: 'desc' }, { ratingAvg: 'desc' }],
+      take: ITINERARY_PLANNING_CONFIG.LIMITS.CANDIDATE_MAX,
+    });
+
+    const items: CachedLodgingPlace[] = rows.map((r) => ({
+      id: r.id,
+      name: r.name,
+      address: r.address ?? null,
+      latitude: Number(r.latitude),
+      longitude: Number(r.longitude),
+      ratingAvg:
+        r.ratingAvg != null && Number(r.ratingAvg) > 0
+          ? Number(r.ratingAvg)
+          : null,
+      reviewCount:
+        r.reviewCount != null && Number(r.reviewCount) > 0
+          ? Number(r.reviewCount)
+          : null,
+      priceLevel: r.priceLevel ?? null,
+      priceRange: r.priceRange ?? null,
+      category: r.category ?? null,
+      imageUrl: undefined,
+    }));
+
+    const cfg = ITINERARY_PLANNING_CONFIG.LODGING;
+    if (this.lodgingCandidateCache.size >= cfg.CANDIDATE_CACHE_MAX_ENTRIES) {
+      const oldestKey = this.lodgingCandidateCache.keys().next().value;
+      if (oldestKey) this.lodgingCandidateCache.delete(oldestKey);
+    }
+    this.lodgingCandidateCache.set(key, {
+      expiresAt: now + cfg.CANDIDATE_CACHE_TTL_MS,
+      items,
+    });
+
+    return items;
+  }
+
+  /**
+   * Returns 3 groups of lodging suggestions (nearest to day stops, best value for budget, top rated)
+   * for a given night of an itinerary.
+   */
+  async getLodgingSuggestions(
+    id: string,
+    query: { night?: number; budget?: string },
+    requesterId?: string,
+  ): Promise<ItineraryLodgingSuggestionsResponse> {
+    const row = await this.prisma.itinerary.findFirst({
+      where: { id, deletedAt: null },
+      select: {
+        id: true,
+        creatorId: true,
+        isPublic: true,
+        startDate: true,
+        endDate: true,
+        budgetLevel: true,
+        destination: true,
+        aiPreferences: true,
+        area: {
+          select: {
+            bboxMinLat: true,
+            bboxMaxLat: true,
+            bboxMinLng: true,
+            bboxMaxLng: true,
+          },
+        },
+        lodgings: {
+          select: { nightNumber: true, placeId: true },
+        },
+        destinations: {
+          select: {
+            dayNumber: true,
+            place: { select: { latitude: true, longitude: true } },
+          },
+        },
+        tripGroup: {
+          select: {
+            members: {
+              select: { userId: true },
+            },
+          },
+        },
+      },
+    });
+    if (!row) {
+      throw new NotFoundException(`Itinerary with id "${id}" not found`);
+    }
+
+    const isOwner = Boolean(requesterId && row.creatorId === requesterId);
+    const isMember = Boolean(
+      requesterId &&
+        row.tripGroup?.members.some((m) => m.userId === requesterId),
+    );
+    if (!row.isPublic && !isOwner && !isMember) {
+      if (!requesterId) {
+        throw new UnauthorizedException(
+          'Vui lòng đăng nhập để xem lịch trình riêng tư này.',
+        );
+      }
+      throw new ForbiddenException('Lịch trình này đang ở chế độ riêng tư.');
+    }
+
+    const stored = readStoredPlan(row.aiPreferences);
+    const scheduledDays =
+      row.destinations.length > 0
+        ? row.destinations.map((d) => d.dayNumber)
+        : (stored.plannedDays ?? []).map((d) => d.dayNumber);
+    const totalDays = computeTotalDays(
+      row.startDate,
+      row.endDate,
+      scheduledDays,
+    );
+    const totalNights = Math.max(1, totalDays - 1);
+    const nightNumber = Math.max(
+      1,
+      Math.min(totalNights, Math.trunc(Number(query.night) || 1)),
+    );
+    const effectiveBudget = query.budget || row.budgetLevel || 'MEDIUM';
+
+    // Compute centroid of the target day's stops (or all stops / destination bbox center)
+    const dayStops = row.destinations.filter(
+      (d) => d.dayNumber === nightNumber,
+    );
+    const stopSource = dayStops.length > 0 ? dayStops : row.destinations;
+    let dayCentroid = computeCentroid(
+      stopSource
+        .filter(
+          (d) =>
+            Number.isFinite(Number(d.place.latitude)) &&
+            Number.isFinite(Number(d.place.longitude)),
+        )
+        .map((d) => ({
+          lat: Number(d.place.latitude),
+          lng: Number(d.place.longitude),
+        })),
+    );
+
+    if (!dayCentroid) {
+      if (
+        row.area?.bboxMinLat != null &&
+        row.area?.bboxMaxLat != null &&
+        row.area?.bboxMinLng != null &&
+        row.area?.bboxMaxLng != null
+      ) {
+        dayCentroid = {
+          lat: (Number(row.area.bboxMinLat) + Number(row.area.bboxMaxLat)) / 2,
+          lng: (Number(row.area.bboxMinLng) + Number(row.area.bboxMaxLng)) / 2,
+        };
+      } else {
+        const resolved = await this.transitService.resolveCityLocation(
+          row.destination || '',
+        );
+        dayCentroid = { lat: resolved.lat, lng: resolved.lng };
+      }
+    }
+
+    const bbox =
+      row.area?.bboxMinLat != null &&
+      row.area?.bboxMaxLat != null &&
+      row.area?.bboxMinLng != null &&
+      row.area?.bboxMaxLng != null
+        ? {
+            minLat: Number(row.area.bboxMinLat),
+            maxLat: Number(row.area.bboxMaxLat),
+            minLng: Number(row.area.bboxMinLng),
+            maxLng: Number(row.area.bboxMaxLng),
+          }
+        : {
+            minLat:
+              dayCentroid.lat -
+              ITINERARY_PLANNING_CONFIG.GEO.SUGGESTION_BBOX_EXPAND_DEG,
+            maxLat:
+              dayCentroid.lat +
+              ITINERARY_PLANNING_CONFIG.GEO.SUGGESTION_BBOX_EXPAND_DEG,
+            minLng:
+              dayCentroid.lng -
+              ITINERARY_PLANNING_CONFIG.GEO.SUGGESTION_BBOX_EXPAND_DEG,
+            maxLng:
+              dayCentroid.lng +
+              ITINERARY_PLANNING_CONFIG.GEO.SUGGESTION_BBOX_EXPAND_DEG,
+          };
+
+    const currentLodging = (row.lodgings ?? []).find(
+      (l) => l.nightNumber === nightNumber,
+    );
+    const currentPlaceId = currentLodging?.placeId ?? null;
+
+    const candidates = await this.getCachedLodgingCandidates(bbox);
+
+    const groups = buildLodgingSuggestions(candidates, {
+      budgetLevel: effectiveBudget,
+      dayCentroid,
+      currentPlaceId,
+    });
+
+    // Lazy primary-image resolution only for the <= 15 winning hotels (memoized onto cached items)
+    const winningPlaces = [
+      ...groups.nearest,
+      ...groups.bestValue,
+      ...groups.topRated,
+    ].map((item) => item.place);
+    const missingImgPlaces = Array.from(
+      new Set(winningPlaces.filter((p) => p.imageUrl === undefined)),
+    );
+
+    if (missingImgPlaces.length > 0) {
+      const images = await this.prisma.placeImage.findMany({
+        where: {
+          placeId: { in: missingImgPlaces.map((p) => p.id) },
+          isPrimary: true,
+        },
+        select: { placeId: true, imageUrl: true, thumbnailUrl: true },
+      });
+      const imgByPlaceId = new Map(
+        images.map((img) => [
+          img.placeId,
+          img.imageUrl ?? img.thumbnailUrl ?? null,
+        ]),
+      );
+      for (const p of missingImgPlaces) {
+        p.imageUrl = imgByPlaceId.get(p.id) ?? null;
+      }
+    }
+
+    const mapSuggestion = (
+      item: ScoredLodgingCandidate<CachedLodgingPlace>,
+    ): ItineraryLodgingSuggestionItem => {
+      const p = item.place;
+      return {
+        placeId: p.id,
+        name: p.name,
+        address: p.address,
+        latitude: p.latitude,
+        longitude: p.longitude,
+        ratingAvg: p.ratingAvg,
+        reviewCount: p.reviewCount,
+        priceLevel: p.priceLevel,
+        priceRange: p.priceRange,
+        pricePerNight: resolveNightlyHotelRate({
+          lodgingPlace: p,
+          budgetLevel: effectiveBudget,
+          destinationCity: row.destination,
+        }),
+        imageUrl: p.imageUrl ?? null,
+        distanceKm: item.distanceKm,
+        score: Math.round(item.score * 1000) / 1000,
+      };
+    };
+
+    return {
+      nightNumber,
+      totalNights,
+      currentPlaceId,
+      nearest: groups.nearest.map(mapSuggestion),
+      bestValue: groups.bestValue.map(mapSuggestion),
+      topRated: groups.topRated.map(mapSuggestion),
+    };
+  }
+
+  /**
+   * Updates lodging for a night range [fromNight..toNight], recalculates accommodation budget,
+   * and re-optimizes in-day route sequences for all affected days.
+   * Allowed for itinerary OWNER and trip group EDITOR.
+   */
+  async updateLodging(
+    id: string,
+    dto: UpdateItineraryLodgingDto,
+    userId?: string,
+  ): Promise<ItineraryDetail> {
+    await this.accessService.assertCanEdit(id, userId);
+
+    const row = await this.prisma.itinerary.findFirst({
+      where: { id, deletedAt: null },
+      include: DETAIL_INCLUDE,
+    });
+    if (!row) {
+      throw new NotFoundException(`Itinerary with id "${id}" not found`);
+    }
+
+    const stored = readStoredPlan(row.aiPreferences);
+    const totalDays = computeRowTotalDays(row, stored);
+    if (totalDays <= 1) {
+      throw new BadRequestException(
+        'Chuyến đi trong ngày không có đêm lưu trú.',
+      );
+    }
+
+    const totalNights = totalDays - 1;
+    const fromNight = Math.max(1, Math.min(totalNights, dto.fromNight));
+    const toNight = Math.max(
+      fromNight,
+      Math.min(totalNights, dto.toNight ?? totalNights),
+    );
+
+    const place = await this.prisma.place.findFirst({
+      where: { id: dto.placeId, deletedAt: null },
+      select: {
+        id: true,
+        name: true,
+        latitude: true,
+        longitude: true,
+        priceRange: true,
+        priceLevel: true,
+      },
+    });
+    if (!place) {
+      throw new NotFoundException('Không tìm thấy địa điểm lưu trú đã chọn.');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // Bulk replace lodgings in [fromNight..toNight]: delete + createMany avoids N upsert round-trips.
+      const nightsInRange = Array.from(
+        { length: toNight - fromNight + 1 },
+        (_, i) => fromNight + i,
+      );
+      await tx.itineraryLodging.deleteMany({
+        where: { itineraryId: id, nightNumber: { in: nightsInRange } },
+      });
+      await tx.itineraryLodging.createMany({
+        data: nightsInRange.map((night) => ({
+          itineraryId: id,
+          nightNumber: night,
+          placeId: place.id,
+          isAutoSuggested: false,
+        })),
+      });
+
+      const allLodgings = await tx.itineraryLodging.findMany({
+        where: { itineraryId: id },
+        include: {
+          place: {
+            select: {
+              id: true,
+              latitude: true,
+              longitude: true,
+              priceRange: true,
+            },
+          },
+        },
+      });
+      const lodgingByNight = new Map(
+        allLodgings.map((l) => [l.nightNumber, l]),
+      );
+
+      // Re-optimize affected days: nights [fromNight..toNight] anchor days [fromNight .. min(totalDays, toNight + 1)]
+      const startAffectedDay = Math.max(1, fromNight);
+      const endAffectedDay = Math.min(totalDays, toNight + 1);
+      const destUpdates: Promise<unknown>[] = [];
+
+      for (let d = startAffectedDay; d <= endAffectedDay; d++) {
+        const dayDests = row.destinations.filter((dest) => dest.dayNumber === d);
+        if (dayDests.length <= 1) continue;
+
+        const startLodgingRow =
+          lodgingByNight.get(d === totalDays ? totalDays - 1 : d) ??
+          lodgingByNight.get(Math.max(1, d - 1));
+        const endLodgingRow =
+          d < totalDays ? lodgingByNight.get(d) : undefined;
+
+        const startAnchor: GeoCoord | null = startLodgingRow?.place
+          ? {
+              lat: Number(startLodgingRow.place.latitude),
+              lng: Number(startLodgingRow.place.longitude),
+            }
+          : null;
+        const endAnchor: GeoCoord | null = endLodgingRow?.place
+          ? {
+              lat: Number(endLodgingRow.place.latitude),
+              lng: Number(endLodgingRow.place.longitude),
+            }
+          : null;
+
+        const optimizable = dayDests.map((dest, idx) => {
+          const costInfo = toLiveCostItem(dest, row.budgetLevel);
+          return {
+            destId: dest.id,
+            placeId: dest.placeId,
+            placeName: dest.place.name,
+            startTime: formatTimeOfDay(dest.startTime) || '08:30',
+            endTime: formatTimeOfDay(dest.endTime) || '10:30',
+            durationMinutes: dest.estimatedDurationMinutes || 90,
+            visitOrder: idx + 1,
+            latitude: Number(dest.place.latitude),
+            longitude: Number(dest.place.longitude),
+            isDining: costInfo.isDining,
+            openingHours: dest.place.openingHours,
+            category: dest.place.category,
+          };
+        });
+
+        const optimized = optimizeDayRoute({
+          activities: optimizable,
+          startAnchor,
+          endAnchor,
+          dayDate: computeDayDateIso(row.startDate, d),
+        });
+
+        for (const item of optimized) {
+          destUpdates.push(
+            tx.itineraryDestination.update({
+              where: { id: item.destId },
+              data: {
+                visitOrder: item.visitOrder,
+                startTime: parseTimeOfDay(item.startTime),
+                endTime: parseTimeOfDay(item.endTime),
+                estimatedDurationMinutes: item.durationMinutes,
+              },
+            }),
+          );
+        }
+      }
+
+      if (destUpdates.length > 0) {
+        await Promise.all(destUpdates);
+      }
+
+      // Recalculate 1-room accommodation sum across all nights 1..totalNights
+      let newUnitAccommodation = 0;
+      for (let n = 1; n <= totalNights; n++) {
+        const lRow = lodgingByNight.get(n);
+        newUnitAccommodation += resolveNightlyHotelRate({
+          lodgingPlace: lRow?.place ?? null,
+          budgetLevel: row.budgetLevel,
+          destinationCity: row.destination,
+        });
+      }
+
+      const updatedStored: Partial<StoredPlan> = {
+        ...stored,
+        baseBudgetBreakdown: stored.baseBudgetBreakdown
+          ? {
+              ...stored.baseBudgetBreakdown,
+              accommodation: newUnitAccommodation,
+            }
+          : undefined,
+      };
+
+      const { unitBase, scaled: budgetBreakdown } = computeScaledPartyBudget({
+        stored: updatedStored,
+        liveCostItems: row.destinations.map((d) =>
+          toLiveCostItem(d, row.budgetLevel),
+        ),
+        totalDays,
+        budgetLevel: row.budgetLevel,
+        destination: row.destination,
+        partySize: row.partySize,
+        currentRowPartySize: row.partySize,
+      });
+      unitBase.accommodation = newUnitAccommodation;
+      const rescaled = scaleBudgetBreakdownForParty(unitBase, {
+        partySize: row.partySize,
+        intercityMode: stored.intercityTransit?.mode,
+        intracityMode: stored.intracityMode,
+      });
+
+      const updatedAiPreferences = {
+        ...(typeof row.aiPreferences === 'object' && row.aiPreferences !== null
+          ? row.aiPreferences
+          : {}),
+        baseBudgetBreakdown: unitBase,
+        budgetBreakdown: rescaled,
+      };
+
+      await tx.itinerary.update({
+        where: { id },
+        data: {
+          totalBudget: rescaled.totalEstimated,
+          estimatedCost: rescaled.totalEstimated,
+          aiPreferences:
+            updatedAiPreferences as unknown as Prisma.InputJsonValue,
+        },
+      });
+    });
+
+    return this.getById(id, userId);
   }
 }
 

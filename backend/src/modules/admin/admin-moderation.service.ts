@@ -11,19 +11,28 @@ import {
   Prisma,
   PostModerationStatus,
   ReportStatus,
+  ReportTargetType,
   AuditAction,
   UserRole,
+  NotificationType,
 } from '@prisma/client';
 import axios, { AxiosInstance } from 'axios';
 import Redis from 'ioredis';
 import { PrismaService } from '@/database/prisma.service';
 import { AuthenticatedUser } from '@/common/types';
-import { NotificationTargetType } from '../notifications/notifications.constants';
+import {
+  writeNotification,
+  PostModeratedNotificationInput,
+} from '../notifications/notification-writer';
+import {
+  NOTIFICATIONS_CONSTANTS,
+  NotificationTargetType,
+} from '../notifications/notifications.constants';
 import { AdminService } from './admin.service';
+import { BannedWordsService } from './banned-words.service';
 import {
   ADMIN_CONSTANTS,
   ADMIN_ERRORS,
-  MODERATION_HARD_BLOCK_PATTERNS,
   MODERATION_SUSPICIOUS_PATTERNS,
 } from './admin.constants';
 import { AdminRequestMeta } from './dto/admin-users.dto';
@@ -37,7 +46,7 @@ import {
 export interface ModerationEvaluationResult {
   status: PostModerationStatus;
   reason: string | null;
-  tier: 'MANUAL_QUEUE' | 'HARD_BLOCKLIST' | 'FAST_CLEAN' | 'GEMINI_AI' | 'FALLBACK_FLAGGED' | 'FALLBACK_CLEAN';
+  tier: 'GEMINI_AI' | 'AI_UNAVAILABLE';
 }
 
 @Injectable()
@@ -52,6 +61,7 @@ export class AdminModerationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly adminService: AdminService,
+    private readonly bannedWordsService: BannedWordsService,
     @Optional()
     private readonly configService?: ConfigService,
     @Optional()
@@ -85,31 +95,24 @@ export class AdminModerationService {
   }
 
   /**
-   * Normalizes text to defeat simple leetspeak punctuation insertion (e.g. "l.ừ.a đ.ả.o" -> "lừa đảo").
+   * Tier 1 gate (sync, RAM only, no DB/AI): rejects content containing an
+   * admin-managed banned word. Shared by posts and comments.
+   * The matched word is logged but never echoed back, so it can't be probed.
    */
-  private normalizeForModerationScan(text: string): string {
-    return text
-      .toLowerCase()
-      .replace(/(\p{L})[._*-]+(?=\p{L})/gu, '$1')
-      .replace(/\s+/g, ' ')
-      .trim();
-  }
+  assertContentAllowedSync(text: string): void {
+    const { isBanned, matchedWord, category } =
+      this.bannedWordsService.checkBannedSync(text);
+    if (!isBanned) return;
 
-  /**
-   * Tier 1: Checks if text matches hard blocklist (profanity, gambling, adult spam in VI & EN).
-   */
-  matchesHardBlocklist(text: string): boolean {
-    const normalized = this.normalizeForModerationScan(text);
-    return MODERATION_HARD_BLOCK_PATTERNS.some((pattern) =>
-      pattern.test(normalized),
-    );
+    this.logger.warn(`Blocked content at Tier 1 (${category}): "${matchedWord}"`);
+    throw new BadRequestException(ADMIN_ERRORS.CONTENT_VIOLATES_POLICY);
   }
 
   /**
    * Tier 2: Checks if text contains ambiguous/context-sensitive words that warrant AI contextual review.
    */
   matchesSuspiciousTriggers(text: string): boolean {
-    const normalized = this.normalizeForModerationScan(text);
+    const normalized = this.bannedWordsService.normalizeForScan(text);
     return MODERATION_SUSPICIOUS_PATTERNS.some((pattern) =>
       pattern.test(normalized),
     );
@@ -216,10 +219,9 @@ export class AdminModerationService {
     };
   }
 
-  // ponytail: 3-tier text-only moderation funnel caps Gemini payload at <=1500 chars (~300 tokens) and 80 output tokens with 2.5s timeout; media is validated by URL regex & human report queue to prevent multimodal token explosion.
+  // ponytail: text-only moderation caps Gemini payload at <=1500 chars (~300 tokens) and 80 output tokens; media is validated by URL regex & human report queue to prevent multimodal token explosion.
   private async evaluateWithGemini(
     text: string,
-    hasSuspiciousTrigger: boolean,
   ): Promise<ModerationEvaluationResult> {
     const truncated = text.slice(
       0,
@@ -227,17 +229,7 @@ export class AdminModerationService {
     );
 
     if (!this.apiKey || this.apiKey === 'mock_key') {
-      return hasSuspiciousTrigger
-        ? {
-            status: PostModerationStatus.FLAGGED,
-            reason: ADMIN_CONSTANTS.MESSAGES.FALLBACK_FLAGGED_NOTE,
-            tier: 'FALLBACK_FLAGGED',
-          }
-        : {
-            status: PostModerationStatus.APPROVED,
-            reason: ADMIN_CONSTANTS.MESSAGES.AUTO_APPROVED_CLEAN_NOTE,
-            tier: 'FALLBACK_CLEAN',
-          };
+      return this.aiUnavailableResult();
     }
 
     const endpoint = `${this.baseUrl}/models/${this.modelName}:generateContent?key=${this.apiKey}`;
@@ -297,81 +289,23 @@ export class AdminModerationService {
       };
     } catch (err) {
       this.logger.warn(
-        `Gemini moderation call failed/timed out, using safe fallback: ${
+        `Gemini moderation call failed/timed out, escalating to manual review: ${
           err instanceof Error ? err.message : String(err)
         }`,
       );
-
-      return hasSuspiciousTrigger
-        ? {
-            status: PostModerationStatus.FLAGGED,
-            reason: ADMIN_CONSTANTS.MESSAGES.FALLBACK_FLAGGED_NOTE,
-            tier: 'FALLBACK_FLAGGED',
-          }
-        : {
-            status: PostModerationStatus.APPROVED,
-            reason: ADMIN_CONSTANTS.MESSAGES.AUTO_APPROVED_CLEAN_NOTE,
-            tier: 'FALLBACK_CLEAN',
-          };
+      return this.aiUnavailableResult();
     }
   }
 
-  /**
-   * Gatekeeper for new Community Posts:
-   * - If AI Moderation is OFF -> status is PENDING (hidden until Admin manually approves).
-   * - If AI Moderation is ON -> runs 3-tier funnel (Tier 1 Hard Block -> Tier 2/3 Contextual AI).
-   */
-  async evaluatePostForCreation(input: {
-    title: string;
-    caption?: string | null;
-    tags?: string[];
-  }): Promise<ModerationEvaluationResult> {
-    const combinedText = [
-      input.title,
-      input.caption ?? '',
-      (input.tags ?? []).join(' '),
-    ]
-      .join(' ')
-      .trim();
-
-    if (this.matchesHardBlocklist(combinedText)) {
-      return {
-        status: PostModerationStatus.REJECTED,
-        reason: ADMIN_CONSTANTS.MESSAGES.HARD_BLOCKLIST_REJECT_NOTE,
-        tier: 'HARD_BLOCKLIST',
-      };
-    }
-
-    const aiEnabled = await this.isAiModerationEnabled();
-    if (!aiEnabled) {
-      return {
-        status: PostModerationStatus.PENDING,
-        reason: ADMIN_CONSTANTS.MESSAGES.PENDING_MANUAL_MODERATION_NOTE,
-        tier: 'MANUAL_QUEUE',
-      };
-    }
-
-    const hasSuspicious = this.matchesSuspiciousTriggers(combinedText);
-    if (!hasSuspicious) {
-      return {
-        status: PostModerationStatus.APPROVED,
-        reason: ADMIN_CONSTANTS.MESSAGES.AUTO_APPROVED_CLEAN_NOTE,
-        tier: 'FAST_CLEAN',
-      };
-    }
-
-    return this.evaluateWithGemini(combinedText, hasSuspicious);
+  // Fail closed: when AI can't judge, a human must. Never auto-approve unreviewed content.
+  private aiUnavailableResult(): ModerationEvaluationResult {
+    return {
+      status: PostModerationStatus.FLAGGED,
+      reason: ADMIN_CONSTANTS.MESSAGES.AI_UNAVAILABLE_NOTE,
+      tier: 'AI_UNAVAILABLE',
+    };
   }
 
-  /**
-   * TikTok-style Comment Moderation (Part 1 - Sync at the door):
-   * Blocks unambiguous profanity/gambling spam in 0.05ms before DB insert.
-   */
-  assertCommentAllowedSync(content: string): void {
-    if (this.matchesHardBlocklist(content)) {
-      throw new BadRequestException(ADMIN_ERRORS.CONTENT_VIOLATES_POLICY);
-    }
-  }
 
   /**
    * TikTok-style Comment Moderation (Part 2 - Async post-moderation):
@@ -393,7 +327,7 @@ export class AdminModerationService {
         return;
       }
 
-      const result = await this.evaluateWithGemini(content, true);
+      const result = await this.evaluateWithGemini(content);
       if (result.status !== PostModerationStatus.REJECTED) {
         return;
       }
@@ -428,6 +362,94 @@ export class AdminModerationService {
     } catch (err) {
       this.logger.warn(
         `Async comment moderation failed for comment ${commentId}: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
+    }
+  }
+
+  /**
+   * Post moderation, Tier 3 (async, after the post is saved as PENDING).
+   * AI ON  -> Gemini decides APPROVED / REJECTED / FLAGGED (fails closed to FLAGGED).
+   * AI OFF -> stays PENDING for a human, with a note saying so.
+   * Only PENDING posts are touched, so an Admin decision made meanwhile always wins.
+   */
+  // ponytail: runs in-process via setImmediate; a restart mid-flight leaves the post PENDING, where it surfaces in the Admin queue. Upgrade path: BullMQ job (already a dependency) with retries.
+  async evaluatePostAsync(postId: string, text: string): Promise<void> {
+    try {
+      const post = await this.prisma.communityPost.findUnique({
+        where: { id: postId },
+        select: {
+          id: true,
+          userId: true,
+          deletedAt: true,
+          moderationStatus: true,
+        },
+      });
+      if (
+        !post ||
+        post.deletedAt ||
+        post.moderationStatus !== PostModerationStatus.PENDING
+      ) {
+        return;
+      }
+
+      const aiEnabled = await this.isAiModerationEnabled();
+      const result: Pick<ModerationEvaluationResult, 'status' | 'reason'> =
+        aiEnabled
+          ? await this.evaluateWithGemini(text)
+          : {
+              status: PostModerationStatus.PENDING,
+              reason: ADMIN_CONSTANTS.MESSAGES.PENDING_MANUAL_MODERATION_NOTE,
+            };
+
+      await this.prisma.$transaction(async (tx) => {
+        const { count } = await tx.communityPost.updateMany({
+          where: {
+            id: postId,
+            deletedAt: null,
+            moderationStatus: PostModerationStatus.PENDING,
+          },
+          data: {
+            moderationStatus: result.status,
+            moderationNote: result.reason,
+            moderatedAt:
+              result.status === PostModerationStatus.PENDING
+                ? null
+                : new Date(),
+          },
+        });
+        if (count === 0) return;
+
+        if (result.status === PostModerationStatus.APPROVED) {
+          await this.syncGroupPostCounts(tx);
+        }
+
+        const moderationNotificationTypes: Record<
+          Exclude<PostModerationStatus, 'PENDING'>,
+          PostModeratedNotificationInput['type']
+        > = {
+          [PostModerationStatus.APPROVED]: NotificationType.POST_APPROVED,
+          [PostModerationStatus.FLAGGED]: NotificationType.POST_FLAGGED,
+          [PostModerationStatus.REJECTED]: NotificationType.POST_REJECTED,
+        };
+
+        if (result.status !== PostModerationStatus.PENDING) {
+          const notifType = moderationNotificationTypes[result.status];
+          await writeNotification(tx, {
+            recipientId: post.userId,
+            actorId: null,
+            type: notifType,
+            targetType: NotificationTargetType.POST,
+            targetId: postId,
+            eventKey: `${NOTIFICATIONS_CONSTANTS.EVENT_KEY_PREFIXES.POST_MODERATION}:${postId}:${result.status}`,
+            metadata: { reason: result.reason ?? '' },
+          });
+        }
+      });
+    } catch (err) {
+      this.logger.error(
+        `evaluatePostAsync failed for post ${postId}: ${
           err instanceof Error ? err.message : String(err)
         }`,
       );
@@ -535,7 +557,7 @@ export class AdminModerationService {
 
       const now = new Date();
       const note =
-        dto?.reason?.trim() || 'Đã được phê duyệt bởi Quản trị viên';
+        dto?.reason?.trim() || ADMIN_CONSTANTS.MESSAGES.DEFAULT_APPROVE_POST_NOTE;
 
       const updated = await tx.communityPost.update({
         where: { id: postId },
@@ -547,6 +569,16 @@ export class AdminModerationService {
       });
 
       await this.syncGroupPostCounts(tx);
+
+      await writeNotification(tx, {
+        recipientId: existing.userId,
+        actorId: admin.id,
+        type: NotificationType.POST_APPROVED,
+        targetType: NotificationTargetType.POST,
+        targetId: existing.id,
+        eventKey: `${NOTIFICATIONS_CONSTANTS.EVENT_KEY_PREFIXES.POST_MODERATION}:${existing.id}:APPROVED`,
+        metadata: { reason: note },
+      });
 
       await this.adminService.logAudit(
         {
@@ -601,7 +633,7 @@ export class AdminModerationService {
 
       const now = new Date();
       const note =
-        dto?.reason?.trim() || 'Bị từ chối bởi Quản trị viên do vi phạm tiêu chuẩn cộng đồng';
+        dto?.reason?.trim() || ADMIN_CONSTANTS.MESSAGES.DEFAULT_REJECT_POST_NOTE;
 
       const updated = await tx.communityPost.update({
         where: { id: postId },
@@ -613,6 +645,16 @@ export class AdminModerationService {
       });
 
       await this.syncGroupPostCounts(tx);
+
+      await writeNotification(tx, {
+        recipientId: existing.userId,
+        actorId: admin.id,
+        type: NotificationType.POST_REJECTED,
+        targetType: NotificationTargetType.POST,
+        targetId: existing.id,
+        eventKey: `${NOTIFICATIONS_CONSTANTS.EVENT_KEY_PREFIXES.POST_MODERATION}:${existing.id}:REJECTED`,
+        metadata: { reason: note },
+      });
 
       await this.adminService.logAudit(
         {
@@ -805,8 +847,8 @@ export class AdminModerationService {
       const note =
         dto.resolutionNote?.trim() ||
         (dto.action === 'RESOLVE'
-          ? 'Báo cáo hợp lệ — Đã xử lý nội dung vi phạm'
-          : 'Bác bỏ báo cáo — Nội dung không vi phạm');
+          ? ADMIN_CONSTANTS.MESSAGES.DEFAULT_RESOLVE_REPORT_NOTE
+          : ADMIN_CONSTANTS.MESSAGES.DEFAULT_DISMISS_REPORT_NOTE);
 
       await tx.contentReport.updateMany({
         where: {
@@ -825,17 +867,34 @@ export class AdminModerationService {
       if (
         dto.action === 'RESOLVE' &&
         dto.rejectTargetPost !== false &&
-        report.targetType === 'POST'
+        report.targetType === ReportTargetType.POST
       ) {
-        await tx.communityPost.updateMany({
+        const targetPost = await tx.communityPost.findUnique({
           where: { id: report.targetId },
-          data: {
-            moderationStatus: PostModerationStatus.REJECTED,
-            moderationNote: note,
-            moderatedAt: now,
-          },
+          select: { id: true, userId: true },
         });
-        await this.syncGroupPostCounts(tx);
+
+        if (targetPost) {
+          await tx.communityPost.updateMany({
+            where: { id: report.targetId },
+            data: {
+              moderationStatus: PostModerationStatus.REJECTED,
+              moderationNote: note,
+              moderatedAt: now,
+            },
+          });
+          await this.syncGroupPostCounts(tx);
+
+          await writeNotification(tx, {
+            recipientId: targetPost.userId,
+            actorId: admin.id,
+            type: NotificationType.POST_REJECTED,
+            targetType: NotificationTargetType.POST,
+            targetId: targetPost.id,
+            eventKey: `${NOTIFICATIONS_CONSTANTS.EVENT_KEY_PREFIXES.POST_MODERATION}:${targetPost.id}:REJECTED`,
+            metadata: { reason: note },
+          });
+        }
       }
 
       await this.adminService.logAudit(

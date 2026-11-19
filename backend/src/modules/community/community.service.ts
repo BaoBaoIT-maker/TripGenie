@@ -10,6 +10,7 @@ import {
 import { PostModerationStatus, UserRole } from '@prisma/client';
 import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
 import { AdminModerationService } from '../admin/admin-moderation.service';
+import { ADMIN_CONSTANTS } from '../admin/admin.constants';
 import {
   COMMUNITY_CONSTANTS,
   CommunitySortMode,
@@ -31,6 +32,7 @@ import {
   CreatorProfileData,
   FeedPageResult,
   ICommunityRepository,
+  PostModerationFields,
   PostReportResult,
   SidebarDiscoveryData,
 } from './interfaces/community-repository.interface';
@@ -70,6 +72,32 @@ export class CommunityService {
           .map((t) => (t.startsWith('#') ? t : `#${t}`)),
       ),
     ).slice(0, COMMUNITY_CONSTANTS.MAX_TAGS_COUNT);
+  }
+
+  private buildModerationText(
+    title: string,
+    caption: string | null,
+    tags: string[],
+  ): string {
+    return [title, caption ?? '', tags.join(' ')].join(' ').trim();
+  }
+
+  /** Posts start hidden (PENDING) only when a moderation pipeline exists to resolve them. */
+  private pendingModerationFields(): PostModerationFields {
+    if (!this.moderationService) return {};
+    return {
+      moderationStatus: PostModerationStatus.PENDING,
+      moderationNote: ADMIN_CONSTANTS.MESSAGES.AI_REVIEWING_NOTE,
+      moderatedAt: null,
+    };
+  }
+
+  /** Fire-and-forget: the user already got their response; evaluatePostAsync handles its own errors. */
+  private scheduleAiModeration(postId: string, text: string): void {
+    if (!this.moderationService) return;
+    setImmediate(() => {
+      void this.moderationService?.evaluatePostAsync(postId, text);
+    });
   }
 
   private slugifyGroupName(input: string): string {
@@ -188,6 +216,7 @@ export class CommunityService {
   async getFeed(
     query: QueryCommunityFeedDto,
     viewerId?: string,
+    viewerRole?: UserRole,
   ): Promise<FeedPageResult> {
     const limit = Math.min(
       Math.max(1, query.limit ?? COMMUNITY_CONSTANTS.DEFAULT_FEED_LIMIT),
@@ -205,15 +234,23 @@ export class CommunityService {
       tag: query.tag?.trim() || undefined,
       search: query.search?.trim() || undefined,
       viewerId,
+      ...(viewerRole ? { viewerRole } : {}),
     });
   }
 
   async getPostById(
     postId: string,
     viewerId?: string,
+    viewerRole?: UserRole,
   ): Promise<CommunityPostView> {
     const post = await this.communityRepository.findPostById(postId, viewerId);
-    if (!post) {
+    // Unreviewed/rejected posts are visible to their author and ADMIN only (404 for everyone else).
+    const isVisible =
+      post &&
+      (post.moderationStatus === PostModerationStatus.APPROVED ||
+        viewerRole === UserRole.ADMIN ||
+        (viewerId !== undefined && post.userId === viewerId));
+    if (!post || !isVisible) {
       throw new NotFoundException(
         'Không tìm thấy bài viết hoặc bài viết đã bị xóa',
       );
@@ -276,26 +313,15 @@ export class CommunityService {
     const resolvedGroupId = await this.resolveTargetGroupId(dto.groupId);
     const trimmedCaption = dto.caption?.trim() || null;
 
-    let moderationFields: {
-      moderationStatus?: PostModerationStatus;
-      moderationNote?: string | null;
-      moderatedAt?: Date | null;
-    } = {};
+    // Tier 1: instant rejection, nothing is written for banned content.
+    const moderationText = this.buildModerationText(
+      trimmedTitle,
+      trimmedCaption,
+      normalizedTags,
+    );
+    this.moderationService?.assertContentAllowedSync(moderationText);
 
-    if (this.moderationService) {
-      const evaluation = await this.moderationService.evaluatePostForCreation({
-        title: trimmedTitle,
-        caption: trimmedCaption,
-        tags: normalizedTags,
-      });
-      moderationFields = {
-        moderationStatus: evaluation.status,
-        moderationNote: evaluation.reason,
-        moderatedAt:
-          evaluation.status === PostModerationStatus.PENDING ? null : new Date(),
-      };
-    }
-
+    // Tier 2: persist as PENDING (hidden from public feed) and respond immediately.
     const created = await this.communityRepository.createPost({
       userId,
       groupId: resolvedGroupId,
@@ -304,13 +330,15 @@ export class CommunityService {
       mediaUrls: sanitizedMediaUrls,
       tags: normalizedTags,
       itineraryId: dto.itineraryId ?? null,
-      ...moderationFields,
+      ...this.pendingModerationFields(),
     });
 
+    this.scheduleAiModeration(created.id, moderationText);
     this.invalidateSidebarCache();
     return created;
   }
 
+  /** Re-moderates on edit so approved content can't be swapped for violating content. */
   async updatePost(
     userId: string,
     userRole: UserRole | undefined,
@@ -332,23 +360,33 @@ export class CommunityService {
     }
 
     const normalizedTags = this.normalizeTags(dto.tags);
+    const trimmedCaption = dto.caption?.trim() || null;
 
     let resolvedGroupId: string | null | undefined = undefined;
     if (dto.groupId !== undefined) {
       resolvedGroupId = await this.resolveTargetGroupId(dto.groupId);
     }
 
+    const moderationText = this.buildModerationText(
+      trimmedTitle,
+      trimmedCaption,
+      normalizedTags,
+    );
+    this.moderationService?.assertContentAllowedSync(moderationText);
+
     const updated = await this.communityRepository.updatePost(
       postId,
       {
         title: trimmedTitle,
-        caption: dto.caption?.trim() || null,
+        caption: trimmedCaption,
         tags: normalizedTags,
         ...(resolvedGroupId !== undefined ? { groupId: resolvedGroupId } : {}),
+        ...this.pendingModerationFields(),
       },
       userId,
     );
 
+    this.scheduleAiModeration(postId, moderationText);
     this.invalidateSidebarCache();
     return updated;
   }
@@ -457,7 +495,7 @@ export class CommunityService {
     }
 
     if (this.moderationService) {
-      this.moderationService.assertCommentAllowedSync(trimmed);
+      this.moderationService.assertContentAllowedSync(trimmed);
     }
 
     const result = await this.communityRepository.createComment({
@@ -519,10 +557,12 @@ export class CommunityService {
   async getCreatorProfile(
     targetUserIdOrUsername: string,
     viewerId?: string,
+    viewerRole?: UserRole,
   ): Promise<CreatorProfileData> {
     const profile = await this.communityRepository.getCreatorProfile(
       targetUserIdOrUsername,
       viewerId,
+      ...(viewerRole ? [viewerRole] : []),
     );
 
     if (!profile) {

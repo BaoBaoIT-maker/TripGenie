@@ -7,7 +7,10 @@ import {
   NotificationListResult,
   QueryNotificationsParams,
 } from './interfaces/notifications-repository.interface';
-import { NOTIFICATIONS_CONSTANTS } from './notifications.constants';
+import {
+  NOTIFICATIONS_CONSTANTS,
+  NOTIFICATIONS_ERRORS,
+} from './notifications.constants';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -23,6 +26,7 @@ interface RawNotificationRow {
   actor_avatar: string | null;
   post_id: string | null;
   post_title: string | null;
+  post_moderation_note: string | null;
   comment_id: string | null;
   itinerary_id: string | null;
   itinerary_title: string | null;
@@ -52,7 +56,7 @@ export class NotificationsRepository implements INotificationsRepository {
       }
       return { createdAt, id };
     } catch {
-      throw new BadRequestException('Cursor phân trang không hợp lệ');
+      throw new BadRequestException(NOTIFICATIONS_ERRORS.INVALID_CURSOR);
     }
   }
 
@@ -67,9 +71,12 @@ export class NotificationsRepository implements INotificationsRepository {
     const a = Prisma.raw(alias);
     return Prisma.sql`
       (
-        (${a}.target_type = 'POST' AND EXISTS (
-          SELECT 1 FROM community_posts p
-          WHERE p.id = ${a}.target_id AND p.deleted_at IS NULL
+        (${a}.target_type = 'POST' AND (
+          ${a}.type IN ('POST_APPROVED', 'POST_FLAGGED', 'POST_REJECTED')
+          OR EXISTS (
+            SELECT 1 FROM community_posts p
+            WHERE p.id = ${a}.target_id AND p.deleted_at IS NULL
+          )
         ))
         OR
         (${a}.target_type = 'COMMENT' AND EXISTS (
@@ -142,6 +149,10 @@ export class NotificationsRepository implements INotificationsRepository {
             ELSE NULL
           END AS post_title,
           CASE
+            WHEN n.target_type = 'POST' THEN COALESCE(n.metadata->>'reason', p.moderation_note)
+            ELSE NULL
+          END AS post_moderation_note,
+          CASE
             WHEN n.target_type = 'COMMENT' THEN c.id
             ELSE NULL
           END AS comment_id,
@@ -197,6 +208,7 @@ export class NotificationsRepository implements INotificationsRepository {
         ? {
             id: r.post_id,
             title: r.post_title ?? '',
+            moderationNote: r.post_moderation_note,
           }
         : null,
       commentId: r.comment_id ?? null,

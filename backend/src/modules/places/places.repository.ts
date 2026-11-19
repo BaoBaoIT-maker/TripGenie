@@ -211,12 +211,42 @@ export class PlacesRepository implements IPlaceRepository {
       LIMIT $${limitIdx} OFFSET $${offsetIdx};
     `;
 
-    const rows = await this.prisma.$queryRawUnsafe<PlaceRow[]>(sql, ...args);
+    const countQuery =
+      areaId !== undefined
+        ? this.prisma.$queryRawUnsafe<{ slug: string; count: number }[]>(
+            `SELECT c.slug, COUNT(p.id)::int AS count
+             FROM places p
+             JOIN categories c ON p.category_id = c.id
+             LEFT JOIN travel_areas a ON p.area_id = a.id
+             LEFT JOIN travel_areas pa ON a.parent_id = pa.id
+             WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
+               AND (p.area_id = $1 OR a.parent_id = $1 OR pa.parent_id = $1)
+             GROUP BY c.slug;`,
+            areaId,
+          )
+        : this.prisma.$queryRawUnsafe<{ slug: string; count: number }[]>(
+            `SELECT c.slug, COUNT(p.id)::int AS count
+             FROM places p
+             JOIN categories c ON p.category_id = c.id
+             WHERE p.status = 'ACTIVE' AND p.deleted_at IS NULL
+             GROUP BY c.slug;`,
+          );
+
+    const [rows, countRows] = await Promise.all([
+      this.prisma.$queryRawUnsafe<PlaceRow[]>(sql, ...args),
+      countQuery,
+    ]);
     const total = rows.length > 0 ? Number(rows[0].full_count) : 0;
+
+    const categoryCounts: Record<string, number> = {};
+    for (const row of countRows) {
+      categoryCounts[row.slug] = Number(row.count);
+    }
 
     return {
       items: rows,
       total,
+      categoryCounts,
     };
   }
 

@@ -2,7 +2,6 @@
 
 import React, { useMemo } from "react";
 import Link from "next/link";
-import { Heart, MessageSquare, Reply, AlertCircle, Loader2, UserPlus, Check, X } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { NotificationFilter, NotificationItem } from "@/types/notification";
@@ -22,6 +21,12 @@ interface NotificationListProps {
   onItemClick?: (item: NotificationItem) => void;
   showDateGroups?: boolean;
 }
+
+const GLYPH_BADGE_BASE =
+  "absolute -bottom-0.5 -right-0.5 z-10 text-[13px] sm:text-[15px] bg-background rounded-full ring-2 ring-background leading-none";
+
+const ACTION_BADGE_BASE =
+  "absolute -bottom-0.5 -right-0.5 z-10 size-3.5 sm:size-4 rounded-full flex items-center justify-center ring-2 ring-background shadow-2xs";
 
 function getDateGroupLabel(isoDate: string): string {
   const d = new Date(isoDate);
@@ -54,7 +59,15 @@ function NotificationRow({
   onClick: (item: NotificationItem) => void;
 }) {
   const isUnread = !item.readAt;
-  const actorName = item.actor?.fullName || NOTIFICATION_CONFIG.ACTOR_FALLBACK_NAME;
+  const isModerationType =
+    item.type === "POST_APPROVED" ||
+    item.type === "POST_FLAGGED" ||
+    item.type === "POST_REJECTED";
+  const actorName =
+    item.actor?.fullName ||
+    (isModerationType
+      ? NOTIFICATION_CONFIG.SYSTEM_ACTOR_NAME
+      : NOTIFICATION_CONFIG.ACTOR_FALLBACK_NAME);
   const postTitle = item.post?.title || "bài viết";
   const tripTitle = item.itinerary?.title || "chuyến đi";
   const targetUrl = item.post?.id
@@ -127,6 +140,38 @@ function NotificationRow({
             </span>
           </>
         );
+      case "POST_APPROVED":
+        return (
+          <>
+            Bài viết{" "}
+            <span className="font-medium text-foreground italic">
+              &ldquo;{postTitle}&rdquo;
+            </span>{" "}
+            {NOTIFICATION_CONFIG.MODERATION_MESSAGES.POST_APPROVED_SUFFIX}
+          </>
+        );
+      case "POST_FLAGGED":
+        return (
+          <>
+            Bài viết{" "}
+            <span className="font-medium text-foreground italic">
+              &ldquo;{postTitle}&rdquo;
+            </span>{" "}
+            {NOTIFICATION_CONFIG.MODERATION_MESSAGES.POST_FLAGGED_SUFFIX}
+            {item.post?.moderationNote ? `: "${item.post.moderationNote}"` : "."}
+          </>
+        );
+      case "POST_REJECTED":
+        return (
+          <>
+            Bài viết{" "}
+            <span className="font-medium text-foreground italic">
+              &ldquo;{postTitle}&rdquo;
+            </span>{" "}
+            {NOTIFICATION_CONFIG.MODERATION_MESSAGES.POST_REJECTED_SUFFIX}
+            {item.post?.moderationNote ? `: "${item.post.moderationNote}"` : "."}
+          </>
+        );
       default:
         return (
           <>
@@ -138,45 +183,59 @@ function NotificationRow({
   };
 
   const renderBadgeIcon = () => {
-    const baseBadge =
-      "absolute -bottom-0.5 -right-0.5 z-10 size-4 sm:size-5 rounded-full flex items-center justify-center shadow-xs ring-2 ring-white dark:ring-slate-900";
-
     switch (item.type) {
-      case "POST_LIKED":
-        return (
-          <div className={cn(baseBadge, "bg-rose-500 text-white")}>
-            <Heart className="size-2.5 sm:size-3 fill-white" />
-          </div>
-        );
-      case "POST_COMMENTED":
-        return (
-          <div className={cn(baseBadge, "bg-primary text-primary-foreground")}>
-            <MessageSquare className="size-2.5 sm:size-3 fill-current" />
-          </div>
-        );
-      case "COMMENT_REPLIED":
-        return (
-          <div className={cn(baseBadge, "bg-[#0068B8] text-white")}>
-            <Reply className="size-2.5 sm:size-3" />
-          </div>
-        );
-      case "TRIP_INVITED":
-        return (
-          <div className={cn(baseBadge, "bg-primary text-primary-foreground")}>
-            <UserPlus className="size-2.5 sm:size-3" />
-          </div>
-        );
+      case "POST_APPROVED":
       case "TRIP_INVITATION_ACCEPTED":
         return (
-          <div className={cn(baseBadge, "bg-emerald-600 text-white")}>
-            <Check className="size-2.5 sm:size-3 stroke-[3]" />
-          </div>
+          <i
+            className={cn(GLYPH_BADGE_BASE, "fa-solid fa-circle-check text-emerald-500 dark:text-emerald-400")}
+            aria-hidden="true"
+          />
+        );
+      case "POST_REJECTED":
+        return (
+          <i
+            className={cn(GLYPH_BADGE_BASE, "fa-solid fa-circle-xmark text-rose-500 dark:text-rose-400")}
+            aria-hidden="true"
+          />
+        );
+      case "POST_FLAGGED":
+        return (
+          <i
+            className={cn(GLYPH_BADGE_BASE, "fa-solid fa-circle-exclamation text-amber-500 dark:text-amber-400")}
+            aria-hidden="true"
+          />
         );
       case "TRIP_INVITATION_DECLINED":
         return (
-          <div className={cn(baseBadge, "bg-muted-foreground text-background")}>
-            <X className="size-2.5 sm:size-3 stroke-[2.5]" />
-          </div>
+          <i
+            className={cn(GLYPH_BADGE_BASE, "fa-solid fa-circle-xmark text-muted-foreground")}
+            aria-hidden="true"
+          />
+        );
+      case "POST_LIKED":
+        return (
+          <span className={cn(ACTION_BADGE_BASE, "bg-rose-500 text-white")}>
+            <i className="fa-solid fa-heart text-[7px] sm:text-[8px]" aria-hidden="true" />
+          </span>
+        );
+      case "POST_COMMENTED":
+        return (
+          <span className={cn(ACTION_BADGE_BASE, "bg-sky-500 text-white")}>
+            <i className="fa-solid fa-comment text-[7px] sm:text-[8px]" aria-hidden="true" />
+          </span>
+        );
+      case "COMMENT_REPLIED":
+        return (
+          <span className={cn(ACTION_BADGE_BASE, "bg-[#0068B8] text-white")}>
+            <i className="fa-solid fa-reply text-[6.5px] sm:text-[7.5px]" aria-hidden="true" />
+          </span>
+        );
+      case "TRIP_INVITED":
+        return (
+          <span className={cn(ACTION_BADGE_BASE, "bg-primary text-primary-foreground")}>
+            <i className="fa-solid fa-user-plus text-[6.5px] sm:text-[7.5px]" aria-hidden="true" />
+          </span>
         );
       default:
         return null;
@@ -200,8 +259,17 @@ function NotificationRow({
             alt={actorName}
             className="object-cover"
           />
-          <AvatarFallback className="bg-primary/10 text-primary font-bold text-xs sm:text-sm">
-            {actorName.charAt(0).toUpperCase()}
+          <AvatarFallback
+            className={cn(
+              "font-bold text-xs sm:text-sm",
+              isModerationType && !item.actor
+                ? "bg-primary text-primary-foreground"
+                : "bg-primary/10 text-primary"
+            )}
+          >
+            {isModerationType && !item.actor
+              ? "TG"
+              : actorName.charAt(0).toUpperCase()}
           </AvatarFallback>
         </Avatar>
         {renderBadgeIcon()}
@@ -291,7 +359,10 @@ export function NotificationList({
   if (isError && items.length === 0) {
     return (
       <div className="p-6 text-center space-y-3">
-        <AlertCircle className="size-8 text-destructive mx-auto" />
+        <i
+          className="fa-solid fa-circle-exclamation text-3xl text-destructive mx-auto block"
+          aria-hidden="true"
+        />
         <p className="text-sm text-muted-foreground">
           Không thể tải danh sách thông báo
         </p>
@@ -359,7 +430,7 @@ export function NotificationList({
           >
             {isFetchingNextPage ? (
               <>
-                <Loader2 className="size-3.5 animate-spin" />
+                <i className="fa-solid fa-spinner animate-spin text-xs" aria-hidden="true" />
                 Đang tải thêm...
               </>
             ) : (

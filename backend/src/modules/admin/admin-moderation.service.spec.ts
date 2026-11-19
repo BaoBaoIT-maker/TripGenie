@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import {
   AuditAction,
+  BannedWordCategory,
   PostModerationStatus,
   ReportStatus,
   ReportTargetType,
@@ -12,17 +13,22 @@ import { BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@/database/prisma.service';
 import { AuthenticatedUser } from '@/common/types';
 import { AdminService } from './admin.service';
+import { BannedWordsService } from './banned-words.service';
 import { AdminModerationService } from './admin-moderation.service';
 import { ADMIN_CONSTANTS, ADMIN_ERROR_CODES } from './admin.constants';
 
-describe('AdminModerationService - Step 5: 3-Tier AI Moderation & Anti-Brigading Reports', () => {
+describe('AdminModerationService - 3-Tier AI Moderation & Anti-Brigading Reports', () => {
   let service: AdminModerationService;
   let mockPrisma: any;
   let mockAdminService: { logAudit: jest.Mock };
+  let mockBannedWordsService: {
+    checkBannedSync: jest.Mock;
+    normalizeForScan: jest.Mock;
+  };
   let mockRedis: { get: jest.Mock; set: jest.Mock };
 
   const mockAdminUser: AuthenticatedUser = {
-    id: 'admin-1',
+    id: '00000000-0000-4000-8000-000000000001',
     email: 'admin@tripgenie.vn',
     username: 'admin',
     fullName: 'Master Admin',
@@ -34,14 +40,25 @@ describe('AdminModerationService - Step 5: 3-Tier AI Moderation & Anti-Brigading
     exp: 9999999999,
   };
 
+  const mockPostId = '11111111-1111-4111-8111-111111111111';
+
   beforeEach(async () => {
     mockPrisma = {
       communityPost: {
         count: jest.fn().mockResolvedValue(0),
         findMany: jest.fn().mockResolvedValue([]),
-        findUnique: jest.fn(),
+        findUnique: jest.fn().mockResolvedValue({
+          id: mockPostId,
+          userId: '55555555-5555-4555-8555-555555555555',
+          title: 'Review Hội An',
+          deletedAt: null,
+          moderationStatus: PostModerationStatus.PENDING,
+        }),
         update: jest.fn(),
         updateMany: jest.fn(),
+      },
+      notification: {
+        upsert: jest.fn().mockResolvedValue({ id: 'notif-1' }),
       },
       contentReport: {
         groupBy: jest.fn().mockResolvedValue([]),
@@ -57,6 +74,12 @@ describe('AdminModerationService - Step 5: 3-Tier AI Moderation & Anti-Brigading
       logAudit: jest.fn().mockResolvedValue({ id: 'audit-1' }),
     };
 
+    mockBannedWordsService = {
+      // Default: nothing is banned
+      checkBannedSync: jest.fn().mockReturnValue({ isBanned: false }),
+      normalizeForScan: jest.fn((t: string) => t.toLowerCase().trim()),
+    };
+
     mockRedis = {
       get: jest.fn().mockResolvedValue('true'),
       set: jest.fn().mockResolvedValue('OK'),
@@ -67,6 +90,7 @@ describe('AdminModerationService - Step 5: 3-Tier AI Moderation & Anti-Brigading
         AdminModerationService,
         { provide: PrismaService, useValue: mockPrisma },
         { provide: AdminService, useValue: mockAdminService },
+        { provide: BannedWordsService, useValue: mockBannedWordsService },
         {
           provide: ConfigService,
           useValue: {
@@ -110,69 +134,20 @@ describe('AdminModerationService - Step 5: 3-Tier AI Moderation & Anti-Brigading
     });
   });
 
-  describe('3-Tier Post Evaluation Funnel (Gatekeeper)', () => {
-    it('Tier 1: should immediately reject posts with hard profanity or gambling spam (including leetspeak)', async () => {
-      const res1 = await service.evaluatePostForCreation({
-        title: 'Tham gia n.h.à c.á.i kubet nhận thưởng',
-        caption: 'Chơi tài xỉu thắng lớn',
-      });
-      expect(res1.status).toBe(PostModerationStatus.REJECTED);
-      expect(res1.tier).toBe('HARD_BLOCKLIST');
-
-      const res2 = await service.evaluatePostForCreation({
-        title: 'What the fuck is this place',
-        caption: 'So bad đ.m',
-      });
-      expect(res2.status).toBe(PostModerationStatus.REJECTED);
-      expect(res2.tier).toBe('HARD_BLOCKLIST');
-    });
-
-    it('Manual Mode (AI OFF): should place clean posts into PENDING manual queue', async () => {
-      mockRedis.get.mockResolvedValue('false');
-
-      const res = await service.evaluatePostForCreation({
-        title: 'Lịch trình khám phá Đà Lạt 3 ngày 2 đêm',
-        caption: 'Chia sẻ các quán cafe đẹp và điểm săn mây tuyệt vời',
+  describe('Tier 1 Sync Gate — assertContentAllowedSync', () => {
+    it('should throw BadRequestException when BannedWordsService flags the content', () => {
+      mockBannedWordsService.checkBannedSync.mockReturnValue({
+        isBanned: true,
+        matchedWord: 'cờ bạc',
+        category: BannedWordCategory.GAMBLING,
       });
 
-      expect(res.status).toBe(PostModerationStatus.PENDING);
-      expect(res.tier).toBe('MANUAL_QUEUE');
-    });
-
-    it('Tier 2 Fast Clean (AI ON): should auto-approve clean travel posts with 0 AI tokens', async () => {
-      mockRedis.get.mockResolvedValue('true');
-
-      const res = await service.evaluatePostForCreation({
-        title: 'Lịch trình khám phá Phú Quốc 4N3Đ tự túc',
-        caption: 'Bãi Sao nước trong vắt, hải sản tươi ngon, người dân thân thiện',
-        tags: ['#PhuQuoc', '#DuLichTuTuc'],
-      });
-
-      expect(res.status).toBe(PostModerationStatus.APPROVED);
-      expect(res.tier).toBe('FAST_CLEAN');
-    });
-
-    it('Tier 3 Suspicious Trigger (AI ON + Mock Key Fallback): should flag ambiguous posts for Admin review', async () => {
-      mockRedis.get.mockResolvedValue('true');
-
-      const res = await service.evaluatePostForCreation({
-        title: 'Cảnh báo lừa đảo đặt cọc phòng khách sạn qua Zalo',
-        caption: 'Mọi người cẩn thận đừng chuyển khoản cọc trước nhé',
-      });
-
-      expect(res.status).toBe(PostModerationStatus.FLAGGED);
-      expect(res.tier).toBe('FALLBACK_FLAGGED');
-    });
-  });
-
-  describe('TikTok-Style Comment Moderation (Sync Door Guard + Async Post-Moderation)', () => {
-    it('assertCommentAllowedSync should block hard profanity/gambling at the door', () => {
       expect(() =>
-        service.assertCommentAllowedSync('Web cá độ tài xỉu uy tín nhất'),
+        service.assertContentAllowedSync('Tham gia n.h.à c.á.i kubet nhận thưởng'),
       ).toThrow(BadRequestException);
 
       try {
-        service.assertCommentAllowedSync('Đồ chó đẻ vcl');
+        service.assertContentAllowedSync('Đồ chó đẻ vcl');
         fail('Should have thrown BadRequestException');
       } catch (err: any) {
         expect(err.getResponse().code).toBe(
@@ -181,14 +156,105 @@ describe('AdminModerationService - Step 5: 3-Tier AI Moderation & Anti-Brigading
       }
     });
 
-    it('assertCommentAllowedSync should allow normal and ambiguous comments through with 0ms delay', () => {
+    it('should pass clean and ambiguous content through (no throw)', () => {
+      mockBannedWordsService.checkBannedSync.mockReturnValue({ isBanned: false });
+
       expect(() =>
-        service.assertCommentAllowedSync('Lịch trình chi tiết quá, cảm ơn bạn!'),
+        service.assertContentAllowedSync('Lịch trình chi tiết quá, cảm ơn bạn!'),
       ).not.toThrow();
 
       expect(() =>
-        service.assertCommentAllowedSync('Quán này ngon chết mê, không chặt chém!'),
+        service.assertContentAllowedSync('Quán này ngon chết mê, không chặt chém!'),
       ).not.toThrow();
+    });
+  });
+
+  describe('Tier 3 — evaluatePostAsync (async background moderation)', () => {
+    it('AI OFF: post stays PENDING with manual queue note', async () => {
+      mockRedis.get.mockResolvedValue('false');
+
+      let capturedData: any;
+      mockPrisma.$transaction.mockImplementation(async (cb: any) => {
+        const mockTx = {
+          communityPost: {
+            updateMany: jest.fn().mockImplementation(({ data }: any) => {
+              capturedData = data;
+              return { count: 1 };
+            }),
+          },
+          notification: {
+            upsert: jest.fn().mockResolvedValue({ id: 'notif-1' }),
+          },
+          $executeRaw: jest.fn().mockResolvedValue(1),
+        };
+        return cb(mockTx);
+      });
+
+      await service.evaluatePostAsync(mockPostId, 'Lịch trình Đà Lạt 3N2Đ');
+
+      expect(capturedData.moderationStatus).toBe(PostModerationStatus.PENDING);
+      expect(capturedData.moderationNote).toBe(
+        ADMIN_CONSTANTS.MESSAGES.PENDING_MANUAL_MODERATION_NOTE,
+      );
+    });
+
+    it('AI ON (mock_key → fail-closed): post is FLAGGED for human review', async () => {
+      mockRedis.get.mockResolvedValue('true');
+
+      let capturedData: any;
+      mockPrisma.$transaction.mockImplementation(async (cb: any) => {
+        const mockTx = {
+          communityPost: {
+            updateMany: jest.fn().mockImplementation(({ data }: any) => {
+              capturedData = data;
+              return { count: 1 };
+            }),
+          },
+          notification: {
+            upsert: jest.fn().mockResolvedValue({ id: 'notif-1' }),
+          },
+          $executeRaw: jest.fn().mockResolvedValue(1),
+        };
+        return cb(mockTx);
+      });
+
+      // mock_key causes evaluateWithGemini → aiUnavailableResult → FLAGGED
+      await service.evaluatePostAsync(
+        mockPostId,
+        'Cảnh báo lừa đảo đặt cọc phòng khách sạn qua Zalo',
+      );
+
+      expect(capturedData.moderationStatus).toBe(PostModerationStatus.FLAGGED);
+      expect(capturedData.moderationNote).toBe(
+        ADMIN_CONSTANTS.MESSAGES.AI_UNAVAILABLE_NOTE,
+      );
+    });
+
+    it('should not overwrite a post that was already reviewed (admin decision wins)', async () => {
+      mockRedis.get.mockResolvedValue('false');
+
+      let updateManyCallCount = 0;
+      mockPrisma.$transaction.mockImplementation(async (cb: any) => {
+        const mockTx = {
+          communityPost: {
+            // count: 0 → admin already acted, updateMany skips sync
+            updateMany: jest.fn().mockImplementation(() => {
+              updateManyCallCount++;
+              return { count: 0 }; // 0 rows updated: post not in PENDING state
+            }),
+          },
+          $executeRaw: jest.fn().mockResolvedValue(1),
+        };
+        return cb(mockTx);
+      });
+
+      await service.evaluatePostAsync(
+        '22222222-2222-4222-8222-222222222222',
+        'some text',
+      );
+
+      // updateMany was called with moderationStatus: PENDING filter, found 0 rows — correct
+      expect(updateManyCallCount).toBe(1);
     });
   });
 
@@ -197,30 +263,35 @@ describe('AdminModerationService - Step 5: 3-Tier AI Moderation & Anti-Brigading
       const mockTx = {
         communityPost: {
           findUnique: jest.fn().mockResolvedValue({
-            id: 'post-1',
+            id: mockPostId,
+            userId: '55555555-5555-4555-8555-555555555555',
             title: 'Review Hội An',
             moderationStatus: PostModerationStatus.PENDING,
             moderationNote: null,
             deletedAt: null,
           }),
           update: jest.fn().mockResolvedValue({
-            id: 'post-1',
+            id: mockPostId,
+            userId: '55555555-5555-4555-8555-555555555555',
             title: 'Review Hội An',
             moderationStatus: PostModerationStatus.APPROVED,
           }),
+        },
+        notification: {
+          upsert: jest.fn().mockResolvedValue({ id: 'notif-1' }),
         },
         $executeRaw: jest.fn().mockResolvedValue(1),
       };
       mockPrisma.$transaction.mockImplementation(async (cb: any) => cb(mockTx));
 
-      const result = await service.approvePost(mockAdminUser, 'post-1', {
+      const result = await service.approvePost(mockAdminUser, mockPostId, {
         reason: 'Nội dung tốt',
       });
 
       expect(result.success).toBe(true);
       expect(mockTx.communityPost.update).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: 'post-1' },
+          where: { id: mockPostId },
           data: expect.objectContaining({
             moderationStatus: PostModerationStatus.APPROVED,
           }),

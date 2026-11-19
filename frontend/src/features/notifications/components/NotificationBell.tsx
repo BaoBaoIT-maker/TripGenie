@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
-import { Bell, CheckCheck, X } from "lucide-react";
 import { useAuth } from "@/features/auth/hooks/use-auth";
-import type { NotificationFilter } from "@/types/notification";
+import type { NotificationFilter, NotificationItem } from "@/types/notification";
 import { NOTIFICATION_CONFIG } from "../config/notification.config";
 import {
   useNotifications,
@@ -60,10 +59,22 @@ export function NotificationBell() {
 
   if (!user) return null;
 
-  const items = listData?.pages.flatMap((page) => page.items) ?? [];
+  const items = useMemo(() => {
+    if (!listData?.pages) return [];
+    const map = new Map<string, NotificationItem>();
+    for (const page of listData.pages) {
+      for (const item of page.items) {
+        if (!map.has(item.id)) {
+          map.set(item.id, item);
+        }
+      }
+    }
+    return Array.from(map.values());
+  }, [listData]);
 
   const handleMarkAll = () => {
     if (unreadCount > 0 && !markAllMutation.isPending) {
+      setFilter("ALL");
       markAllMutation.mutate();
     }
   };
@@ -89,7 +100,10 @@ export function NotificationBell() {
         }
         className="relative min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full text-foreground/80 hover:text-foreground hover:bg-muted/70 transition-colors cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40"
       >
-        <Bell className="size-5" />
+        <i
+          className={`${unreadCount > 0 ? "fa-solid" : "fa-regular"} fa-bell text-[18px]`}
+          aria-hidden="true"
+        />
         {badgeText && (
           <span className="absolute top-1.5 right-1.5 inline-flex items-center justify-center px-1.5 min-w-[18px] h-[18px] text-[10px] font-bold text-white bg-rose-500 rounded-full shadow-xs">
             {badgeText}
@@ -129,9 +143,9 @@ export function NotificationBell() {
                   onClick={handleMarkAll}
                   disabled={unreadCount === 0 || markAllMutation.isPending}
                   title="Đánh dấu tất cả đã đọc"
-                  className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-primary hover:text-primary/80 hover:bg-primary/5 rounded-md disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-semibold text-primary hover:text-primary/80 hover:bg-primary/5 rounded-md disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                 >
-                  <CheckCheck className="size-3.5" />
+                  <i className="fa-solid fa-check-double text-[11px]" aria-hidden="true" />
                   <span>Đã đọc tất cả</span>
                 </button>
                 <button
@@ -140,7 +154,7 @@ export function NotificationBell() {
                   className="p-1 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden cursor-pointer"
                   aria-label="Đóng thông báo"
                 >
-                  <X className="size-4" />
+                  <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
                 </button>
               </div>
             </div>

@@ -54,6 +54,7 @@ import ItineraryTimeline from './ItineraryTimeline';
 import { MobileItineraryMapCarousel, type MobileItineraryStop } from './MobileItineraryMapCarousel';
 import { ModalCopilotAssist } from './ModalCopilotAssist';
 import PlaceAlternativesModal from './PlaceAlternativesModal';
+import { LodgingPickerDialog } from './LodgingPickerDialog';
 import { TourBriefingBanner } from './TourBriefingBanner';
 import { TourBriefingPrintModal } from './TourBriefingPrintModal';
 import {
@@ -157,6 +158,7 @@ export default function ItineraryView({ id }: Props) {
   const [editingDestination, setEditingDestination] = useState<ItineraryActivity | null>(null);
   const [selectedActivityForSwap, setSelectedActivityForSwap] = useState<ItineraryActivity | null>(null);
   const [placeSearchState, setPlaceSearchState] = useState<PlaceSearchModalState | null>(null);
+  const [lodgingPickerNight, setLodgingPickerNight] = useState<number | null>(null);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [wizardPrefilledDestination, setWizardPrefilledDestination] = useState('');
 
@@ -242,9 +244,27 @@ export default function ItineraryView({ id }: Props) {
 
     async function computeDailySegments() {
       const dayInputs = visibleDays.map((day) => {
-        const coords: Coordinate[] = day.activities
+        const stopCoords: Coordinate[] = day.activities
           .filter((a): a is ItineraryActivity => a.latitude != null && a.longitude != null)
           .map((a) => ({ latitude: Number(a.latitude), longitude: Number(a.longitude) }));
+
+        const lodgingCoord: Coordinate | null =
+          day.lodging &&
+          Number.isFinite(Number(day.lodging.latitude)) &&
+          Number.isFinite(Number(day.lodging.longitude))
+            ? {
+                latitude: Number(day.lodging.latitude),
+                longitude: Number(day.lodging.longitude),
+              }
+            : null;
+
+        const coords: Coordinate[] = [
+          ...(lodgingCoord && stopCoords.length > 0 ? [lodgingCoord] : []),
+          ...stopCoords,
+          ...(lodgingCoord && !day.lodging?.isCheckOutDay && stopCoords.length > 0
+            ? [lodgingCoord]
+            : []),
+        ];
 
         const unique: Coordinate[] = [];
         for (const c of coords) {
@@ -299,8 +319,43 @@ export default function ItineraryView({ id }: Props) {
     const colors: Record<string, string> = {};
     const places: DiscoveryPlace[] = [];
 
+    const addedLodgingIds = new Set<string>();
     visibleDays.forEach((d) => {
       const dayColor = getDayColor(d.dayNumber);
+      if (
+        d.lodging &&
+        !addedLodgingIds.has(d.lodging.placeId) &&
+        Number.isFinite(Number(d.lodging.latitude)) &&
+        Number.isFinite(Number(d.lodging.longitude))
+      ) {
+        addedLodgingIds.add(d.lodging.placeId);
+        labels[d.lodging.placeId] = 'H';
+        colors[d.lodging.placeId] = '#0194F3';
+        places.push({
+          id: d.lodging.placeId,
+          slug: d.lodging.placeId,
+          name: d.lodging.name,
+          category: 'stay',
+          categoryLabel: 'Chỗ lưu trú',
+          areaSlug: '',
+          areaName: data?.destination || '',
+          address: d.lodging.address ?? '',
+          latitude: Number(d.lodging.latitude),
+          longitude: Number(d.lodging.longitude),
+          rating: d.lodging.ratingAvg ?? null,
+          reviewCount: d.lodging.reviewCount ?? 0,
+          priceLevel: d.lodging.priceLevel
+            ? (PRICE_LEVEL_NUMERIC[d.lodging.priceLevel] ?? 2)
+            : null,
+          isOpenNow: true,
+          primaryImage: d.lodging.imageUrl,
+          images: d.lodging.imageUrl ? [d.lodging.imageUrl] : [],
+          phone: null,
+          website: null,
+          openingHours: null,
+          tags: [],
+        });
+      }
       d.activities.forEach((a) => {
         if (a.latitude != null && a.longitude != null) {
           labels[a.placeId] = String(counter++);
@@ -1005,6 +1060,9 @@ export default function ItineraryView({ id }: Props) {
                   onProposeNewForDay={isMemberOrOwner ? handleProposeNewForDay : undefined}
                   pendingProposalCountByStop={pendingProposalCountByStop}
                   onOpenVotingTab={isMemberOrOwner ? () => setActiveTab('voting') : undefined}
+                  onOpenLodgingPicker={
+                    canEdit ? (night) => setLodgingPickerNight(night) : undefined
+                  }
                 />
               </div>
 
@@ -1435,6 +1493,18 @@ export default function ItineraryView({ id }: Props) {
           setSelectedActivityForSwap(null);
         }}
         onAskCopilot={handleAskCopilotFromModal}
+      />
+
+      {/* Lodging Picker Dialog */}
+      <LodgingPickerDialog
+        open={lodgingPickerNight !== null}
+        onClose={() => setLodgingPickerNight(null)}
+        itineraryId={id}
+        initialNight={lodgingPickerNight ?? 1}
+        totalNights={totalNights}
+        budgetLevel={data.budgetLevel}
+        destinationCity={data.destination}
+        days={days}
       />
 
       {/* New Trip Wizard Modal */}

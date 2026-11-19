@@ -6,6 +6,7 @@ import {
   useQuery,
   useQueryClient,
   InfiniteData,
+  QueryClient,
 } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
@@ -27,6 +28,7 @@ import type {
 } from "@/types/community";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { ApiClientError } from "@/lib/api-client";
+import { COMMUNITY_CONFIG } from "../config/community.config";
 
 export const COMMUNITY_QUERY_KEYS = {
   all: ["community"] as const,
@@ -57,6 +59,64 @@ function updatePostInFeedPages(
       ),
     })),
   };
+}
+
+function removePostFromFeedPages(
+  oldData: InfiniteData<CommunityFeedResponse> | undefined,
+  postId: string
+): InfiniteData<CommunityFeedResponse> | undefined {
+  if (!oldData) return oldData;
+  return {
+    ...oldData,
+    pages: oldData.pages.map((page) => ({
+      ...page,
+      items: page.items.filter((item) => item.id !== postId),
+    })),
+  };
+}
+
+function scheduleModerationOutcomeCheck(
+  queryClient: QueryClient,
+  postId: string
+): void {
+  setTimeout(async () => {
+    try {
+      const res = await communityService.getPostById(postId);
+      const latest = res?.post;
+      if (!latest) return;
+
+      queryClient.setQueriesData<InfiniteData<CommunityFeedResponse>>(
+        { queryKey: ["community", "feed"] },
+        (old) => updatePostInFeedPages(old, postId, () => latest)
+      );
+
+      if (latest.moderationStatus === "APPROVED") {
+        toast.success(COMMUNITY_CONFIG.MESSAGES.MODERATION_APPROVED);
+      } else if (latest.moderationStatus === "FLAGGED") {
+        toast.warning(
+          latest.moderationNote ||
+            COMMUNITY_CONFIG.MESSAGES.MODERATION_FLAGGED_FALLBACK
+        );
+      } else if (latest.moderationStatus === "REJECTED") {
+        toast.error(
+          `${COMMUNITY_CONFIG.MESSAGES.MODERATION_REJECTED_PREFIX}: ${
+            latest.moderationNote ||
+            COMMUNITY_CONFIG.MESSAGES.MODERATION_REJECTED_FALLBACK
+          }`
+        );
+      }
+    } catch (err) {
+      if (err instanceof ApiClientError && err.statusCode === 404) {
+        queryClient.setQueriesData<InfiniteData<CommunityFeedResponse>>(
+          { queryKey: ["community", "feed"] },
+          (old) => removePostFromFeedPages(old, postId)
+        );
+        toast.error(COMMUNITY_CONFIG.MESSAGES.POST_NOT_FOUND_OR_DELETED);
+      }
+    } finally {
+      queryClient.invalidateQueries({ queryKey: COMMUNITY_QUERY_KEYS.all });
+    }
+  }, COMMUNITY_CONFIG.MODERATION_CHECK_DELAY_MS);
 }
 
 export function useCommunitySidebarDiscovery(
@@ -208,12 +268,51 @@ export function useCreateCommunityPost() {
   return useMutation({
     mutationFn: (payload: CreateCommunityPostPayload) =>
       communityService.createPost(payload),
-    onSuccess: () => {
-      toast.success("Đã đăng bài chia sẻ lên cộng đồng!");
-      queryClient.invalidateQueries({ queryKey: COMMUNITY_QUERY_KEYS.all });
+    onSuccess: (data) => {
+      const newPost = data?.post;
+      if (!newPost) return;
+
+      // Post-response injection: hiển thị ngay trên đầu bảng tin cho tác giả và Admin.
+      queryClient.setQueriesData<InfiniteData<CommunityFeedResponse>>(
+        { queryKey: ["community", "feed"] },
+        (old) => {
+          if (!old) return old;
+          const firstPage = old.pages[0];
+          if (firstPage?.items.some((p) => p.id === newPost.id)) return old;
+          return {
+            ...old,
+            pages: [
+              { ...firstPage, items: [newPost, ...(firstPage?.items ?? [])] },
+              ...old.pages.slice(1),
+            ],
+          };
+        }
+      );
+
+      queryClient.setQueriesData<CreatorProfileData>(
+        { queryKey: ["community", "creator"] },
+        (old) => {
+          if (!old || old.user.id !== newPost.userId) return old;
+          if (old.posts.some((p) => p.id === newPost.id)) return old;
+          return {
+            ...old,
+            posts: [newPost, ...old.posts],
+          };
+        }
+      );
+
+      if (newPost.moderationStatus === "PENDING") {
+        toast.info(COMMUNITY_CONFIG.MESSAGES.POST_CREATED_PENDING, {
+          duration: COMMUNITY_CONFIG.INFO_TOAST_DURATION_MS,
+        });
+        scheduleModerationOutcomeCheck(queryClient, newPost.id);
+      } else {
+        toast.success(COMMUNITY_CONFIG.MESSAGES.POST_CREATED_SUCCESS);
+        queryClient.invalidateQueries({ queryKey: COMMUNITY_QUERY_KEYS.all });
+      }
     },
     onError: (err: Error) => {
-      toast.error(err.message || "Không thể đăng bài viết");
+      toast.error(err.message || COMMUNITY_CONFIG.MESSAGES.ERROR_CREATE_POST);
     },
   });
 }
@@ -229,12 +328,28 @@ export function useUpdateCommunityPost() {
       postId: string;
       payload: UpdateCommunityPostPayload;
     }) => communityService.updatePost(postId, payload),
-    onSuccess: () => {
-      toast.success("Đã cập nhật bài viết!");
-      queryClient.invalidateQueries({ queryKey: COMMUNITY_QUERY_KEYS.all });
+    onSuccess: (data, { postId }) => {
+      const updatedPost = data?.post;
+      queryClient.setQueriesData<InfiniteData<CommunityFeedResponse>>(
+        { queryKey: ["community", "feed"] },
+        (old) =>
+          updatePostInFeedPages(old, postId, (post) =>
+            updatedPost
+              ? { ...post, ...updatedPost }
+              : {
+                  ...post,
+                  moderationStatus: "PENDING" as const,
+                  moderationNote: COMMUNITY_CONFIG.MESSAGES.AI_REVIEWING_NOTE,
+                }
+          )
+      );
+      toast.info(COMMUNITY_CONFIG.MESSAGES.POST_UPDATED_PENDING, {
+        duration: COMMUNITY_CONFIG.INFO_TOAST_DURATION_MS,
+      });
+      scheduleModerationOutcomeCheck(queryClient, postId);
     },
     onError: (err: Error) => {
-      toast.error(err.message || "Không thể cập nhật bài viết");
+      toast.error(err.message || COMMUNITY_CONFIG.MESSAGES.ERROR_UPDATE_POST);
     },
   });
 }
@@ -244,11 +359,28 @@ export function useDeleteCommunityPost() {
 
   return useMutation({
     mutationFn: (postId: string) => communityService.deletePost(postId),
+    onMutate: async (postId: string) => {
+      await queryClient.cancelQueries({ queryKey: ["community", "feed"] });
+      // Snapshot + optimistic remove
+      const previousFeeds = queryClient.getQueriesData<
+        InfiniteData<CommunityFeedResponse>
+      >({ queryKey: ["community", "feed"] });
+
+      queryClient.setQueriesData<InfiniteData<CommunityFeedResponse>>(
+        { queryKey: ["community", "feed"] },
+        (old) => removePostFromFeedPages(old, postId)
+      );
+      return { previousFeeds };
+    },
     onSuccess: () => {
-      toast.success("Đã xóa bài viết");
+      toast.success("Bài viết đã được xóa vĩnh viễn.");
       queryClient.invalidateQueries({ queryKey: COMMUNITY_QUERY_KEYS.all });
     },
-    onError: (err: Error) => {
+    onError: (err: Error, _postId, context) => {
+      // Rollback
+      context?.previousFeeds?.forEach(([queryKey, data]) => {
+        queryClient.setQueryData(queryKey, data);
+      });
       toast.error(err.message || "Không thể xóa bài viết");
     },
   });

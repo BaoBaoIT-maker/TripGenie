@@ -35,6 +35,7 @@ export interface PlaceFilterParams {
   amenities?: string[] | string;
   city?: string;
   areaId?: number;
+  areaSlug?: string;
   suitableFor?: SuitableAudience;
   minRating?: number;
   budgetLevels?: string[] | string;
@@ -62,6 +63,7 @@ export interface PaginatedPlacesResult {
   totalPages: number;
   geocoded?: GeocodedLocation;
   isFallback?: boolean;
+  categoryCounts?: Record<string, number>;
 }
 
 
@@ -274,6 +276,7 @@ export const placeService = {
 
       if (params?.keyword?.trim()) searchParams.set("keyword", params.keyword.trim());
       if (params?.areaId) searchParams.set("areaId", String(params.areaId));
+      if (params?.areaSlug?.trim()) searchParams.set("areaSlug", params.areaSlug.trim());
       if (params?.suitableFor) searchParams.set("suitableFor", params.suitableFor);
 
       if (params?.categorySlugs) {
@@ -324,6 +327,7 @@ export const placeService = {
         meta: { totalItems: number; page: number; limit: number; totalPages: number };
         geocoded?: GeocodedLocation;
         isFallback?: boolean;
+        categoryCounts?: Record<string, number>;
       }>(`/places/search?${cacheKey}`);
 
       const rawItems = Array.isArray(payload.items) ? payload.items : [];
@@ -346,6 +350,7 @@ export const placeService = {
         totalPages: meta.totalPages,
         geocoded: payload.geocoded,
         isFallback: payload.isFallback,
+        categoryCounts: payload.categoryCounts,
       };
 
       SEARCH_CACHE.set(cacheKey, { data: result, timestamp: Date.now() });

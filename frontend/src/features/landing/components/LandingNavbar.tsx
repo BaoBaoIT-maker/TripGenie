@@ -18,7 +18,7 @@ const NAV_LINKS = [
 ];
 
 export function LandingNavbar() {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const openAuthModal = useAuthModalStore((state) => state.openAuthModal);
 
   return (
@@ -61,7 +61,13 @@ export function LandingNavbar() {
 
       {/* Action area: User controls when logged in, Auth buttons when logged out */}
       <div className="flex items-center justify-end gap-2 sm:gap-3">
-        {user ? (
+        {isLoading ? (
+          <div className="flex items-center gap-1.5 sm:gap-2.5">
+            <div className="hidden sm:block size-10 rounded-xl bg-white/10 animate-pulse" />
+            <div className="size-9 sm:size-9.5 rounded-full bg-white/20 animate-pulse border border-white/20 shadow-xs" />
+            <MobileNavSheet triggerVariant="transparent" />
+          </div>
+        ) : user ? (
           <div className="flex items-center gap-1.5 sm:gap-2.5">
             {/* Nút Bộ sưu tập - Hiện trên tablet+ */}
             <Link href="/collections" className="hidden sm:inline-flex">

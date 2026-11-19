@@ -82,7 +82,12 @@ export class PlacesService {
     const parsed = rawKeyword ? parseSearchQuery(rawKeyword) : null;
 
     let effectiveAreaId = dto.areaId;
-    if (!effectiveAreaId && parsed?.areaName) {
+    if (!effectiveAreaId && dto.areaSlug) {
+      const area = await this.placeRepo.findAreaByName(dto.areaSlug);
+      if (area) {
+        effectiveAreaId = area.id;
+      }
+    } else if (!effectiveAreaId && parsed?.areaName) {
       const area = await this.placeRepo.findAreaByName(parsed.areaName);
       if (area) {
         effectiveAreaId = area.id;
@@ -108,6 +113,7 @@ export class PlacesService {
 
         const spatialDto: SearchPlacesDto = {
           ...dto,
+          areaId: effectiveAreaId,
           lat: landmark.lat,
           lng: landmark.lng,
           radiusMeters: effectiveRadius,
@@ -118,7 +124,7 @@ export class PlacesService {
           limit,
         };
 
-        const { items: rawItems, total: dbTotal } =
+        const { items: rawItems, total: dbTotal, categoryCounts } =
           await this.placeRepo.searchPlaces(spatialDto);
         const items = rawItems.map((row) => this.mapToPlaceItemDto(row));
         return {
@@ -130,6 +136,7 @@ export class PlacesService {
             totalPages: Math.ceil(dbTotal / limit) || 1,
           },
           geocoded: landmark,
+          categoryCounts,
         };
       }
     }
@@ -162,7 +169,7 @@ export class PlacesService {
     };
 
     const openNowOnly = dto.openNow === true;
-    const { items: rawItems, total: dbTotal } =
+    const { items: rawItems, total: dbTotal, categoryCounts } =
       await this.placeRepo.searchPlaces(
         openNowOnly
           ? { ...searchFilters, page: 1, limit: OPEN_NOW_SCAN_LIMIT }
@@ -189,6 +196,7 @@ export class PlacesService {
           limit,
           totalPages: Math.ceil(totalItems / limit) || 1,
         },
+        categoryCounts,
       };
     }
 
@@ -198,6 +206,7 @@ export class PlacesService {
       return {
         items: [],
         meta: { totalItems: 0, page: 1, limit, totalPages: 0 },
+        categoryCounts,
       };
     }
 
@@ -209,6 +218,7 @@ export class PlacesService {
           items: [],
           meta: { totalItems: 0, page: 1, limit, totalPages: 0 },
           geocoded,
+          categoryCounts,
         };
       }
     }
@@ -230,10 +240,11 @@ export class PlacesService {
         items: semantic,
         meta: { totalItems: semantic.length, page: 1, limit, totalPages: 1 },
         isFallback: true,
+        categoryCounts,
       };
     }
 
-    return { items: [], meta: { totalItems: 0, page, limit, totalPages: 0 } };
+    return { items: [], meta: { totalItems: 0, page, limit, totalPages: 0 }, categoryCounts };
   }
 
   /**

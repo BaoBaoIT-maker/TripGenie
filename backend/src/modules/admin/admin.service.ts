@@ -39,7 +39,7 @@ import { ADMIN_CONSTANTS, ADMIN_ERRORS } from './admin.constants';
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private resolvePagination(query: { page?: number; limit?: number }) {
+  resolvePagination(query: { page?: number; limit?: number }) {
     const page = Math.max(query.page ?? 1, 1);
     const limit = Math.min(
       Math.max(query.limit ?? ADMIN_CONSTANTS.PAGINATION.DEFAULT_LIMIT, 1),
@@ -49,7 +49,7 @@ export class AdminService {
     return { page, limit, skip };
   }
 
-  private buildPaginatedResponse<T>(
+  buildPaginatedResponse<T>(
     items: T[],
     total: number,
     page: number,

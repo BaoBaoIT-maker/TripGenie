@@ -76,6 +76,10 @@ export class SearchPlacesDto {
   areaId?: number;
 
   @IsOptional()
+  @IsString()
+  areaSlug?: string;
+
+  @IsOptional()
   @Transform(transformStringArray)
   @IsArray()
   @IsString({ each: true })

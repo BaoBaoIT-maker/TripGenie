@@ -82,6 +82,8 @@ export class PaginatedPlacesResponseDto {
   geocoded?: GeocodedLocationDto;
   /** True when items are semantic fallback results, not exact keyword matches. */
   isFallback?: boolean;
+  /** Facet aggregation counts by category slug for the selected area. */
+  categoryCounts?: Record<string, number>;
 }
 
 export class CategoryItemDto {

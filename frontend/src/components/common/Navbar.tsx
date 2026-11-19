@@ -21,7 +21,7 @@ const NAV_LINKS = [
 
 export function Navbar() {
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const openAuthModal = useAuthModalStore((state) => state.openAuthModal);
 
   return (
@@ -73,7 +73,13 @@ export function Navbar() {
 
         {/* Cột 3: User controls / Auth actions căn sát lề phải */}
         <div className="flex items-center justify-end gap-2 sm:gap-3">
-          {user ? (
+          {isLoading ? (
+            <div className="flex items-center gap-1.5 sm:gap-2.5">
+              <div className="hidden sm:block size-10 rounded-xl bg-slate-100 animate-pulse" />
+              <div className="size-9 sm:size-9.5 rounded-full bg-slate-200/70 animate-pulse border border-slate-200/80" />
+              <MobileNavSheet triggerVariant="light" />
+            </div>
+          ) : user ? (
             <div className="flex items-center gap-1.5 sm:gap-2.5">
               {/* Nút Bộ sưu tập - Hiện từ tablet trở lên */}
               <Link href="/collections" className="hidden sm:inline-flex">

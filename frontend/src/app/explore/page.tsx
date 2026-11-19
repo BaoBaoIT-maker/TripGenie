@@ -414,6 +414,7 @@ function ExploreContent() {
   const [totalCount, setTotalCount] = useState(0);
   const [places, setPlaces] = useState<Place[]>([]);
   const [loading, setLoading] = useState(true);
+  const [categoryCounts, setCategoryCounts] = useState<Record<string, number>>({});
 
   // Geocoded Pin (Coordinates / Address search) & Fallback indicator
   const [geocodedLocation, setGeocodedLocation] = useState<GeocodedLocation | null>(null);
@@ -453,8 +454,16 @@ function ExploreContent() {
       filterChanged = true;
     }
 
-    const nextAreaId = parsedQuery.areaId || "all";
-    if (selectedAreaId !== nextAreaId) {
+    let nextAreaId: number | "all" = "all";
+    if (parsedQuery.areaId) {
+      nextAreaId = parsedQuery.areaId;
+    } else if (parsedQuery.areaSlug && travelAreas.length > 0) {
+      const matched = travelAreas.find(
+        (a) => a.slug === parsedQuery.areaSlug || String(a.id) === parsedQuery.areaSlug
+      );
+      if (matched) nextAreaId = matched.id;
+    }
+    if (selectedAreaId !== nextAreaId && (nextAreaId !== "all" || !parsedQuery.areaSlug)) {
       setSelectedAreaId(nextAreaId);
       filterChanged = true;
     }
@@ -570,6 +579,14 @@ function ExploreContent() {
         const areas = await placeService.getTravelAreas();
         if (active && areas && areas.length > 0) {
           setTravelAreas(areas);
+          if (parsedQuery.areaSlug) {
+            const matched = areas.find(
+              (a) => a.slug === parsedQuery.areaSlug || String(a.id) === parsedQuery.areaSlug
+            );
+            if (matched) {
+              setSelectedAreaId(matched.id);
+            }
+          }
         }
       } catch (err) {
         console.warn("Could not load travel areas:", err);
@@ -579,7 +596,7 @@ function ExploreContent() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [parsedQuery.areaSlug]);
 
   // Fetch places using unified search (with automatic NLP fallback in backend)
   const fetchPlaces = useCallback(async () => {
@@ -593,6 +610,10 @@ function ExploreContent() {
 
     try {
       const areaId = !useGpsSearch && !pinNearbyCenter && selectedAreaId !== "all" ? selectedAreaId : undefined;
+      const areaSlug =
+        !useGpsSearch && !pinNearbyCenter && areaId === undefined && parsedQuery.areaSlug
+          ? parsedQuery.areaSlug
+          : undefined;
       const categorySlugs =
         activeSuperCategory.slugs.length > 0 ? activeSuperCategory.slugs : undefined;
 
@@ -612,6 +633,7 @@ function ExploreContent() {
       const res = await placeService.searchPlaces({
         keyword: keyword.trim() || undefined,
         areaId,
+        areaSlug,
         categorySlugs,
         minRating: minRating || undefined,
         budgetLevels: selectedBudgetLevel ? [selectedBudgetLevel] : undefined,
@@ -668,6 +690,9 @@ function ExploreContent() {
       setPlaces(displayedItems);
       setTotalCount(res.total);
       setTotalPages(res.totalPages || Math.ceil(res.total / (limit || 24)) || 1);
+      if (res.categoryCounts) {
+        setCategoryCounts(res.categoryCounts);
+      }
     } catch (err) {
       console.error("Error fetching places:", err);
     } finally {
@@ -690,6 +715,7 @@ function ExploreContent() {
     page,
     pageSize,
     initialSelectedId,
+    parsedQuery.areaSlug,
   ]);
 
   useEffect(() => {
@@ -1208,6 +1234,11 @@ function ExploreContent() {
       <div className="shrink-0 flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
         {SUPER_CATEGORIES.map((cat) => {
           const isSelected = selectedSuperCategoryId === cat.id;
+          const count =
+            cat.id === "all"
+              ? Object.values(categoryCounts).reduce((acc, c) => acc + c, 0)
+              : cat.slugs.reduce((acc, s) => acc + (categoryCounts[s] || 0), 0);
+          const hasLoadedCounts = Object.keys(categoryCounts).length > 0;
           return (
             <button
               key={cat.id}
@@ -1229,7 +1260,7 @@ function ExploreContent() {
                     : "bg-slate-100 text-slate-500"
                 )}
               >
-                {cat.count.toLocaleString("vi-VN")}
+                {hasLoadedCounts ? count.toLocaleString("vi-VN") : "..."}
               </span>
             </button>
           );

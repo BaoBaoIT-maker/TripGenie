@@ -24,7 +24,7 @@ export const SEASONAL_DESTINATIONS: SeasonalDestination[] = [
     subtitle: "Thung lũng sóng lúa bậc thang chạm mây trời, rực rỡ sắc vàng Tây Bắc.",
     imageUrl:
       "https://images.unsplash.com/photo-1609412058473-c199497c3c5d?w=1200&auto=format&fit=crop&q=85",
-    targetUrl: "/explore?keyword=Y%C3%AAn+B%C3%A1i",
+    targetUrl: "/explore?area=sa-pa",
   },
   {
     id: "mua-nuoc-noi-tra-su",
@@ -36,7 +36,7 @@ export const SEASONAL_DESTINATIONS: SeasonalDestination[] = [
     subtitle: "Thảm bèo cám xanh ngút ngàn giữa mênh mông rừng tràm sông nước miền Tây.",
     imageUrl:
       "https://images.unsplash.com/photo-1580630873708-e0475b1856c4?w=1200&auto=format&fit=crop&q=85",
-    targetUrl: "/explore?keyword=An+Giang",
+    targetUrl: "/explore?area=an-giang",
   },
   {
     id: "mua-may-ngan-ma-pi-leng",
@@ -48,7 +48,7 @@ export const SEASONAL_DESTINATIONS: SeasonalDestination[] = [
     subtitle: "Biển mây ôm trọn hẻm Tu Sản và tứ đại đỉnh đèo kỳ vĩ vùng cao nguyên đá.",
     imageUrl:
       "https://images.unsplash.com/photo-1462688681110-15bc88b1497c?w=1200&auto=format&fit=crop&q=85",
-    targetUrl: "/explore?keyword=H%C3%A0+Giang",
+    targetUrl: "/explore?area=lao-cai",
   },
   {
     id: "mua-bien-ngoc-ha-long",
@@ -60,7 +60,7 @@ export const SEASONAL_DESTINATIONS: SeasonalDestination[] = [
     subtitle: "Làn nước ngọc bích phẳng lặng len lỏi giữa hàng nghìn đảo đá vôi kỳ vĩ.",
     imageUrl:
       "https://images.unsplash.com/photo-1528127269322-539801943592?w=1200&auto=format&fit=crop&q=85",
-    targetUrl: "/explore?keyword=Qu%E1%BA%A3ng+Ninh",
+    targetUrl: "/explore?area=ha-long",
   },
   {
     id: "mua-den-long-hoi-an",
@@ -72,6 +72,6 @@ export const SEASONAL_DESTINATIONS: SeasonalDestination[] = [
     subtitle: "Hoa đăng rực rỡ soi bóng dòng sông Hoài hoài niệm lung linh giữa lòng phố cổ.",
     imageUrl:
       "https://images.unsplash.com/photo-1544722827-484d3a94c799?w=1200&auto=format&fit=crop&q=85",
-    targetUrl: "/explore?keyword=H%E1%BB%99i+An",
+    targetUrl: "/explore?area=hoi-an",
   },
 ];

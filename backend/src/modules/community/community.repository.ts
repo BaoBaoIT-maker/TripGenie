@@ -5,6 +5,7 @@ import {
   PostModerationStatus,
   ReportStatus,
   ReportTargetType,
+  UserRole,
 } from '@prisma/client';
 import { PrismaService } from '@/database/prisma.service';
 import { writeNotification } from '../notifications/notification-writer';
@@ -31,6 +32,7 @@ import {
   ICommunityRepository,
   MatchedCreatorSummary,
   PostReportResult,
+  PostModerationFields,
   SidebarDiscoveryData,
   TopCreatorSummary,
 } from './interfaces/community-repository.interface';
@@ -396,9 +398,26 @@ export class CommunityRepository implements ICommunityRepository {
     where: Prisma.CommunityPostWhereInput;
     matchedCreators?: MatchedCreatorSummary[];
   }> {
+    const isAdminViewer = params.viewerRole === UserRole.ADMIN;
+    const andConditions: Prisma.CommunityPostWhereInput[] = [];
+
+    if (!isAdminViewer) {
+      if (params.viewerId) {
+        andConditions.push({
+          OR: [
+            { moderationStatus: PostModerationStatus.APPROVED },
+            { userId: params.viewerId },
+          ],
+        });
+      } else {
+        andConditions.push({
+          moderationStatus: PostModerationStatus.APPROVED,
+        });
+      }
+    }
+
     const where: Prisma.CommunityPostWhereInput = {
       deletedAt: null,
-      moderationStatus: PostModerationStatus.APPROVED,
     };
 
     if (params.groupId) {
@@ -434,8 +453,12 @@ export class CommunityRepository implements ICommunityRepository {
 
     if (params.search) {
       const conditions = await this.buildSearchConditions(params.search);
-      where.OR = conditions;
+      andConditions.push({ OR: conditions });
       matchedCreators = await this.findMatchedCreators(params.search);
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     return { where, matchedCreators };
@@ -537,7 +560,7 @@ export class CommunityRepository implements ICommunityRepository {
       caption?: string | null;
       tags: string[];
       groupId?: string | null;
-    },
+    } & PostModerationFields,
     viewerId?: string,
   ): Promise<CommunityPostView> {
     await this.prisma.$transaction(async (tx) => {
@@ -548,12 +571,19 @@ export class CommunityRepository implements ICommunityRepository {
           caption: data.caption ?? null,
           tags: data.tags,
           ...(data.groupId !== undefined ? { groupId: data.groupId } : {}),
+          ...(data.moderationStatus !== undefined
+            ? {
+                moderationStatus: data.moderationStatus,
+                moderationNote: data.moderationNote ?? null,
+                moderatedAt: data.moderatedAt ?? null,
+              }
+            : {}),
           editedAt: new Date(),
         },
         select: { id: true },
       });
 
-      if (data.groupId !== undefined) {
+      if (data.groupId !== undefined || data.moderationStatus !== undefined) {
         await this.syncGroupPostCounts(tx);
       }
     });
@@ -582,8 +612,27 @@ export class CommunityRepository implements ICommunityRepository {
       await tx.notification.deleteMany({
         where: {
           OR: [
-            { targetType: NotificationTargetType.POST, targetId: postId },
-            { postId },
+            {
+              targetType: NotificationTargetType.POST,
+              targetId: postId,
+              type: {
+                notIn: [
+                  NotificationType.POST_APPROVED,
+                  NotificationType.POST_FLAGGED,
+                  NotificationType.POST_REJECTED,
+                ],
+              },
+            },
+            {
+              postId,
+              type: {
+                notIn: [
+                  NotificationType.POST_APPROVED,
+                  NotificationType.POST_FLAGGED,
+                  NotificationType.POST_REJECTED,
+                ],
+              },
+            },
             ...(commentIds.length > 0
               ? [
                   { targetType: NotificationTargetType.COMMENT, targetId: { in: commentIds } },
@@ -627,10 +676,12 @@ export class CommunityRepository implements ICommunityRepository {
 
       const post = await tx.communityPost.findUnique({
         where: { id: postId },
-        select: { userId: true },
+        select: { userId: true, deletedAt: true },
       });
-      if (!post) {
-        throw new NotFoundException('Không tìm thấy bài viết');
+      if (!post || post.deletedAt) {
+        throw new NotFoundException(
+          'Không tìm thấy bài viết hoặc bài viết đã bị xóa',
+        );
       }
 
       if (existingLike) {
@@ -983,6 +1034,7 @@ export class CommunityRepository implements ICommunityRepository {
   async getCreatorProfile(
     targetUserIdOrUsername: string,
     viewerId?: string,
+    viewerRole?: UserRole,
   ): Promise<CreatorProfileData | null> {
     const cleanIdentifier = targetUserIdOrUsername.replace(/^@/, '').trim();
     const isUuid = UUID_REGEX.test(cleanIdentifier);
@@ -1001,6 +1053,10 @@ export class CommunityRepository implements ICommunityRepository {
 
     if (!user) return null;
 
+    const canSeeUnapprovedPosts =
+      viewerRole === UserRole.ADMIN ||
+      (viewerId !== undefined && viewerId === user.id);
+
     const aggregateStats = await this.prisma.communityPost.aggregate({
       where: {
         userId: user.id,
@@ -1018,7 +1074,9 @@ export class CommunityRepository implements ICommunityRepository {
       where: {
         userId: user.id,
         deletedAt: null,
-        moderationStatus: PostModerationStatus.APPROVED,
+        ...(canSeeUnapprovedPosts
+          ? {}
+          : { moderationStatus: PostModerationStatus.APPROVED }),
       },
       include: this.buildPostInclude(viewerId),
       orderBy: { createdAt: 'desc' },

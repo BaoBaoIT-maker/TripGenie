@@ -39,6 +39,7 @@ export interface PlaceRow {
 export interface PlaceSearchResult {
   items: PlaceRow[];
   total: number;
+  categoryCounts?: Record<string, number>;
 }
 
 export type PlaceDetail = Prisma.PlaceGetPayload<{

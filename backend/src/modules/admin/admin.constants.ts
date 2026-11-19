@@ -30,7 +30,7 @@ export const ADMIN_CONSTANTS = {
     HIGH_PRIORITY_REPORT_THRESHOLD: 20,
     MAX_AI_INPUT_CHARS: 1500,
     MAX_AI_OUTPUT_TOKENS: 80,
-    AI_TIMEOUT_MS: 2500,
+    AI_TIMEOUT_MS: 8000, // async background call, no user is waiting on it
     DEFAULT_GEMINI_MODEL: 'gemini-2.5-flash',
     DEFAULT_GEMINI_BASE_URL: 'https://generativelanguage.googleapis.com/v1beta',
   },
@@ -43,6 +43,7 @@ export const ADMIN_CONSTANTS = {
     CONTENT_REPORT: 'CONTENT_REPORT',
     TRAVEL_AREA: 'TRAVEL_AREA',
     SYSTEM_SETTING: 'SYSTEM_SETTING',
+    BANNED_WORD: 'BANNED_WORD',
   },
   REDIS_KEYS: {
     AI_MODERATION_ENABLED: 'system:config:ai_moderation_enabled',
@@ -77,18 +78,19 @@ export const ADMIN_CONSTANTS = {
     AUTO_APPROVED_CLEAN_NOTE: 'Duyệt tự động (văn bản hợp lệ)',
     HARD_BLOCKLIST_REJECT_NOTE: 'Chứa từ ngữ bị cấm hoặc quảng cáo vi phạm tiêu chuẩn cộng đồng',
     FALLBACK_FLAGGED_NOTE: 'Nội dung chứa từ khóa nhạy cảm, cần Quản trị viên duyệt thủ công',
+    DELETE_BANNED_WORD_SUCCESS: 'Đã xóa từ cấm thành công',
+    AI_REVIEWING_NOTE: 'Đang được AI kiểm duyệt tự động',
+    AI_UNAVAILABLE_NOTE: 'Hệ thống AI tạm thời không phản hồi, cần Quản trị viên duyệt thủ công',
+    DEFAULT_CREATE_BANNED_WORD_NOTE: 'Thêm từ khóa cấm mới',
+    DEFAULT_ENABLE_BANNED_WORD_NOTE: 'Kích hoạt từ khóa cấm',
+    DEFAULT_DISABLE_BANNED_WORD_NOTE: 'Vô hiệu hóa từ khóa cấm',
+    DEFAULT_DELETE_BANNED_WORD_NOTE: 'Xóa từ khóa cấm khỏi hệ thống',
+    DEFAULT_APPROVE_POST_NOTE: 'Đã được phê duyệt bởi Quản trị viên',
+    DEFAULT_REJECT_POST_NOTE: 'Bị từ chối bởi Quản trị viên do vi phạm tiêu chuẩn cộng đồng',
+    DEFAULT_RESOLVE_REPORT_NOTE: 'Báo cáo hợp lệ — Đã xử lý nội dung vi phạm',
+    DEFAULT_DISMISS_REPORT_NOTE: 'Bác bỏ báo cáo — Nội dung không vi phạm',
   },
 } as const;
-
-/**
- * Tier 1: Hard Blocklist (0.05ms, 0 AI tokens) — Bilingual Vietnamese & English.
- * Unambiguously toxic profanity, illegal gambling, or adult spam that is never valid in travel posts.
- */
-export const MODERATION_HARD_BLOCK_PATTERNS: readonly RegExp[] = [
-  /\b(đm|đkm|đcm|vcl|vkl|đéo|đĩ|lồn|cặc|buồi|chó đẻ|óc chó|mẹ mày|bố mày)\b/i,
-  /\b(fuck|motherfucker|bitch|asshole|cunt|whore|slut|dickhead)\b/i,
-  /\b(nhà cái|cá độ|tài xỉu|nổ hũ|xóc đĩa|lô đề|kubet|bet88|fun88|w88|fb88|gái gọi|thuốc lắc|ma túy|cần sa|onlyfans|pornhub|xvideos)\b/i,
-];
 
 /**
  * Tier 2: Ambiguous / Context-dependent Triggers (0.05ms, 0 AI tokens) — Bilingual Vietnamese & English.
@@ -126,6 +128,8 @@ export const ADMIN_ERROR_CODES = {
   COMMENT_NOT_FOUND: 'ADMIN_COMMENT_NOT_FOUND',
   REPORT_NOT_FOUND: 'ADMIN_REPORT_NOT_FOUND',
   CONTENT_VIOLATES_POLICY: 'COMMUNITY_CONTENT_VIOLATES_POLICY',
+  BANNED_WORD_EXISTS: 'ADMIN_BANNED_WORD_EXISTS',
+  BANNED_WORD_NOT_FOUND: 'ADMIN_BANNED_WORD_NOT_FOUND',
 } as const;
 
 export const ADMIN_ERRORS = {
@@ -195,7 +199,7 @@ export const ADMIN_ERRORS = {
   },
   POST_NOT_FOUND: {
     code: ADMIN_ERROR_CODES.POST_NOT_FOUND,
-    message: 'Không tìm thấy bài viết cần kiểm duyệt',
+    message: 'Bài viết không tồn tại hoặc đã bị xóa, không thể kiểm duyệt được nữa',
   },
   POST_ALREADY_MODERATED: {
     code: ADMIN_ERROR_CODES.POST_ALREADY_MODERATED,
@@ -212,5 +216,13 @@ export const ADMIN_ERRORS = {
   CONTENT_VIOLATES_POLICY: {
     code: ADMIN_ERROR_CODES.CONTENT_VIOLATES_POLICY,
     message: 'Nội dung chứa từ ngữ vi phạm tiêu chuẩn cộng đồng và đã bị chặn',
+  },
+  BANNED_WORD_EXISTS: {
+    code: ADMIN_ERROR_CODES.BANNED_WORD_EXISTS,
+    message: 'Từ khóa này đã tồn tại trong danh sách từ cấm',
+  },
+  BANNED_WORD_NOT_FOUND: {
+    code: ADMIN_ERROR_CODES.BANNED_WORD_NOT_FOUND,
+    message: 'Không tìm thấy từ cấm yêu cầu',
   },
 } as const;

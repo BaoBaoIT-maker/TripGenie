@@ -10,6 +10,7 @@ import {
 import { DEFAULT_AVATAR } from "@/config/avatars";
 import { ADMIN_UI_CONSTANTS } from "@/features/admin/admin.constants";
 import { AdminDebouncedSearch } from "@/features/admin/components/AdminDebouncedSearch";
+import { AdminBannedWordsSection } from "@/features/admin/components/AdminBannedWordsSection";
 import {
   PostReviewSheet,
   type ModerationReviewTarget,
@@ -25,7 +26,12 @@ import {
   useUpdateAdminModerationConfig,
 } from "@/features/admin/hooks/use-admin";
 
-type ModerationTabFilter = "ALL" | "HIGH_REPORT" | "FLAGGED" | "PENDING";
+type ModerationTabFilter =
+  | "ALL"
+  | "HIGH_REPORT"
+  | "FLAGGED"
+  | "PENDING"
+  | "BANNED_WORDS";
 
 export default function AdminModerationPage() {
   const [activeFilter, setActiveFilter] = useState<ModerationTabFilter>("ALL");
@@ -234,15 +240,35 @@ export default function AdminModerationPage() {
             >
               Chờ duyệt ({pendingPostsCount})
             </button>
+            <button
+              type="button"
+              onClick={() => handleFilterChange("BANNED_WORDS")}
+              className={`px-4 py-2 rounded-xl text-xs cursor-pointer transition-colors flex items-center gap-1.5 ${
+                activeFilter === "BANNED_WORDS"
+                  ? "font-bold bg-[#10243A] text-white"
+                  : "font-semibold text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <i
+                className="fa-solid fa-shield-halved text-[11px]"
+                aria-hidden="true"
+              />
+              <span>Từ khóa cấm</span>
+            </button>
           </div>
 
-          <AdminDebouncedSearch
-            placeholder="Tìm tiêu đề, nội dung bài viết..."
-            onSearchChange={handleSearchChange}
-          />
+          {activeFilter !== "BANNED_WORDS" && (
+            <AdminDebouncedSearch
+              placeholder="Tìm tiêu đề, nội dung bài viết..."
+              onSearchChange={handleSearchChange}
+            />
+          )}
         </div>
 
-        <div className="overflow-x-auto">
+        {activeFilter === "BANNED_WORDS" ? (
+          <AdminBannedWordsSection />
+        ) : (
+          <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -565,6 +591,7 @@ export default function AdminModerationPage() {
             </tbody>
           </table>
         </div>
+        )}
       </div>
 
       <PostReviewSheet

@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { TripGenieMark } from '@/components/common/TripGenieMark';
 import { placeService } from '@/services/place.service';
 import { CopilotProposal, ItineraryDay } from '@/types/itinerary';
+import { AiThinkingIndicator } from './AiThinkingIndicator';
 
 export interface CopilotMessageItem {
   sender: 'ai' | 'user';
@@ -967,15 +968,7 @@ export default function CopilotDrawer({
         {/* AI Thinking Indicator */}
         {isPending && (
           <div className="flex justify-start">
-            <div className="flex items-start gap-2">
-              <div className="size-7 rounded-full bg-[#0194F3] text-white flex items-center justify-center shrink-0 shadow-2xs mt-0.5 border border-white">
-                <i className="fa-solid fa-compass text-xs" aria-hidden="true" />
-              </div>
-              <div className="p-3.5 rounded-2xl rounded-tl-xs bg-white border border-slate-200 text-slate-600 shadow-xs flex items-center gap-2 text-xs">
-                <i className="fa-solid fa-circle-notch fa-spin text-xs text-[#0194F3]" aria-hidden="true" />
-                <span>Genie đang suy nghĩ &amp; tìm kiếm địa điểm...</span>
-              </div>
-            </div>
+            <AiThinkingIndicator context="copilot" />
           </div>
         )}
       </div>

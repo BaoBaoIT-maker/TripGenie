@@ -24,6 +24,13 @@ import {
   type MoveDirection,
 } from '../../../common/utils/time-of-day.util';
 import { calculatePlaceEstimatedCost } from '../../../config/pricing.config';
+import { ITINERARY_PLANNING_CONFIG } from '../../../config/itinerary-planning.config';
+import { computeHaversineDistance } from '../../../common/utils/geo.util';
+import {
+  computeCandidatePopularityScore,
+  isLodgingCategory,
+  isNonTouristicNoise,
+} from '../../../common/utils/brand-key.util';
 
 interface BoundingBox {
   minLat: number;
@@ -112,7 +119,8 @@ export class CopilotToolsService {
       existingDestinations.map((d) => d.placeId),
     );
 
-    let candidates = await this.prisma.place.findMany({
+    const scanLimit = Math.max(limit * 6, ITINERARY_PLANNING_CONFIG.LIMITS.CANDIDATE_MIN);
+    let rawCandidates = await this.prisma.place.findMany({
       where: {
         id: { notIn: Array.from(excludedPlaceIds) },
         deletedAt: null,
@@ -125,17 +133,21 @@ export class CopilotToolsService {
         category: true,
         images: { where: { isPrimary: true }, take: 1 },
       },
-      orderBy: [{ ratingAvg: 'desc' }, { reviewCount: 'desc' }],
-      take: limit,
+      orderBy: [{ reviewCount: 'desc' }, { ratingAvg: 'desc' }],
+      take: scanLimit,
     });
 
-    if (candidates.length < limit) {
+    rawCandidates = rawCandidates.filter(
+      (p) => !isLodgingCategory(p.category, p.name) && !isNonTouristicNoise(p.name),
+    );
+
+    if (rawCandidates.length < limit) {
       const more = await this.prisma.place.findMany({
         where: {
           id: {
             notIn: [
               ...Array.from(excludedPlaceIds),
-              ...candidates.map((c) => c.id),
+              ...rawCandidates.map((c) => c.id),
             ],
           },
           deletedAt: null,
@@ -147,11 +159,26 @@ export class CopilotToolsService {
           category: true,
           images: { where: { isPrimary: true }, take: 1 },
         },
-        orderBy: [{ ratingAvg: 'desc' }, { reviewCount: 'desc' }],
-        take: limit - candidates.length,
+        orderBy: [{ reviewCount: 'desc' }, { ratingAvg: 'desc' }],
+        take: scanLimit,
       });
-      candidates = [...candidates, ...more];
+      rawCandidates = [
+        ...rawCandidates,
+        ...more.filter(
+          (p) =>
+            !isLodgingCategory(p.category, p.name) &&
+            !isNonTouristicNoise(p.name),
+        ),
+      ];
     }
+
+    const candidates = rawCandidates
+      .sort(
+        (a, b) =>
+          computeCandidatePopularityScore(b) -
+          computeCandidatePopularityScore(a),
+      )
+      .slice(0, limit);
 
     return candidates.map((p) => {
       const dist = this.haversineDistance(
@@ -1572,8 +1599,9 @@ export class CopilotToolsService {
     lng: number,
     radiusKm: number,
   ): BoundingBox {
-    const deltaLat = radiusKm / 111;
-    const deltaLng = radiusKm / (111 * Math.cos((lat * Math.PI) / 180));
+    const kmPerDeg = ITINERARY_PLANNING_CONFIG.GEO.KM_PER_DEG_LAT;
+    const deltaLat = radiusKm / kmPerDeg;
+    const deltaLng = radiusKm / (kmPerDeg * Math.cos((lat * Math.PI) / 180));
     return {
       minLat: lat - deltaLat,
       maxLat: lat + deltaLat,
@@ -1590,18 +1618,6 @@ export class CopilotToolsService {
     lat2: number,
     lon2: number,
   ): number {
-    const dLat = ((lat2 - lat1) * Math.PI) / 180;
-    const dLon = ((lon2 - lon1) * Math.PI) / 180;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos((lat1 * Math.PI) / 180) *
-        Math.cos((lat2 * Math.PI) / 180) *
-        Math.sin(dLon / 2) *
-        Math.sin(dLon / 2);
-    return (
-      COPILOT_CONSTANTS.EARTH_RADIUS_KM *
-      2 *
-      Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
-    );
+    return computeHaversineDistance(lat1, lon1, lat2, lon2);
   }
 }

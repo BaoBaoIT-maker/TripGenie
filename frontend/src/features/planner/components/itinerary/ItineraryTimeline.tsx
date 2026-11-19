@@ -14,6 +14,7 @@ import {
 import { getDayColor } from '@/features/map/types';
 import TransitRouteBreakdown from './TransitRouteBreakdown';
 import { WeatherIcon } from './WeatherIcon';
+import { LodgingAnchorBar } from './LodgingAnchorBar';
 import type {
   DayWeather,
   IntercityTransit,
@@ -57,6 +58,7 @@ interface Props {
   onProposeNewForDay?: (dayNumber: number) => void;
   pendingProposalCountByStop?: Record<string, number>;
   onOpenVotingTab?: () => void;
+  onOpenLodgingPicker?: (nightNumber: number) => void;
 }
 
 const TRANSIT_MODE_OPTIONS: ReadonlyArray<{
@@ -386,6 +388,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
   onProposeNewForDay,
   pendingProposalCountByStop,
   onOpenVotingTab,
+  onOpenLodgingPicker,
 }: Props) {
   const numbered = numberStops(days);
   const setStoreHoveredPlaceId = useItineraryHoverStore((s) => s.setHoveredPlaceId);
@@ -814,6 +817,18 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                 </div>
               );
             })()}
+
+            {day.lodging && (
+              <LodgingAnchorBar
+                dayNumber={day.dayNumber}
+                lodging={day.lodging}
+                canEdit={Boolean(onEditStop || onAddPlace)}
+                isSelected={day.lodging.placeId === selectedPlaceId}
+                onSelectLodging={onSelectPlace}
+                onHoverLodging={handleHoverPlace}
+                onOpenPicker={onOpenLodgingPicker}
+              />
+            )}
 
             {isCollapsed ? (
               <button

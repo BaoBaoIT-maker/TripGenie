@@ -49,9 +49,10 @@ export const TRAVEL_STYLE_OPTIONS: ReadonlyArray<{ label: string; value: string 
 ];
 
 export const PACE_OPTIONS: ReadonlyArray<{ label: string; value: TravelPace; desc: string }> = [
-  { label: 'Thư thả', value: 'RELAXED', desc: '2–3 điểm/ngày' },
-  { label: 'Cân bằng', value: 'BALANCED', desc: '4–5 điểm/ngày' },
-  { label: 'Khám phá nhiều', value: 'PACKED', desc: '6–7 điểm/ngày' },
+  { label: 'Thư thả', value: 'RELAXED', desc: '4–5 hoạt động/ngày' },
+  { label: 'Cân bằng', value: 'BALANCED', desc: '6–7 hoạt động/ngày' },
+  { label: 'Khám phá nhiều', value: 'PACKED', desc: '7–8 hoạt động/ngày' },
 ];
 
-export const MAX_TRIP_DAYS = 30;
+export const MAX_TRIP_DAYS = 7;
+export const MANUAL_MAX_TRIP_DAYS = 14;

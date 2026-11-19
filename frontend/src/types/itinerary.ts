@@ -154,9 +154,70 @@ export interface ItineraryActivity {
   openingStatus?: OpeningStatus | null;
 }
 
+export interface ItineraryDayLodging {
+  nightNumber: number;
+  isCheckOutDay?: boolean;
+  isAutoSuggested: boolean;
+  placeId: string;
+  name: string;
+  address: string | null;
+  latitude: number;
+  longitude: number;
+  ratingAvg: number | null;
+  reviewCount: number | null;
+  priceLevel: string | null;
+  priceRange?: PlacePriceRange | null;
+  pricePerNight: number | null;
+  imageUrl: string | null;
+  distanceToFirstStopKm: number | null;
+}
+
+export interface ItineraryLodgingSuggestionItem {
+  placeId: string;
+  name: string;
+  address: string | null;
+  latitude: number;
+  longitude: number;
+  ratingAvg: number | null;
+  reviewCount: number | null;
+  priceLevel: string | null;
+  priceRange?: PlacePriceRange | null;
+  pricePerNight: number | null;
+  imageUrl: string | null;
+  distanceKm: number;
+  score: number;
+}
+
+export interface ItineraryLodgingSuggestionsResponse {
+  nightNumber: number;
+  totalNights: number;
+  currentPlaceId: string | null;
+  nearest: ItineraryLodgingSuggestionItem[];
+  bestValue: ItineraryLodgingSuggestionItem[];
+  topRated: ItineraryLodgingSuggestionItem[];
+}
+
+export interface UpdateItineraryLodgingOptimisticMeta {
+  name?: string;
+  address?: string | null;
+  latitude?: number;
+  longitude?: number;
+  ratingAvg?: number | null;
+  pricePerNight?: number | null;
+  imageUrl?: string | null;
+}
+
+export interface UpdateItineraryLodgingRequest {
+  placeId: string;
+  fromNight: number;
+  toNight?: number;
+  optimisticLodging?: UpdateItineraryLodgingOptimisticMeta;
+}
+
 export interface ItineraryDay {
   dayNumber: number;
   theme: string;
+  lodging?: ItineraryDayLodging | null;
   activities: ItineraryActivity[];
 }
 

@@ -149,7 +149,46 @@ describe('notification-writer', () => {
           metadata: {},
           eventKey: 'result:1:ACCEPTED',
         },
-        update: {},
+        update: {
+          readAt: null,
+          metadata: {},
+        },
+      });
+    });
+
+    it('should allow metadata with reason for POST_APPROVED notification', async () => {
+      const input: WriteNotificationInput = {
+        recipientId,
+        actorId: null,
+        type: NotificationType.POST_APPROVED,
+        targetType: NotificationTargetType.POST,
+        targetId,
+        eventKey: 'post-moderation:1:APPROVED',
+        metadata: { reason: 'Nội dung hợp lệ' },
+      };
+
+      await writeNotification(mockTx as any, input);
+
+      expect(mockTx.notification.upsert).toHaveBeenCalledWith({
+        where: {
+          recipientId_eventKey: {
+            recipientId,
+            eventKey: 'post-moderation:1:APPROVED',
+          },
+        },
+        create: {
+          recipientId,
+          actorId: null,
+          type: NotificationType.POST_APPROVED,
+          targetType: NotificationTargetType.POST,
+          targetId,
+          metadata: { reason: 'Nội dung hợp lệ' },
+          eventKey: 'post-moderation:1:APPROVED',
+        },
+        update: {
+          readAt: null,
+          metadata: { reason: 'Nội dung hợp lệ' },
+        },
       });
     });
   });

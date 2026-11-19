@@ -1,6 +1,7 @@
 import { apiClient } from "@/lib/api-client";
 import type {
   AdminAuditLogItem,
+  AdminBannedWordItem,
   AdminCommunityGroupItem,
   AdminDashboardStats,
   AdminModerationConfig,
@@ -9,9 +10,11 @@ import type {
   AdminPaginatedResponse,
   AdminPlaceItem,
   AdminUserItem,
+  CreateBannedWordPayload,
   CreateOrUpdateAdminGroupPayload,
   CreateOrUpdateAdminPlacePayload,
   QueryAdminAuditLogsParams,
+  QueryAdminBannedWordsParams,
   QueryAdminCommunityGroupsParams,
   QueryAdminModerationPostsParams,
   QueryAdminPlacesParams,
@@ -211,5 +214,36 @@ export const adminService = {
     apiClient(`/admin/moderation/reports/${reportId}/resolve`, {
       method: "PATCH",
       body: JSON.stringify(payload),
+    }),
+
+  getBannedWords: (
+    params?: QueryAdminBannedWordsParams
+  ): Promise<AdminPaginatedResponse<AdminBannedWordItem>> =>
+    apiClient<AdminPaginatedResponse<AdminBannedWordItem>>(
+      `/admin/banned-words${buildQueryString(params as Record<string, unknown>)}`
+    ),
+
+  createBannedWord: (
+    payload: CreateBannedWordPayload
+  ): Promise<AdminBannedWordItem> =>
+    apiClient<AdminBannedWordItem>("/admin/banned-words", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  toggleBannedWord: (
+    id: string,
+    isActive: boolean
+  ): Promise<AdminBannedWordItem> =>
+    apiClient<AdminBannedWordItem>(`/admin/banned-words/${id}/toggle`, {
+      method: "PATCH",
+      body: JSON.stringify({ isActive }),
+    }),
+
+  deleteBannedWord: (
+    id: string
+  ): Promise<{ success: boolean; message: string; id: string }> =>
+    apiClient(`/admin/banned-words/${id}`, {
+      method: "DELETE",
     }),
 };

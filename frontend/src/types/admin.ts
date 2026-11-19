@@ -347,3 +347,41 @@ export interface QueryAdminReportsParams {
   status?: AdminReportStatus;
   highPriorityOnly?: boolean;
 }
+
+export type BannedWordCategory =
+  | "PROFANITY"
+  | "ADULT"
+  | "SCAM"
+  | "GAMBLING"
+  | "OTHER";
+
+export interface AdminBannedWordItem {
+  id: string;
+  word: string;
+  category: BannedWordCategory;
+  isActive: boolean;
+  notes: string | null;
+  createdBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+  creator?: {
+    id: string;
+    fullName: string;
+    username: string | null;
+  } | null;
+}
+
+export interface CreateBannedWordPayload {
+  word: string;
+  category: BannedWordCategory;
+  notes?: string;
+}
+
+export interface QueryAdminBannedWordsParams {
+  page?: number;
+  limit?: number;
+  category?: BannedWordCategory;
+  isActive?: boolean;
+  search?: string;
+}
+

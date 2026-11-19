@@ -50,7 +50,7 @@ function getUserInitials(fullName?: string | null): string {
 export function MobileNavSheet({ triggerVariant = "light" }: MobileNavSheetProps) {
   const [open, setOpen] = React.useState(false);
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const openAuthModal = useAuthModalStore((state) => state.openAuthModal);
   const userInitials = getUserInitials(user?.fullName);
 
@@ -141,7 +141,15 @@ export function MobileNavSheet({ triggerVariant = "light" }: MobileNavSheetProps
 
         {/* Footer Drawer: User Status or Guest Actions */}
         <div className="p-4 border-t border-slate-100 bg-slate-50/70">
-          {user ? (
+          {isLoading ? (
+            <div className="flex items-center gap-3 p-2">
+              <div className="size-10 rounded-full bg-slate-200 animate-pulse" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 w-28 bg-slate-200 rounded animate-pulse" />
+                <div className="h-3 w-40 bg-slate-200/70 rounded animate-pulse" />
+              </div>
+            </div>
+          ) : user ? (
             <div className="space-y-3">
               <Link
                 href="/profile"

@@ -15,16 +15,26 @@ export interface VibeOption {
   label: string;
 }
 
+export interface QuickSuggestion {
+  label: string;
+  href: string;
+}
+
 export const LANDING_CONFIG = {
   hero: {
     videoSrc: "/videos/hero.mp4",
     posterSrc: "https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=1920&auto=format&fit=crop&q=80",
-    badgeText: "Nền tảng Lập Kế hoạch Du lịch & Đồng hành Thời gian thực",
-    headlineLine1: "Khám phá Việt Nam,",
-    headlineLine2: "theo cách của riêng bạn",
-    subtitle:
-      "Tự động sắp xếp lịch trình chi tiết từng giờ, tính toán chi phí minh bạch và đồng bộ thời gian thực cùng hội bạn thân mà không cần ghi chép thủ công.",
+    badgeText: "Lên lịch trình thông minh",
+    headlineLine1: "Khám phá Việt Nam",
+    headlineLine2: "theo cách của bạn",
     defaultLocationTitle: "Vịnh Hạ Long, Quảng Ninh",
+    quickSuggestions: [
+      { label: "Đà Nẵng", href: "/explore?area=da-nang" },
+      { label: "Phú Quốc", href: "/explore?area=phu-quoc" },
+      { label: "Hội An", href: "/explore?area=hoi-an" },
+      { label: "Hà Nội", href: "/explore?area=ha-noi" },
+      { label: "Sa Pa", href: "/explore?area=sa-pa" },
+    ] as QuickSuggestion[],
   },
   destinations: [
     {

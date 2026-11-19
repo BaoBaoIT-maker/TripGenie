@@ -11,6 +11,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RateLimit } from '../../common/decorators/rate-limit.decorator';
+import { RateLimitTier } from '../../config/rate-limit.config';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../../common/guards/optional-jwt-auth.guard';
 import { AdvisorService } from './advisor.service';
@@ -25,6 +27,7 @@ export class AdvisorController {
    * Executes the Agentic RAG AI Travel Advisor conversation turn.
    */
   @UseGuards(JwtAuthGuard)
+  @RateLimit({ tier: RateLimitTier.AI_CHAT })
   @Post('chat')
   @HttpCode(HttpStatus.OK)
   async chat(@Body() dto: AdvisorChatDto, @CurrentUser('id') userId: string) {

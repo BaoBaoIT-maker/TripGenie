@@ -18,6 +18,8 @@ import { FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '@/common/guards/optional-jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { RateLimit } from '@/common/decorators/rate-limit.decorator';
+import { RateLimitTier } from '@/config/rate-limit.config';
 import { AuthenticatedUser } from '@/common/types';
 import { COMMUNITY_CONSTANTS } from './community.constants';
 import { CommunityService } from './community.service';
@@ -37,6 +39,7 @@ export class CommunityController {
 
   @Post('media/upload')
   @UseGuards(JwtAuthGuard)
+  @RateLimit({ tier: RateLimitTier.MEDIA_UPLOAD })
   @UseInterceptors(
     FilesInterceptor('files', COMMUNITY_CONSTANTS.MAX_FILES_PER_UPLOAD, {
       limits: {

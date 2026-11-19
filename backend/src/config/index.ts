@@ -31,3 +31,13 @@ export const aiConfig = registerAs('ai', () => ({
 }));
 
 export { weatherConfig } from './weather.config';
+export {
+  rateLimitConfig,
+  RateLimitTier,
+  RATE_LIMIT_DEFAULT_TIERS,
+} from './rate-limit.config';
+export type {
+  RateLimitConfig,
+  RateLimitTierConfig,
+  RateLimitKeyBy,
+} from './rate-limit.config';

@@ -26,6 +26,8 @@ import {
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '@/common/guards/optional-jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { RateLimit } from '@/common/decorators/rate-limit.decorator';
+import { RateLimitTier } from '@/config/rate-limit.config';
 import {
   GenerateItineraryDto,
   TransitPreviewDto,
@@ -57,6 +59,7 @@ export class ItinerariesController {
    * POST /api/v1/itineraries/generate
    */
   @UseGuards(JwtAuthGuard)
+  @RateLimit({ tier: RateLimitTier.AI_GENERATE })
   @Post('generate')
   @HttpCode(HttpStatus.CREATED)
   generate(
@@ -244,6 +247,7 @@ export class ItinerariesController {
    * POST /api/v1/itineraries/:id/chat
    */
   @UseGuards(JwtAuthGuard)
+  @RateLimit({ tier: RateLimitTier.AI_CHAT })
   @Post(':id/chat')
   @HttpCode(HttpStatus.OK)
   chat(

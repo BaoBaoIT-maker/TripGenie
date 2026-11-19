@@ -82,4 +82,17 @@ export const envValidationSchema = Joi.object({
   EMAIL_PORT: Joi.number().optional(),
   EMAIL_USER: Joi.string().optional().allow(''),
   EMAIL_PASS: Joi.string().optional().allow(''),
+
+  // Rate Limiting (optional overrides)
+  RATE_LIMIT_ENABLED: Joi.boolean().optional().default(true),
+  RATE_LIMIT_GLOBAL_TTL: Joi.number().optional(),
+  RATE_LIMIT_GLOBAL_LIMIT: Joi.number().optional(),
+  RATE_LIMIT_AUTH_TTL: Joi.number().optional(),
+  RATE_LIMIT_AUTH_LIMIT: Joi.number().optional(),
+  RATE_LIMIT_AI_GENERATE_TTL: Joi.number().optional(),
+  RATE_LIMIT_AI_GENERATE_LIMIT: Joi.number().optional(),
+  RATE_LIMIT_AI_CHAT_TTL: Joi.number().optional(),
+  RATE_LIMIT_AI_CHAT_LIMIT: Joi.number().optional(),
+  RATE_LIMIT_UPLOAD_TTL: Joi.number().optional(),
+  RATE_LIMIT_UPLOAD_LIMIT: Joi.number().optional(),
 });

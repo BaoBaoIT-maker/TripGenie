@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './database/prisma.module';
 import { RedisModule } from './database/redis.module';
+import { RateLimitGuard } from './common/guards/rate-limit.guard';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { PlacesModule } from './modules/places/places.module';
@@ -24,6 +26,7 @@ import {
   redisConfig,
   aiConfig,
   weatherConfig,
+  rateLimitConfig,
 } from './config';
 import { envValidationSchema } from './config/env.validation';
 
@@ -38,6 +41,7 @@ import { envValidationSchema } from './config/env.validation';
         redisConfig,
         aiConfig,
         weatherConfig,
+        rateLimitConfig,
       ],
       validationSchema: envValidationSchema,
     }),
@@ -88,6 +92,12 @@ import { envValidationSchema } from './config/env.validation';
     AdminModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
+    },
+  ],
 })
 export class AppModule {}

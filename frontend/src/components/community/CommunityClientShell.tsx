@@ -481,33 +481,36 @@ export function CommunityClientShell({
               </div>
 
               {/* Tầng dưới: Các công cụ với icon màu đen than chì chuyên nghiệp + Nút Đăng bài */}
-              <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between flex-wrap gap-2">
-                <div className="flex items-center gap-1 flex-wrap min-w-0">
+              <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between flex-nowrap gap-1.5 sm:gap-2">
+                <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
                   {/* Nút Tệp */}
                   <button
                     type="button"
                     onClick={handlePickFiles}
-                    className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-transparent hover:bg-slate-100 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-transparent hover:bg-slate-100 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
+                    title="Đính kèm tệp"
                   >
                     <i className="fa-solid fa-folder text-slate-700 text-[13px]" />
-                    <span>Tệp</span>
+                    <span className="hidden sm:inline">Tệp</span>
                   </button>
 
                   {/* Nút Ảnh / Video */}
                   <button
                     type="button"
                     onClick={handlePickMedia}
-                    className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-transparent hover:bg-slate-100 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-transparent hover:bg-slate-100 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
+                    title="Đính kèm ảnh hoặc video"
                   >
                     <i className="fa-solid fa-image text-slate-700 text-[13px]" />
-                    <span>Ảnh / Video</span>
+                    <span>Ảnh<span className="hidden sm:inline"> / Video</span></span>
                   </button>
 
                   {/* Nút Lịch trình */}
                   <button
                     type="button"
                     onClick={() => handleOpenComposer(true)}
-                    className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-transparent hover:bg-slate-100 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-transparent hover:bg-slate-100 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
+                    title="Đính kèm lịch trình chuyến đi"
                   >
                     <i className="fa-solid fa-route text-slate-700 text-[13px]" />
                     <span>Lịch trình</span>
@@ -518,7 +521,7 @@ export function CommunityClientShell({
                 <button
                   type="button"
                   onClick={() => handleOpenComposer(false)}
-                  className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-4 py-2 text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-xs active:scale-[0.98] cursor-pointer shrink-0"
+                  className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-3 sm:px-4 py-1.5 sm:py-2 text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-xs active:scale-[0.98] cursor-pointer shrink-0"
                 >
                   <i className="fa-solid fa-pen-to-square text-[11px]" aria-hidden="true" />
                   <span>Đăng bài</span>

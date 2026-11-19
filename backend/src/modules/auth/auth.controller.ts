@@ -28,6 +28,8 @@ import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '@/common/types';
 import { UserResponse } from './interfaces/auth.interface';
+import { RateLimit } from '../../common/decorators/rate-limit.decorator';
+import { RateLimitTier } from '../../config/rate-limit.config';
 
 @Controller('auth')
 export class AuthController {
@@ -101,6 +103,7 @@ export class AuthController {
     return result;
   }
 
+  @RateLimit({ tier: RateLimitTier.AUTH_LOGIN })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(

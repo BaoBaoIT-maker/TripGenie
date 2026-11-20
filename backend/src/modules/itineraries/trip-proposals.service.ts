@@ -11,6 +11,8 @@ import { ItineraryAccessService } from './services/itinerary-access.service';
 import { ItineraryPlannerService } from './services/itinerary-planner.service';
 import { CopilotToolsService } from './copilot/copilot-tools.service';
 import { TripCompanionsRepository } from './trip-companions.repository';
+import { ItineraryEventsService } from './events/itinerary-events.service';
+import { ItineraryLiveEventType } from './events/itinerary-events.constants';
 import {
   PROPOSAL_LIMITS,
   type ProposalResolveAction,
@@ -71,6 +73,7 @@ export class TripProposalsService {
     private readonly companionsRepository: TripCompanionsRepository,
     private readonly copilotTools: CopilotToolsService,
     private readonly plannerService: ItineraryPlannerService,
+    private readonly eventsService: ItineraryEventsService,
   ) {}
 
   async listProposals(
@@ -158,7 +161,21 @@ export class TripProposalsService {
         });
       });
 
-      return this.toProposalDto(created, userId);
+      const dtoResult = this.toProposalDto(created, userId);
+
+      void this.eventsService.emit({
+        type: ItineraryLiveEventType.PROPOSAL_CREATED,
+        itineraryId,
+        actor: {
+          userId,
+          fullName: created.proposer?.fullName,
+          avatarUrl: created.proposer?.avatarUrl,
+        },
+        payload: dtoResult,
+        timestamp: new Date().toISOString(),
+      });
+
+      return dtoResult;
     } catch (error) {
       if (
         error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -213,6 +230,25 @@ export class TripProposalsService {
         include: PROPOSAL_INCLUDE,
       });
       const dto = this.toProposalDto(updated, userId);
+      const currentVoter = dto.voters.find((v) => v.userId === userId);
+
+      void this.eventsService.emit({
+        type: ItineraryLiveEventType.PROPOSAL_VOTED,
+        itineraryId,
+        actor: {
+          userId,
+          fullName: currentVoter?.fullName,
+          avatarUrl: currentVoter?.avatarUrl,
+        },
+        payload: {
+          proposalId,
+          voted,
+          voteCount: dto.voteCount,
+          proposal: dto,
+        },
+        timestamp: new Date().toISOString(),
+      });
+
       return { proposalId, voted, voteCount: dto.voteCount, proposal: dto };
     });
   }
@@ -259,6 +295,18 @@ export class TripProposalsService {
       return this.toProposalDto(resolved, userId);
     });
 
+    void this.eventsService.emit({
+      type: ItineraryLiveEventType.PROPOSAL_RESOLVED,
+      itineraryId,
+      actor: { userId },
+      payload: {
+        proposalId,
+        action,
+        proposal,
+      },
+      timestamp: new Date().toISOString(),
+    });
+
     if (!approve) {
       return { proposal };
     }
@@ -303,6 +351,14 @@ export class TripProposalsService {
       if (deleted.count === 0) {
         throw new ConflictException('Đề xuất này đã được xử lý trước đó.');
       }
+    });
+
+    void this.eventsService.emit({
+      type: ItineraryLiveEventType.PROPOSAL_WITHDRAWN,
+      itineraryId,
+      actor: { userId },
+      payload: { proposalId },
+      timestamp: new Date().toISOString(),
     });
 
     return { deletedId: proposalId };

@@ -37,6 +37,7 @@ import {
 } from '../../hooks/use-itinerary-planner';
 import { useTripCompanions } from '../../hooks/use-trip-companions';
 import { useCreateGroupProposal, useTripProposals } from '../../hooks/use-trip-proposals';
+import { useItineraryLiveEvents } from '../../hooks/use-itinerary-live-events';
 import ItineraryWizardModal from '../ItineraryWizardModal';
 import { PlaceSearchDialog, type PlaceSearchMode } from '../PlaceSearchDialog';
 import { TripCompanionCard } from '../companions/TripCompanionCard';
@@ -113,6 +114,9 @@ export default function ItineraryView({ id }: Props) {
   const { user } = useAuth();
   const { data, isLoading, error } = useItineraryQuery(id);
   const { data: weatherData } = useItineraryWeatherQuery(id);
+
+  // Live real-time collaboration events stream
+  useItineraryLiveEvents(id, user?.id, Boolean(data));
 
   // Access rights & collaborative roles
   const isOwner = Boolean(data?.isOwner);

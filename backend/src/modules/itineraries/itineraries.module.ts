@@ -15,6 +15,7 @@ import { TrainTransitStrategy } from './services/transit/strategies/train.strate
 import { RoadTransitStrategy } from './services/transit/strategies/road.strategy';
 import { TransitModeEnum } from './dto/generate-itinerary.dto';
 import { GeminiPlannerService } from './services/gemini-planner.service';
+import { ItineraryEventsService } from './events/itinerary-events.service';
 import { CopilotToolsService } from './copilot/copilot-tools.service';
 import { CopilotAgentService } from './copilot/copilot-agent.service';
 import { CopilotSummaryProcessor } from './copilot/copilot-summary.processor';
@@ -58,10 +59,12 @@ import { WeatherModule } from '../weather/weather.module';
     TripCompanionsRepository,
     TripCompanionsService,
     TripProposalsService,
+    ItineraryEventsService,
     ItineraryAccessService,
     ItineraryPlannerService,
     TransitService,
     GeminiPlannerService,
+    ItineraryEventsService,
     CopilotToolsService,
     CopilotAgentService,
     CopilotSummaryProcessor,
@@ -70,6 +73,7 @@ import { WeatherModule } from '../weather/weather.module';
     TripCompanionsService,
     TripCompanionsRepository,
     TripProposalsService,
+    ItineraryEventsService,
     ItineraryAccessService,
     ItineraryPlannerService,
     TransitService,

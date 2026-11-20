@@ -36,4 +36,14 @@ export const TRIP_COMPANIONS_CONFIG = {
     REMOVE_MEMBER: (name: string) => `Bạn có chắc chắn muốn xóa "${name}" khỏi chuyến đi?`,
     LEAVE_TRIP: 'Bạn có chắc chắn muốn rời khỏi chuyến đi này không?',
   },
+  LIVE_NOTIFICATIONS: {
+    PROPOSAL_VOTED: (name?: string | null) => `${name || 'Một thành viên'} vừa bình chọn đề xuất!`,
+    PROPOSAL_CREATED: (name?: string | null) => `${name || 'Một thành viên'} vừa gửi một đề xuất bình chọn mới!`,
+    PROPOSAL_RESOLVED: (approved: boolean, name?: string | null) =>
+      approved
+        ? `${name || 'Trưởng nhóm'} vừa duyệt đề xuất và cập nhật lịch trình!`
+        : `${name || 'Trưởng nhóm'} vừa từ chối đề xuất bình chọn.`,
+    PROPOSAL_WITHDRAWN: (name?: string | null) => `${name || 'Một thành viên'} đã rút lại đề xuất bình chọn.`,
+    STOPS_REORDERED: (name?: string | null) => `${name || 'Một thành viên'} vừa thay đổi thứ tự điểm dừng!`,
+  },
 } as const;

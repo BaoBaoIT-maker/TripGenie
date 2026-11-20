@@ -12,12 +12,17 @@ import {
   HttpCode,
   HttpStatus,
   UseGuards,
+  Sse,
+  MessageEvent,
 } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import { ItineraryPlannerService } from './services/itinerary-planner.service';
 import { ItineraryAccessService } from './services/itinerary-access.service';
 import { TransitService } from './services/transit.service';
 import { CopilotAgentService } from './copilot/copilot-agent.service';
 import { CopilotToolsService } from './copilot/copilot-tools.service';
+import { ItineraryEventsService } from './events/itinerary-events.service';
+import { ItineraryLiveEventType } from './events/itinerary-events.constants';
 import {
   CopilotChatDto,
   DirectSwapDto,
@@ -51,6 +56,7 @@ export class ItinerariesController {
     private readonly transitService: TransitService,
     private readonly copilotAgent: CopilotAgentService,
     private readonly copilotTools: CopilotToolsService,
+    private readonly eventsService: ItineraryEventsService,
   ) {}
 
   /**
@@ -390,7 +396,32 @@ export class ItinerariesController {
       destinationId,
       dto.direction,
     );
-    return this.plannerService.getById(id, userId);
+    const updated = await this.plannerService.getById(id, userId);
+
+    void this.eventsService.emit({
+      type: ItineraryLiveEventType.STOPS_REORDERED,
+      itineraryId: id,
+      actor: { userId },
+      payload: { destinationId, direction: dto.direction },
+      timestamp: new Date().toISOString(),
+    });
+
+    return updated;
+  }
+
+  /**
+   * SSE Stream endpoint for real-time collaboration events within an itinerary.
+   * Delivers live proposals, votes, and reordering updates across participants.
+   * GET /api/v1/itineraries/:id/live-events
+   */
+  @UseGuards(JwtAuthGuard)
+  @Sse(':id/live-events')
+  async subscribeLiveEvents(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') userId: string,
+  ): Promise<Observable<MessageEvent>> {
+    await this.accessService.assertCanView(id, userId);
+    return this.eventsService.createStream(id, userId);
   }
 
   /**

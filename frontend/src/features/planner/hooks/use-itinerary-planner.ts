@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient, skipToken } from '@tanstack/react-query';
 import { itineraryService, ApiError } from '@/services/itinerary-planner.service';
-import { COPILOT_TOOL_NAMES } from '@/features/planner/utils/itinerary-schedule.util';
+import { COPILOT_TOOL_NAMES, swapStopsOptimistically } from '@/features/planner/utils/itinerary-schedule.util';
 import { NON_RETRYABLE_HTTP_STATUS } from '@/features/planner/constants/itinerary.constants';
 import type {
   GenerateItineraryRequest,
@@ -303,13 +303,62 @@ export function useUpdateItineraryMeta(itineraryId: string) {
   });
 }
 
-/** Move a destination up or down within the same day (swap order + shift times). */
+/** Move a destination up or down within the same day with Optimistic UI update. */
 export function useMoveDestination(itineraryId: string) {
-  return useItineraryDetailMutation(
-    itineraryId,
-    ({ destinationId, direction }: { destinationId: string; direction: MoveDirection }) =>
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      destinationId,
+      direction,
+    }: {
+      destinationId: string;
+      direction: MoveDirection;
+    }) =>
       itineraryService.moveDestination(itineraryId, destinationId, direction),
-  );
+
+    onMutate: async ({ destinationId, direction }) => {
+      // 1. Cancel in-flight queries so they don't overwrite optimistic cache
+      await queryClient.cancelQueries({
+        queryKey: itineraryKeys.detail(itineraryId),
+      });
+
+      // 2. Snapshot previous state for rollback
+      const previousItinerary = queryClient.getQueryData<ItineraryDetail>(
+        itineraryKeys.detail(itineraryId)
+      );
+
+      // 3. Optimistically swap stops in cache (0ms perceived latency)
+      if (previousItinerary) {
+        const optimisticItinerary = swapStopsOptimistically(
+          previousItinerary,
+          destinationId,
+          direction
+        );
+        queryClient.setQueryData(
+          itineraryKeys.detail(itineraryId),
+          optimisticItinerary
+        );
+      }
+
+      return { previousItinerary };
+    },
+
+    onError: (_err, _variables, context) => {
+      // Rollback to previous state on failure
+      if (context?.previousItinerary) {
+        queryClient.setQueryData(
+          itineraryKeys.detail(itineraryId),
+          context.previousItinerary
+        );
+      }
+    },
+
+    onSuccess: (updated) => {
+      // Sync official server calculation (accurate times and recalculated transit)
+      queryClient.setQueryData(itineraryKeys.detail(itineraryId), updated);
+    },
+  });
 }
 
 /** Direct DB add destination into a specific day without LLM round-trip. */

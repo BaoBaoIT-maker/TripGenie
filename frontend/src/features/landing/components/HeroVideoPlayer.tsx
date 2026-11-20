@@ -31,6 +31,7 @@ export function HeroVideoPlayer() {
         loop
         playsInline
         preload="auto"
+        poster={LANDING_CONFIG.hero.posterSrc}
         className="w-full h-full object-cover"
       >
         <source src={LANDING_CONFIG.hero.videoSrc} type="video/mp4" />

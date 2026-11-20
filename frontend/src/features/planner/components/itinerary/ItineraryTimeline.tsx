@@ -909,18 +909,18 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                       );
 
                       return (
-                        <div key={stopKey}>
+                        <div key={stopKey} className="transition-all duration-200">
                           {/* Stop Card Matched to Demo v2.3 */}
                           <article
                             id={`itinerary-activity-${act.placeId}`}
                             onClick={() => onSelectPlace?.(act.placeId)}
                             onMouseEnter={() => handleHoverPlace(act.placeId)}
                             onMouseLeave={() => handleHoverPlace(null)}
-                            className={`group bg-white rounded-2xl border p-3.5 sm:p-4 transition-colors cursor-pointer space-y-2.5 ${
+                            className={`group bg-white rounded-2xl border p-3.5 sm:p-4 transition-all duration-200 cursor-pointer space-y-2.5 ${
                               isSelected
                                 ? 'border-[#0194F3] ring-2 ring-[#0194F3]/15 shadow-sm'
                                 : 'border-slate-200/80 shadow-[0_2px_12px_-2px_rgba(15,23,42,0.04),0_1px_3px_0_rgba(15,23,42,0.03)] hover:border-slate-300'
-                            }`}
+                            } ${isMoving ? 'ring-2 ring-primary/40 shadow-md scale-[1.008]' : ''}`}
                             style={
                               isSelected
                                 ? { borderColor: dayColor, boxShadow: `0 0 0 2px ${dayColor}26` }

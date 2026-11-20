@@ -22,8 +22,10 @@ export interface QuickSuggestion {
 
 export const LANDING_CONFIG = {
   hero: {
-    videoSrc: "/videos/hero.mp4",
-    posterSrc: "https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=1920&auto=format&fit=crop&q=80",
+    videoSrc:
+      "https://res.cloudinary.com/drhe1rp0y/video/upload/f_auto,q_auto/v1795143433/tripgenie/assets/hero_video_720p.mp4",
+    posterSrc:
+      "https://res.cloudinary.com/drhe1rp0y/video/upload/f_auto,q_auto/v1795143433/tripgenie/assets/hero_video_720p.jpg",
     badgeText: "Lên lịch trình thông minh",
     headlineLine1: "Khám phá Việt Nam",
     headlineLine2: "theo cách của bạn",

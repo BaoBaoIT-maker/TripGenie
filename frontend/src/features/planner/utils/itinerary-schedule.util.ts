@@ -1,4 +1,5 @@
 import { Sunrise, Sun, Sunset, Moon } from "lucide-react";
+import type { ItineraryDetail, MoveDirection } from "@/types/itinerary";
 
 export interface AddablePlace {
   id: string;
@@ -218,4 +219,65 @@ export function resolveDefaultTimeSlot(
     rule.keywords.some((kw) => norm.includes(kw))
   );
   return matched ? matched.slotId : DEFAULT_TIME_SLOT_ID;
+}
+
+/**
+ * Pure function: Optimistically swaps an activity's position within its day.
+ * Returns a new immutable ItineraryDetail instance.
+ * If destinationId is invalid, not found, or at boundaries, returns original instance untouched.
+ */
+export function swapStopsOptimistically(
+  itinerary: ItineraryDetail,
+  destinationId: string,
+  direction: MoveDirection
+): ItineraryDetail {
+  if (!itinerary?.days || !destinationId) return itinerary;
+
+  let targetDayIndex = -1;
+  let targetActivityIndex = -1;
+
+  for (let d = 0; d < itinerary.days.length; d++) {
+    const activities = itinerary.days[d].activities || [];
+    const actIdx = activities.findIndex((a) => a.id === destinationId);
+    if (actIdx !== -1) {
+      targetDayIndex = d;
+      targetActivityIndex = actIdx;
+      break;
+    }
+  }
+
+  if (targetDayIndex === -1 || targetActivityIndex === -1) {
+    return itinerary;
+  }
+
+  const targetDay = itinerary.days[targetDayIndex];
+  const activities = targetDay.activities;
+  const swapIndex =
+    direction === "UP" ? targetActivityIndex - 1 : targetActivityIndex + 1;
+
+  // Boundary guards: cannot move UP past first item, or DOWN past last item
+  if (swapIndex < 0 || swapIndex >= activities.length) {
+    return itinerary;
+  }
+
+  // Immutably swap items and recalculate visitOrder
+  const newActivities = [...activities];
+  const [movedItem] = newActivities.splice(targetActivityIndex, 1);
+  newActivities.splice(swapIndex, 0, movedItem);
+
+  const updatedActivities = newActivities.map((act, index) => ({
+    ...act,
+    visitOrder: index + 1,
+  }));
+
+  const updatedDays = [...itinerary.days];
+  updatedDays[targetDayIndex] = {
+    ...targetDay,
+    activities: updatedActivities,
+  };
+
+  return {
+    ...itinerary,
+    days: updatedDays,
+  };
 }

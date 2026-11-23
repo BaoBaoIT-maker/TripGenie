@@ -179,6 +179,14 @@ enum ProposalStatus {
   @@map("proposal_status_enum")
 }
 
+enum PlaceImageStatus {
+  PENDING
+  APPROVED
+  REJECTED
+
+  @@map("place_image_status_enum")
+}
+
 enum ReportTargetType {
   PLACE
   REVIEW
@@ -255,6 +263,8 @@ model User {
   sentTripInvitations     TripInvitation[]     @relation("SentTripInvitations")
   receivedTripInvitations TripInvitation[]     @relation("ReceivedTripInvitations")
   createdBannedWords      BannedWord[]         @relation("AdminCreatedBannedWords")
+  contributedPlaceImages  PlaceImage[]         @relation("UserContributedPlaceImages")
+  reviewedPlaceImages     PlaceImage[]         @relation("AdminReviewedPlaceImages")
 
   @@map("users")
 }
@@ -399,19 +409,28 @@ model Place {
 }
 
 model PlaceImage {
-  id           String   @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  placeId      String   @map("place_id") @db.Uuid
-  imageUrl     String   @map("image_url")
-  thumbnailUrl String?  @map("thumbnail_url")
-  displayOrder Int      @default(0) @map("display_order")
-  isPrimary    Boolean  @default(false) @map("is_primary")
-  caption      String?
-  source       String?  @db.VarChar(50)
-  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id             String           @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
+  placeId        String           @map("place_id") @db.Uuid
+  imageUrl       String           @map("image_url")
+  thumbnailUrl   String?          @map("thumbnail_url")
+  displayOrder   Int              @default(0) @map("display_order")
+  isPrimary      Boolean          @default(false) @map("is_primary")
+  caption        String?
+  source         String?          @db.VarChar(50)
+  status         PlaceImageStatus @default(APPROVED)
+  uploadedById   String?          @map("uploaded_by_id") @db.Uuid
+  reviewedById   String?          @map("reviewed_by_id") @db.Uuid
+  moderationNote String?          @map("moderation_note")
+  reviewedAt     DateTime?        @map("reviewed_at") @db.Timestamptz
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
 
-  place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  place      Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  uploadedBy User? @relation("UserContributedPlaceImages", fields: [uploadedById], references: [id], onDelete: SetNull)
+  reviewedBy User? @relation("AdminReviewedPlaceImages", fields: [reviewedById], references: [id], onDelete: SetNull)
 
   @@index([placeId])
+  @@index([placeId, status])
+  @@index([status, createdAt])
   @@map("place_images")
 }
 

@@ -131,7 +131,7 @@ export class CopilotToolsService {
       },
       include: {
         category: true,
-        images: { where: { isPrimary: true }, take: 1 },
+        images: { where: { isPrimary: true, status: 'APPROVED' }, take: 1 },
       },
       orderBy: [{ reviewCount: 'desc' }, { ratingAvg: 'desc' }],
       take: scanLimit,
@@ -157,7 +157,7 @@ export class CopilotToolsService {
         },
         include: {
           category: true,
-          images: { where: { isPrimary: true }, take: 1 },
+          images: { where: { isPrimary: true, status: 'APPROVED' }, take: 1 },
         },
         orderBy: [{ reviewCount: 'desc' }, { ratingAvg: 'desc' }],
         take: scanLimit,

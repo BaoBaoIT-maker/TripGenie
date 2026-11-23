@@ -2,6 +2,8 @@ import { Module, Global, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
+export const REDIS_CLIENT_TOKEN = 'REDIS_CLIENT' as const;
+
 /**
  * Global RedisModule — provides a single shared Redis connection across all modules.
  */
@@ -9,7 +11,7 @@ import Redis from 'ioredis';
 @Module({
   providers: [
     {
-      provide: 'REDIS_CLIENT',
+      provide: REDIS_CLIENT_TOKEN,
       inject: [ConfigService],
       useFactory: (configService: ConfigService): Redis => {
         const logger = new Logger('RedisModule');
@@ -63,6 +65,6 @@ import Redis from 'ioredis';
       },
     },
   ],
-  exports: ['REDIS_CLIENT'],
+  exports: [REDIS_CLIENT_TOKEN],
 })
 export class RedisModule {}

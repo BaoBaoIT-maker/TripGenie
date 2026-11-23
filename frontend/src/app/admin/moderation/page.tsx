@@ -1,16 +1,18 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { Suspense, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { DEFAULT_AVATAR } from "@/config/avatars";
-import { ADMIN_UI_CONSTANTS } from "@/features/admin/admin.constants";
+  ADMIN_MODERATION_QUEUE_STATUSES,
+  ADMIN_ROUTES,
+  ADMIN_TAB_QUERY_PARAMS,
+  ADMIN_UI_CONSTANTS,
+} from "@/features/admin/admin.constants";
 import { AdminDebouncedSearch } from "@/features/admin/components/AdminDebouncedSearch";
 import { AdminBannedWordsSection } from "@/features/admin/components/AdminBannedWordsSection";
+import { AdminModerationPostsTable } from "@/features/admin/components/AdminModerationPostsTable";
+import { AdminModerationReportsTable } from "@/features/admin/components/AdminModerationReportsTable";
 import {
   PostReviewSheet,
   type ModerationReviewTarget,
@@ -26,15 +28,43 @@ import {
   useUpdateAdminModerationConfig,
 } from "@/features/admin/hooks/use-admin";
 
-type ModerationTabFilter =
-  | "ALL"
-  | "HIGH_REPORT"
-  | "FLAGGED"
-  | "PENDING"
-  | "BANNED_WORDS";
+type ModerationTab = "QUEUE" | "REPORTS" | "REJECTED" | "BANNED_WORDS";
+type QueueSubFilter = "ALL" | "FLAGGED" | "PENDING";
 
-export default function AdminModerationPage() {
-  const [activeFilter, setActiveFilter] = useState<ModerationTabFilter>("ALL");
+function resolveTabFromQuery(tabParam: string | null): ModerationTab {
+  switch (tabParam) {
+    case ADMIN_TAB_QUERY_PARAMS.MODERATION_REPORTS:
+      return "REPORTS";
+    case ADMIN_TAB_QUERY_PARAMS.MODERATION_REJECTED:
+      return "REJECTED";
+    case ADMIN_TAB_QUERY_PARAMS.MODERATION_BANNED_WORDS:
+      return "BANNED_WORDS";
+    default:
+      return "QUEUE";
+  }
+}
+
+function resolveRouteForTab(tab: ModerationTab): string {
+  switch (tab) {
+    case "REPORTS":
+      return ADMIN_ROUTES.MODERATION_REPORTS;
+    case "REJECTED":
+      return `${ADMIN_ROUTES.MODERATION}?${ADMIN_TAB_QUERY_PARAMS.KEY}=${ADMIN_TAB_QUERY_PARAMS.MODERATION_REJECTED}`;
+    case "BANNED_WORDS":
+      return `${ADMIN_ROUTES.MODERATION}?${ADMIN_TAB_QUERY_PARAMS.KEY}=${ADMIN_TAB_QUERY_PARAMS.MODERATION_BANNED_WORDS}`;
+    default:
+      return ADMIN_ROUTES.MODERATION;
+  }
+}
+
+function AdminModerationPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get(ADMIN_TAB_QUERY_PARAMS.KEY);
+  const activeTab = resolveTabFromQuery(tabParam);
+
+  const [queueSubFilter, setQueueSubFilter] = useState<QueueSubFilter>("ALL");
+  const [highPriorityOnly, setHighPriorityOnly] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [reviewTarget, setReviewTarget] =
@@ -48,38 +78,60 @@ export default function AdminModerationPage() {
   const rejectPostMutation = useRejectAdminPost();
   const resolveReportMutation = useResolveAdminReport();
 
-  const isReportView = activeFilter === "HIGH_REPORT";
+  const isPostsTab = activeTab === "QUEUE" || activeTab === "REJECTED";
+  const isReportsTab = activeTab === "REPORTS";
 
-  const { data: postsData, isLoading: isPostsLoading } =
-    useAdminModerationPosts({
-      page,
-      limit: ADMIN_UI_CONSTANTS.DEFAULT_PAGE_SIZE,
-      status:
-        activeFilter === "FLAGGED"
-          ? "FLAGGED"
-          : activeFilter === "PENDING"
-            ? "PENDING"
-            : undefined,
-      search: search || undefined,
-    });
+  const postsQueryParams =
+    activeTab === "REJECTED"
+      ? {
+          page,
+          limit: ADMIN_UI_CONSTANTS.DEFAULT_PAGE_SIZE,
+          status: "REJECTED" as const,
+          search: search || undefined,
+        }
+      : {
+          page,
+          limit: ADMIN_UI_CONSTANTS.DEFAULT_PAGE_SIZE,
+          ...(queueSubFilter === "ALL"
+            ? { statuses: ADMIN_MODERATION_QUEUE_STATUSES }
+            : { status: queueSubFilter }),
+          search: search || undefined,
+        };
 
-  const { data: reportsData, isLoading: isReportsLoading } =
-    useAdminModerationReports({
+  const {
+    data: postsData,
+    isLoading: isPostsLoading,
+    isError: isPostsError,
+    refetch: refetchPosts,
+  } = useAdminModerationPosts(postsQueryParams, { enabled: isPostsTab });
+
+  const {
+    data: reportsData,
+    isLoading: isReportsLoading,
+    isError: isReportsError,
+    refetch: refetchReports,
+  } = useAdminModerationReports(
+    {
       page,
       limit: ADMIN_UI_CONSTANTS.DEFAULT_PAGE_SIZE,
       status: "PENDING",
-      highPriorityOnly: activeFilter === "HIGH_REPORT" ? true : undefined,
-    });
+      highPriorityOnly: highPriorityOnly ? true : undefined,
+    },
+    { enabled: isReportsTab }
+  );
 
   const handleSearchChange = useCallback((val: string) => {
     setSearch(val);
     setPage(1);
   }, []);
 
-  const handleFilterChange = (next: ModerationTabFilter) => {
-    setActiveFilter(next);
-    setPage(1);
-  };
+  const handleTabChange = useCallback(
+    (next: ModerationTab) => {
+      router.replace(resolveRouteForTab(next), { scroll: false });
+      setPage(1);
+    },
+    [router]
+  );
 
   const aiEnabled = modConfig?.aiModerationEnabled ?? true;
 
@@ -90,65 +142,95 @@ export default function AdminModerationPage() {
 
   const pendingPostsCount = stats?.moderation.pendingPosts ?? 0;
   const flaggedPostsCount = stats?.moderation.flaggedPosts ?? 0;
-  const highReportCount = stats?.moderation.highPriorityReportAlerts ?? 0;
-  const totalModCount = pendingPostsCount + flaggedPostsCount + highReportCount;
+  const queueTotalCount = pendingPostsCount + flaggedPostsCount;
+  const pendingReportsCount = stats?.moderation.pendingReports ?? 0;
+  const highPriorityAlertCount =
+    stats?.moderation.highPriorityReportAlerts ?? 0;
+  const rejectedPostsCount = stats?.moderation.rejectedPosts ?? 0;
 
-  const postItems =
-    activeFilter === "ALL"
-      ? (postsData?.items ?? []).filter(
-          (p) =>
-            p.moderationStatus === "PENDING" || p.moderationStatus === "FLAGGED"
-        )
-      : (postsData?.items ?? []);
-
+  const postItems = postsData?.items ?? [];
   const reportItems = reportsData?.items ?? [];
+  const activeMeta = isReportsTab ? reportsData?.meta : postsData?.meta;
+  const totalPages = activeMeta?.totalPages ?? 1;
+  const totalItems = activeMeta?.total ?? 0;
 
   return (
     <div className="space-y-4">
-      {/* Row 1: Summary Cards + AI Auto-Moderation Control Card */}
+      {/* Row 1: 4 Summary Cards + Optimistic AI Auto-Moderation Control */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        <div className="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+        <button
+          type="button"
+          onClick={() => handleTabChange("QUEUE")}
+          className={`text-left bg-white rounded-2xl p-5 border shadow-2xs transition-colors cursor-pointer ${
+            activeTab === "QUEUE"
+              ? "border-[#0194F3]/50"
+              : "border-slate-200/80 hover:border-slate-300"
+          }`}
+        >
           <div className="text-xs font-semibold text-slate-500">
-            Báo cáo khẩn cấp (&ge; 20)
+            Chờ kiểm duyệt
           </div>
-          <div className="text-2xl font-extrabold text-rose-600 mt-2">
-            {highReportCount.toLocaleString("vi-VN")} mục
+          <div className="text-2xl font-extrabold text-[#10243A] mt-2 tabular-nums">
+            {queueTotalCount.toLocaleString("vi-VN")} bài viết
           </div>
-          <div className="text-[11px] text-slate-400 mt-1">
-            Cần Admin phân xử thủ công
+          <div className="text-[11px] text-slate-500 mt-1">
+            AI gắn cờ: <b className="text-amber-700">{flaggedPostsCount}</b> • Thủ công:{" "}
+            <b className="text-[#0194F3]">{pendingPostsCount}</b>
           </div>
-        </div>
+        </button>
 
-        <div className="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+        <button
+          type="button"
+          onClick={() => handleTabChange("REPORTS")}
+          className={`text-left bg-white rounded-2xl p-5 border shadow-2xs transition-colors cursor-pointer ${
+            activeTab === "REPORTS"
+              ? "border-[#0194F3]/50"
+              : "border-slate-200/80 hover:border-slate-300"
+          }`}
+        >
           <div className="text-xs font-semibold text-slate-500">
-            AI gắn cờ nghi vấn
+            Báo cáo vi phạm
           </div>
-          <div className="text-2xl font-extrabold text-amber-600 mt-2">
-            {flaggedPostsCount.toLocaleString("vi-VN")} bài viết
+          <div className="text-2xl font-extrabold text-rose-600 mt-2 tabular-nums">
+            {pendingReportsCount.toLocaleString("vi-VN")} báo cáo
           </div>
-          <div className="text-[11px] text-slate-400 mt-1">
-            Phát hiện từ khóa nhạy cảm
+          <div className="text-[11px] text-slate-500 mt-1">
+            {highPriorityAlertCount > 0 ? (
+              <>
+                <b className="text-rose-600">{highPriorityAlertCount} mục</b> ưu tiên cao cần phân xử
+              </>
+            ) : (
+              "Không có cảnh báo ưu tiên cao"
+            )}
           </div>
-        </div>
+        </button>
 
-        <div className="bg-white rounded-[24px] p-5 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)]">
+        <button
+          type="button"
+          onClick={() => handleTabChange("REJECTED")}
+          className={`text-left bg-white rounded-2xl p-5 border shadow-2xs transition-colors cursor-pointer ${
+            activeTab === "REJECTED"
+              ? "border-[#0194F3]/50"
+              : "border-slate-200/80 hover:border-slate-300"
+          }`}
+        >
           <div className="text-xs font-semibold text-slate-500">
-            Bài viết chờ duyệt
+            Đã gỡ / Từ chối
           </div>
-          <div className="text-2xl font-extrabold text-[#0194F3] mt-2">
-            {pendingPostsCount.toLocaleString("vi-VN")} bài viết
+          <div className="text-2xl font-extrabold text-slate-700 mt-2 tabular-nums">
+            {rejectedPostsCount.toLocaleString("vi-VN")} bài viết
           </div>
-          <div className="text-[11px] text-slate-400 mt-1">
-            Chưa hiển thị trên Cộng đồng
+          <div className="text-[11px] text-slate-500 mt-1">
+            Có thể xem lý do & khôi phục nếu nhầm
           </div>
-        </div>
+        </button>
 
-        {/* AI Auto-Moderation Toggle Switch Card (Exclusively in Moderation Tab) */}
-        <div className="bg-white rounded-[24px] p-5 border border-sky-200 shadow-[0_4px_20px_rgba(1,148,243,0.06)] flex flex-col justify-between">
+        {/* AI Auto-Moderation Toggle Switch Card */}
+        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-[#10243A] flex items-center gap-1.5">
               <i
-                className="fa-solid fa-robot text-[#0194F3]"
+                className="fa-solid fa-shield-halved text-[#0194F3]"
                 aria-hidden="true"
               />
               <span>AI Auto-Moderation</span>
@@ -160,12 +242,12 @@ export default function AdminModerationPage() {
               aria-label="Bật hoặc tắt AI Auto-Moderation"
               disabled={updateConfigMutation.isPending}
               onClick={handleToggleAi}
-              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 disabled:opacity-50 ${
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 disabled:opacity-60 ${
                 aiEnabled ? "bg-[#0194F3]" : "bg-slate-300"
               }`}
             >
               <span
-                className={`pointer-events-none inline-block size-5 transform rounded-full bg-white shadow-sm transition duration-200 ${
+                className={`pointer-events-none inline-block size-5 transform rounded-full bg-white shadow-xs transition duration-200 ${
                   aiEnabled ? "translate-x-5" : "translate-x-0"
                 }`}
               />
@@ -173,424 +255,236 @@ export default function AdminModerationPage() {
           </div>
           <div className="mt-2">
             <span
-              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
                 aiEnabled
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "bg-amber-50 text-amber-700"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200/80"
+                  : "bg-amber-50 text-amber-800 border-amber-200/80"
               }`}
             >
               {aiEnabled
-                ? "Đang bật duyệt tự động 3 tầng"
+                ? "Đang bật duyệt tự động"
                 : "Đang tắt — Duyệt thủ công 100%"}
             </span>
           </div>
-          <div className="text-[11px] text-slate-400 mt-1">
+          <div className="text-[11px] text-slate-500 mt-1">
             {aiEnabled
-              ? "Tự động lọc từ cấm & chấm điểm bài mới"
-              : "Mọi bài viết mới sẽ vào hàng đợi Chờ duyệt"}
+              ? "Bài nghi vấn sẽ tự động gắn cờ về hàng đợi"
+              : "Mọi bài đăng mới đều chờ Quản trị viên duyệt"}
           </div>
         </div>
       </div>
 
-      {/* Row 2: Moderation Queue & Reports Table */}
-      <div className="bg-white rounded-[24px] p-6 border border-slate-200/70 shadow-[0_4px_20px_rgba(16,36,58,0.03)] space-y-5">
+      {/* Row 2: 4 Clean Tabs + Contextual Sub-filters + Dedicated Table Component */}
+      <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-2xs space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex p-1 rounded-2xl bg-[#F4F7FB] border border-slate-200/60">
+          <div
+            role="tablist"
+            aria-label="Phân loại kiểm duyệt nội dung"
+            className="inline-flex flex-wrap p-1 rounded-xl bg-[#F5F9FF] border border-slate-200/70 gap-1"
+          >
             <button
               type="button"
-              onClick={() => handleFilterChange("ALL")}
-              className={`px-4 py-2 rounded-xl text-xs cursor-pointer transition-colors ${
-                activeFilter === "ALL"
-                  ? "font-bold bg-[#10243A] text-white"
-                  : "font-semibold text-slate-600 hover:text-slate-900"
+              role="tab"
+              aria-selected={activeTab === "QUEUE"}
+              onClick={() => handleTabChange("QUEUE")}
+              className={`px-3.5 py-2 rounded-lg text-xs cursor-pointer transition-colors ${
+                activeTab === "QUEUE"
+                  ? "font-bold bg-[#0194F3] text-white shadow-2xs"
+                  : "font-semibold text-slate-600 hover:text-[#10243A]"
               }`}
             >
-              Tất cả ({totalModCount})
+              Chờ duyệt ({queueTotalCount})
             </button>
+
             <button
               type="button"
-              onClick={() => handleFilterChange("HIGH_REPORT")}
-              className={`px-4 py-2 rounded-xl text-xs cursor-pointer transition-colors ${
-                activeFilter === "HIGH_REPORT"
-                  ? "font-bold bg-[#10243A] text-white"
-                  : "font-semibold text-slate-600 hover:text-slate-900"
+              role="tab"
+              aria-selected={activeTab === "REPORTS"}
+              onClick={() => handleTabChange("REPORTS")}
+              className={`px-3.5 py-2 rounded-lg text-xs cursor-pointer transition-colors ${
+                activeTab === "REPORTS"
+                  ? "font-bold bg-[#0194F3] text-white shadow-2xs"
+                  : "font-semibold text-slate-600 hover:text-[#10243A]"
               }`}
             >
-              &ge; 20 Reports ({highReportCount})
+              Báo cáo vi phạm ({pendingReportsCount})
             </button>
+
             <button
               type="button"
-              onClick={() => handleFilterChange("FLAGGED")}
-              className={`px-4 py-2 rounded-xl text-xs cursor-pointer transition-colors ${
-                activeFilter === "FLAGGED"
-                  ? "font-bold bg-[#10243A] text-white"
-                  : "font-semibold text-slate-600 hover:text-slate-900"
+              role="tab"
+              aria-selected={activeTab === "REJECTED"}
+              onClick={() => handleTabChange("REJECTED")}
+              className={`px-3.5 py-2 rounded-lg text-xs cursor-pointer transition-colors ${
+                activeTab === "REJECTED"
+                  ? "font-bold bg-[#0194F3] text-white shadow-2xs"
+                  : "font-semibold text-slate-600 hover:text-[#10243A]"
               }`}
             >
-              AI Nghi vấn ({flaggedPostsCount})
+              Đã gỡ / Từ chối ({rejectedPostsCount})
             </button>
+
             <button
               type="button"
-              onClick={() => handleFilterChange("PENDING")}
-              className={`px-4 py-2 rounded-xl text-xs cursor-pointer transition-colors ${
-                activeFilter === "PENDING"
-                  ? "font-bold bg-[#10243A] text-white"
-                  : "font-semibold text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Chờ duyệt ({pendingPostsCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => handleFilterChange("BANNED_WORDS")}
-              className={`px-4 py-2 rounded-xl text-xs cursor-pointer transition-colors flex items-center gap-1.5 ${
-                activeFilter === "BANNED_WORDS"
-                  ? "font-bold bg-[#10243A] text-white"
-                  : "font-semibold text-slate-600 hover:text-slate-900"
+              role="tab"
+              aria-selected={activeTab === "BANNED_WORDS"}
+              onClick={() => handleTabChange("BANNED_WORDS")}
+              className={`px-3.5 py-2 rounded-lg text-xs cursor-pointer transition-colors flex items-center gap-1.5 ${
+                activeTab === "BANNED_WORDS"
+                  ? "font-bold bg-[#0194F3] text-white shadow-2xs"
+                  : "font-semibold text-slate-600 hover:text-[#10243A]"
               }`}
             >
               <i
-                className="fa-solid fa-shield-halved text-[11px]"
+                className="fa-solid fa-ban text-[11px]"
                 aria-hidden="true"
               />
               <span>Từ khóa cấm</span>
             </button>
           </div>
 
-          {activeFilter !== "BANNED_WORDS" && (
-            <AdminDebouncedSearch
-              placeholder="Tìm tiêu đề, nội dung bài viết..."
-              onSearchChange={handleSearchChange}
-            />
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {activeTab === "QUEUE" && (
+              <div className="inline-flex items-center gap-1 bg-[#F8FAFC] border border-slate-200/80 rounded-xl p-1">
+                {(
+                  [
+                    { id: "ALL", label: "Tất cả" },
+                    { id: "FLAGGED", label: `AI gắn cờ (${flaggedPostsCount})` },
+                    { id: "PENDING", label: `Thủ công (${pendingPostsCount})` },
+                  ] as const
+                ).map((chip) => (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    onClick={() => {
+                      setQueueSubFilter(chip.id);
+                      setPage(1);
+                    }}
+                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors cursor-pointer ${
+                      queueSubFilter === chip.id
+                        ? "bg-white text-[#0194F3] shadow-2xs border border-slate-200/80"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {activeTab === "REPORTS" && (
+              <button
+                type="button"
+                onClick={() => {
+                  setHighPriorityOnly((prev) => !prev);
+                  setPage(1);
+                }}
+                className={`h-9 px-3 rounded-xl text-xs font-bold border transition-colors cursor-pointer inline-flex items-center gap-1.5 ${
+                  highPriorityOnly
+                    ? "bg-rose-50 text-rose-700 border-rose-300"
+                    : "bg-[#F8FAFC] text-slate-600 border-slate-200 hover:text-slate-900"
+                }`}
+              >
+                <i className="fa-solid fa-filter text-[11px]" aria-hidden="true" />
+                <span>Chỉ ưu tiên cao ({highPriorityAlertCount})</span>
+              </button>
+            )}
+
+            {isPostsTab && (
+              <AdminDebouncedSearch
+                placeholder="Tìm tiêu đề, nội dung bài viết..."
+                onSearchChange={handleSearchChange}
+              />
+            )}
+          </div>
         </div>
 
-        {activeFilter === "BANNED_WORDS" ? (
+        {activeTab === "BANNED_WORDS" ? (
           <AdminBannedWordsSection />
         ) : (
-          <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                <th className="py-3.5 pr-4">Bài viết & Chủ đề</th>
-                <th className="py-3.5 px-4">Tác giả</th>
-                <th className="py-3.5 px-4">Phân loại</th>
-                <th className="py-3.5 px-4">Chẩn đoán</th>
-                <th className="py-3.5 pl-4 text-right w-14" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-xs">
-              {isReportView ? (
-                reportItems.length > 0 ? (
-                  reportItems.map((report) => {
-                    const post = report.targetPost;
-                    const cover =
-                      post?.mediaUrls?.[0] ||
-                      ADMIN_UI_CONSTANTS.FALLBACK_PLACE_IMAGE;
-                    const authorName =
-                      post?.user?.fullName ||
-                      report.reporter?.fullName ||
-                      "Thành viên";
-                    const authorEmail =
-                      post?.user?.email || report.reporter?.email || "";
-                    const authorAvatar =
-                      post?.user?.avatarUrl || DEFAULT_AVATAR;
-
-                    return (
-                      <tr
-                        key={report.id}
-                        onClick={() =>
-                          setReviewTarget({ kind: "REPORT", report })
-                        }
-                        className="hover:bg-slate-50/90 transition-colors cursor-pointer"
-                      >
-                        <td className="py-4 pr-4">
-                          <div className="flex items-center gap-3.5">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={cover}
-                              alt=""
-                              loading="lazy"
-                              decoding="async"
-                              className="size-11 rounded-2xl object-cover shrink-0 border border-slate-200"
-                            />
-                            <div>
-                              <div className="font-bold text-[#10243A] line-clamp-1">
-                                {post?.title ||
-                                  `Báo cáo #${report.targetId.slice(0, 8)}`}
-                              </div>
-                              <span className="text-[11px] font-medium text-slate-400">
-                                {post?.group?.name || "Cộng đồng chung"}
-                              </span>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4">
-                          <div className="flex items-center gap-2.5">
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src={authorAvatar}
-                              alt=""
-                              loading="lazy"
-                              className="size-7 rounded-full object-cover"
-                            />
-                            <div>
-                              <div className="font-bold text-slate-800">
-                                {authorName}
-                              </div>
-                              <div className="text-[11px] text-slate-400">
-                                {authorEmail}
-                              </div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="py-4 px-4 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-200 font-bold text-[11px]">
-                            <i className="fa-solid fa-fire" aria-hidden="true" />
-                            <span>{report.targetReportCount} Reports</span>
-                          </span>
-                        </td>
-                        <td className="py-4 px-4 text-slate-600 max-w-xs">
-                          <p className="line-clamp-2 text-xs">
-                            {report.description ||
-                              `Báo cáo ${report.reportType} — Hệ thống giữ hiển thị chống công kích hội đồng.`}
-                          </p>
-                        </td>
-                        <td
-                          className="py-4 pl-4 text-right whitespace-nowrap"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              aria-label="Mở menu thao tác"
-                              className="size-8 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-[#10243A] inline-flex items-center justify-center cursor-pointer outline-none"
-                            >
-                              <i
-                                className="fa-solid fa-ellipsis text-sm"
-                                aria-hidden="true"
-                              />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent
-                              align="end"
-                              className="w-48 rounded-2xl p-1.5 border border-slate-200 bg-white shadow-xl"
-                            >
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  setReviewTarget({ kind: "REPORT", report })
-                                }
-                                className="rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 cursor-pointer flex items-center gap-2.5"
-                              >
-                                <i
-                                  className="fa-regular fa-eye w-4 text-slate-400"
-                                  aria-hidden="true"
-                                />
-                                <span>Xem chi tiết & Phân xử</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  resolveReportMutation.mutate({
-                                    reportId: report.id,
-                                    action: "DISMISS",
-                                  })
-                                }
-                                className="rounded-xl px-3 py-2 text-xs font-semibold text-emerald-600 cursor-pointer flex items-center gap-2.5"
-                              >
-                                <i
-                                  className="fa-solid fa-check w-4"
-                                  aria-hidden="true"
-                                />
-                                <span>Bác bỏ Report ảo</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  resolveReportMutation.mutate({
-                                    reportId: report.id,
-                                    action: "RESOLVE",
-                                    rejectTargetPost: true,
-                                  })
-                                }
-                                className="rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 cursor-pointer flex items-center gap-2.5"
-                              >
-                                <i
-                                  className="fa-solid fa-ban w-4"
-                                  aria-hidden="true"
-                                />
-                                <span>Xác nhận vi phạm & Gỡ bài</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    );
+          <>
+            {(isPostsTab && isPostsError) || (isReportsTab && isReportsError) ? (
+              <div className="rounded-xl bg-rose-50 border border-rose-200 p-4 flex items-center justify-between text-xs text-rose-800">
+                <span className="font-semibold">
+                  Không thể tải dữ liệu kiểm duyệt. Vui lòng thử lại.
+                </span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void (isReportsTab ? refetchReports() : refetchPosts())
+                  }
+                  className="px-3 py-1.5 rounded-lg bg-white border border-rose-200 hover:bg-rose-100 text-rose-700 font-bold cursor-pointer"
+                >
+                  Thử lại
+                </button>
+              </div>
+            ) : isReportsTab ? (
+              <AdminModerationReportsTable
+                reports={reportItems}
+                isLoading={isReportsLoading}
+                highPriorityOnly={highPriorityOnly}
+                onSelectReport={(report) =>
+                  setReviewTarget({ kind: "REPORT", report })
+                }
+                onDismissReport={(reportId) =>
+                  resolveReportMutation.mutate({ reportId, action: "DISMISS" })
+                }
+                onResolveAndRejectPost={(reportId) =>
+                  resolveReportMutation.mutate({
+                    reportId,
+                    action: "RESOLVE",
+                    rejectTargetPost: true,
                   })
-                ) : (
-                  <tr>
-                    <td
-                      colSpan={5}
-                      className="py-12 text-center text-slate-400 font-semibold"
-                    >
-                      {isReportsLoading
-                        ? "Đang tải danh sách báo cáo..."
-                        : "Không có báo cáo khẩn cấp nào cần xử lý."}
-                    </td>
-                  </tr>
-                )
-              ) : postItems.length > 0 ? (
-                postItems.map((post) => {
-                  const cover =
-                    post.mediaUrls?.[0] ||
-                    ADMIN_UI_CONSTANTS.FALLBACK_PLACE_IMAGE;
-                  return (
-                    <tr
-                      key={post.id}
-                      onClick={() => setReviewTarget({ kind: "POST", post })}
-                      className="hover:bg-slate-50/90 transition-colors cursor-pointer"
-                    >
-                      <td className="py-4 pr-4">
-                        <div className="flex items-center gap-3.5">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={cover}
-                            alt=""
-                            loading="lazy"
-                            decoding="async"
-                            className="size-11 rounded-2xl object-cover shrink-0 border border-slate-200"
-                          />
-                          <div>
-                            <div className="font-bold text-[#10243A] line-clamp-1">
-                              {post.title}
-                            </div>
-                            <span className="text-[11px] font-medium text-slate-400">
-                              {post.group?.name || "Cộng đồng chung"}
-                            </span>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div className="flex items-center gap-2.5">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={post.user?.avatarUrl || DEFAULT_AVATAR}
-                            alt=""
-                            loading="lazy"
-                            className="size-7 rounded-full object-cover"
-                          />
-                          <div>
-                            <div className="font-bold text-slate-800">
-                              {post.user?.fullName || "Thành viên"}
-                            </div>
-                            <div className="text-[11px] text-slate-400">
-                              {post.user?.email || ""}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4 whitespace-nowrap">
-                        {post.moderationStatus === "FLAGGED" ? (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-bold text-[11px]">
-                            <i
-                              className="fa-solid fa-triangle-exclamation"
-                              aria-hidden="true"
-                            />
-                            <span>AI Nghi vấn</span>
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-50 text-[#0194F3] border border-sky-200 font-bold text-[11px]">
-                            <i
-                              className="fa-regular fa-clock"
-                              aria-hidden="true"
-                            />
-                            <span>Chờ duyệt</span>
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-4 px-4 text-slate-600 max-w-xs">
-                        <p className="line-clamp-2 text-xs">
-                          {post.moderationNote ||
-                            (post.moderationStatus === "FLAGGED"
-                              ? "Phễu AI phát hiện từ nhạy cảm cần kiểm tra ngữ cảnh."
-                              : "Bài viết mới ở trạng thái chờ duyệt thủ công.")}
-                        </p>
-                      </td>
-                      <td
-                        className="py-4 pl-4 text-right whitespace-nowrap"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            aria-label="Mở menu thao tác"
-                            className="size-8 rounded-xl hover:bg-slate-100 text-slate-500 hover:text-[#10243A] inline-flex items-center justify-center cursor-pointer outline-none"
-                          >
-                            <i
-                              className="fa-solid fa-ellipsis text-sm"
-                              aria-hidden="true"
-                            />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="end"
-                            className="w-48 rounded-2xl p-1.5 border border-slate-200 bg-white shadow-xl"
-                          >
-                            <DropdownMenuItem
-                              onClick={() =>
-                                setReviewTarget({ kind: "POST", post })
-                              }
-                              className="rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 cursor-pointer flex items-center gap-2.5"
-                            >
-                              <i
-                                className="fa-regular fa-eye w-4 text-slate-400"
-                                aria-hidden="true"
-                              />
-                              <span>Xem chi tiết & Phân xử</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                approvePostMutation.mutate({
-                                  postId: post.id,
-                                })
-                              }
-                              className="rounded-xl px-3 py-2 text-xs font-semibold text-emerald-600 cursor-pointer flex items-center gap-2.5"
-                            >
-                              <i
-                                className="fa-solid fa-check w-4"
-                                aria-hidden="true"
-                              />
-                              <span>Phê duyệt nhanh</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() =>
-                                rejectPostMutation.mutate({
-                                  postId: post.id,
-                                })
-                              }
-                              className="rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 cursor-pointer flex items-center gap-2.5"
-                            >
-                              <i
-                                className="fa-solid fa-ban w-4"
-                                aria-hidden="true"
-                              />
-                              <span>Từ chối / Gỡ bài</span>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td
-                    colSpan={5}
-                    className="py-12 text-center text-slate-400 font-semibold"
+                }
+              />
+            ) : (
+              <AdminModerationPostsTable
+                posts={postItems}
+                isLoading={isPostsLoading}
+                isRejectedTab={activeTab === "REJECTED"}
+                onSelectPost={(post) => setReviewTarget({ kind: "POST", post })}
+                onApprovePost={(postId) =>
+                  approvePostMutation.mutate({ postId })
+                }
+                onRejectPost={(postId) => rejectPostMutation.mutate({ postId })}
+              />
+            )}
+
+            {/* Pagination Footer */}
+            {totalItems > 0 && (
+              <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+                <div className="font-medium">
+                  Trang <b className="text-[#10243A]">{page}</b> /{" "}
+                  <b className="text-[#10243A]">{totalPages}</b> • Tổng{" "}
+                  <b className="text-[#10243A] tabular-nums">
+                    {totalItems.toLocaleString("vi-VN")}
+                  </b>{" "}
+                  mục
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="px-3 h-8 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs cursor-pointer disabled:opacity-40"
                   >
-                    {isPostsLoading
-                      ? "Đang tải hàng đợi kiểm duyệt..."
-                      : "Hàng đợi kiểm duyệt trống."}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                    Trước
+                  </button>
+                  <span className="px-3 h-8 rounded-xl bg-[#0194F3] text-white font-bold text-xs inline-flex items-center justify-center tabular-nums">
+                    {page}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    className="px-3 h-8 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs cursor-pointer disabled:opacity-40"
+                  >
+                    Sau
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -599,5 +493,13 @@ export default function AdminModerationPage() {
         onClose={() => setReviewTarget(null)}
       />
     </div>
+  );
+}
+
+export default function AdminModerationPage() {
+  return (
+    <Suspense fallback={<Skeleton className="h-96 w-full rounded-2xl" />}>
+      <AdminModerationPageContent />
+    </Suspense>
   );
 }

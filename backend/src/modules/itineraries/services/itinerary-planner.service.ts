@@ -283,6 +283,7 @@ const DETAIL_INCLUDE = {
           openingHours: true,
           category: { select: { name: true, nameVi: true, slug: true } },
           images: {
+            where: { status: 'APPROVED' },
             orderBy: [{ isPrimary: 'desc' }, { displayOrder: 'asc' }],
             take: 1,
             select: { imageUrl: true, thumbnailUrl: true },
@@ -307,6 +308,7 @@ const DETAIL_INCLUDE = {
           priceRange: true,
           category: { select: { name: true, nameVi: true, slug: true } },
           images: {
+            where: { status: 'APPROVED' },
             orderBy: [{ isPrimary: 'desc' }, { displayOrder: 'asc' }],
             take: 1,
             select: { imageUrl: true, thumbnailUrl: true },

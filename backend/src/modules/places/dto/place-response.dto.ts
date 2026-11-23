@@ -1,4 +1,4 @@
-import { BudgetLevel } from '@prisma/client';
+import { BudgetLevel, PlaceImageStatus } from '@prisma/client';
 
 export class PlaceCategoryDto {
   id: number;
@@ -21,6 +21,7 @@ export class PlaceImageDto {
   thumbnailUrl: string | null;
   isPrimary: boolean;
   caption: string | null;
+  status?: PlaceImageStatus;
 }
 
 export class PlaceSourceDto {

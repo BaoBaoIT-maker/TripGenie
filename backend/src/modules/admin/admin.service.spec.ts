@@ -6,12 +6,18 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
+import { AdminUsersService } from './services/admin-users.service';
+import { AdminPlacesService } from './services/admin-places.service';
+import { AdminCommunityService } from './services/admin-community.service';
 import { PrismaService } from '@/database/prisma.service';
 import { AuthenticatedUser } from '@/common/types';
 import { ADMIN_ERROR_CODES, ADMIN_CONSTANTS } from './admin.constants';
 
 describe('AdminService', () => {
   let service: AdminService;
+  let usersService: AdminUsersService;
+  let placesService: AdminPlacesService;
+  let communityService: AdminCommunityService;
   let mockPrisma: {
     auditLog: {
       create: jest.Mock;
@@ -50,6 +56,13 @@ describe('AdminService', () => {
     contentReport: {
       count: jest.Mock;
       groupBy: jest.Mock;
+    };
+    placeImage: {
+      findUnique: jest.Mock;
+      count: jest.Mock;
+      findMany: jest.Mock;
+      update: jest.Mock;
+      updateMany: jest.Mock;
     };
     $transaction: jest.Mock;
   };
@@ -112,12 +125,22 @@ describe('AdminService', () => {
         count: jest.fn(),
         groupBy: jest.fn(),
       },
+      placeImage: {
+        findUnique: jest.fn(),
+        count: jest.fn(),
+        findMany: jest.fn(),
+        update: jest.fn(),
+        updateMany: jest.fn(),
+      },
       $transaction: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AdminService,
+        AdminUsersService,
+        AdminPlacesService,
+        AdminCommunityService,
         {
           provide: PrismaService,
           useValue: mockPrisma,
@@ -126,6 +149,9 @@ describe('AdminService', () => {
     }).compile();
 
     service = module.get<AdminService>(AdminService);
+    usersService = module.get<AdminUsersService>(AdminUsersService);
+    placesService = module.get<AdminPlacesService>(AdminPlacesService);
+    communityService = module.get<AdminCommunityService>(AdminCommunityService);
   });
 
   it('should be defined', () => {
@@ -194,7 +220,7 @@ describe('AdminService', () => {
     it('getUsers should strictly enforce role: USER to isolate admin accounts', async () => {
       mockPrisma.$transaction.mockResolvedValue([0, []]);
 
-      await service.getUsers({ page: 1, limit: 20, search: 'john' });
+      await usersService.getUsers({ page: 1, limit: 20, search: 'john' });
 
       expect(mockPrisma.$transaction).toHaveBeenCalled();
       const countCall = mockPrisma.user.count.mock.calls[0][0];
@@ -210,7 +236,7 @@ describe('AdminService', () => {
         mockPrisma.$transaction.mockImplementation(async (callback) => callback(mockTx));
 
         await expect(
-          service.banUser(mockAdminUser, 'user-999', { reason: 'Violating rules' }),
+          usersService.banUser(mockAdminUser, 'user-999', { reason: 'Violating rules' }),
         ).rejects.toThrow(NotFoundException);
       });
 
@@ -227,7 +253,7 @@ describe('AdminService', () => {
         mockPrisma.$transaction.mockImplementation(async (callback) => callback(mockTx));
 
         try {
-          await service.banUser(mockAdminUser, 'admin-2', { reason: 'Test' });
+          await usersService.banUser(mockAdminUser, 'admin-2', { reason: 'Test' });
           fail('Should have thrown BadRequestException');
         } catch (err: any) {
           expect(err).toBeInstanceOf(BadRequestException);
@@ -251,7 +277,7 @@ describe('AdminService', () => {
         };
         mockPrisma.$transaction.mockImplementation(async (callback) => callback(mockTx));
 
-        const result = await service.banUser(
+        const result = await usersService.banUser(
           mockAdminUser,
           'user-2',
           { reason: 'Spamming' },
@@ -287,7 +313,7 @@ describe('AdminService', () => {
         };
         mockPrisma.$transaction.mockImplementation(async (callback) => callback(mockTx));
 
-        const result = await service.promoteUserToAdmin(
+        const result = await usersService.promoteUserToAdmin(
           mockAdminUser,
           'user-candidate',
           { notes: 'Promoted to moderator/admin' },
@@ -313,7 +339,7 @@ describe('AdminService', () => {
         mockPrisma.$transaction.mockImplementation(async (callback) => callback(mockTx));
 
         try {
-          await service.createPlace(mockAdminUser, {
+          await placesService.createPlace(mockAdminUser, {
             name: 'Invalid Place',
             address: '123 Fake St',
             latitude: 120,
@@ -343,7 +369,7 @@ describe('AdminService', () => {
         mockPrisma.$transaction.mockImplementation(async (callback) => callback(mockTx));
 
         try {
-          await service.createPlace(mockAdminUser, {
+          await placesService.createPlace(mockAdminUser, {
             name: 'Hồ Gươm nhầm vùng Đà Lạt',
             address: 'Hoàn Kiếm',
             latitude: 21.0285,
@@ -387,7 +413,7 @@ describe('AdminService', () => {
         };
         mockPrisma.$transaction.mockImplementation(async (callback) => callback(mockTx));
 
-        const result = await service.createPlace(
+        const result = await placesService.createPlace(
           mockAdminUser,
           {
             name: '  Đỉnh Bà Nà Hills  ',
@@ -440,7 +466,7 @@ describe('AdminService', () => {
         };
         mockPrisma.$transaction.mockImplementation(async (callback) => callback(mockTx));
 
-        const result = await service.deletePlace(
+        const result = await placesService.deletePlace(
           mockAdminUser,
           'place-referenced-1',
           mockMeta,
@@ -478,7 +504,7 @@ describe('AdminService', () => {
         };
         mockPrisma.$transaction.mockImplementation(async (callback) => callback(mockTx));
 
-        const result = await service.createCommunityGroup(
+        const result = await communityService.createCommunityGroup(
           mockAdminUser,
           {
             name: '  Săn Mây Đà Lạt  ',
@@ -512,7 +538,7 @@ describe('AdminService', () => {
         mockPrisma.$transaction.mockImplementation(async (callback) => callback(mockTx));
 
         try {
-          await service.createCommunityGroup(mockAdminUser, {
+          await communityService.createCommunityGroup(mockAdminUser, {
             name: 'Săn Mây Đà Lạt',
           });
           fail('Should have thrown ConflictException');
@@ -542,7 +568,7 @@ describe('AdminService', () => {
         mockPrisma.$transaction.mockImplementation(async (callback) => callback(mockTx));
 
         try {
-          await service.updateCommunityGroup(mockAdminUser, 'default-group-id', {
+          await communityService.updateCommunityGroup(mockAdminUser, 'default-group-id', {
             isActive: false,
           });
           fail('Should have thrown BadRequestException');
@@ -554,7 +580,7 @@ describe('AdminService', () => {
         }
 
         try {
-          await service.deleteCommunityGroup(mockAdminUser, 'default-group-id');
+          await communityService.deleteCommunityGroup(mockAdminUser, 'default-group-id');
           fail('Should have thrown BadRequestException');
         } catch (err: any) {
           expect(err).toBeInstanceOf(BadRequestException);
@@ -596,7 +622,7 @@ describe('AdminService', () => {
         };
         mockPrisma.$transaction.mockImplementation(async (callback) => callback(mockTx));
 
-        const result = await service.deleteCommunityGroup(
+        const result = await communityService.deleteCommunityGroup(
           mockAdminUser,
           'group-regular-1',
           mockMeta,
@@ -649,6 +675,8 @@ describe('AdminService', () => {
           { targetType: 'POST', targetId: 'post-hot-1', _count: { _all: 22 } },
           { targetType: 'POST', targetId: 'post-norm-2', _count: { _all: 6 } },
         ], // pendingReportsByTarget
+        9, // rejectedPosts
+        4, // pendingPlacePhotos
       ]);
 
       const stats = await service.getDashboardStats();
@@ -661,6 +689,7 @@ describe('AdminService', () => {
         newThisWeek: 19,
       });
       expect(stats.places.total).toBe(1200);
+      expect(stats.places.pendingPhotos).toBe(4);
       expect(stats.places.byCategory).toEqual([
         {
           id: 1,
@@ -678,10 +707,104 @@ describe('AdminService', () => {
       expect(stats.moderation).toEqual({
         pendingPosts: 5,
         flaggedPosts: 3,
+        rejectedPosts: 9,
         pendingReports: 28,
         highPriorityReportAlerts: 1,
         highPriorityReportThreshold: 20,
       });
+    });
+  });
+
+  describe('Step 7: Place Photo Contributions Moderation', () => {
+    it('approves a pending photo and promotes it to primary atomically', async () => {
+      mockPrisma.placeImage.findUnique.mockResolvedValue({
+        id: 'img-1',
+        placeId: 'place-1',
+        status: 'PENDING',
+        isPrimary: false,
+        place: { id: 'place-1', name: 'Bãi Mỹ Khê' },
+      });
+
+      const txMock = {
+        placeImage: {
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+          update: jest.fn().mockResolvedValue({
+            id: 'img-1',
+            status: 'APPROVED',
+            isPrimary: true,
+          }),
+        },
+        auditLog: { create: jest.fn().mockResolvedValue({ id: 'audit-1' }) },
+      };
+      mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof txMock) => unknown) =>
+        cb(txMock),
+      );
+
+      const res = await placesService.approvePlacePhoto(
+        mockAdminUser,
+        'img-1',
+        { setAsPrimary: true },
+        mockMeta,
+      );
+
+      expect(res.success).toBe(true);
+      expect(txMock.placeImage.updateMany).toHaveBeenCalledWith({
+        where: { placeId: 'place-1', id: { not: 'img-1' } },
+        data: { isPrimary: false },
+      });
+      expect(txMock.placeImage.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'img-1' },
+          data: expect.objectContaining({
+            status: 'APPROVED',
+            isPrimary: true,
+          }),
+        }),
+      );
+      expect(txMock.auditLog.create).toHaveBeenCalled();
+    });
+
+    it('rejects a photo while keeping its record and logs audit trail', async () => {
+      mockPrisma.placeImage.findUnique.mockResolvedValue({
+        id: 'img-2',
+        placeId: 'place-1',
+        status: 'PENDING',
+        isPrimary: false,
+        place: { id: 'place-1', name: 'Bãi Mỹ Khê' },
+      });
+
+      const txMock = {
+        placeImage: {
+          update: jest.fn().mockResolvedValue({
+            id: 'img-2',
+            status: 'REJECTED',
+            isPrimary: false,
+          }),
+        },
+        auditLog: { create: jest.fn().mockResolvedValue({ id: 'audit-2' }) },
+      };
+      mockPrisma.$transaction.mockImplementation(async (cb: (tx: typeof txMock) => unknown) =>
+        cb(txMock),
+      );
+
+      const res = await placesService.rejectPlacePhoto(
+        mockAdminUser,
+        'img-2',
+        { reason: 'Ảnh bị mờ' },
+        mockMeta,
+      );
+
+      expect(res.success).toBe(true);
+      expect(txMock.placeImage.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'REJECTED',
+            isPrimary: false,
+            moderationNote: 'Ảnh bị mờ',
+          }),
+        }),
+      );
+      expect(txMock.auditLog.create).toHaveBeenCalled();
     });
   });
 });

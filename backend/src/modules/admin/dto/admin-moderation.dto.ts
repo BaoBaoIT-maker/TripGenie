@@ -1,4 +1,5 @@
 import {
+  IsArray,
   IsBoolean,
   IsEnum,
   IsIn,
@@ -36,6 +37,23 @@ export class QueryAdminModerationPostsDto {
   @IsOptional()
   @IsEnum(PostModerationStatus)
   status?: PostModerationStatus;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) {
+      return value.map((v) => String(v).trim().toUpperCase()).filter(Boolean);
+    }
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value
+        .split(',')
+        .map((v) => v.trim().toUpperCase())
+        .filter(Boolean);
+    }
+    return undefined;
+  })
+  @IsArray()
+  @IsEnum(PostModerationStatus, { each: true })
+  statuses?: PostModerationStatus[];
 
   @IsOptional()
   @IsUUID()

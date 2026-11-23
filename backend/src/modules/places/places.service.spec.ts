@@ -534,4 +534,89 @@ describe('PlacesService', () => {
       expect(result.metadata).toEqual({ total: 1, count: 1, page: 1 });
     });
   });
+
+  describe('contributePlacePhoto', () => {
+    it('strictly rejects video files before touching storage or database', async () => {
+      await expect(
+        service.contributePlacePhoto(
+          mockRawPlaceRow.id,
+          'user-1',
+          {
+            originalname: 'clip.mp4',
+            mimetype: 'video/mp4',
+            size: 1024,
+            buffer: Buffer.from('fake-video'),
+          },
+          'Video test',
+        ),
+      ).rejects.toThrow('Không hỗ trợ tải lên video');
+    });
+
+    it('uploads a valid image with imageOnly=true and saves as PENDING', async () => {
+      const mockPrisma = {
+        place: {
+          findFirst: jest.fn().mockResolvedValue({
+            id: mockRawPlaceRow.id,
+            name: mockRawPlaceRow.name,
+          }),
+        },
+        placeImage: {
+          create: jest.fn().mockResolvedValue({
+            id: 'new-img-1',
+            placeId: mockRawPlaceRow.id,
+            imageUrl: 'https://res.cloudinary.com/demo/image/upload/photo.jpg',
+            caption: 'Mặt tiền quán',
+            status: 'PENDING',
+            createdAt: new Date(),
+          }),
+        },
+      };
+      const mockStorage = {
+        saveFiles: jest.fn().mockResolvedValue([
+          {
+            url: 'https://res.cloudinary.com/demo/image/upload/photo.jpg',
+            mimeType: 'image/jpeg',
+            sizeBytes: 2048,
+            mediaType: 'IMAGE',
+          },
+        ]),
+      };
+
+      const svcWithStorage = new PlacesService(
+        repository,
+        embeddingService,
+        new GeoJsonService(),
+        { reverseGeocode: jest.fn(), geocodeAddress: jest.fn() } as unknown as NominatimService,
+        mockPrisma as unknown as never,
+        mockStorage,
+      );
+
+      const res = await svcWithStorage.contributePlacePhoto(
+        mockRawPlaceRow.id,
+        'user-1',
+        {
+          originalname: 'front.jpg',
+          mimetype: 'image/jpeg',
+          size: 2048,
+          buffer: Buffer.from('fake-jpg'),
+        },
+        'Mặt tiền quán',
+      );
+
+      expect(mockStorage.saveFiles).toHaveBeenCalledWith(
+        expect.any(Array),
+        expect.objectContaining({ imageOnly: true, maxFiles: 1 }),
+      );
+      expect(mockPrisma.placeImage.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            status: 'PENDING',
+            uploadedById: 'user-1',
+            source: 'user_contribution',
+          }),
+        }),
+      );
+      expect(res.image.status).toBe('PENDING');
+    });
+  });
 });

@@ -39,6 +39,7 @@ const PROPOSAL_INCLUDE = {
         select: { name: true, nameVi: true, slug: true },
       },
       images: {
+        where: { status: 'APPROVED' },
         select: { imageUrl: true },
         take: 1,
         orderBy: [

@@ -31,6 +31,23 @@ export interface PlaceOpeningHour {
   close: string; // "22:00"
 }
 
+export const CONTRIBUTED_PHOTO_STATES = {
+  UPLOADING: "uploading",
+  PENDING: "pending",
+  ERROR: "error",
+} as const;
+
+export type ContributedPhotoUploadState =
+  (typeof CONTRIBUTED_PHOTO_STATES)[keyof typeof CONTRIBUTED_PHOTO_STATES];
+
+export interface PendingContributedPhoto {
+  id: string;
+  imageUrl: string;
+  caption?: string | null;
+  uploadState?: ContributedPhotoUploadState;
+  errorMessage?: string | null;
+}
+
 export interface Place {
   id: string;
   slug: string;
@@ -39,9 +56,12 @@ export interface Place {
   description: string;
   whyGo?: string[];
   tips?: string[];
-  suggestedDuration?: string; // "1.5 - 2 giờ"
+  suggestedDuration?: string;
   category: PlaceCategory;
+  categorySlug?: string;
   categoryLabel: string;
+  areaId?: number;
+  areaSlug?: string;
   address: string;
   city: string;
   latitude: number;
@@ -51,6 +71,7 @@ export interface Place {
   priceLevel?: 1 | 2 | 3 | 4; // 1: < 50k, 2: 50k-150k, 3: 150k-500k, 4: > 500k
   priceRangeText?: string;
   images: string[];
+  pendingContributedImages?: PendingContributedPhoto[];
   coverImage: string;
   phone?: string;
   website?: string;
@@ -59,6 +80,7 @@ export interface Place {
   styles: TravelStyle[];
   matchScore?: number; // Ví dụ: 95 (%)
   matchReason?: string;
+  isOpenNow?: boolean | null;
   openingHoursText?: string;
   featured?: boolean;
   distanceKm?: number;

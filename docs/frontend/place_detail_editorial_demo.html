@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TripGenie — Demo Trang Chi Tiết Địa Điểm (Clean Editorial & Anti-Slop)</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #F5F9FF;
+      color: #10243A;
+      -webkit-font-smoothing: antialiased;
+    }
+    .cta-primary-shadow {
+      box-shadow: 0 2px 8px rgba(1, 148, 243, 0.3);
+    }
+    .card-surface {
+      background: #FFFFFF;
+      border: 1px solid rgba(226, 232, 240, 0.85);
+      box-shadow: 0 1px 2px rgba(16, 36, 58, 0.04);
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#F5F9FF] text-[#10243A] selection:bg-[#0194F3] selection:text-white">
+
+  <!-- ======================================================================= -->
+  <!-- TOP DEMO CONTROL BAR (CHỈ DÙNG ĐỂ TEST KỊCH BẢN TRONG BẢN DEMO)         -->
+  <!-- ======================================================================= -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 px-4 py-2.5">
+    <div class="max-w-[1280px] mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5">
+        <div class="size-7 rounded-lg bg-[#0194F3] text-white flex items-center justify-center font-black text-xs">
+          TG
+        </div>
+        <div>
+          <span class="font-extrabold text-[#10243A] text-xs sm:text-sm tracking-tight">
+            Demo Chi Tiết Địa Điểm (100% Inter • Font Awesome • Candidate 2 Tầng)
+          </span>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2 text-xs">
+        <button
+          type="button"
+          id="btn-toggle-skeleton"
+          onclick="toggleSkeletonView()"
+          class="px-3 py-1.5 rounded-xl border border-slate-200 bg-[#F8FAFC] text-[#10243A] font-semibold hover:bg-[#F0F7FF] hover:text-[#0194F3] transition-colors cursor-pointer inline-flex items-center gap-1.5"
+        >
+          <i class="fa-solid fa-table-cells-large text-[11px] text-[#0194F3]"></i>
+          <span id="lbl-toggle-skeleton">Xem Skeleton Loading</span>
+        </button>
+
+        <button
+          type="button"
+          id="btn-toggle-tier"
+          onclick="toggleCandidateTierScenario()"
+          class="px-3 py-1.5 rounded-xl border border-slate-200 bg-[#F8FAFC] text-[#10243A] font-semibold hover:bg-[#F0F7FF] hover:text-[#0194F3] transition-colors cursor-pointer inline-flex items-center gap-1.5"
+        >
+          <i class="fa-solid fa-layer-group text-[11px] text-[#0194F3]"></i>
+          <span id="lbl-toggle-tier">Candidate: Tầng 1 (2 quán) + Tầng 2 bù (1 điểm cùng Area)</span>
+        </button>
+
+        <button
+          type="button"
+          id="btn-toggle-pending"
+          onclick="togglePendingStrip()"
+          class="px-3 py-1.5 rounded-xl border border-amber-300 bg-amber-50 text-amber-900 font-bold hover:bg-amber-100 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+        >
+          <i class="fa-regular fa-clock text-[11px]"></i>
+          <span id="lbl-toggle-pending">Đang bật: Dải ảnh chờ duyệt</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ======================================================================= -->
+  <!-- MAIN PLACE DETAIL PAGE CONTAINER                                        -->
+  <!-- ======================================================================= -->
+  <main id="ready-view" class="max-w-[1280px] mx-auto w-full px-4 py-6 sm:px-6 lg:px-8 space-y-6 pb-16">
+
+    <!-- 1. Top Breadcrumb & Back Navigation -->
+    <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+      <button
+        type="button"
+        onclick="showToast('Quay lại trang Khám phá')"
+        class="inline-flex items-center gap-1.5 font-semibold text-[#10243A] hover:text-[#0194F3] transition-colors cursor-pointer"
+      >
+        <i class="fa-solid fa-arrow-left text-xs"></i>
+        <span>Quay lại</span>
+      </button>
+
+      <nav aria-label="Breadcrumb" class="flex items-center gap-1.5 text-xs">
+        <a href="#top" class="hover:text-[#10243A] transition-colors">Trang chủ</a>
+        <span class="text-slate-300">/</span>
+        <a href="#top" class="hover:text-[#10243A] transition-colors">Khám phá</a>
+        <span class="text-slate-300">/</span>
+        <span class="font-semibold text-[#10243A] truncate max-w-[220px]">Reply 1988 Cafe &amp; Bakery</span>
+      </nav>
+    </div>
+
+    <!-- 2. Hero Gallery (Visual-First at top of page) -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
+      <!-- Primary Photo (Span 8) -->
+      <div class="lg:col-span-8 relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden rounded-2xl bg-slate-200 group border border-slate-200/80">
+        <img
+          id="hero-main-img"
+          src="https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=1200&auto=format&fit=crop&q=80"
+          alt="Reply 1988 Cafe & Bakery - Không gian chính"
+          class="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.02]"
+        />
+        <div class="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent pointer-events-none"></div>
+
+        <!-- Contextual Photo Contribution Trigger -->
+        <button
+          type="button"
+          onclick="openContributeModal()"
+          class="absolute bottom-3.5 right-3.5 z-10 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/95 hover:bg-white backdrop-blur-md shadow-md text-xs font-bold text-[#10243A] border border-slate-200/80 transition-all hover:border-[#0194F3]/40 cursor-pointer"
+        >
+          <i class="fa-solid fa-camera text-[#0194F3]"></i>
+          <span>Đóng góp ảnh</span>
+        </button>
+      </div>
+
+      <!-- Side Thumbnails (Span 4) -->
+      <div class="lg:col-span-4 grid grid-cols-2 lg:grid-cols-1 gap-3.5">
+        <div
+          onclick="swapMainImage('https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=1200&auto=format&fit=crop&q=80')"
+          class="relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden rounded-2xl bg-slate-200 group border border-slate-200/80 cursor-pointer"
+          title="Nhấn để xem ảnh này lớn hơn"
+        >
+          <img
+            src="https://images.unsplash.com/photo-1501339847302-ac426a4a7cbb?w=700&auto=format&fit=crop&q=80"
+            alt="Góc pha chế & bánh ngọt"
+            class="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+          />
+        </div>
+
+        <div
+          onclick="swapMainImage('https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=1200&auto=format&fit=crop&q=80')"
+          class="relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden rounded-2xl bg-slate-200 group border border-slate-200/80 cursor-pointer"
+          title="Nhấn để xem ảnh này lớn hơn"
+        >
+          <img
+            src="https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=700&auto=format&fit=crop&q=80"
+            alt="Cà phê thủ công"
+            class="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+          />
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Owner-Only Honest Optimistic Pending Photos Strip -->
+    <section
+      id="pending-strip"
+      aria-label="Ảnh đóng góp của bạn"
+      class="rounded-2xl border border-amber-200/90 bg-amber-50/55 p-4 space-y-2.5"
+    >
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <i class="fa-regular fa-clock text-amber-600 text-xs"></i>
+          <span class="text-xs font-bold text-[#10243A]">
+            Ảnh bạn đã đóng góp — Đang chờ Quản trị viên duyệt (<span id="pending-count" class="tabular-nums">1</span>)
+          </span>
+        </div>
+        <span class="text-[11px] font-medium text-slate-600">
+          Chỉ mình bạn nhìn thấy cho đến khi được phê duyệt
+        </span>
+      </div>
+      <div id="pending-grid" class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-5 gap-3">
+        <div class="relative aspect-[16/10] rounded-xl overflow-hidden border border-amber-200 bg-white">
+          <img
+            src="https://images.unsplash.com/photo-1511920170033-f8396924c348?w=400&auto=format&fit=crop&q=80"
+            alt="Ảnh đóng góp mặt tiền buổi sáng"
+            class="w-full h-full object-cover opacity-90"
+          />
+          <span class="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-amber-100/95 text-amber-900 border border-amber-300/80 text-[10px] font-extrabold">
+            Chờ duyệt
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Title & Meta Row (Placed BELOW Hero Gallery — No Category Badge, Includes Open Status, Rating, Address, Favorite & Share) -->
+    <section class="card-surface rounded-2xl p-5 sm:p-6">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div class="space-y-2.5 min-w-0">
+          <!-- Pure H1 Title without Eyebrow Category Badge -->
+          <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#10243A] leading-tight">
+            Reply 1988 Cafe &amp; Bakery
+          </h1>
+
+          <!-- Factual Meta Row: Open Status • Rating • Address -->
+          <div class="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-600">
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-800 font-semibold">
+              <span class="size-1.5 rounded-full bg-emerald-600"></span>
+              <span>Đang mở cửa</span>
+            </span>
+
+            <span class="text-slate-300">•</span>
+
+            <div class="inline-flex items-center gap-1.5 font-semibold text-[#10243A] tabular-nums">
+              <i class="fa-solid fa-star text-amber-400 text-xs"></i>
+              <span class="font-extrabold">4.7</span>
+              <span class="text-slate-500 font-medium">(128 đánh giá)</span>
+            </div>
+
+            <span class="text-slate-300">•</span>
+
+            <a
+              href="#map-action"
+              onclick="showToast('Mở chế độ bản đồ phân đôi tại 20 Lê Hồng Phong')"
+              class="inline-flex items-center gap-1.5 text-slate-700 hover:text-[#0194F3] font-medium transition-colors"
+            >
+              <i class="fa-solid fa-location-dot text-slate-400 text-xs"></i>
+              <span class="underline decoration-slate-300 underline-offset-4 hover:decoration-[#0194F3]">
+                20 Lê Hồng Phong, Phước Ninh, Hải Châu, Đà Nẵng
+              </span>
+            </a>
+          </div>
+        </div>
+
+        <!-- Favorite & Share Actions -->
+        <div class="flex items-center gap-2 shrink-0 self-start md:self-end">
+          <button
+            type="button"
+            id="btn-favorite"
+            onclick="toggleFavorite()"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200/90 bg-white hover:bg-[#F8FAFC] text-xs font-semibold text-[#10243A] transition-colors cursor-pointer"
+          >
+            <i id="icon-favorite" class="fa-regular fa-heart text-slate-600"></i>
+            <span id="lbl-favorite">Yêu thích</span>
+          </button>
+
+          <button
+            type="button"
+            onclick="showToast('Đã sao chép liên kết địa điểm!')"
+            class="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200/90 bg-white hover:bg-[#F8FAFC] text-xs font-semibold text-[#10243A] transition-colors cursor-pointer"
+          >
+            <i class="fa-solid fa-share-nodes text-slate-600"></i>
+            <span>Chia sẻ</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Two-Column Main Content & Sticky Sidebar -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- LEFT COLUMN (Span 8): Description & Factual DB Info Only -->
+      <div class="lg:col-span-8 space-y-6">
+
+        <!-- About / Description Card -->
+        <div class="card-surface rounded-2xl p-6 space-y-3">
+          <h2 class="text-lg font-extrabold text-[#10243A] tracking-tight">
+            Giới thiệu địa điểm
+          </h2>
+          <p class="text-sm text-slate-700 font-medium leading-relaxed">
+            Không gian cà phê mang cảm hứng hoài niệm ấm cúng giữa trung tâm quận Hải Châu, nổi bật với tông gỗ trầm, ánh sáng tự nhiên ngập tràn qua khung cửa kính lớn và khu vực bàn dài yên tĩnh phù hợp cho cả làm việc lẫn trò chuyện cuối tuần.
+          </p>
+          <p class="text-sm text-slate-700 font-medium leading-relaxed">
+            Thực đơn kết hợp giữa cà phê pha máy chuẩn vị, cold brew ủ lạnh 18 giờ cùng các dòng bánh nướng bơ Pháp ra lò mỗi sáng. Quán có khu vực sân trong thoáng gió và ổ cắm điện tại hầu hết các bàn.
+          </p>
+        </div>
+
+        <!-- Factual Practical Details Grid (100% Inter + tabular-nums, no Geist Mono, no fake itinerary suggestion box) -->
+        <div class="card-surface rounded-2xl p-6 space-y-4">
+          <h2 class="text-lg font-extrabold text-[#10243A] tracking-tight">
+            Thông tin thực tế
+          </h2>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
+            <div class="p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200/80 flex items-start gap-3">
+              <div class="size-8 rounded-lg bg-white border border-slate-200/80 text-[#10243A] flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-wallet text-emerald-600"></i>
+              </div>
+              <div>
+                <div class="text-slate-500 font-medium">Mức giá tham khảo</div>
+                <div class="text-sm font-bold text-[#10243A] mt-0.5 tabular-nums">50.000đ – 150.000đ</div>
+              </div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200/80 flex items-start gap-3">
+              <div class="size-8 rounded-lg bg-white border border-slate-200/80 text-[#10243A] flex items-center justify-center shrink-0">
+                <i class="fa-regular fa-clock text-slate-700"></i>
+              </div>
+              <div>
+                <div class="text-slate-500 font-medium">Trạng thái hoạt động</div>
+                <div class="text-sm font-bold text-[#10243A] mt-0.5 tabular-nums">Đang mở cửa</div>
+              </div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200/80 flex items-start gap-3">
+              <div class="size-8 rounded-lg bg-white border border-slate-200/80 text-[#10243A] flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-phone text-slate-700"></i>
+              </div>
+              <div>
+                <div class="text-slate-500 font-medium">Số điện thoại</div>
+                <div class="text-sm font-bold text-[#10243A] mt-0.5 tabular-nums">0236 3888 988</div>
+              </div>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200/80 flex items-start gap-3">
+              <div class="size-8 rounded-lg bg-white border border-slate-200/80 text-[#10243A] flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-globe text-slate-700"></i>
+              </div>
+              <div class="min-w-0">
+                <div class="text-slate-500 font-medium">Khu vực</div>
+                <div class="text-sm font-bold text-[#10243A] mt-0.5 truncate">Đà Nẵng</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Neutral Tags Strip -->
+          <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2">
+            <span class="text-xs font-semibold text-slate-500 mr-1">Chủ đề:</span>
+            <span class="px-2.5 py-1 rounded-lg bg-[#F8FAFC] border border-slate-200/80 text-xs font-semibold text-slate-700">
+              #ca-phe-hai-chau
+            </span>
+            <span class="px-2.5 py-1 rounded-lg bg-[#F8FAFC] border border-slate-200/80 text-xs font-semibold text-slate-700">
+              #banh-ngot-thu-cong
+            </span>
+            <span class="px-2.5 py-1 rounded-lg bg-[#F8FAFC] border border-slate-200/80 text-xs font-semibold text-slate-700">
+              #khong-gian-lam-viec
+            </span>
+            <span class="px-2.5 py-1 rounded-lg bg-[#F8FAFC] border border-slate-200/80 text-xs font-semibold text-slate-700">
+              #da-nang
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN (Span 4): Focused Sticky Action Card -->
+      <aside class="lg:col-span-4 sticky top-20">
+        <div class="card-surface rounded-2xl p-5 space-y-5">
+
+          <!-- Primary Conversion Block: 1 Deliberate #0194F3 CTA + 1 Neutral Secondary CTA -->
+          <div class="space-y-2.5">
+            <button
+              type="button"
+              onclick="showToast('Mở hộp thoại: Thêm địa điểm vào Lịch trình')"
+              class="w-full h-11 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] active:scale-[0.98] text-white font-bold text-xs sm:text-sm cta-primary-shadow transition-all flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <i class="fa-regular fa-calendar-plus"></i>
+              <span>Thêm vào lịch trình</span>
+            </button>
+
+            <button
+              type="button"
+              onclick="showToast('Mở hộp thoại: Lưu vào Bộ sưu tập')"
+              class="w-full h-10 rounded-xl border border-slate-200 bg-white hover:bg-[#F8FAFC] text-[#10243A] font-semibold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <i class="fa-regular fa-bookmark text-slate-600"></i>
+              <span>Lưu vào bộ sưu tập</span>
+            </button>
+          </div>
+
+          <div class="border-t border-slate-100"></div>
+
+          <!-- Neutral Distance & Directions Island (100% Inter + tabular-nums) -->
+          <div id="map-action" class="rounded-xl bg-[#F8FAFC] border border-slate-200/90 p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-[#10243A] flex items-center gap-1.5">
+                <i class="fa-solid fa-route text-slate-600"></i>
+                <span>Khoảng cách &amp; Chỉ đường</span>
+              </span>
+              <span class="tabular-nums text-[11px] font-bold text-[#10243A] bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                ~2.4 km
+              </span>
+            </div>
+
+            <div class="space-y-1.5 text-xs">
+              <div class="flex items-center justify-between text-slate-600">
+                <span>Đường chim bay:</span>
+                <strong class="tabular-nums text-[#10243A] font-bold">~2.4 km</strong>
+              </div>
+              <div class="flex items-center justify-between text-slate-600">
+                <span>Ước tính di chuyển:</span>
+                <strong class="tabular-nums text-emerald-700 font-bold">~7 phút</strong>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <button
+                type="button"
+                onclick="showToast('Mở trang Khám phá chế độ bản đồ tại tọa độ địa điểm')"
+                class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#0194F3]/40 px-3 py-2 text-xs font-semibold text-[#10243A] transition-colors cursor-pointer"
+              >
+                <i class="fa-regular fa-map text-xs"></i>
+                <span>Trên bản đồ</span>
+              </button>
+
+              <a
+                href="https://www.google.com/maps/dir/?api=1&destination=16.0638,108.2204"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#0194F3]/40 px-3 py-2 text-xs font-semibold text-[#10243A] transition-colors"
+              >
+                <span>Google Maps</span>
+                <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+              </a>
+            </div>
+          </div>
+
+        </div>
+      </aside>
+    </section>
+
+    <!-- ===================================================================== -->
+    <!-- 6. RELATED PLACES CANDIDATES ("Địa điểm gợi ý" + "Xem thêm")           -->
+    <!-- ===================================================================== -->
+    <section class="pt-6 border-t border-slate-200/80 space-y-5">
+      <!-- Minimal Header: ONLY "Địa điểm gợi ý" + "Xem thêm" link (areaId + category) -->
+      <div class="flex items-center justify-between gap-3">
+        <h2 class="text-xl sm:text-2xl font-extrabold tracking-tight text-[#10243A]">
+          Địa điểm gợi ý
+        </h2>
+
+        <a
+          href="/explore?areaId=5&category=ca-phe"
+          onclick="event.preventDefault(); showToast('Điều hướng tới: /explore?areaId=5&category=ca-phe (Đà Nẵng • Cà phê)');"
+          class="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-[#0194F3] hover:text-[#0084DE] transition-colors shrink-0 group"
+        >
+          <span>Xem thêm</span>
+          <i class="fa-solid fa-arrow-right text-xs transition-transform group-hover:translate-x-1"></i>
+        </a>
+      </div>
+
+      <div id="candidates-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <!-- Candidate 1 (Tier 1: Same Category + Same Area) -->
+        <article class="card-surface rounded-2xl overflow-hidden group hover:shadow-lg hover:border-slate-300 transition-all flex flex-col">
+          <div class="relative h-44 sm:h-48 w-full overflow-hidden bg-slate-100">
+            <img
+              src="https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=700&auto=format&fit=crop&q=80"
+              alt="Wonderlust Cafe & Souvenir"
+              class="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+            />
+          </div>
+          <div class="p-4 flex-1 flex flex-col justify-between space-y-2.5">
+            <div class="space-y-1">
+              <div class="flex items-center justify-between gap-2 text-xs">
+                <span class="font-semibold text-slate-500">Cà phê &amp; Tráng miệng</span>
+                <span class="inline-flex items-center gap-1 font-bold text-[#10243A] tabular-nums">
+                  <i class="fa-solid fa-star text-amber-400 text-[11px]"></i>
+                  <span>4.6</span>
+                </span>
+              </div>
+              <h3 class="text-base font-bold text-[#10243A] group-hover:text-[#0194F3] transition-colors line-clamp-1">
+                Wonderlust Cafe &amp; Souvenir
+              </h3>
+              <p class="text-xs text-slate-500 line-clamp-1">
+                96 Trần Phú, Hải Châu, Đà Nẵng
+              </p>
+            </div>
+            <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span class="font-semibold text-slate-700 tabular-nums">50.000đ – 150.000đ</span>
+              <span class="font-bold text-[#0194F3]">Xem chi tiết</span>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 2 (Tier 1: Same Category + Same Area) -->
+        <article class="card-surface rounded-2xl overflow-hidden group hover:shadow-lg hover:border-slate-300 transition-all flex flex-col">
+          <div class="relative h-44 sm:h-48 w-full overflow-hidden bg-slate-100">
+            <img
+              src="https://images.unsplash.com/photo-1521017432531-fbd92d768814?w=700&auto=format&fit=crop&q=80"
+              alt="Golem Specialty Coffee Roasters"
+              class="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+            />
+          </div>
+          <div class="p-4 flex-1 flex flex-col justify-between space-y-2.5">
+            <div class="space-y-1">
+              <div class="flex items-center justify-between gap-2 text-xs">
+                <span class="font-semibold text-slate-500">Cà phê &amp; Tráng miệng</span>
+                <span class="inline-flex items-center gap-1 font-bold text-[#10243A] tabular-nums">
+                  <i class="fa-solid fa-star text-amber-400 text-[11px]"></i>
+                  <span>4.8</span>
+                </span>
+              </div>
+              <h3 class="text-base font-bold text-[#10243A] group-hover:text-[#0194F3] transition-colors line-clamp-1">
+                Golem Specialty Coffee Roasters
+              </h3>
+              <p class="text-xs text-slate-500 line-clamp-1">
+                27 Trần Quốc Toản, Hải Châu, Đà Nẵng
+              </p>
+            </div>
+            <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span class="font-semibold text-slate-700 tabular-nums">50.000đ – 150.000đ</span>
+              <span class="font-bold text-[#0194F3]">Xem chi tiết</span>
+            </div>
+          </div>
+        </article>
+
+        <!-- Candidate 3 (Dynamically switches between Tier 2 Area Fallback vs Tier 1 Full Match) -->
+        <article id="candidate-card-3" class="card-surface rounded-2xl overflow-hidden group hover:shadow-lg hover:border-slate-300 transition-all flex flex-col">
+          <div class="relative h-44 sm:h-48 w-full overflow-hidden bg-slate-100">
+            <img
+              id="c3-img"
+              src="https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=700&auto=format&fit=crop&q=80"
+              alt="Cầu Rồng Sông Hàn"
+              class="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
+            />
+          </div>
+          <div class="p-4 flex-1 flex flex-col justify-between space-y-2.5">
+            <div class="space-y-1">
+              <div class="flex items-center justify-between gap-2 text-xs">
+                <span id="c3-cat" class="font-semibold text-slate-500">Điểm tham quan</span>
+                <span class="inline-flex items-center gap-1 font-bold text-[#10243A] tabular-nums">
+                  <i class="fa-solid fa-star text-amber-400 text-[11px]"></i>
+                  <span id="c3-rating">4.9</span>
+                </span>
+              </div>
+              <h3 id="c3-name" class="text-base font-bold text-[#10243A] group-hover:text-[#0194F3] transition-colors line-clamp-1">
+                Bến Cá Chép Hóa Rồng &amp; Cầu Rồng
+              </h3>
+              <p id="c3-addr" class="text-xs text-slate-500 line-clamp-1">
+                Trần Hưng Đạo, Sơn Trà, Đà Nẵng
+              </p>
+            </div>
+            <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span id="c3-price" class="font-semibold text-slate-700 tabular-nums">Dưới 50.000đ</span>
+              <span class="font-bold text-[#0194F3]">Xem chi tiết</span>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <!-- ======================================================================= -->
+  <!-- GEOMETRIC SKELETON LOADING VIEW (1:1 MATCH FOR ZERO CLS)                -->
+  <!-- ======================================================================= -->
+  <section
+    id="skeleton-view"
+    aria-label="Đang tải chi tiết địa điểm"
+    class="hidden max-w-[1280px] mx-auto w-full px-4 py-6 sm:px-6 lg:px-8 space-y-6 pb-16 animate-pulse"
+  >
+    <!-- 1. Back Button & Breadcrumbs Skeleton -->
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div class="h-4 w-20 rounded-md bg-slate-200"></div>
+      <div class="flex items-center gap-2">
+        <div class="h-3.5 w-16 rounded bg-slate-200"></div>
+        <div class="h-3.5 w-16 rounded bg-slate-200"></div>
+        <div class="h-3.5 w-32 rounded bg-slate-200"></div>
+      </div>
+    </div>
+
+    <!-- 2. Hero Gallery Skeleton -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
+      <div class="lg:col-span-8 relative aspect-[16/10] sm:aspect-[16/9] w-full rounded-2xl bg-slate-200 border border-slate-200/80">
+        <div class="absolute bottom-3.5 right-3.5 h-9 w-32 rounded-xl bg-white/80"></div>
+      </div>
+      <div class="lg:col-span-4 grid grid-cols-2 lg:grid-cols-1 gap-3.5">
+        <div class="aspect-[16/10] sm:aspect-[16/9] w-full rounded-2xl bg-slate-200 border border-slate-200/80"></div>
+        <div class="aspect-[16/10] sm:aspect-[16/9] w-full rounded-2xl bg-slate-200 border border-slate-200/80"></div>
+      </div>
+    </div>
+
+    <!-- 3. Title & Meta Card Skeleton -->
+    <div class="rounded-2xl border border-slate-200/85 bg-white p-5 sm:p-6 shadow-2xs">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div class="space-y-3 flex-1">
+          <div class="h-8 w-3/4 sm:w-96 rounded-lg bg-slate-200"></div>
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="h-5 w-24 rounded-full bg-slate-100"></div>
+            <div class="h-4 w-32 rounded bg-slate-200"></div>
+            <div class="h-4 w-56 rounded bg-slate-100"></div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <div class="h-9 w-24 rounded-xl bg-slate-100 border border-slate-200/70"></div>
+          <div class="h-9 w-24 rounded-xl bg-slate-100 border border-slate-200/70"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Two-Column Main Content & Sticky Sidebar Skeleton -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+      <div class="lg:col-span-8 space-y-6">
+        <div class="rounded-2xl border border-slate-200/85 bg-white p-6 space-y-3 shadow-2xs">
+          <div class="h-6 w-44 rounded-md bg-slate-200"></div>
+          <div class="space-y-2 pt-1">
+            <div class="h-3.5 w-full rounded bg-slate-100"></div>
+            <div class="h-3.5 w-11/12 rounded bg-slate-100"></div>
+            <div class="h-3.5 w-full rounded bg-slate-100"></div>
+            <div class="h-3.5 w-3/4 rounded bg-slate-100"></div>
+          </div>
+        </div>
+
+        <div class="rounded-2xl border border-slate-200/85 bg-white p-6 space-y-4 shadow-2xs">
+          <div class="h-6 w-40 rounded-md bg-slate-200"></div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+            <div class="p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200/80 flex items-start gap-3">
+              <div class="size-8 rounded-lg bg-slate-200 shrink-0"></div>
+              <div class="space-y-1.5 flex-1">
+                <div class="h-3 w-24 rounded bg-slate-200"></div>
+                <div class="h-4 w-36 rounded bg-slate-200"></div>
+              </div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200/80 flex items-start gap-3">
+              <div class="size-8 rounded-lg bg-slate-200 shrink-0"></div>
+              <div class="space-y-1.5 flex-1">
+                <div class="h-3 w-24 rounded bg-slate-200"></div>
+                <div class="h-4 w-36 rounded bg-slate-200"></div>
+              </div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200/80 flex items-start gap-3">
+              <div class="size-8 rounded-lg bg-slate-200 shrink-0"></div>
+              <div class="space-y-1.5 flex-1">
+                <div class="h-3 w-24 rounded bg-slate-200"></div>
+                <div class="h-4 w-36 rounded bg-slate-200"></div>
+              </div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200/80 flex items-start gap-3">
+              <div class="size-8 rounded-lg bg-slate-200 shrink-0"></div>
+              <div class="space-y-1.5 flex-1">
+                <div class="h-3 w-24 rounded bg-slate-200"></div>
+                <div class="h-4 w-36 rounded bg-slate-200"></div>
+              </div>
+            </div>
+          </div>
+          <div class="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2">
+            <div class="h-4 w-14 rounded bg-slate-100"></div>
+            <div class="h-6 w-24 rounded-lg bg-slate-100"></div>
+            <div class="h-6 w-28 rounded-lg bg-slate-100"></div>
+            <div class="h-6 w-20 rounded-lg bg-slate-100"></div>
+          </div>
+        </div>
+      </div>
+
+      <aside class="lg:col-span-4">
+        <div class="rounded-2xl border border-slate-200/85 bg-white p-5 space-y-5 shadow-2xs">
+          <div class="space-y-2.5">
+            <div class="h-11 w-full rounded-xl bg-slate-200"></div>
+            <div class="h-10 w-full rounded-xl bg-slate-100 border border-slate-200/70"></div>
+          </div>
+          <div class="border-t border-slate-100"></div>
+          <div class="rounded-xl bg-[#F8FAFC] border border-slate-200/90 p-4 space-y-3">
+            <div class="flex items-center justify-between">
+              <div class="h-4 w-36 rounded bg-slate-200"></div>
+              <div class="h-5 w-14 rounded-md bg-white border border-slate-200"></div>
+            </div>
+            <div class="space-y-2">
+              <div class="flex items-center justify-between">
+                <div class="h-3.5 w-28 rounded bg-slate-200"></div>
+                <div class="h-3.5 w-14 rounded bg-slate-200"></div>
+              </div>
+              <div class="flex items-center justify-between">
+                <div class="h-3.5 w-32 rounded bg-slate-200"></div>
+                <div class="h-3.5 w-16 rounded bg-slate-200"></div>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2 pt-1">
+              <div class="h-9 rounded-xl bg-white border border-slate-200"></div>
+              <div class="h-9 rounded-xl bg-white border border-slate-200"></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- 5. Related Places Section Skeleton -->
+    <div class="pt-6 border-t border-slate-200/80 space-y-5">
+      <div class="flex items-center justify-between">
+        <div class="h-7 w-44 rounded-md bg-slate-200"></div>
+        <div class="h-4 w-20 rounded bg-slate-200"></div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="rounded-2xl border border-slate-200/80 bg-white overflow-hidden">
+          <div class="h-44 sm:h-48 w-full bg-slate-200"></div>
+          <div class="p-4 space-y-3">
+            <div class="h-5 w-3/4 rounded bg-slate-200"></div>
+            <div class="h-3.5 w-full rounded bg-slate-100"></div>
+            <div class="pt-2 border-t border-slate-100 flex justify-between">
+              <div class="h-3.5 w-20 rounded bg-slate-200"></div>
+              <div class="h-3.5 w-14 rounded bg-slate-200"></div>
+            </div>
+          </div>
+        </div>
+        <div class="rounded-2xl border border-slate-200/80 bg-white overflow-hidden">
+          <div class="h-44 sm:h-48 w-full bg-slate-200"></div>
+          <div class="p-4 space-y-3">
+            <div class="h-5 w-3/4 rounded bg-slate-200"></div>
+            <div class="h-3.5 w-full rounded bg-slate-100"></div>
+            <div class="pt-2 border-t border-slate-100 flex justify-between">
+              <div class="h-3.5 w-20 rounded bg-slate-200"></div>
+              <div class="h-3.5 w-14 rounded bg-slate-200"></div>
+            </div>
+          </div>
+        </div>
+        <div class="rounded-2xl border border-slate-200/80 bg-white overflow-hidden">
+          <div class="h-44 sm:h-48 w-full bg-slate-200"></div>
+          <div class="p-4 space-y-3">
+            <div class="h-5 w-3/4 rounded bg-slate-200"></div>
+            <div class="h-3.5 w-full rounded bg-slate-100"></div>
+            <div class="pt-2 border-t border-slate-100 flex justify-between">
+              <div class="h-3.5 w-20 rounded bg-slate-200"></div>
+              <div class="h-3.5 w-14 rounded bg-slate-200"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================================================================= -->
+  <!-- INTERACTIVE PHOTO CONTRIBUTION MODAL (HONEST OPTIMISTIC PREVIEW)        -->
+  <!-- ======================================================================= -->
+  <div
+    id="contribute-modal"
+    class="hidden fixed inset-0 z-50 bg-[#10243A]/50 backdrop-blur-xs flex items-center justify-center p-4"
+  >
+    <div class="bg-white rounded-2xl border border-slate-200 max-w-md w-full p-5 space-y-4 shadow-2xl">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <span class="text-[11px] font-bold uppercase tracking-wider text-[#0194F3] flex items-center gap-1.5">
+            <i class="fa-solid fa-camera"></i>
+            <span>Đóng góp ảnh thực tế</span>
+          </span>
+          <h3 class="text-base font-extrabold text-[#10243A] mt-0.5">
+            Reply 1988 Cafe &amp; Bakery
+          </h3>
+        </div>
+        <button
+          type="button"
+          onclick="closeContributeModal()"
+          class="size-7 rounded-lg hover:bg-slate-100 text-slate-500 flex items-center justify-center cursor-pointer"
+        >
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="rounded-xl bg-amber-50/90 border border-amber-200 p-3 text-xs text-amber-950 flex items-start gap-2.5">
+        <i class="fa-solid fa-shield-halved text-amber-600 mt-0.5"></i>
+        <p class="leading-relaxed">
+          Chỉ chấp nhận <b>hình ảnh thực tế</b> (JPG, PNG, WebP — không nhận video). Khi bấm gửi, modal đóng ngay và ảnh sẽ tải ngầm ở dải <b>Chờ duyệt</b> bên dưới.
+        </p>
+      </div>
+
+      <div class="space-y-1.5">
+        <label class="text-xs font-bold text-[#10243A] block">Mô tả ngắn (Tùy chọn)</label>
+        <input
+          id="demo-caption"
+          type="text"
+          spellcheck="false"
+          autocomplete="off"
+          placeholder="Ví dụ: Góc ban công tầng 2 buổi chiều..."
+          class="w-full h-10 px-3 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-[#0194F3]"
+        />
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-1">
+        <button
+          type="button"
+          onclick="closeContributeModal()"
+          class="px-3.5 h-9 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
+        >
+          Hủy bỏ
+        </button>
+        <button
+          type="button"
+          onclick="simulateHonestOptimisticUpload()"
+          class="px-4 h-9 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] text-white text-xs font-bold cta-primary-shadow cursor-pointer inline-flex items-center gap-1.5"
+        >
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <span>Gửi ảnh kiểm duyệt</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div
+    id="demo-toast"
+    class="hidden fixed bottom-5 right-5 z-50 bg-[#10243A] text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-xl border border-slate-700 flex items-center gap-2.5"
+  >
+    <i class="fa-solid fa-circle-check text-[#0194F3]"></i>
+    <span id="demo-toast-msg">Thông báo</span>
+  </div>
+
+  <script>
+    let isFav = false;
+    let showPending = true;
+    let tierFallbackActive = true;
+    let isSkeletonMode = false;
+
+    function toggleSkeletonView() {
+      isSkeletonMode = !isSkeletonMode;
+      const readyView = document.getElementById('ready-view');
+      const skeletonView = document.getElementById('skeleton-view');
+      const lbl = document.getElementById('lbl-toggle-skeleton');
+      const btn = document.getElementById('btn-toggle-skeleton');
+      if (isSkeletonMode) {
+        readyView.classList.add('hidden');
+        skeletonView.classList.remove('hidden');
+        lbl.textContent = 'Đang xem: Skeleton Loading (Bấm về trang thật)';
+        btn.classList.add('bg-[#0194F3]', 'text-white', 'border-[#0194F3]');
+        btn.classList.remove('bg-[#F8FAFC]', 'text-[#10243A]');
+      } else {
+        skeletonView.classList.add('hidden');
+        readyView.classList.remove('hidden');
+        lbl.textContent = 'Xem Skeleton Loading';
+        btn.classList.remove('bg-[#0194F3]', 'text-white', 'border-[#0194F3]');
+        btn.classList.add('bg-[#F8FAFC]', 'text-[#10243A]');
+      }
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('demo-toast');
+      const m = document.getElementById('demo-toast-msg');
+      m.textContent = msg;
+      t.classList.remove('hidden');
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => t.classList.add('hidden'), 2800);
+    }
+
+    function toggleFavorite() {
+      isFav = !isFav;
+      const icon = document.getElementById('icon-favorite');
+      const lbl = document.getElementById('lbl-favorite');
+      const btn = document.getElementById('btn-favorite');
+      if (isFav) {
+        icon.className = 'fa-solid fa-heart text-rose-500';
+        lbl.textContent = 'Đã lưu';
+        btn.classList.add('border-rose-200', 'bg-rose-50/60', 'text-rose-700');
+        showToast('Đã lưu vào Danh sách yêu thích!');
+      } else {
+        icon.className = 'fa-regular fa-heart text-slate-600';
+        lbl.textContent = 'Yêu thích';
+        btn.classList.remove('border-rose-200', 'bg-rose-50/60', 'text-rose-700');
+        showToast('Đã bỏ lưu địa điểm');
+      }
+    }
+
+    function togglePendingStrip() {
+      showPending = !showPending;
+      const strip = document.getElementById('pending-strip');
+      const lbl = document.getElementById('lbl-toggle-pending');
+      if (showPending) {
+        strip.classList.remove('hidden');
+        lbl.textContent = 'Đang bật: Dải ảnh chờ duyệt';
+      } else {
+        strip.classList.add('hidden');
+        lbl.textContent = 'Đang tắt: Dải ảnh chờ duyệt';
+      }
+    }
+
+    function toggleCandidateTierScenario() {
+      tierFallbackActive = !tierFallbackActive;
+      const lbl = document.getElementById('lbl-toggle-tier');
+      const img = document.getElementById('c3-img');
+      const cat = document.getElementById('c3-cat');
+      const rating = document.getElementById('c3-rating');
+      const name = document.getElementById('c3-name');
+      const addr = document.getElementById('c3-addr');
+      const price = document.getElementById('c3-price');
+
+      if (tierFallbackActive) {
+        lbl.textContent = 'Candidate: Tầng 1 (2 quán) + Tầng 2 bù (1 điểm cùng Area)';
+        img.src = 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?w=700&auto=format&fit=crop&q=80';
+        cat.textContent = 'Điểm tham quan';
+        rating.textContent = '4.9';
+        name.textContent = 'Bến Cá Chép Hóa Rồng & Cầu Rồng';
+        addr.textContent = 'Trần Hưng Đạo, Sơn Trà, Đà Nẵng';
+        price.textContent = 'Dưới 50.000đ';
+        showToast('Kịch bản Tầng 2: Bù địa điểm nổi bật cùng Khu vực Đà Nẵng');
+      } else {
+        lbl.textContent = 'Candidate: Tầng 1 đủ 3 địa điểm (Cùng Category + Cùng Area)';
+        img.src = 'https://images.unsplash.com/photo-1445116572660-236099ec97a0?w=700&auto=format&fit=crop&q=80';
+        cat.textContent = 'Cà phê & Tráng miệng';
+        rating.textContent = '4.7';
+        name.textContent = '43 Factory Coffee Roaster';
+        addr.textContent = 'Lô 422 Ngô Thì Sĩ, Ngũ Hành Sơn, Đà Nẵng';
+        price.textContent = '50.000đ – 150.000đ';
+        showToast('Kịch bản Tầng 1: Đủ 3 địa điểm cùng Cà phê tại Đà Nẵng');
+      }
+    }
+
+    function swapMainImage(url) {
+      document.getElementById('hero-main-img').src = url;
+    }
+
+    function openContributeModal() {
+      document.getElementById('contribute-modal').classList.remove('hidden');
+    }
+
+    function closeContributeModal() {
+      document.getElementById('contribute-modal').classList.add('hidden');
+    }
+
+    function simulateHonestOptimisticUpload() {
+      closeContributeModal();
+      const strip = document.getElementById('pending-strip');
+      strip.classList.remove('hidden');
+      showPending = true;
+      document.getElementById('lbl-toggle-pending').textContent = 'Đang bật: Dải ảnh chờ duyệt';
+
+      const grid = document.getElementById('pending-grid');
+      const countEl = document.getElementById('pending-count');
+      const card = document.createElement('div');
+      card.className = 'relative aspect-[16/10] rounded-xl overflow-hidden border border-sky-300 bg-white';
+      card.innerHTML = `
+        <img src="https://images.unsplash.com/photo-1442512595331-e89e73853f31?w=400&auto=format&fit=crop&q=80" class="w-full h-full object-cover opacity-65" />
+        <div class="absolute inset-0 bg-[#10243A]/35 backdrop-blur-[1px] flex flex-col items-center justify-center gap-1 text-white">
+          <i class="fa-solid fa-circle-notch fa-spin text-xs"></i>
+          <span class="text-[11px] font-bold">Đang tải lên...</span>
+        </div>
+        <span class="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-sky-100/95 text-[#0369A1] border border-sky-300 text-[10px] font-extrabold">
+          Đang gửi
+        </span>
+      `;
+      grid.prepend(card);
+      countEl.textContent = String(grid.children.length);
+
+      setTimeout(() => {
+        card.className = 'relative aspect-[16/10] rounded-xl overflow-hidden border border-amber-200 bg-white';
+        card.innerHTML = `
+          <img src="https://images.unsplash.com/photo-1442512595331-e89e73853f31?w=400&auto=format&fit=crop&q=80" class="w-full h-full object-cover opacity-90" />
+          <span class="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-amber-100/95 text-amber-900 border border-amber-300/80 text-[10px] font-extrabold">
+            Chờ duyệt
+          </span>
+        `;
+        showToast('Đã gửi ảnh thành công! Đang chờ Quản trị viên duyệt.');
+      }, 1400);
+    }
+  </script>
+</body>
+</html>

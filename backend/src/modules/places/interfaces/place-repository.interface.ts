@@ -122,8 +122,9 @@ export interface IPlaceRepository {
 
   /**
    * Finds a place by its unique UUID with full details, images, and sources.
+   * When viewerId is provided, also includes the viewer's own PENDING contributed photos.
    */
-  findById(id: string): Promise<PlaceDetail | null>;
+  findById(id: string, viewerId?: string): Promise<PlaceDetail | null>;
 
   /**
    * Retrieves all active categories sorted by sortOrder.

@@ -1,5 +1,21 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Inject,
+  Injectable,
+  Logger,
+  NotFoundException,
+  Optional,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
+import { PrismaService } from '../../database/prisma.service';
+import {
+  IMediaStorageProvider,
+  RawUploadFile,
+} from '../community/interfaces/media-storage.interface';
+import { AdminEventsService } from '../admin/events/admin-events.service';
+import { AdminLiveEventType } from '../admin/events/admin-events.constants';
+import { PLACE_PHOTO_CONTRIBUTION_CONFIG } from './places.constants';
 import {
   IPlaceRepository,
   PlaceRow,
@@ -24,7 +40,7 @@ import {
   CategoryItemDto,
   TravelAreaItemDto,
 } from './dto/place-response.dto';
-import { BudgetLevel } from '@prisma/client';
+import { BudgetLevel, PlaceImageStatus, PlaceStatus } from '@prisma/client';
 import { detectSearchIntent } from '../../common/utils/string.util';
 import { PlaceSortBy } from '../../common/enums/places.enum';
 import { parseSearchQuery } from './utils/search-query-parser.util';
@@ -44,6 +60,13 @@ export class PlacesService {
     private readonly embeddingService: IEmbeddingService,
     private readonly geoJsonService: GeoJsonService,
     private readonly nominatim: NominatimService,
+    @Optional()
+    private readonly prisma?: PrismaService,
+    @Optional()
+    @Inject(INJECT_TOKENS.MEDIA_STORAGE_PROVIDER)
+    private readonly mediaStorage?: IMediaStorageProvider,
+    @Optional()
+    private readonly adminEvents?: AdminEventsService,
   ) {}
 
   /**
@@ -379,12 +402,25 @@ export class PlacesService {
 
   /**
    * Retrieve full details of a place by its UUID.
+   * When viewerId is provided, includes the viewer's own PENDING contributed photos
+   * while keeping primaryImage strictly from APPROVED images.
    */
-  async getPlaceById(id: string): Promise<PlaceDetailDto> {
-    const place = await this.placeRepo.findById(id);
+  async getPlaceById(id: string, viewerId?: string): Promise<PlaceDetailDto> {
+    const place = viewerId
+      ? await this.placeRepo.findById(id, viewerId)
+      : await this.placeRepo.findById(id);
     if (!place) {
       throw new NotFoundException(`Place with ID "${id}" not found`);
     }
+
+    const rawImages = place.images || [];
+    const approvedImages = rawImages.filter(
+      (img) => !img.status || img.status === PlaceImageStatus.APPROVED,
+    );
+    const pendingOwnImages = rawImages.filter(
+      (img) => img.status === PlaceImageStatus.PENDING,
+    );
+    const orderedImages = [...approvedImages, ...pendingOwnImages];
 
     const baseDto = this.mapToPlaceItemDto({
       id: place.id,
@@ -411,7 +447,7 @@ export class PlacesService {
       area_name: place.area?.name,
       area_name_vi: place.area?.nameVi,
       area_slug: place.area?.slug,
-      primary_image: place.images?.[0]?.imageUrl || null,
+      primary_image: approvedImages[0]?.imageUrl || null,
       distance_meters: null,
     });
 
@@ -420,12 +456,13 @@ export class PlacesService {
       priceRange: place.priceRange as Record<string, unknown> | null,
       tags: place.tags || [],
       attributes: (place.attributes as Record<string, unknown>) || {},
-      images: (place.images || []).map((img) => ({
+      images: orderedImages.map((img) => ({
         id: img.id,
         imageUrl: img.imageUrl,
         thumbnailUrl: img.thumbnailUrl,
         isPrimary: img.isPrimary,
         caption: img.caption,
+        status: img.status,
       })),
       sources: (place.sources || []).map((src) => ({
         provider: src.provider,
@@ -547,6 +584,107 @@ export class PlacesService {
             slug: row.area_slug as string,
           }
         : null,
+    };
+  }
+
+  /**
+   * User contributes a real photo for an active place.
+   * Strictly accepts images only (rejects videos), uploads via IMediaStorageProvider,
+   * and persists as PENDING until approved by an Admin.
+   */
+  async contributePlacePhoto(
+    placeId: string,
+    userId: string,
+    file: RawUploadFile | undefined,
+    caption?: string,
+  ) {
+    const cfg = PLACE_PHOTO_CONTRIBUTION_CONFIG;
+
+    if (!file) {
+      throw new BadRequestException(cfg.MESSAGES.FILE_REQUIRED);
+    }
+
+    const normalizedMime = (file.mimetype || '').toLowerCase().trim();
+    if (normalizedMime.startsWith('video/')) {
+      throw new BadRequestException(cfg.MESSAGES.VIDEO_REJECTED);
+    }
+
+    const isAllowedImage = (
+      cfg.ALLOWED_IMAGE_MIME_TYPES as readonly string[]
+    ).includes(normalizedMime);
+    if (!isAllowedImage) {
+      throw new BadRequestException(cfg.MESSAGES.INVALID_MIME);
+    }
+
+    if (!file.buffer || file.size <= 0) {
+      throw new BadRequestException(cfg.MESSAGES.FILE_REQUIRED);
+    }
+
+    if (file.size > cfg.MAX_FILE_SIZE_BYTES) {
+      throw new BadRequestException(cfg.MESSAGES.FILE_TOO_LARGE);
+    }
+
+    if (!this.prisma || !this.mediaStorage) {
+      throw new ServiceUnavailableException(cfg.MESSAGES.STORAGE_UNAVAILABLE);
+    }
+
+    const place = await this.prisma.place.findFirst({
+      where: {
+        id: placeId,
+        deletedAt: null,
+        status: PlaceStatus.ACTIVE,
+      },
+      select: { id: true, name: true },
+    });
+
+    if (!place) {
+      throw new NotFoundException(cfg.MESSAGES.PLACE_NOT_FOUND);
+    }
+
+    const [uploaded] = await this.mediaStorage.saveFiles([file], {
+      folder: cfg.CLOUDINARY_FOLDER,
+      imageOnly: true,
+      maxFileSizeBytes: cfg.MAX_FILE_SIZE_BYTES,
+      maxFiles: 1,
+    });
+
+    const trimmedCaption = caption?.trim() || null;
+
+    const created = await this.prisma.placeImage.create({
+      data: {
+        placeId: place.id,
+        imageUrl: uploaded.url,
+        thumbnailUrl: uploaded.url,
+        caption: trimmedCaption,
+        source: cfg.SOURCE_TAG,
+        status: PlaceImageStatus.PENDING,
+        isPrimary: false,
+        uploadedById: userId,
+      },
+      select: {
+        id: true,
+        placeId: true,
+        imageUrl: true,
+        caption: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    void this.adminEvents?.emit({
+      type: AdminLiveEventType.PLACE_PHOTO_SUBMITTED,
+      payload: {
+        imageId: created.id,
+        placeId: place.id,
+        placeName: place.name,
+        imageUrl: created.imageUrl,
+      },
+      timestamp: new Date().toISOString(),
+    });
+
+    return {
+      message: cfg.MESSAGES.SUCCESS,
+      image: created,
     };
   }
 }

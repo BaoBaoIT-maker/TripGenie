@@ -5,10 +5,13 @@ import { PlacesRepository } from './places.repository';
 import { GeminiEmbeddingService } from './services/gemini-embedding.service';
 import { NominatimService } from './services/nominatim.service';
 import { GeoModule } from '../geo/geo.module';
+import { PrismaModule } from '../../database/prisma.module';
+import { CommunityModule } from '../community/community.module';
+import { AdminModule } from '../admin/admin.module';
 import { INJECT_TOKENS } from '../../common/constants/inject-tokens';
 
 @Module({
-  imports: [GeoModule],
+  imports: [GeoModule, PrismaModule, CommunityModule, AdminModule],
   controllers: [PlacesController],
   providers: [
     PlacesService,

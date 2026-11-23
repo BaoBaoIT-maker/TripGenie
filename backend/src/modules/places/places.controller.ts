@@ -9,8 +9,19 @@ import {
   HttpStatus,
   ParseUUIDPipe,
   UseGuards,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '@/common/guards/optional-jwt-auth.guard';
+import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { RateLimit } from '@/common/decorators/rate-limit.decorator';
+import { RateLimitTier } from '@/config/rate-limit.config';
+import { RawUploadFile } from '../community/interfaces/media-storage.interface';
+import { PLACE_PHOTO_CONTRIBUTION_CONFIG } from './places.constants';
+import { ContributePlacePhotoDto } from './dto/contribute-place-photo.dto';
 import { PlacesService } from './places.service';
 import { SearchPlacesDto } from './dto/search-places.dto';
 import { NearbyPlacesDto } from './dto/nearby-places.dto';
@@ -112,14 +123,46 @@ export class PlacesController {
   }
 
   /**
+   * Contribute a real photo for a place (images only; videos strictly rejected).
+   * Stored with PENDING status until approved by Admin.
+   * POST /api/v1/places/:id/photos/contribute
+   */
+  @Post(':id/photos/contribute')
+  @UseGuards(JwtAuthGuard)
+  @RateLimit({ tier: RateLimitTier.MEDIA_UPLOAD })
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: {
+        fileSize: PLACE_PHOTO_CONTRIBUTION_CONFIG.MAX_FILE_SIZE_BYTES,
+      },
+    }),
+  )
+  @HttpCode(HttpStatus.CREATED)
+  async contributePlacePhoto(
+    @Param('id', ParseUUIDPipe) id: string,
+    @CurrentUser('id') userId: string,
+    @UploadedFile() file: RawUploadFile,
+    @Body() dto: ContributePlacePhotoDto,
+  ) {
+    return this.placesService.contributePlacePhoto(
+      id,
+      userId,
+      file,
+      dto.caption,
+    );
+  }
+
+  /**
    * Get full details of a place by its UUID.
-   * Public endpoint.
+   * Public endpoint; when logged in, also includes the viewer's own PENDING contributed photos.
    */
   @Get(':id')
+  @UseGuards(OptionalJwtAuthGuard)
   @HttpCode(HttpStatus.OK)
   async getPlaceById(
     @Param('id', new ParseUUIDPipe({ version: '4' })) id: string,
+    @CurrentUser('id') viewerId?: string,
   ): Promise<PlaceDetailDto> {
-    return this.placesService.getPlaceById(id);
+    return this.placesService.getPlaceById(id, viewerId);
   }
 }

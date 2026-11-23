@@ -42,7 +42,7 @@ const PLACE_COLUMNS = `
         a.slug AS area_slug,
         (
           SELECT pi.image_url FROM place_images pi
-          WHERE pi.place_id = p.id
+          WHERE pi.place_id = p.id AND pi.status = 'APPROVED'
           ORDER BY pi.is_primary DESC, pi.display_order ASC, pi.created_at ASC
           LIMIT 1
         ) AS primary_image`;
@@ -375,17 +375,25 @@ export class PlacesRepository implements IPlaceRepository {
     return this.prisma.$queryRawUnsafe<PlaceRow[]>(sql, ...args);
   }
 
-  async findById(id: string): Promise<PlaceDetail | null> {
+  async findById(id: string, viewerId?: string): Promise<PlaceDetail | null> {
     return this.prisma.place.findUnique({
       where: { id },
       include: {
         category: true,
         area: true,
         images: {
+          where: viewerId
+            ? {
+                OR: [
+                  { status: 'APPROVED' },
+                  { status: 'PENDING', uploadedById: viewerId },
+                ],
+              }
+            : { status: 'APPROVED' },
           orderBy: [
             { isPrimary: 'desc' },
+            { createdAt: 'desc' },
             { displayOrder: 'asc' },
-            { createdAt: 'asc' },
           ],
         },
         sources: {

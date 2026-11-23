@@ -9,6 +9,7 @@ import type {
   AdminModerationReportsResponse,
   AdminPaginatedResponse,
   AdminPlaceItem,
+  AdminPlacePhotoContributionItem,
   AdminUserItem,
   CreateBannedWordPayload,
   CreateOrUpdateAdminGroupPayload,
@@ -17,6 +18,7 @@ import type {
   QueryAdminBannedWordsParams,
   QueryAdminCommunityGroupsParams,
   QueryAdminModerationPostsParams,
+  QueryAdminPlacePhotosParams,
   QueryAdminPlacesParams,
   QueryAdminReportsParams,
   QueryAdminUsersParams,
@@ -26,7 +28,10 @@ function buildQueryString(params?: Record<string, unknown>): string {
   if (!params) return "";
   const sp = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
-    if (value !== undefined && value !== null && value !== "") {
+    if (Array.isArray(value)) {
+      const joined = value.filter(Boolean).join(",");
+      if (joined) sp.set(key, joined);
+    } else if (value !== undefined && value !== null && value !== "") {
       sp.set(key, String(value));
     }
   }
@@ -107,6 +112,39 @@ export const adminService = {
   ): Promise<{ success: boolean; message: string; placeId: string }> =>
     apiClient(`/admin/places/${placeId}`, {
       method: "DELETE",
+    }),
+
+  getPlacePhotoContributions: (
+    params?: QueryAdminPlacePhotosParams
+  ): Promise<AdminPaginatedResponse<AdminPlacePhotoContributionItem>> =>
+    apiClient<AdminPaginatedResponse<AdminPlacePhotoContributionItem>>(
+      `/admin/places/photo-contributions${buildQueryString(params as Record<string, unknown>)}`
+    ),
+
+  approvePlacePhoto: (
+    imageId: string,
+    payload?: { setAsPrimary?: boolean; note?: string }
+  ): Promise<{
+    success: boolean;
+    message: string;
+    image: AdminPlacePhotoContributionItem;
+  }> =>
+    apiClient(`/admin/places/photo-contributions/${imageId}/approve`, {
+      method: "PATCH",
+      body: JSON.stringify(payload ?? {}),
+    }),
+
+  rejectPlacePhoto: (
+    imageId: string,
+    payload?: { reason?: string }
+  ): Promise<{
+    success: boolean;
+    message: string;
+    image: AdminPlacePhotoContributionItem;
+  }> =>
+    apiClient(`/admin/places/photo-contributions/${imageId}/reject`, {
+      method: "PATCH",
+      body: JSON.stringify(payload ?? {}),
     }),
 
   getCommunityGroups: (

@@ -138,3 +138,143 @@ export function ExploreSplitSkeleton() {
     </div>
   );
 }
+
+/**
+ * Geometric skeleton for the Place Detail page (/places/[slug]).
+ * Mirrors the exact 1:1 visual-first layout (Hero Gallery -> Title & Meta Card ->
+ * 8/4 Content & Sticky Sidebar -> 3 Related PlaceCardSkeletons) for 0 CLS.
+ */
+export function PlaceDetailSkeleton() {
+  return (
+    <div
+      role="status"
+      aria-label="Đang tải chi tiết địa điểm"
+      className="max-w-[1280px] mx-auto w-full px-4 py-6 sm:px-6 lg:px-8 space-y-6 pb-16 animate-pulse"
+    >
+      {/* 1. Back Button & Breadcrumbs Skeleton */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="h-4 w-20 rounded-md bg-slate-200" />
+        <div className="flex items-center gap-2">
+          <div className="h-3.5 w-16 rounded bg-slate-200" />
+          <div className="h-3.5 w-16 rounded bg-slate-200" />
+          <div className="h-3.5 w-32 rounded bg-slate-200" />
+        </div>
+      </div>
+
+      {/* 2. Hero Gallery Skeleton (8 cols primary + 4 cols side thumbnails) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5">
+        <div className="lg:col-span-8 relative aspect-[16/10] sm:aspect-[16/9] w-full rounded-2xl bg-slate-200 border border-slate-200/80">
+          <div className="absolute bottom-3.5 right-3.5 h-9 w-32 rounded-xl bg-white/80" />
+        </div>
+        <div className="lg:col-span-4 grid grid-cols-2 lg:grid-cols-1 gap-3.5">
+          <div className="aspect-[16/10] sm:aspect-[16/9] w-full rounded-2xl bg-slate-200 border border-slate-200/80" />
+          <div className="aspect-[16/10] sm:aspect-[16/9] w-full rounded-2xl bg-slate-200 border border-slate-200/80" />
+        </div>
+      </div>
+
+      {/* 3. Title & Meta Card Skeleton (Placed below Gallery) */}
+      <div className="rounded-2xl border border-slate-200/85 bg-white p-5 sm:p-6 shadow-2xs">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div className="space-y-3 flex-1">
+            <div className="h-8 w-3/4 sm:w-96 rounded-lg bg-slate-200" />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="h-5 w-24 rounded-full bg-slate-100" />
+              <div className="h-4 w-32 rounded bg-slate-200" />
+              <div className="h-4 w-56 rounded bg-slate-100" />
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="h-9 w-24 rounded-xl bg-slate-100 border border-slate-200/70" />
+            <div className="h-9 w-24 rounded-xl bg-slate-100 border border-slate-200/70" />
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Two-Column Main Content & Sticky Sidebar Skeleton */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column (Span 8) */}
+        <div className="lg:col-span-8 space-y-6">
+          {/* Description Card Skeleton */}
+          <div className="rounded-2xl border border-slate-200/85 bg-white p-6 space-y-3 shadow-2xs">
+            <div className="h-6 w-44 rounded-md bg-slate-200" />
+            <div className="space-y-2 pt-1">
+              <div className="h-3.5 w-full rounded bg-slate-100" />
+              <div className="h-3.5 w-11/12 rounded bg-slate-100" />
+              <div className="h-3.5 w-full rounded bg-slate-100" />
+              <div className="h-3.5 w-3/4 rounded bg-slate-100" />
+            </div>
+          </div>
+
+          {/* Practical Info Grid Card Skeleton */}
+          <div className="rounded-2xl border border-slate-200/85 bg-white p-6 space-y-4 shadow-2xs">
+            <div className="h-6 w-40 rounded-md bg-slate-200" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              {Array.from({ length: 4 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200/80 flex items-start gap-3"
+                >
+                  <div className="size-8 rounded-lg bg-slate-200 shrink-0" />
+                  <div className="space-y-1.5 flex-1">
+                    <div className="h-3 w-24 rounded bg-slate-200" />
+                    <div className="h-4 w-36 rounded bg-slate-200" />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2">
+              <div className="h-4 w-14 rounded bg-slate-100" />
+              <div className="h-6 w-24 rounded-lg bg-slate-100" />
+              <div className="h-6 w-28 rounded-lg bg-slate-100" />
+              <div className="h-6 w-20 rounded-lg bg-slate-100" />
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Sticky Action Card Skeleton (Span 4) */}
+        <aside className="lg:col-span-4">
+          <div className="rounded-2xl border border-slate-200/85 bg-white p-5 space-y-5 shadow-2xs">
+            <div className="space-y-2.5">
+              <div className="h-11 w-full rounded-xl bg-slate-200" />
+              <div className="h-10 w-full rounded-xl bg-slate-100 border border-slate-200/70" />
+            </div>
+            <div className="border-t border-slate-100" />
+            <div className="rounded-xl bg-[#F8FAFC] border border-slate-200/90 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="h-4 w-36 rounded bg-slate-200" />
+                <div className="h-5 w-14 rounded-md bg-white border border-slate-200" />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="h-3.5 w-28 rounded bg-slate-200" />
+                  <div className="h-3.5 w-14 rounded bg-slate-200" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="h-3.5 w-32 rounded bg-slate-200" />
+                  <div className="h-3.5 w-16 rounded bg-slate-200" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <div className="h-9 rounded-xl bg-white border border-slate-200" />
+                <div className="h-9 rounded-xl bg-white border border-slate-200" />
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      {/* 5. Related Places Section Skeleton */}
+      <div className="pt-6 border-t border-slate-200/80 space-y-5">
+        <div className="flex items-center justify-between">
+          <div className="h-7 w-44 rounded-md bg-slate-200" />
+          <div className="h-4 w-20 rounded bg-slate-200" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 3 }).map((_, idx) => (
+            <PlaceCardSkeleton key={idx} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}

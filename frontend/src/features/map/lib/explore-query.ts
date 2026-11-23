@@ -17,11 +17,13 @@ export interface ExploreQuery {
 const CATEGORY_ALIASES: Record<string, string> = {
   cafe: "ca-phe",
   restaurant: "am-thuc",
+  sightseeing: "tham-quan",
   nature: "tham-quan",
   culture: "tham-quan",
   entertainment: "giai-tri",
   nightlife: "giai-tri",
   relaxation: "luu-tru",
+  shopping: "mua-sam",
 };
 
 const VALID_AUDIENCES: readonly SuitableAudience[] = [
@@ -40,6 +42,26 @@ const VALID_SORTS: readonly ExploreSort[] = ["rating", "reviews", "name"];
 const VALID_CATEGORY_IDS = new Set(
   SUPER_CATEGORIES.map((c) => c.id).filter((id) => id !== "all")
 );
+
+const SUB_SLUG_TO_SUPER_CATEGORY = new Map<string, string>(
+  SUPER_CATEGORIES.flatMap((sc) => sc.slugs.map((slug) => [slug, sc.id]))
+);
+
+/**
+ * Normalizes a SuperCategory id, backend sub-category slug (e.g. "diem-tham-quan", "khach-san"),
+ * or frontend PlaceCategory alias (e.g. "cafe", "sightseeing") into a valid /explore SuperCategory id.
+ */
+export function resolveExploreCategoryId(
+  raw?: string | null
+): string | undefined {
+  const cleaned = raw?.trim().toLowerCase();
+  if (!cleaned || cleaned === "all") return undefined;
+  const candidate =
+    CATEGORY_ALIASES[cleaned] ||
+    SUB_SLUG_TO_SUPER_CATEGORY.get(cleaned) ||
+    cleaned;
+  return VALID_CATEGORY_IDS.has(candidate) ? candidate : undefined;
+}
 
 /**
  * Normalize and parse raw URLSearchParams into a sanitized ExploreQuery object.
@@ -64,13 +86,10 @@ export function parseExploreQuery(params: URLSearchParams): ExploreQuery {
     }
   }
 
-  // 3. Category (validates against SUPER_CATEGORIES, supports legacy aliases)
-  const rawCategory = params.get("category")?.trim().toLowerCase();
-  if (rawCategory && rawCategory !== "all") {
-    const resolvedCat = CATEGORY_ALIASES[rawCategory] || rawCategory;
-    if (VALID_CATEGORY_IDS.has(resolvedCat)) {
-      query.category = resolvedCat;
-    }
+  // 3. Category (validates against SUPER_CATEGORIES, supports sub-slugs and legacy aliases)
+  const resolvedCat = resolveExploreCategoryId(params.get("category"));
+  if (resolvedCat) {
+    query.category = resolvedCat;
   }
 
   // 4. Suitable Audience (supports suitableFor or fallback audience)
@@ -106,14 +125,15 @@ export function buildExploreHref(filters: Partial<ExploreQuery>): string {
     params.set("keyword", filters.keyword.trim());
   }
 
-  if (filters.areaSlug) {
-    params.set("area", filters.areaSlug);
-  } else if (filters.areaId && Number.isInteger(filters.areaId) && filters.areaId > 0) {
+  if (filters.areaId && Number.isInteger(filters.areaId) && filters.areaId > 0) {
     params.set("areaId", String(filters.areaId));
+  } else if (filters.areaSlug) {
+    params.set("area", filters.areaSlug);
   }
 
-  if (filters.category && filters.category !== "all" && VALID_CATEGORY_IDS.has(filters.category)) {
-    params.set("category", filters.category);
+  const resolvedCategory = resolveExploreCategoryId(filters.category);
+  if (resolvedCategory) {
+    params.set("category", resolvedCategory);
   }
 
   if (filters.suitableFor && VALID_AUDIENCES.includes(filters.suitableFor)) {

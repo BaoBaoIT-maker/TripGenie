@@ -12,7 +12,17 @@ export interface RawUploadFile {
   buffer: Buffer;
 }
 
+export interface MediaUploadOptions {
+  folder?: string;
+  imageOnly?: boolean;
+  maxFileSizeBytes?: number;
+  maxFiles?: number;
+}
+
 export interface IMediaStorageProvider {
-  saveFiles(files: RawUploadFile[]): Promise<UploadedMediaItem[]>;
+  saveFiles(
+    files: RawUploadFile[],
+    options?: MediaUploadOptions,
+  ): Promise<UploadedMediaItem[]>;
   deleteFile?(fileUrl: string): Promise<void>;
 }

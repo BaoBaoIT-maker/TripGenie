@@ -20,7 +20,7 @@ import { ADMIN_CONSTANTS, ADMIN_ERROR_CODES } from './admin.constants';
 describe('AdminModerationService - 3-Tier AI Moderation & Anti-Brigading Reports', () => {
   let service: AdminModerationService;
   let mockPrisma: any;
-  let mockAdminService: { logAudit: jest.Mock };
+  let mockAdminService: { logAudit: jest.Mock; resolvePagination: jest.Mock };
   let mockBannedWordsService: {
     checkBannedSync: jest.Mock;
     normalizeForScan: jest.Mock;
@@ -72,6 +72,11 @@ describe('AdminModerationService - 3-Tier AI Moderation & Anti-Brigading Reports
 
     mockAdminService = {
       logAudit: jest.fn().mockResolvedValue({ id: 'audit-1' }),
+      resolvePagination: jest.fn((query: { page?: number; limit?: number }) => {
+        const page = Math.max(query?.page ?? 1, 1);
+        const limit = Math.min(Math.max(query?.limit ?? 20, 1), 100);
+        return { page, limit, skip: (page - 1) * limit };
+      }),
     };
 
     mockBannedWordsService = {

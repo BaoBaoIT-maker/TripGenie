@@ -1,9 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   parseExploreQuery,
   buildExploreHref,
   type ExploreQuery,
 } from "@/features/map/lib/explore-query";
+import { placeService, type PaginatedPlacesResult } from "@/services/place.service";
+import type { Place } from "@/types/place";
 
 describe("explore-query lib", () => {
   describe("parseExploreQuery", () => {
@@ -124,6 +126,101 @@ describe("explore-query lib", () => {
       const url = new URL(href, "http://localhost");
       const parsed = parseExploreQuery(url.searchParams);
       expect(parsed).toEqual(original);
+    });
+
+    it("normalizes backend sub-category slugs and PlaceCategory aliases in buildExploreHref", () => {
+      expect(
+        buildExploreHref({ areaId: 5, category: "diem-tham-quan" })
+      ).toBe("/explore?areaId=5&category=tham-quan");
+      expect(
+        buildExploreHref({ areaId: 5, category: "khach-san" })
+      ).toBe("/explore?areaId=5&category=luu-tru");
+      expect(
+        buildExploreHref({ areaId: 5, category: "sightseeing" })
+      ).toBe("/explore?areaId=5&category=tham-quan");
+    });
+  });
+
+  describe("placeService.getRelatedPlaces (2-tier waterfall)", () => {
+    const stubPlace = (id: string, category: Place["category"]): Place => ({
+      id,
+      slug: id,
+      name: `Place ${id}`,
+      description: "Desc",
+      category,
+      categoryLabel: "Label",
+      address: "Đà Nẵng",
+      city: "Đà Nẵng",
+      latitude: 16.06,
+      longitude: 108.22,
+      rating: 4.7,
+      reviewCount: 10,
+      images: [],
+      coverImage: "",
+      tags: [],
+      suitableFor: ["friends"],
+      styles: ["chill"],
+    });
+
+    it("fills from Tier 1 (Same Category + Same Area) and falls back to Tier 2 (Same Area) when Tier 1 has < 3 results", async () => {
+      const searchSpy = vi
+        .spyOn(placeService, "searchPlaces")
+        .mockResolvedValueOnce({
+          places: [
+            stubPlace("current-1", "cafe"),
+            stubPlace("cafe-2", "cafe"),
+            stubPlace("cafe-3", "cafe"),
+          ],
+          total: 3,
+          page: 1,
+          limit: 4,
+          totalPages: 1,
+        } as PaginatedPlacesResult)
+        .mockResolvedValueOnce({
+          places: [
+            stubPlace("current-1", "cafe"),
+            stubPlace("cafe-2", "cafe"),
+            stubPlace("sight-1", "sightseeing"),
+            stubPlace("food-1", "restaurant"),
+          ],
+          total: 4,
+          page: 1,
+          limit: 7,
+          totalPages: 1,
+        } as PaginatedPlacesResult);
+
+      const candidates = await placeService.getRelatedPlaces(
+        {
+          id: "current-1",
+          areaId: 5,
+          category: "cafe",
+          categorySlug: "ca-phe",
+        },
+        3
+      );
+
+      expect(candidates.map((p) => p.id)).toEqual([
+        "cafe-2",
+        "cafe-3",
+        "sight-1",
+      ]);
+      expect(searchSpy).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          areaId: 5,
+          categorySlugs: "ca-phe",
+          sortBy: "rating",
+        })
+      );
+      expect(searchSpy).toHaveBeenNthCalledWith(
+        2,
+        expect.objectContaining({
+          areaId: 5,
+          sortBy: "rating",
+        })
+      );
+
+      searchSpy.mockRestore();
     });
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ADMIN_UI_CONSTANTS } from "../admin.constants";
 
 interface AdminDebouncedSearchProps {
@@ -17,8 +17,13 @@ export function AdminDebouncedSearch({
   className = "w-full sm:w-72",
 }: AdminDebouncedSearchProps) {
   const [value, setValue] = useState(initialValue);
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
     const timer = setTimeout(() => {
       onSearchChange(value.trim());
     }, ADMIN_UI_CONSTANTS.SEARCH_DEBOUNCE_MS);
@@ -34,9 +39,13 @@ export function AdminDebouncedSearch({
       <input
         type="text"
         value={value}
+        spellCheck={false}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
         onChange={(e) => setValue(e.target.value)}
         placeholder={placeholder}
-        className="w-full h-10 pl-9 pr-8 rounded-2xl bg-[#F8FAFC] border border-slate-200 text-xs font-medium text-[#10243A] placeholder:text-slate-400 focus:outline-none focus:border-[#0194F3] focus:bg-white transition-colors"
+        className="w-full h-10 pl-9 pr-8 rounded-xl bg-[#F8FAFC] border border-slate-200 text-xs font-medium text-[#10243A] placeholder:text-slate-400 focus:outline-none focus:border-[#0194F3] focus:bg-white transition-colors"
       />
       {value && (
         <button

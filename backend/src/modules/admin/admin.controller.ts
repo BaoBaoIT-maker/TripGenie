@@ -10,7 +10,10 @@ import {
   Req,
   UseGuards,
   ParseUUIDPipe,
+  Sse,
+  MessageEvent,
 } from '@nestjs/common';
+import { Observable } from 'rxjs';
 import { Request } from 'express';
 import { UserRole } from '@prisma/client';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
@@ -19,8 +22,12 @@ import { Roles } from '@/common/decorators/roles.decorator';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
 import { AuthenticatedUser } from '@/common/types';
 import { AdminService } from './admin.service';
+import { AdminUsersService } from './services/admin-users.service';
+import { AdminPlacesService } from './services/admin-places.service';
+import { AdminCommunityService } from './services/admin-community.service';
 import { AdminModerationService } from './admin-moderation.service';
 import { BannedWordsService } from './banned-words.service';
+import { AdminEventsService } from './events/admin-events.service';
 import { QueryAuditLogsDto } from './dto/admin-audit.dto';
 import {
   AdminBanUserDto,
@@ -33,6 +40,11 @@ import {
   AdminUpdatePlaceDto,
   QueryAdminPlacesDto,
 } from './dto/admin-places.dto';
+import {
+  AdminApprovePlacePhotoDto,
+  AdminRejectPlacePhotoDto,
+  QueryAdminPlacePhotosDto,
+} from './dto/admin-place-photos.dto';
 import {
   AdminCreateCommunityGroupDto,
   AdminUpdateCommunityGroupDto,
@@ -57,9 +69,22 @@ import {
 export class AdminController {
   constructor(
     private readonly adminService: AdminService,
+    private readonly adminUsersService: AdminUsersService,
+    private readonly adminPlacesService: AdminPlacesService,
+    private readonly adminCommunityService: AdminCommunityService,
     private readonly adminModerationService: AdminModerationService,
     private readonly bannedWordsService: BannedWordsService,
+    private readonly adminEventsService: AdminEventsService,
   ) {}
+
+  /**
+   * Real-time Admin SSE channel (protected by class-level JwtAuthGuard + RolesGuard ADMIN).
+   * Pushes new photo contributions, flagged posts, and user reports in <100ms.
+   */
+  @Sse('live-events')
+  subscribeLiveEvents(): Observable<MessageEvent> {
+    return this.adminEventsService.createStream();
+  }
 
   private extractMeta(req: Request): AdminRequestMeta {
     const forwarded = req.headers['x-forwarded-for'];
@@ -89,7 +114,7 @@ export class AdminController {
 
   @Get('users')
   async getUsers(@Query() query: QueryAdminUsersDto) {
-    return this.adminService.getUsers(query);
+    return this.adminUsersService.getUsers(query);
   }
 
   @Patch('users/:id/ban')
@@ -99,7 +124,7 @@ export class AdminController {
     @Body() dto: AdminBanUserDto,
     @Req() req: Request,
   ) {
-    return this.adminService.banUser(admin, id, dto, this.extractMeta(req));
+    return this.adminUsersService.banUser(admin, id, dto, this.extractMeta(req));
   }
 
   @Patch('users/:id/unban')
@@ -108,7 +133,7 @@ export class AdminController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request,
   ) {
-    return this.adminService.unbanUser(admin, id, this.extractMeta(req));
+    return this.adminUsersService.unbanUser(admin, id, this.extractMeta(req));
   }
 
   @Patch('users/:id/promote')
@@ -118,7 +143,7 @@ export class AdminController {
     @Body() dto: AdminPromoteUserDto,
     @Req() req: Request,
   ) {
-    return this.adminService.promoteUserToAdmin(
+    return this.adminUsersService.promoteUserToAdmin(
       admin,
       id,
       dto,
@@ -126,9 +151,44 @@ export class AdminController {
     );
   }
 
+  @Get('places/photo-contributions')
+  async getPlacePhotoContributions(@Query() query: QueryAdminPlacePhotosDto) {
+    return this.adminPlacesService.getPlacePhotoContributions(query);
+  }
+
+  @Patch('places/photo-contributions/:imageId/approve')
+  async approvePlacePhoto(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('imageId', ParseUUIDPipe) imageId: string,
+    @Body() dto: AdminApprovePlacePhotoDto,
+    @Req() req: Request,
+  ) {
+    return this.adminPlacesService.approvePlacePhoto(
+      admin,
+      imageId,
+      dto,
+      this.extractMeta(req),
+    );
+  }
+
+  @Patch('places/photo-contributions/:imageId/reject')
+  async rejectPlacePhoto(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('imageId', ParseUUIDPipe) imageId: string,
+    @Body() dto: AdminRejectPlacePhotoDto,
+    @Req() req: Request,
+  ) {
+    return this.adminPlacesService.rejectPlacePhoto(
+      admin,
+      imageId,
+      dto,
+      this.extractMeta(req),
+    );
+  }
+
   @Get('places')
   async getPlaces(@Query() query: QueryAdminPlacesDto) {
-    return this.adminService.getPlaces(query);
+    return this.adminPlacesService.getPlaces(query);
   }
 
   @Post('places')
@@ -137,7 +197,7 @@ export class AdminController {
     @Body() dto: AdminCreatePlaceDto,
     @Req() req: Request,
   ) {
-    return this.adminService.createPlace(admin, dto, this.extractMeta(req));
+    return this.adminPlacesService.createPlace(admin, dto, this.extractMeta(req));
   }
 
   @Patch('places/:id')
@@ -147,7 +207,7 @@ export class AdminController {
     @Body() dto: AdminUpdatePlaceDto,
     @Req() req: Request,
   ) {
-    return this.adminService.updatePlace(admin, id, dto, this.extractMeta(req));
+    return this.adminPlacesService.updatePlace(admin, id, dto, this.extractMeta(req));
   }
 
   @Delete('places/:id')
@@ -156,12 +216,12 @@ export class AdminController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request,
   ) {
-    return this.adminService.deletePlace(admin, id, this.extractMeta(req));
+    return this.adminPlacesService.deletePlace(admin, id, this.extractMeta(req));
   }
 
   @Get('community/groups')
   async getCommunityGroups(@Query() query: QueryAdminCommunityGroupsDto) {
-    return this.adminService.getCommunityGroups(query);
+    return this.adminCommunityService.getCommunityGroups(query);
   }
 
   @Post('community/groups')
@@ -170,7 +230,7 @@ export class AdminController {
     @Body() dto: AdminCreateCommunityGroupDto,
     @Req() req: Request,
   ) {
-    return this.adminService.createCommunityGroup(
+    return this.adminCommunityService.createCommunityGroup(
       admin,
       dto,
       this.extractMeta(req),
@@ -184,7 +244,7 @@ export class AdminController {
     @Body() dto: AdminUpdateCommunityGroupDto,
     @Req() req: Request,
   ) {
-    return this.adminService.updateCommunityGroup(
+    return this.adminCommunityService.updateCommunityGroup(
       admin,
       id,
       dto,
@@ -198,7 +258,7 @@ export class AdminController {
     @Param('id', ParseUUIDPipe) id: string,
     @Req() req: Request,
   ) {
-    return this.adminService.deleteCommunityGroup(
+    return this.adminCommunityService.deleteCommunityGroup(
       admin,
       id,
       this.extractMeta(req),

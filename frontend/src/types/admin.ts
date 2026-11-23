@@ -61,6 +61,7 @@ export interface AdminDashboardStats {
     total: number;
     active: number;
     inactive: number;
+    pendingPhotos: number;
     byCategory: AdminCategoryBreakdownItem[];
   };
   community: {
@@ -71,6 +72,7 @@ export interface AdminDashboardStats {
   moderation: {
     pendingPosts: number;
     flaggedPosts: number;
+    rejectedPosts: number;
     pendingReports: number;
     highPriorityReportAlerts: number;
     highPriorityReportThreshold: number;
@@ -338,6 +340,52 @@ export interface QueryAdminModerationPostsParams {
   page?: number;
   limit?: number;
   status?: AdminPostModerationStatus;
+  statuses?: AdminPostModerationStatus[];
+  search?: string;
+}
+
+export type AdminPlaceImageStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface AdminPlacePhotoContributionItem {
+  id: string;
+  placeId: string;
+  imageUrl: string;
+  thumbnailUrl: string | null;
+  caption: string | null;
+  isPrimary: boolean;
+  source: string | null;
+  status: AdminPlaceImageStatus;
+  moderationNote: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+  place: {
+    id: string;
+    name: string;
+    slug?: string | null;
+    address: string;
+    area?: {
+      id: number;
+      name: string;
+      nameVi: string | null;
+    } | null;
+  } | null;
+  uploadedBy?: {
+    id: string;
+    fullName: string;
+    email: string;
+    avatarUrl: string | null;
+  } | null;
+  reviewedBy?: {
+    id: string;
+    fullName: string;
+    email: string;
+  } | null;
+}
+
+export interface QueryAdminPlacePhotosParams {
+  page?: number;
+  limit?: number;
+  status?: AdminPlaceImageStatus;
   search?: string;
 }
 

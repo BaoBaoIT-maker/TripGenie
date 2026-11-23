@@ -8,6 +8,7 @@ import {
 } from '../community.constants';
 import {
   IMediaStorageProvider,
+  MediaUploadOptions,
   RawUploadFile,
   UploadedMediaItem,
 } from '../interfaces/media-storage.interface';
@@ -21,16 +22,26 @@ export class LocalDiskStorageProvider implements IMediaStorageProvider {
   );
 
   // ponytail: local disk storage suits single-node deployments; swap provider binding in CommunityModule to S3/Cloudinary when scaling horizontally.
-  async saveFiles(files: RawUploadFile[]): Promise<UploadedMediaItem[]> {
+  async saveFiles(
+    files: RawUploadFile[],
+    options?: MediaUploadOptions,
+  ): Promise<UploadedMediaItem[]> {
+    const imageOnly = options?.imageOnly ?? false;
+    const maxFiles = options?.maxFiles ?? COMMUNITY_CONSTANTS.MAX_FILES_PER_UPLOAD;
+    const maxFileSizeBytes =
+      options?.maxFileSizeBytes ?? COMMUNITY_CONSTANTS.MAX_FILE_SIZE_BYTES;
+
     if (!files || files.length === 0) {
       throw new BadRequestException(
-        'Vui lòng chọn ít nhất 1 tệp ảnh hoặc video để tải lên',
+        imageOnly
+          ? 'Vui lòng chọn ít nhất 1 tệp hình ảnh để tải lên'
+          : 'Vui lòng chọn ít nhất 1 tệp ảnh hoặc video để tải lên',
       );
     }
 
-    if (files.length > COMMUNITY_CONSTANTS.MAX_FILES_PER_UPLOAD) {
+    if (files.length > maxFiles) {
       throw new BadRequestException(
-        `Chỉ được tải lên tối đa ${COMMUNITY_CONSTANTS.MAX_FILES_PER_UPLOAD} tệp trong một lần`,
+        `Chỉ được tải lên tối đa ${maxFiles} tệp trong một lần`,
       );
     }
 
@@ -41,10 +52,19 @@ export class LocalDiskStorageProvider implements IMediaStorageProvider {
     for (const file of files) {
       const normalizedMime = (file.mimetype || '').toLowerCase().trim();
       const safeExt = ALLOWED_MEDIA_MIME_TO_EXT[normalizedMime];
+      const isVideo = normalizedMime.startsWith('video/');
 
-      if (!safeExt) {
+      if (imageOnly && isVideo) {
         throw new BadRequestException(
-          `Định dạng tệp "${file.mimetype || file.originalname}" không được hỗ trợ. Chỉ chấp nhận ảnh (JPG, PNG, WebP, GIF) và video (MP4, WebM, MOV).`,
+          'Không hỗ trợ tải lên video. Vui lòng chỉ chọn tệp hình ảnh (JPG, PNG, WebP).',
+        );
+      }
+
+      if (!safeExt || (imageOnly && !normalizedMime.startsWith('image/'))) {
+        throw new BadRequestException(
+          imageOnly
+            ? `Định dạng tệp "${file.mimetype || file.originalname}" không được hỗ trợ. Chỉ chấp nhận hình ảnh (JPG, PNG, WebP, GIF).`
+            : `Định dạng tệp "${file.mimetype || file.originalname}" không được hỗ trợ. Chỉ chấp nhận ảnh (JPG, PNG, WebP, GIF) và video (MP4, WebM, MOV).`,
         );
       }
 
@@ -54,9 +74,10 @@ export class LocalDiskStorageProvider implements IMediaStorageProvider {
         );
       }
 
-      if (file.size > COMMUNITY_CONSTANTS.MAX_FILE_SIZE_BYTES) {
+      if (file.size > maxFileSizeBytes) {
+        const maxMb = Math.round(maxFileSizeBytes / (1024 * 1024));
         throw new BadRequestException(
-          `Tệp "${file.originalname}" vượt quá dung lượng tối đa cho phép (50MB)`,
+          `Tệp "${file.originalname}" vượt quá dung lượng tối đa cho phép (${maxMb}MB)`,
         );
       }
 

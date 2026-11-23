@@ -49,6 +49,7 @@ export function PostReviewSheet({ target, onClose }: PostReviewSheetProps) {
   if (!target) return null;
 
   const isReport = target.kind === "REPORT";
+  const isRejectedPost = !isReport && target.post.moderationStatus === "REJECTED";
   const postData = isReport ? target.report.targetPost : target.post;
   const reportCount = isReport ? target.report.targetReportCount : 0;
   const isHighPriority = isReport && target.report.isHighPriorityAlert;
@@ -79,9 +80,11 @@ export function PostReviewSheet({ target, onClose }: PostReviewSheetProps) {
         "Hệ thống giữ nguyên hiển thị bài đã duyệt để chống công kích hội đồng."
       }`
     : target.post.moderationNote ||
-      (target.post.moderationStatus === "FLAGGED"
-        ? "AI phát hiện từ khóa nhạy cảm — Cần Quản trị viên kiểm tra ngữ cảnh."
-        : "Bài viết mới ở trạng thái chờ duyệt thủ công.");
+      (target.post.moderationStatus === "REJECTED"
+        ? "Bài viết này đã bị từ chối hoặc gỡ bỏ khỏi cộng đồng."
+        : target.post.moderationStatus === "FLAGGED"
+          ? "AI phát hiện nội dung cần kiểm tra ngữ cảnh trước khi hiển thị."
+          : "Bài viết mới ở trạng thái chờ duyệt thủ công.");
 
   const handleDecision = async (decision: "APPROVE" | "REJECT") => {
     const trimmedNote = note.trim() || undefined;
@@ -193,20 +196,22 @@ export function PostReviewSheet({ target, onClose }: PostReviewSheetProps) {
         </div>
 
         <div
-          className={`p-3.5 rounded-[12px] border text-xs space-y-1 ${
-            isHighPriority
+          className={`p-3.5 rounded-xl border text-xs space-y-1 ${
+            isHighPriority || isRejectedPost
               ? "bg-rose-50 border-rose-200 text-rose-900"
-              : "bg-amber-50 border-amber-200 text-amber-900"
+              : "bg-amber-50 border-amber-200 text-amber-950"
           }`}
         >
-          <div className="font-extrabold">Chẩn đoán hệ thống</div>
+          <div className="font-extrabold">
+            {isRejectedPost ? "Lý do từ chối / gỡ bài" : "Chẩn đoán hệ thống"}
+          </div>
           <p>{diagnosisText}</p>
         </div>
 
         <div className="space-y-1.5">
           <label
             htmlFor="moderation-decision-note"
-            className="block text-xs font-extrabold text-[#0F172A]"
+            className="block text-xs font-extrabold text-[#10243A]"
           >
             Ghi chú quyết định (Lưu vào Nhật ký kiểm toán)
           </label>
@@ -214,32 +219,39 @@ export function PostReviewSheet({ target, onClose }: PostReviewSheetProps) {
             id="moderation-decision-note"
             rows={2}
             value={note}
+            spellCheck={false}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Nhập lý do phê duyệt hoặc từ chối..."
-            className="w-full p-3 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] text-xs text-[#0F172A] focus:outline-none focus:border-[#0194F3] focus:bg-white transition-colors"
+            placeholder={
+              isRejectedPost
+                ? "Nhập lý do khôi phục bài viết..."
+                : "Nhập lý do phê duyệt hoặc từ chối..."
+            }
+            className="w-full p-3 rounded-xl border border-slate-200 bg-[#F8FAFC] text-xs text-[#10243A] focus:outline-none focus:border-[#0194F3] focus:bg-white transition-colors"
           />
         </div>
 
-        <div className="pt-2 border-t border-[#F1F5F9] flex items-center justify-end gap-2.5">
-          <button
-            type="button"
-            disabled={isSubmitting}
-            onClick={() => handleDecision("REJECT")}
-            className="h-9 px-4 rounded-[10px] bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
-          >
-            {isSubmitting ? (
-              <Loader2 className="size-3.5 animate-spin" />
-            ) : (
-              <i className="fa-solid fa-ban" aria-hidden="true" />
-            )}
-            <span>Từ chối / Gỡ bài</span>
-          </button>
+        <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2.5">
+          {!isRejectedPost && (
+            <button
+              type="button"
+              disabled={isSubmitting}
+              onClick={() => handleDecision("REJECT")}
+              className="h-9 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+            >
+              {isSubmitting ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <i className="fa-solid fa-ban" aria-hidden="true" />
+              )}
+              <span>Từ chối / Gỡ bài</span>
+            </button>
+          )}
 
           <button
             type="button"
             disabled={isSubmitting}
             onClick={() => handleDecision("APPROVE")}
-            className="h-9 px-4 rounded-[10px] bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
+            className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-60"
           >
             {isSubmitting ? (
               <Loader2 className="size-3.5 animate-spin" />
@@ -247,7 +259,11 @@ export function PostReviewSheet({ target, onClose }: PostReviewSheetProps) {
               <i className="fa-solid fa-check" aria-hidden="true" />
             )}
             <span>
-              {isReport ? "Bác bỏ Report ảo" : "Phê duyệt hiển thị"}
+              {isReport
+                ? "Bác bỏ báo cáo"
+                : isRejectedPost
+                  ? "Khôi phục & Phê duyệt"
+                  : "Phê duyệt hiển thị"}
             </span>
           </button>
         </div>

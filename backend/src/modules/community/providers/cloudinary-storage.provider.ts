@@ -13,6 +13,7 @@ import {
 } from '../community.constants';
 import {
   IMediaStorageProvider,
+  MediaUploadOptions,
   RawUploadFile,
   UploadedMediaItem,
 } from '../interfaces/media-storage.interface';
@@ -47,22 +48,33 @@ export class CloudinaryStorageProvider implements IMediaStorageProvider {
   }
 
   // ponytail: uploads directly to Cloudinary folder via stream; fail-fast with clean HTTP 503 if remote is unavailable rather than silent ephemeral fallback
-  async saveFiles(files: RawUploadFile[]): Promise<UploadedMediaItem[]> {
+  async saveFiles(
+    files: RawUploadFile[],
+    options?: MediaUploadOptions,
+  ): Promise<UploadedMediaItem[]> {
     if (!this.isConfigured) {
       throw new ServiceUnavailableException(
         'Dịch vụ lưu trữ Cloudinary chưa được cấu hình đầy đủ API Key/Secret.',
       );
     }
 
+    const imageOnly = options?.imageOnly ?? false;
+    const maxFiles = options?.maxFiles ?? COMMUNITY_CONSTANTS.MAX_FILES_PER_UPLOAD;
+    const maxFileSizeBytes =
+      options?.maxFileSizeBytes ?? COMMUNITY_CONSTANTS.MAX_FILE_SIZE_BYTES;
+    const targetFolder = options?.folder ?? COMMUNITY_CONSTANTS.CLOUDINARY_FOLDER;
+
     if (!files || files.length === 0) {
       throw new BadRequestException(
-        'Vui lòng chọn ít nhất 1 tệp ảnh hoặc video để tải lên',
+        imageOnly
+          ? 'Vui lòng chọn ít nhất 1 tệp hình ảnh để tải lên'
+          : 'Vui lòng chọn ít nhất 1 tệp ảnh hoặc video để tải lên',
       );
     }
 
-    if (files.length > COMMUNITY_CONSTANTS.MAX_FILES_PER_UPLOAD) {
+    if (files.length > maxFiles) {
       throw new BadRequestException(
-        `Chỉ được tải lên tối đa ${COMMUNITY_CONSTANTS.MAX_FILES_PER_UPLOAD} tệp trong một lần`,
+        `Chỉ được tải lên tối đa ${maxFiles} tệp trong một lần`,
       );
     }
 
@@ -71,10 +83,19 @@ export class CloudinaryStorageProvider implements IMediaStorageProvider {
     for (const file of files) {
       const normalizedMime = (file.mimetype || '').toLowerCase().trim();
       const safeExt = ALLOWED_MEDIA_MIME_TO_EXT[normalizedMime];
+      const isVideo = normalizedMime.startsWith('video/');
 
-      if (!safeExt) {
+      if (imageOnly && isVideo) {
         throw new BadRequestException(
-          `Định dạng tệp "${file.mimetype || file.originalname}" không được hỗ trợ. Chỉ chấp nhận ảnh (JPG, PNG, WebP, GIF) và video (MP4, WebM, MOV).`,
+          'Không hỗ trợ tải lên video. Vui lòng chỉ chọn tệp hình ảnh (JPG, PNG, WebP).',
+        );
+      }
+
+      if (!safeExt || (imageOnly && !normalizedMime.startsWith('image/'))) {
+        throw new BadRequestException(
+          imageOnly
+            ? `Định dạng tệp "${file.mimetype || file.originalname}" không được hỗ trợ. Chỉ chấp nhận hình ảnh (JPG, PNG, WebP, GIF).`
+            : `Định dạng tệp "${file.mimetype || file.originalname}" không được hỗ trợ. Chỉ chấp nhận ảnh (JPG, PNG, WebP, GIF) và video (MP4, WebM, MOV).`,
         );
       }
 
@@ -84,19 +105,20 @@ export class CloudinaryStorageProvider implements IMediaStorageProvider {
         );
       }
 
-      if (file.size > COMMUNITY_CONSTANTS.MAX_FILE_SIZE_BYTES) {
+      if (file.size > maxFileSizeBytes) {
+        const maxMb = Math.round(maxFileSizeBytes / (1024 * 1024));
         throw new BadRequestException(
-          `Tệp "${file.originalname}" vượt quá dung lượng tối đa cho phép (50MB)`,
+          `Tệp "${file.originalname}" vượt quá dung lượng tối đa cho phép (${maxMb}MB)`,
         );
       }
 
-      const isVideo = normalizedMime.startsWith('video/');
       const resourceType: 'image' | 'video' = isVideo ? 'video' : 'image';
 
       try {
         const uploadResult = await this.uploadToCloudinary(
           file.buffer,
           resourceType,
+          targetFolder,
         );
 
         uploadedItems.push({
@@ -123,11 +145,12 @@ export class CloudinaryStorageProvider implements IMediaStorageProvider {
   private uploadToCloudinary(
     buffer: Buffer,
     resourceType: 'image' | 'video',
+    folder: string,
   ): Promise<UploadApiResponse> {
     return new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
-          folder: COMMUNITY_CONSTANTS.CLOUDINARY_FOLDER,
+          folder,
           resource_type: resourceType,
         },
         (error, result) => {

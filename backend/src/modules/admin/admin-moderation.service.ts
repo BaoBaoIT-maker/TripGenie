@@ -19,6 +19,7 @@ import {
 import axios, { AxiosInstance } from 'axios';
 import Redis from 'ioredis';
 import { PrismaService } from '@/database/prisma.service';
+import { REDIS_CLIENT_TOKEN } from '@/database/redis.module';
 import { AuthenticatedUser } from '@/common/types';
 import {
   writeNotification,
@@ -30,6 +31,8 @@ import {
 } from '../notifications/notifications.constants';
 import { AdminService } from './admin.service';
 import { BannedWordsService } from './banned-words.service';
+import { AdminEventsService } from './events/admin-events.service';
+import { AdminLiveEventType } from './events/admin-events.constants';
 import {
   ADMIN_CONSTANTS,
   ADMIN_ERRORS,
@@ -65,8 +68,10 @@ export class AdminModerationService {
     @Optional()
     private readonly configService?: ConfigService,
     @Optional()
-    @Inject('REDIS_CLIENT')
+    @Inject(REDIS_CLIENT_TOKEN)
     private readonly redisClient?: Redis,
+    @Optional()
+    private readonly adminEvents?: AdminEventsService,
   ) {
     this.apiKey = this.configService?.get<string>('GEMINI_API_KEY', '') ?? '';
     this.modelName =
@@ -82,16 +87,6 @@ export class AdminModerationService {
     this.httpClient = axios.create({
       timeout: ADMIN_CONSTANTS.MODERATION.AI_TIMEOUT_MS,
     });
-  }
-
-  private resolvePagination(query: { page?: number; limit?: number }) {
-    const page = Math.max(query.page ?? 1, 1);
-    const limit = Math.min(
-      Math.max(query.limit ?? ADMIN_CONSTANTS.PAGINATION.DEFAULT_LIMIT, 1),
-      ADMIN_CONSTANTS.PAGINATION.MAX_LIMIT,
-    );
-    const skip = (page - 1) * limit;
-    return { page, limit, skip };
   }
 
   /**
@@ -228,7 +223,7 @@ export class AdminModerationService {
       ADMIN_CONSTANTS.MODERATION.MAX_AI_INPUT_CHARS,
     );
 
-    if (!this.apiKey || this.apiKey === 'mock_key') {
+    if (!this.apiKey || this.apiKey === ADMIN_CONSTANTS.MODERATION.MOCK_API_KEY) {
       return this.aiUnavailableResult();
     }
 
@@ -447,6 +442,21 @@ export class AdminModerationService {
           });
         }
       });
+
+      if (
+        result.status === PostModerationStatus.FLAGGED ||
+        result.status === PostModerationStatus.PENDING
+      ) {
+        void this.adminEvents?.emit({
+          type: AdminLiveEventType.POST_NEEDS_MODERATION,
+          payload: {
+            postId,
+            status: result.status,
+            reason: result.reason,
+          },
+          timestamp: new Date().toISOString(),
+        });
+      }
     } catch (err) {
       this.logger.error(
         `evaluatePostAsync failed for post ${postId}: ${
@@ -474,13 +484,15 @@ export class AdminModerationService {
    * Retrieves paginated posts in the moderation queue (PENDING, FLAGGED, REJECTED, APPROVED).
    */
   async getModerationPosts(query: QueryAdminModerationPostsDto) {
-    const { page, limit, skip } = this.resolvePagination(query);
+    const { page, limit, skip } = this.adminService.resolvePagination(query);
 
     const where: Prisma.CommunityPostWhereInput = {
       deletedAt: null,
     };
 
-    if (query.status) {
+    if (query.statuses && query.statuses.length > 0) {
+      where.moderationStatus = { in: query.statuses };
+    } else if (query.status) {
       where.moderationStatus = query.status;
     }
 
@@ -504,7 +516,10 @@ export class AdminModerationService {
         where,
         skip,
         take: limit,
-        orderBy: [{ createdAt: 'desc' }],
+        orderBy:
+          query.statuses && query.statuses.length > 1
+            ? [{ moderationStatus: 'desc' }, { createdAt: 'desc' }]
+            : [{ createdAt: 'desc' }],
         include: {
           user: {
             select: {
@@ -695,7 +710,7 @@ export class AdminModerationService {
    * - Aggregates report counts per target and flags High Priority Alert when reportCount >= 20.
    */
   async getModerationReports(query: QueryAdminReportsDto) {
-    const { page, limit, skip } = this.resolvePagination(query);
+    const { page, limit, skip } = this.adminService.resolvePagination(query);
     const threshold =
       ADMIN_CONSTANTS.MODERATION.HIGH_PRIORITY_REPORT_THRESHOLD;
 
@@ -795,16 +810,23 @@ export class AdminModerationService {
         : [];
     const postMap = new Map(targetPosts.map((p) => [p.id, p]));
 
-    const items = rows.map((r) => {
-      const targetReportCount =
-        countMap.get(`${r.targetType}:${r.targetId}`) ?? 1;
-      return {
-        ...r,
-        targetReportCount,
-        isHighPriorityAlert: targetReportCount >= threshold,
-        targetPost: postMap.get(r.targetId) ?? null,
-      };
-    });
+    const items = rows
+      .map((r) => {
+        const targetReportCount =
+          countMap.get(`${r.targetType}:${r.targetId}`) ?? 1;
+        return {
+          ...r,
+          targetReportCount,
+          isHighPriorityAlert: targetReportCount >= threshold,
+          targetPost: postMap.get(r.targetId) ?? null,
+        };
+      })
+      .sort((a, b) => {
+        if (a.isHighPriorityAlert !== b.isHighPriorityAlert) {
+          return a.isHighPriorityAlert ? -1 : 1;
+        }
+        return b.targetReportCount - a.targetReportCount;
+      });
 
     return {
       items,

@@ -1,5 +1,11 @@
 import { apiClient } from "@/lib/api-client";
-import { Place, PlaceCategory, SuitableAudience, TravelStyle } from "@/types/place";
+import {
+  PendingContributedPhoto,
+  Place,
+  PlaceCategory,
+  SuitableAudience,
+  TravelStyle,
+} from "@/types/place";
 
 export interface BackendCategoryItem {
   id: number;
@@ -150,7 +156,15 @@ export interface BackendPlaceItem {
   openingHours?: Record<string, unknown> | null;
   isOpenNow?: boolean | null;
   primaryImage?: string | null;
-  images?: Array<string | { imageUrl: string }>;
+  images?: Array<
+    | string
+    | {
+        id?: string;
+        imageUrl: string;
+        caption?: string | null;
+        status?: "PENDING" | "APPROVED" | "REJECTED";
+      }
+  >;
   tags?: string[];
   category?: {
     id?: number;
@@ -190,12 +204,39 @@ export function optimizeImageUrl(rawUrl?: string | null): string {
 export function mapBackendPlaceToPlace(dto: BackendPlaceItem): Place {
   const { priceLevel, priceRangeText } = mapBudgetLevel(dto.priceLevel);
   const catMapping = mapCategorySlug(dto.category?.slug);
-  const rawPrimary = dto.primaryImage || (dto.images?.[0] ? (typeof dto.images[0] === "string" ? dto.images[0] : dto.images[0].imageUrl) : "");
+  const rawImages = Array.isArray(dto.images) ? dto.images : [];
+  const approvedRaw = rawImages.filter(
+    (img) => typeof img === "string" || !img.status || img.status === "APPROVED"
+  );
+  const pendingContributedImages: PendingContributedPhoto[] = rawImages
+    .filter(
+      (img): img is { id?: string; imageUrl: string; caption?: string | null; status: "PENDING" } =>
+        typeof img !== "string" && img.status === "PENDING"
+    )
+    .map((img, idx) => ({
+      id: img.id || `pending-${idx}`,
+      imageUrl: optimizeImageUrl(img.imageUrl),
+      caption: img.caption ?? null,
+    }))
+    .filter((img) => Boolean(img.imageUrl));
+
+  const rawPrimary =
+    dto.primaryImage ||
+    (approvedRaw[0]
+      ? typeof approvedRaw[0] === "string"
+        ? approvedRaw[0]
+        : approvedRaw[0].imageUrl
+      : "");
   const coverImage = optimizeImageUrl(rawPrimary);
 
-  const imagesList = Array.isArray(dto.images) && dto.images.length > 0
-    ? dto.images.map((img) => optimizeImageUrl(typeof img === "string" ? img : img.imageUrl)).filter(Boolean)
-    : (coverImage ? [coverImage] : []);
+  const imagesList =
+    approvedRaw.length > 0
+      ? approvedRaw
+          .map((img) => optimizeImageUrl(typeof img === "string" ? img : img.imageUrl))
+          .filter(Boolean)
+      : coverImage
+        ? [coverImage]
+        : [];
 
   const city = dto.city || dto.area?.nameVi || dto.area?.name || "Đà Nẵng";
   const tags: string[] = Array.isArray(dto.tags) && dto.tags.length > 0
@@ -217,11 +258,6 @@ export function mapBackendPlaceToPlace(dto: BackendPlaceItem): Place {
   const realRating = dto.ratingAvg ? Number(dto.ratingAvg) : 0;
   const realReviews = dto.reviewCount ? Number(dto.reviewCount) : 0;
 
-  const whyGo: string[] = [];
-  if (dto.address) whyGo.push(`Tọa lạc tại vị trí: ${dto.address}`);
-  if (realRating > 0) whyGo.push(`Được đánh giá ${realRating.toFixed(1)}/5 sao từ ${realReviews} lượt nhận xét`);
-  if (dto.category?.nameVi) whyGo.push(`Điểm đến thuộc nhóm ${dto.category.nameVi}`);
-
   return {
     id: dto.id,
     slug: dto.id, // Primary routing key: UUID
@@ -230,11 +266,11 @@ export function mapBackendPlaceToPlace(dto: BackendPlaceItem): Place {
       ? dto.description.slice(0, 110) + (dto.description.length > 110 ? "..." : "")
       : undefined,
     description: dto.description || `Địa điểm ${dto.name} tọa lạc tại ${dto.address || city}.`,
-    whyGo: whyGo.length > 0 ? whyGo : undefined,
-    tips: undefined,
-    suggestedDuration: "1 - 2 giờ",
     category: catMapping.category,
+    categorySlug: dto.category?.slug || undefined,
     categoryLabel: dto.category?.nameVi || dto.category?.name || catMapping.label,
+    areaId: typeof dto.area?.id === "number" ? dto.area.id : undefined,
+    areaSlug: dto.area?.slug || undefined,
     address: dto.address || city,
     city,
     latitude: Number(dto.latitude) || 16.0544,
@@ -244,6 +280,7 @@ export function mapBackendPlaceToPlace(dto: BackendPlaceItem): Place {
     priceLevel,
     priceRangeText,
     images: imagesList,
+    pendingContributedImages,
     coverImage,
     phone: dto.phone || undefined,
     website: dto.website || undefined,
@@ -254,6 +291,7 @@ export function mapBackendPlaceToPlace(dto: BackendPlaceItem): Place {
     matchReason: matchScore
       ? `Độ tương đồng ngữ nghĩa AI ${matchScore}% với tìm kiếm của bạn`
       : undefined,
+    isOpenNow: dto.isOpenNow ?? null,
     openingHoursText,
     featured: realRating >= 4.5 || Boolean(dto.imageCount && dto.imageCount > 0),
     distanceKm:
@@ -472,15 +510,111 @@ export const placeService = {
   },
 
   /**
-   * Get related places near a place.
+   * Two-tier waterfall candidate selection for Place Detail page:
+   * - Tier 1: Same Category + Same Area (sorted by rating)
+   * - Tier 2: Same Area fallback across categories if Tier 1 yields < limit places
    */
-  async getRelatedPlaces(currentPlaceId: string, limit = 3): Promise<Place[]> {
+  async getRelatedPlaces(
+    currentPlaceOrId:
+      | (Partial<Pick<Place, "areaId" | "areaSlug" | "category" | "categorySlug">> & {
+          id: string;
+        })
+      | string,
+    limit = 3
+  ): Promise<Place[]> {
     try {
-      const searchRes = await this.searchPlaces({ limit: limit + 1 });
-      const filtered = searchRes.places.filter((p) => p.id !== currentPlaceId);
-      return filtered.slice(0, limit);
+      const target: Partial<
+        Pick<Place, "areaId" | "areaSlug" | "category" | "categorySlug">
+      > & { id: string } =
+        typeof currentPlaceOrId === "string"
+          ? { id: currentPlaceOrId }
+          : currentPlaceOrId;
+
+      const picked: Place[] = [];
+      const seenIds = new Set<string>([target.id]);
+
+      const appendUnique = (candidates: Place[]) => {
+        for (const item of candidates) {
+          if (picked.length >= limit) break;
+          if (!seenIds.has(item.id)) {
+            seenIds.add(item.id);
+            picked.push(item);
+          }
+        }
+      };
+
+      const areaFilter: Pick<PlaceFilterParams, "areaId" | "areaSlug"> = {};
+      if (target.areaId) {
+        areaFilter.areaId = target.areaId;
+      } else if (target.areaSlug) {
+        areaFilter.areaSlug = target.areaSlug;
+      }
+
+      const categoryToken = target.categorySlug || target.category;
+
+      // Tier 1: Same Category + Same Area
+      if (categoryToken) {
+        const tier1Res = await this.searchPlaces({
+          ...areaFilter,
+          categorySlugs: categoryToken,
+          sortBy: "rating",
+          limit: limit + 1,
+        });
+        appendUnique(tier1Res.places);
+      }
+
+      // Tier 2: Same Area (any category) if Tier 1 did not fill `limit`
+      if (picked.length < limit && (areaFilter.areaId || areaFilter.areaSlug)) {
+        const tier2Res = await this.searchPlaces({
+          ...areaFilter,
+          sortBy: "rating",
+          limit: limit + 4,
+        });
+        appendUnique(tier2Res.places);
+      }
+
+      // Safety fallback when area metadata is absent or area has < limit places total
+      if (picked.length < limit) {
+        const fallbackRes = await this.searchPlaces({
+          sortBy: "rating",
+          limit: limit + 4,
+        });
+        appendUnique(fallbackRes.places);
+      }
+
+      return picked;
     } catch {
       return [];
     }
+  },
+
+  /**
+   * User contributes a real photo for a place (strictly images only, max 10MB).
+   * Stored in PENDING state until approved by an Admin.
+   */
+  async contributePhoto(
+    placeId: string,
+    file: File,
+    caption?: string
+  ): Promise<{
+    message: string;
+    image: {
+      id: string;
+      placeId: string;
+      imageUrl: string;
+      caption: string | null;
+      status: string;
+      createdAt: string;
+    };
+  }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (caption?.trim()) {
+      formData.append("caption", caption.trim());
+    }
+    return apiClient(`/places/${placeId}/photos/contribute`, {
+      method: "POST",
+      body: formData,
+    });
   },
 };

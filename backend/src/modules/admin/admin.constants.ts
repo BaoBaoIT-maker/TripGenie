@@ -33,10 +33,16 @@ export const ADMIN_CONSTANTS = {
     AI_TIMEOUT_MS: 8000, // async background call, no user is waiting on it
     DEFAULT_GEMINI_MODEL: 'gemini-2.5-flash',
     DEFAULT_GEMINI_BASE_URL: 'https://generativelanguage.googleapis.com/v1beta',
+    MOCK_API_KEY: 'mock_key',
+  },
+  PLACE_IMAGE_SOURCES: {
+    ADMIN: 'admin',
+    USER_CONTRIBUTION: 'user_contribution',
   },
   AUDIT_TARGET_TYPES: {
     USER: 'USER',
     PLACE: 'PLACE',
+    PLACE_IMAGE: 'PLACE_IMAGE',
     COMMUNITY_POST: 'COMMUNITY_POST',
     POST_COMMENT: 'POST_COMMENT',
     COMMUNITY_GROUP: 'COMMUNITY_GROUP',
@@ -89,6 +95,12 @@ export const ADMIN_CONSTANTS = {
     DEFAULT_REJECT_POST_NOTE: 'Bị từ chối bởi Quản trị viên do vi phạm tiêu chuẩn cộng đồng',
     DEFAULT_RESOLVE_REPORT_NOTE: 'Báo cáo hợp lệ — Đã xử lý nội dung vi phạm',
     DEFAULT_DISMISS_REPORT_NOTE: 'Bác bỏ báo cáo — Nội dung không vi phạm',
+    APPROVE_PLACE_PHOTO_SUCCESS:
+      'Đã phê duyệt ảnh đóng góp hiển thị trên địa điểm',
+    REJECT_PLACE_PHOTO_SUCCESS: 'Đã từ chối ảnh đóng góp',
+    DEFAULT_APPROVE_PLACE_PHOTO_NOTE: 'Phê duyệt ảnh đóng góp của người dùng',
+    DEFAULT_REJECT_PLACE_PHOTO_NOTE:
+      'Ảnh đóng góp không đạt tiêu chuẩn chất lượng hoặc không đúng địa điểm',
   },
 } as const;
 
@@ -130,6 +142,7 @@ export const ADMIN_ERROR_CODES = {
   CONTENT_VIOLATES_POLICY: 'COMMUNITY_CONTENT_VIOLATES_POLICY',
   BANNED_WORD_EXISTS: 'ADMIN_BANNED_WORD_EXISTS',
   BANNED_WORD_NOT_FOUND: 'ADMIN_BANNED_WORD_NOT_FOUND',
+  PLACE_IMAGE_NOT_FOUND: 'ADMIN_PLACE_IMAGE_NOT_FOUND',
 } as const;
 
 export const ADMIN_ERRORS = {
@@ -160,6 +173,10 @@ export const ADMIN_ERRORS = {
   PLACE_NOT_FOUND: {
     code: ADMIN_ERROR_CODES.PLACE_NOT_FOUND,
     message: 'Không tìm thấy địa điểm',
+  },
+  PLACE_IMAGE_NOT_FOUND: {
+    code: ADMIN_ERROR_CODES.PLACE_IMAGE_NOT_FOUND,
+    message: 'Không tìm thấy ảnh đóng góp của địa điểm',
   },
   INVALID_COORDINATES: {
     code: ADMIN_ERROR_CODES.INVALID_COORDINATES,

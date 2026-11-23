@@ -1,11 +1,101 @@
-import type { AdminAuditAction } from "@/types/admin";
+import type {
+  AdminAuditAction,
+  AdminPlaceImageStatus,
+  AdminPostModerationStatus,
+} from "@/types/admin";
+
+export const ADMIN_QUERY_CONFIG = {
+  LIST_STALE_TIME_MS: 5_000,
+  STATS_STALE_TIME_MS: 10_000,
+  STATS_POLL_INTERVAL_MS: 60_000, // Fallback safety net; primary updates arrive via Admin SSE (<100ms)
+  REF_DATA_STALE_TIME_MS: 10 * 60 * 1000,
+} as const;
+
+export const ADMIN_LIVE_EVENT_TYPES = {
+  PLACE_PHOTO_SUBMITTED: "PLACE_PHOTO_SUBMITTED",
+  POST_NEEDS_MODERATION: "POST_NEEDS_MODERATION",
+  REPORT_SUBMITTED: "REPORT_SUBMITTED",
+} as const;
+
+export const ADMIN_TAB_QUERY_PARAMS = {
+  KEY: "tab",
+  PLACES_PHOTOS: "photos",
+  MODERATION_REPORTS: "reports",
+  MODERATION_REJECTED: "rejected",
+  MODERATION_BANNED_WORDS: "banned-words",
+} as const;
+
+export const ADMIN_ROUTES = {
+  DASHBOARD: "/admin/dashboard",
+  MODERATION: "/admin/moderation",
+  MODERATION_REPORTS: `/admin/moderation?${ADMIN_TAB_QUERY_PARAMS.KEY}=${ADMIN_TAB_QUERY_PARAMS.MODERATION_REPORTS}`,
+  PLACES: "/admin/places",
+  PLACES_PHOTOS: `/admin/places?${ADMIN_TAB_QUERY_PARAMS.KEY}=${ADMIN_TAB_QUERY_PARAMS.PLACES_PHOTOS}`,
+  USERS: "/admin/users",
+  COMMUNITY: "/admin/community",
+  AUDIT_LOGS: "/admin/audit-logs",
+} as const;
+
+export const ADMIN_LIVE_EVENT_MESSAGES = {
+  PLACE_PHOTO_SUBMITTED: (placeName?: string) =>
+    placeName
+      ? `Có ảnh đóng góp mới cho "${placeName}" đang chờ duyệt`
+      : "Có ảnh địa điểm đóng góp mới đang chờ duyệt",
+  POST_NEEDS_MODERATION: () => "Có bài viết cộng đồng mới cần kiểm duyệt",
+  REPORT_SUBMITTED: (postTitle?: string) =>
+    postTitle
+      ? `Có báo cáo vi phạm mới cho bài "${postTitle}"`
+      : "Có báo cáo vi phạm mới từ cộng đồng",
+} as const;
+
+export const ADMIN_MODERATION_QUEUE_STATUSES: AdminPostModerationStatus[] = [
+  "FLAGGED",
+  "PENDING",
+];
+
+export const PLACE_PHOTO_UPLOAD_CONFIG = {
+  MAX_FILE_SIZE_BYTES: 10 * 1024 * 1024,
+  MAX_FILE_SIZE_MB: 10,
+  MAX_CAPTION_LENGTH: 200,
+  ACCEPT_ATTR: "image/jpeg,image/png,image/webp",
+  ALLOWED_IMAGE_MIME_TYPES: [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+  ] as readonly string[],
+} as const;
+
+export const PLACE_PHOTO_UPLOAD_MESSAGES = {
+  UPLOAD_SUCCESS: "Đã gửi ảnh thành công! Đang chờ Quản trị viên duyệt.",
+  UNAUTHORIZED: "Vui lòng đăng nhập để đóng góp ảnh cho địa điểm này.",
+  UPLOAD_FAILED_FALLBACK: "Không thể tải ảnh lên lúc này. Vui lòng thử lại.",
+  BEFORE_UNLOAD_WARNING: "Ảnh của bạn đang được tải lên. Bạn có chắc muốn rời trang?",
+} as const;
+
+export const PLACE_PHOTO_STATUS_META: Record<
+  AdminPlaceImageStatus,
+  { label: string; badgeClass: string }
+> = {
+  PENDING: {
+    label: "Chờ duyệt",
+    badgeClass: "bg-amber-50 text-amber-700 border-amber-200",
+  },
+  APPROVED: {
+    label: "Đã duyệt",
+    badgeClass: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  },
+  REJECTED: {
+    label: "Đã từ chối",
+    badgeClass: "bg-rose-50 text-rose-700 border-rose-200",
+  },
+};
 
 export const ADMIN_UI_CONSTANTS = {
   DEFAULT_PAGE_SIZE: 20,
   DASHBOARD_AUDIT_LIMIT: 5,
   SEARCH_DEBOUNCE_MS: 300,
   MIN_BAN_REASON_LENGTH: 3,
-  HIGH_PRIORITY_REPORT_THRESHOLD: 20,
   FALLBACK_PLACE_IMAGE:
     "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=400&auto=format&fit=crop&q=80",
   FALLBACK_GROUP_IMAGE:

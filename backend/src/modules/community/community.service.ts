@@ -10,6 +10,8 @@ import {
 import { PostModerationStatus, UserRole } from '@prisma/client';
 import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
 import { AdminModerationService } from '../admin/admin-moderation.service';
+import { AdminEventsService } from '../admin/events/admin-events.service';
+import { AdminLiveEventType } from '../admin/events/admin-events.constants';
 import { ADMIN_CONSTANTS } from '../admin/admin.constants';
 import {
   COMMUNITY_CONSTANTS,
@@ -57,6 +59,8 @@ export class CommunityService {
     private readonly mediaStorageProvider: IMediaStorageProvider,
     @Optional()
     private readonly moderationService?: AdminModerationService,
+    @Optional()
+    private readonly adminEvents?: AdminEventsService,
   ) {}
 
   invalidateSidebarCache(): void {
@@ -446,12 +450,24 @@ export class CommunityService {
       );
     }
 
-    return this.communityRepository.reportPost({
+    const result = await this.communityRepository.reportPost({
       postId,
       reportedBy: userId,
       reportType: dto.reportType,
       description: dto.description?.trim() || null,
     });
+
+    void this.adminEvents?.emit({
+      type: AdminLiveEventType.REPORT_SUBMITTED,
+      payload: {
+        postId,
+        postTitle: post.title,
+        reportType: dto.reportType,
+      },
+      timestamp: new Date().toISOString(),
+    });
+
+    return result;
   }
 
   async getPostComments(postId: string): Promise<CommunityCommentView[]> {

@@ -11,6 +11,7 @@ import * as bcrypt from 'bcrypt';
 import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
 import { AUTH_CONSTANTS } from '@/common/constants/auth.constants';
 import { IUsersRepository } from '@/modules/users/interfaces/users-repository.interface';
+import { AppLocale, DEFAULT_LOCALE } from '../../../common/i18n/locale.util';
 import { OtpService } from './otp.service';
 import { PrismaService } from '@/database/prisma.service';
 
@@ -49,7 +50,10 @@ export class PasswordResetService {
    * Initiates password reset by sending an OTP.
    * Always returns a generic response to prevent user enumeration (OWASP).
    */
-  async forgotPassword(email: string): Promise<{
+  async forgotPassword(
+    email: string,
+    locale: AppLocale = DEFAULT_LOCALE,
+  ): Promise<{
     message: string;
     expiresIn: number;
     retryAfter: number;
@@ -63,6 +67,7 @@ export class PasswordResetService {
         await this.otpService.generateAndSendOtp(
           normalizedEmail,
           'password-reset',
+          locale,
         );
       } catch (err: any) {
         if (err instanceof BadRequestException) {

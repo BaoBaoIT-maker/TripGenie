@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
+import { AppLocale, DEFAULT_LOCALE } from '../../../common/i18n/locale.util';
+import { t } from '../../../common/i18n/t.util';
 
 @Injectable()
 export class MailService {
@@ -28,28 +30,35 @@ export class MailService {
     toEmail: string,
     otp: string,
     purpose: 'email-verification' | 'password-reset' = 'email-verification',
+    locale: AppLocale = DEFAULT_LOCALE,
   ): Promise<boolean> {
     const sender = this.configService.get<string>('EMAIL_USER');
     const isReset = purpose === 'password-reset';
 
-    const subject = isReset
-      ? `[TripGenie] Mã OTP đặt lại mật khẩu: ${otp}`
-      : `[TripGenie] Mã OTP xác thực tài khoản: ${otp}`;
-
-    const title = isReset
-      ? 'Đặt Lại Mật Khẩu TripGenie'
-      : 'Mã Xác Thực TripGenie';
-    const message = isReset
-      ? 'Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn tại <strong>TripGenie</strong>.'
-      : 'Cảm ơn bạn đã đăng ký tài khoản tại <strong>TripGenie</strong> — Nền tảng Lập kế hoạch Du lịch Thông minh.';
-
-    const note = isReset
-      ? 'Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này hoặc liên hệ hỗ trợ để bảo mật tài khoản.'
-      : 'Vui lòng không chia sẻ mã này với bất kỳ ai để đảm bảo an toàn cho tài khoản của bạn.';
+    const subject = t(
+      locale,
+      isReset ? 'mail.otp.resetSubject' : 'mail.otp.verifySubject',
+      { otp },
+    );
+    const title = t(
+      locale,
+      isReset ? 'mail.otp.resetTitle' : 'mail.otp.verifyTitle',
+    );
+    const greeting = t(locale, 'mail.common.greeting');
+    const message = t(
+      locale,
+      isReset ? 'mail.otp.resetMessage' : 'mail.otp.verifyMessage',
+    );
+    const expiryLine = t(locale, 'mail.otp.expiry');
+    const note = t(
+      locale,
+      isReset ? 'mail.otp.resetNote' : 'mail.otp.verifyNote',
+    );
+    const footer = t(locale, 'mail.common.footer');
 
     const htmlContent = `
       <!DOCTYPE html>
-      <html>
+      <html lang="${locale}">
       <head>
         <meta charset="utf-8">
         <style>
@@ -70,16 +79,16 @@ export class MailService {
           </div>
           <div class="content">
             <h2 style="color: #0f172a; margin-top: 0; font-size: 20px;">${title}</h2>
-            <p>Xin chào,</p>
+            <p>${greeting}</p>
             <p>${message}</p>
             <div class="otp-badge">
               <div class="otp-code">${otp}</div>
             </div>
-            <p style="margin-bottom: 8px;">Mã OTP có hiệu lực trong vòng <strong>10 phút</strong>.</p>
+            <p style="margin-bottom: 8px;">${expiryLine}</p>
             <p style="color: #64748b; font-size: 14px;">${note}</p>
           </div>
           <div class="footer">
-            <p style="margin: 0;">Đây là email tự động từ hệ thống TripGenie, vui lòng không phản hồi thư này.</p>
+            <p style="margin: 0;">${footer}</p>
           </div>
         </div>
       </body>
@@ -103,7 +112,7 @@ export class MailService {
       });
 
       this.logger.log(
-        `Email OTP sent successfully to ${toEmail} for ${purpose}`,
+        `Email OTP sent successfully to ${toEmail} for ${purpose} (${locale})`,
       );
       return true;
     } catch (error: any) {
@@ -118,13 +127,22 @@ export class MailService {
   async sendVerificationLinkEmail(
     toEmail: string,
     verificationUrl: string,
+    locale: AppLocale = DEFAULT_LOCALE,
   ): Promise<boolean> {
     const sender = this.configService.get<string>('EMAIL_USER');
-    const subject = `[TripGenie] Kích hoạt tài khoản của bạn`;
+    const subject = t(locale, 'mail.verification.subject');
+    const heading = t(locale, 'mail.verification.heading');
+    const greeting = t(locale, 'mail.common.greeting');
+    const intro = t(locale, 'mail.verification.intro');
+    const instruction = t(locale, 'mail.verification.instruction');
+    const ctaLabel = t(locale, 'mail.verification.cta');
+    const expiry = t(locale, 'mail.verification.expiry');
+    const fallbackLinkLabel = t(locale, 'mail.verification.fallbackLink');
+    const footer = t(locale, 'mail.common.footer');
 
     const htmlContent = `
       <!DOCTYPE html>
-      <html>
+      <html lang="${locale}">
       <head>
         <meta charset="utf-8">
         <style>
@@ -144,18 +162,18 @@ export class MailService {
             <h1>TripGenie</h1>
           </div>
           <div class="content">
-            <h2 style="color: #0f172a; margin-top: 0; font-size: 20px;">Xác Thực Tài Khoản TripGenie</h2>
-            <p>Xin chào,</p>
-            <p>Cảm ơn bạn đã đăng ký tài khoản tại <strong>TripGenie</strong> — Nền tảng Lập kế hoạch Du lịch Thông minh.</p>
-            <p>Vui lòng nhấn vào nút bên dưới để xác thực địa chỉ email và kích hoạt tài khoản của bạn:</p>
+            <h2 style="color: #0f172a; margin-top: 0; font-size: 20px;">${heading}</h2>
+            <p>${greeting}</p>
+            <p>${intro}</p>
+            <p>${instruction}</p>
             <div class="btn-box">
-              <a href="${verificationUrl}" target="_blank" class="btn">Xác Thực Tài Khoản</a>
+              <a href="${verificationUrl}" target="_blank" class="btn">${ctaLabel}</a>
             </div>
-            <p style="margin-bottom: 8px;">Đường link xác thực này có hiệu lực trong vòng <strong>30 phút</strong>.</p>
-            <p style="color: #64748b; font-size: 13px;">Nếu nút trên không bấm được, bạn có thể copy liên kết này vào trình duyệt:<br/><a href="${verificationUrl}" style="color: #0d9488; word-break: break-all;">${verificationUrl}</a></p>
+            <p style="margin-bottom: 8px;">${expiry}</p>
+            <p style="color: #64748b; font-size: 13px;">${fallbackLinkLabel}<br/><a href="${verificationUrl}" style="color: #0d9488; word-break: break-all;">${verificationUrl}</a></p>
           </div>
           <div class="footer">
-            <p style="margin: 0;">Đây là email tự động từ hệ thống TripGenie, vui lòng không phản hồi thư này.</p>
+            <p style="margin: 0;">${footer}</p>
           </div>
         </div>
       </body>
@@ -178,7 +196,7 @@ export class MailService {
       });
 
       this.logger.log(
-        `Email verification link sent successfully to ${toEmail}`,
+        `Email verification link sent successfully to ${toEmail} (${locale})`,
       );
       return true;
     } catch (error: any) {

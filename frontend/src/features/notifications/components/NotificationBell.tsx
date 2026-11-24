@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import type { NotificationFilter, NotificationItem } from "@/types/notification";
 import { NOTIFICATION_CONFIG } from "../config/notification.config";
+import { useI18n } from "@/i18n";
 import {
   useNotifications,
   useUnreadNotificationCount,
@@ -13,6 +14,7 @@ import {
 import { NotificationList } from "./NotificationList";
 
 export function NotificationBell() {
+  const { t } = useI18n();
   const { user } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [filter, setFilter] = useState<NotificationFilter>("ALL");
@@ -57,8 +59,6 @@ export function NotificationBell() {
     };
   }, [isOpen]);
 
-  if (!user) return null;
-
   const items = useMemo(() => {
     if (!listData?.pages) return [];
     const map = new Map<string, NotificationItem>();
@@ -71,6 +71,8 @@ export function NotificationBell() {
     }
     return Array.from(map.values());
   }, [listData]);
+
+  if (!user) return null;
 
   const handleMarkAll = () => {
     if (unreadCount > 0 && !markAllMutation.isPending) {
@@ -95,8 +97,8 @@ export function NotificationBell() {
         aria-haspopup="dialog"
         aria-label={
           unreadCount > 0
-            ? `Thông báo (${unreadCount} chưa đọc)`
-            : "Thông báo"
+            ? t("notifications.bellAriaUnread", { count: unreadCount })
+            : t("notifications.bellAria")
         }
         className="relative min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full text-foreground/80 hover:text-foreground hover:bg-muted/70 transition-colors cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary/40"
       >
@@ -122,18 +124,18 @@ export function NotificationBell() {
 
           <div
             role="dialog"
-            aria-label="Bảng thông báo"
+            aria-label={t("notifications.dialogAria")}
             className="fixed left-3 right-3 top-16 max-w-md mx-auto sm:max-w-none sm:mx-0 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-[380px] bg-background border border-border rounded-2xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[min(520px,calc(100dvh-80px))] sm:max-h-none animate-in fade-in zoom-in-95 duration-150"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-3.5 sm:px-4 py-2.5 sm:py-3 border-b border-border/60 shrink-0">
               <div className="flex items-center gap-2 min-w-0">
                 <h2 className="text-sm sm:text-base font-bold text-foreground truncate">
-                  Thông báo
+                  {t("notifications.title")}
                 </h2>
-                {unreadCount > 0 && (
+                {unreadCount > 0 && badgeText && (
                   <span className="px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-primary bg-primary/10 rounded-full shrink-0">
-                    {badgeText} mới
+                    {t("notifications.newBadge", { count: badgeText })}
                   </span>
                 )}
               </div>
@@ -142,17 +144,17 @@ export function NotificationBell() {
                   type="button"
                   onClick={handleMarkAll}
                   disabled={unreadCount === 0 || markAllMutation.isPending}
-                  title="Đánh dấu tất cả đã đọc"
+                  title={t("notifications.markAllReadTooltip")}
                   className="inline-flex items-center gap-1.5 px-2 py-1 text-xs font-semibold text-primary hover:text-primary/80 hover:bg-primary/5 rounded-md disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer"
                 >
                   <i className="fa-solid fa-check-double text-[11px]" aria-hidden="true" />
-                  <span>Đã đọc tất cả</span>
+                  <span>{t("notifications.markAllReadShort")}</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsOpen(false)}
                   className="p-1 rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground sm:hidden cursor-pointer"
-                  aria-label="Đóng thông báo"
+                  aria-label={t("notifications.closeAria")}
                 >
                   <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
                 </button>
@@ -170,7 +172,7 @@ export function NotificationBell() {
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
-                Tất cả
+                {t("notifications.tabAll")}
               </button>
               <button
                 type="button"
@@ -181,7 +183,7 @@ export function NotificationBell() {
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
               >
-                Chưa đọc {unreadCount > 0 && `(${badgeText})`}
+                {t("notifications.tabUnread")} {unreadCount > 0 && `(${badgeText})`}
               </button>
             </div>
 
@@ -204,7 +206,7 @@ export function NotificationBell() {
                 onClick={() => setIsOpen(false)}
                 className="inline-block w-full py-1.5 text-xs font-bold text-primary hover:text-primary/80 hover:bg-primary/5 rounded-lg transition-colors"
               >
-                Xem tất cả thông báo
+                {t("notifications.viewAll")}
               </Link>
             </div>
           </div>

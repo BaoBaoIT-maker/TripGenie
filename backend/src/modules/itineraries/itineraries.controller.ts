@@ -31,6 +31,8 @@ import {
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '@/common/guards/optional-jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { RequestLocale } from '@/common/decorators/request-locale.decorator';
+import { AppLocale } from '@/common/i18n/locale.util';
 import { RateLimit } from '@/common/decorators/rate-limit.decorator';
 import { RateLimitTier } from '@/config/rate-limit.config';
 import {
@@ -71,8 +73,9 @@ export class ItinerariesController {
   generate(
     @Body() dto: GenerateItineraryDto,
     @CurrentUser('id') userId: string,
+    @RequestLocale() locale: AppLocale,
   ) {
-    return this.plannerService.generateItinerary(dto, userId);
+    return this.plannerService.generateItinerary(dto, userId, locale);
   }
 
   /**
@@ -94,8 +97,9 @@ export class ItinerariesController {
   getWeather(
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser('id') userId?: string,
+    @RequestLocale() locale: AppLocale = 'vi',
   ) {
-    return this.plannerService.getWeatherById(id, userId);
+    return this.plannerService.getWeatherById(id, userId, locale);
   }
 
   /**
@@ -260,6 +264,7 @@ export class ItinerariesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CopilotChatDto,
     @CurrentUser('id') userId: string,
+    @RequestLocale() locale: AppLocale,
   ) {
     return this.copilotAgent.chat(
       id,
@@ -267,6 +272,7 @@ export class ItinerariesController {
       userId,
       dto.sessionId,
       dto.autoApply,
+      locale,
     );
   }
 

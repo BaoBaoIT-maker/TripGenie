@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { advisorService } from '@/services/advisor.service';
+import { useI18n } from '@/i18n';
 import {
   ADVISOR_UI_CONSTANTS,
   AdvisorMessageItem,
 } from '@/types/advisor';
 
 export function useAdvisorChat(isOpen: boolean) {
+  const { t } = useI18n();
   const [messages, setMessages] = useState<AdvisorMessageItem[]>([]);
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
@@ -95,7 +97,7 @@ export function useAdvisorChat(isOpen: boolean) {
         const errorMessage =
           err instanceof Error && err.message
             ? err.message
-            : ADVISOR_UI_CONSTANTS.FALLBACK_ERROR_MESSAGE;
+            : t('advisor.fallbackError');
 
         const fallbackAgentMessage: AdvisorMessageItem = {
           id: `error-${Date.now()}`,
@@ -110,7 +112,7 @@ export function useAdvisorChat(isOpen: boolean) {
         setIsLoading(false);
       }
     },
-    [isLoading, sessionId],
+    [isLoading, sessionId, t],
   );
 
   const startNewSession = useCallback(async () => {

@@ -3,9 +3,15 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { ADVISOR_UI_CONSTANTS, AdvisorMessageItem } from '@/types/advisor';
+import { useI18n, type TranslationKey } from '@/i18n';
 import { AdvisorPlaceCard } from './AdvisorPlaceCard';
 
 const INTERNAL_ROUTE_PATHS = Object.keys(ADVISOR_UI_CONSTANTS.INTERNAL_ROUTES);
+const INTERNAL_ROUTE_KEYS: Record<string, TranslationKey> = {
+  '/planner': 'advisor.routes.planner',
+  '/explore': 'advisor.routes.explore',
+  '/community': 'advisor.routes.community',
+};
 const INLINE_TOKEN_REGEX = new RegExp(
   `(\\*\\*[^*]+\\*\\*|${INTERNAL_ROUTE_PATHS.map((p) => `${p.replace('/', '\\/')}\\b`).join('|')})`,
   'g',
@@ -18,6 +24,7 @@ const INLINE_TOKEN_REGEX = new RegExp(
  */
 function renderInlineFormattedText(
   text: string,
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
   onNavigate?: () => void,
 ): React.ReactNode[] {
   const parts = text.split(INLINE_TOKEN_REGEX);
@@ -31,7 +38,8 @@ function renderInlineFormattedText(
       );
     }
 
-    const routeLabel = ADVISOR_UI_CONSTANTS.INTERNAL_ROUTES[part];
+    const routeKey = INTERNAL_ROUTE_KEYS[part];
+    const routeLabel = routeKey ? t(routeKey) : ADVISOR_UI_CONSTANTS.INTERNAL_ROUTES[part];
     if (routeLabel) {
       return (
         <Link
@@ -59,6 +67,7 @@ export function AdvisorMessageBubble({
   message,
   onNavigate,
 }: AdvisorMessageBubbleProps) {
+  const { t } = useI18n();
   const isUser = message.sender === 'user';
 
   if (isUser) {
@@ -84,7 +93,7 @@ export function AdvisorMessageBubble({
           {message.isError && (
             <div className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-destructive">
               <i className="fa-solid fa-circle-exclamation text-xs shrink-0" aria-hidden="true" />
-              <span>Thông báo kết nối</span>
+              <span>{t('advisor.connectionNotice')}</span>
             </div>
           )}
 
@@ -101,7 +110,7 @@ export function AdvisorMessageBubble({
                     key={idx}
                     className="pt-1 text-sm font-bold text-foreground"
                   >
-                    {renderInlineFormattedText(trimmed.slice(4), onNavigate)}
+                    {renderInlineFormattedText(trimmed.slice(4), t, onNavigate)}
                   </h4>
                 );
               }
@@ -114,7 +123,7 @@ export function AdvisorMessageBubble({
                       aria-hidden="true"
                     />
                     <span className="flex-1">
-                      {renderInlineFormattedText(trimmed.slice(2), onNavigate)}
+                      {renderInlineFormattedText(trimmed.slice(2), t, onNavigate)}
                     </span>
                   </div>
                 );
@@ -127,14 +136,14 @@ export function AdvisorMessageBubble({
                     key={idx}
                     className="mt-2 rounded-lg border-l-2 border-primary bg-secondary/60 px-3 py-1.5 text-xs text-muted-foreground"
                   >
-                    {renderInlineFormattedText(quoteText, onNavigate)}
+                    {renderInlineFormattedText(quoteText, t, onNavigate)}
                   </blockquote>
                 );
               }
 
               return (
                 <p key={idx} className="break-words">
-                  {renderInlineFormattedText(rawLine, onNavigate)}
+                  {renderInlineFormattedText(rawLine, t, onNavigate)}
                 </p>
               );
             })}
@@ -144,7 +153,7 @@ export function AdvisorMessageBubble({
         {Array.isArray(message.places) && message.places.length > 0 && (
           <div className="space-y-2">
             <p className="px-1 text-xs font-semibold text-muted-foreground">
-              Địa điểm gợi ý từ cơ sở dữ liệu ({message.places.length})
+              {t('advisor.suggestedPlacesHeading', { count: message.places.length })}
             </p>
             <div className="grid grid-cols-1 gap-2">
               {message.places.map((place) => (

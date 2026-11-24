@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
+import { AppLocale, DEFAULT_LOCALE } from '../../../common/i18n/locale.util';
+import { t } from '../../../common/i18n/t.util';
 import {
   DayWeather,
   buildWeatherGuidance,
@@ -70,6 +72,7 @@ export interface PlannerParams {
   lodgingName?: string | null;
   places: PlannerPlace[];
   dayPools?: PlannerDayPool[];
+  locale?: AppLocale;
 }
 
 /**
@@ -129,7 +132,8 @@ export class GeminiPlannerService {
   }
 
   private buildPrompt(params: PlannerParams): string {
-    const weatherGuidance = buildWeatherGuidance(params.dailyWeather);
+    const locale = params.locale ?? DEFAULT_LOCALE;
+    const weatherGuidance = buildWeatherGuidance(params.dailyWeather, locale);
     const paceSpec = getTravelPaceSpec(params.pace);
     const { candidateLimit } = computeCandidateLimit(
       params.totalDays,
@@ -140,7 +144,7 @@ export class GeminiPlannerService {
       params.dayPools && params.dayPools.length > 0,
     );
     const candidateSection = hasDayPools
-      ? `POOL ĐỊA ĐIỂM ĐÃ PHÂN CỤM ĐỊA LÝ THEO TỪNG NGÀY (Ngày nào CHỈ ĐƯỢC chọn từ pool của ngày đó):\n${JSON.stringify(
+      ? `GEOGRAPHICALLY CLUSTERED CANDIDATE POOLS PER DAY (each day MUST ONLY pick from its own day pool):\n${JSON.stringify(
           params.dayPools!.map((dp) => ({
             dayNumber: dp.dayNumber,
             candidates: dp.places.map((p) => ({
@@ -152,7 +156,7 @@ export class GeminiPlannerService {
             })),
           })),
         )}`
-      : `DANH SÁCH CANDIDATE_PLACES:\n${JSON.stringify(
+      : `CANDIDATE_PLACES:\n${JSON.stringify(
           params.places.slice(0, candidateLimit).map((p) => ({
             id: p.id,
             name: p.name,
@@ -162,49 +166,55 @@ export class GeminiPlannerService {
           })),
         )}`;
 
-    return `Bạn là TripGenie - Chuyên gia thiết kế lịch trình du lịch thông minh tại Việt Nam.
-Nhiệm vụ: Sắp xếp một lịch trình ${params.totalDays} ngày tại ${params.destCity}, xuất phát từ ${params.originCity}.
-Số lượng khách: ${params.partySize || 1} người | Phong cách: ${params.travelStyles.join(', ')} | Nhịp độ: ${paceSpec.labelVi} (${paceSpec.minStopsPerDay}–${paceSpec.maxStopsPerDay} điểm/ngày) | Ngân sách: ${params.budgetLevel}.
-${params.lodgingName ? `Chỗ lưu trú trung tâm của đoàn: ${params.lodgingName} (xuất phát mỗi sáng và về nghỉ mỗi tối tại đây).` : ''}
-${params.dietaryRestrictions && params.dietaryRestrictions.length > 0 ? `Chế độ ăn / Kiêng cữ: ${params.dietaryRestrictions.join(', ')} (BẮT BUỘC tôn trọng các món ăn/nhà hàng phù hợp tiêu chí này).` : ''}
-${params.preferredCategories && params.preferredCategories.length > 0 ? `Ưu tiên thể loại địa điểm: ${params.preferredCategories.length > 0 ? params.preferredCategories.join(', ') : ''}.` : ''}
-${params.customPrompt ? `Yêu cầu riêng của khách: ${params.customPrompt}` : ''}
+    const outputLanguageRule =
+      locale === 'en'
+        ? `7. OUTPUT LANGUAGE & TONE (English): Write "title", "description", each day's "theme", and every activity's "notes" in natural, concise English (local Vietnam travel expert tone). Keep exact "placeId" and "placeName" values from the candidate pool.`
+        : `7. OUTPUT LANGUAGE & TONE (Vietnamese): Write "title", "description", each day's "theme", and every activity's "notes" in warm, natural, concise Vietnamese (local travel companion tone; avoid stiff translated phrasing). Keep exact "placeId" and "placeName" values from the candidate pool.`;
+
+    return `You are TripGenie — an expert AI travel itinerary designer for Vietnam.
+Task: Plan a ${params.totalDays}-day itinerary in ${params.destCity}, departing from ${params.originCity}.
+Party size: ${params.partySize || 1} traveler(s) | Travel styles: ${params.travelStyles.join(', ')} | Pace: ${paceSpec.value} (${paceSpec.minStopsPerDay}-${paceSpec.maxStopsPerDay} stops/day) | Budget: ${params.budgetLevel}.
+${params.lodgingName ? `Central accommodation anchor: ${params.lodgingName} (depart each morning and return each evening here).` : ''}
+${params.dietaryRestrictions && params.dietaryRestrictions.length > 0 ? `Dietary restrictions: ${params.dietaryRestrictions.join(', ')} (MUST strictly respect these when choosing dining stops).` : ''}
+${params.preferredCategories && params.preferredCategories.length > 0 ? `Preferred place categories: ${params.preferredCategories.join(', ')}.` : ''}
+${params.customPrompt ? `Traveler's custom request: ${params.customPrompt}` : ''}
 ${weatherGuidance ? `\n${weatherGuidance}\n` : ''}
-Quy tắc bắt buộc:
-1. CHỈ CHỌN TRONG POOL VÀ CẤM BỊA ĐỊA ĐIỂM: Mỗi hoạt động BẮT BUỘC phải chọn đúng "id" từ danh sách ứng viên của ngày tương ứng. TUYỆT ĐỐI CẤM trả về placeId: null hoặc tự sáng tác tên địa điểm ngoài danh sách. Không lặp lại cùng một id trong suốt chuyến đi.
-2. Tôn trọng nhịp sinh hoạt & các bữa ăn chính:
-   - Sáng (07:15 - 08:30): Ăn sáng đặc sản địa phương hoặc cà phê sáng.
-   - Sáng (08:30 - 11:30): Tham quan, ngắm cảnh ngoài trời hoặc di tích lịch sử, bảo tàng.
-   - Trưa (11:30 - 13:15): BẮT BUỘC là Ăn trưa tại nhà hàng/quán ăn trong pool.
-   - Chiều (13:45 - 17:45): Trải nghiệm văn hóa, check-in, thiên nhiên hoặc cà phê thư giãn ngắm cảnh.
-   - Tối (18:00 - 20:00): BẮT BUỘC là Ăn tối tại nhà hàng/quán ăn đặc sản vùng miền trong pool.
-   - Đêm (20:00 - 22:00, tùy nhịp độ): Chợ đêm, phố đi bộ, dạo cảnh đêm.
-3. BẢO VỆ CUỘC SỐNG VỀ ĐÊM & ĐỐI TƯỢNG (Nightlife Guardrail):
-   - TUYỆT ĐỐI KHÔNG xếp Bar, Pub, Club, Lounge làm điểm ăn tối chính (khung 18:00 - 20:00).
-   - Địa điểm giải trí đêm (Bar/Pub/Lounge) CHỈ ĐƯỢC PHÉP xuất hiện sau 20:30 nếu phong cách du lịch phù hợp.
-   - TUYỆT ĐỐI CẤM Bar/Pub/Club nếu đối tượng là gia đình có trẻ em hoặc người lớn tuổi.
-4. Phân bổ cân bằng thể loại trải nghiệm: Mỗi ngày phải kết hợp hài hòa giữa điểm tham quan/ngắm cảnh/văn hóa, điểm ăn uống ẩm thực địa phương, và không gian check-in/thư giãn.
-5. THÍCH ỨNG THỜI TIẾT: Nếu có thông tin thời tiết từng ngày ở trên, ưu tiên điểm trong nhà/có mái che vào ngày mưa cao và sắp xếp điểm ngoài trời vào khung giờ mát mẻ khi nắng gắt/UV cao.
-6. MẬT ĐỘ HOẠT ĐỘNG (${paceSpec.value}): ${paceSpec.promptRule}
+Mandatory Rules:
+1. STRICT POOL GROUNDING (ZERO FABRICATION): Every activity MUST use an exact "id" from that day's candidate pool. NEVER return placeId: null or invent places outside the pool. NEVER repeat the same placeId across the trip.
+2. Respect daily rhythm & main meals:
+   - Breakfast (07:15 - 08:30): Local specialty breakfast or morning cafe.
+   - Morning (08:30 - 11:30): Sightseeing, outdoor landmarks, historic sites, or museums.
+   - Lunch (11:30 - 13:15): MUST be a restaurant/dining venue from the pool.
+   - Afternoon (13:45 - 17:45): Cultural experience, photo spot, nature, or scenic cafe break.
+   - Dinner (18:00 - 20:00): MUST be a local specialty restaurant/dining venue from the pool.
+   - Night (20:00 - 22:00, pace permitting): Night market, walking street, or evening stroll.
+3. NIGHTLIFE GUARDRAIL:
+   - NEVER schedule a Bar, Pub, Club, or Lounge as the main dinner stop (18:00 - 20:00).
+   - Nightlife venues (Bar/Pub/Lounge) are ONLY allowed after 20:30 when travel style fits.
+   - STRICTLY FORBID Bar/Pub/Club for families with children or seniors.
+4. Balanced experience mix: Each day should blend sightseeing/culture, authentic local food, and relaxing/scenic stops.
+5. WEATHER ADAPTATION: If daily weather guidance is provided above, prioritize indoor/covered venues on high-rain days and shift outdoor stops to cooler windows on high-heat/UV days.
+6. ACTIVITY DENSITY (${paceSpec.value}): ${paceSpec.promptRule}
+${outputLanguageRule}
 
 ${candidateSection}
 
-TRẢ VỀ DUY NHẤT ĐỊNH DẠNG JSON (KHÔNG bọc trong markdown tick \`\`\`json):
+RETURN STRICT JSON ONLY (NO markdown code fences \`\`\`json):
 {
-  "title": "Tên hành trình hấp dẫn",
-  "description": "Mô tả ngắn gọn điểm nhấn của chuyến đi",
+  "title": "Engaging trip title",
+  "description": "Concise trip highlight summary",
   "days": [
     {
       "dayNumber": 1,
-      "theme": "Chủ đề của ngày",
+      "theme": "Day theme",
       "activities": [
         {
-          "placeId": "uuid-chính-xác-từ-pool-của-ngày",
-          "placeName": "Tên địa điểm trong pool",
+          "placeId": "exact-uuid-from-day-pool",
+          "placeName": "Exact place name from pool",
           "startTime": "08:30",
           "endTime": "10:30",
           "durationMinutes": 120,
-          "notes": "Gợi ý trải nghiệm cụ thể"
+          "notes": "Actionable local tip for this stop"
         }
       ]
     }
@@ -219,9 +229,10 @@ TRẢ VỀ DUY NHẤT ĐỊNH DẠNG JSON (KHÔNG bọc trong markdown tick \`\`
   private buildFallbackPlan(
     params: Pick<
       PlannerParams,
-      'destCity' | 'totalDays' | 'places' | 'pace' | 'dayPools'
+      'destCity' | 'totalDays' | 'places' | 'pace' | 'dayPools' | 'locale'
     >,
   ): PlannerPlan {
+    const locale = params.locale ?? DEFAULT_LOCALE;
     const slots = getTravelPaceSpec(params.pace).fallbackSlots;
     const days: PlannerDay[] = [];
     const usedIds = new Set<string>();
@@ -250,20 +261,34 @@ TRẢ VỀ DUY NHẤT ĐỊNH DẠNG JSON (KHÔNG bọc trong markdown tick \`\`
           startTime: slot.start,
           endTime: slot.end,
           durationMinutes: slot.dur,
-          notes: slot.note,
+          notes:
+            locale === 'vi'
+              ? slot.note
+              : t(locale, 'planner.fallback.activityNote', {
+                  placeName: picked.name,
+                }),
         });
       }
 
       days.push({
         dayNumber: d,
-        theme: `Khám phá các điểm nổi bật ${params.destCity} - Ngày ${d}`,
+        theme: t(locale, 'planner.fallback.dayTheme', {
+          dest: params.destCity,
+          day: d,
+        }),
         activities,
       });
     }
 
     return {
-      title: `Hành trình khám phá ${params.destCity} ${params.totalDays} ngày`,
-      description: `Lịch trình được tối ưu hóa theo các địa điểm nổi bật tại ${params.destCity}.`,
+      title: t(locale, 'planner.fallback.title', {
+        dest: params.destCity,
+        days: params.totalDays,
+      }),
+      description: t(locale, 'planner.fallback.description', {
+        dest: params.destCity,
+        days: params.totalDays,
+      }),
       days,
     };
   }

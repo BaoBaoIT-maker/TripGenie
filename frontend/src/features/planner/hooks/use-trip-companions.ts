@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useI18n } from '@/i18n';
 import {
   tripCompanionService,
   CompanionsListResponse,
@@ -36,20 +37,22 @@ export function useTripInvitation(invitationId: string, enabled = true) {
 
 export function useInviteCompanion(itineraryId: string) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   return useMutation({
     mutationFn: (email: string) => tripCompanionService.inviteCompanion(itineraryId, email),
     onSuccess: () => {
-      toast.success('Đã gửi lời mời thành công!');
+      toast.success(t('planner.companions.toasts.inviteSuccess'));
       queryClient.invalidateQueries({ queryKey: COMPANIONS_QUERY_KEYS.list(itineraryId) });
     },
     onError: (err: Error) => {
-      toast.error(err.message || 'Không thể gửi lời mời');
+      toast.error(err.message || t('planner.companions.toasts.inviteError'));
     },
   });
 }
 
 export function useUpdateMemberRole(itineraryId: string) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   return useMutation({
     mutationFn: ({ userId, role }: { userId: string; role: 'VIEWER' | 'EDITOR' }) =>
       tripCompanionService.updateMemberRole(itineraryId, userId, role),
@@ -80,10 +83,14 @@ export function useUpdateMemberRole(itineraryId: string) {
           context.previousData
         );
       }
-      toast.error(err.message || 'Không thể cập nhật quyền thành viên');
+      toast.error(err.message || t('planner.companions.toasts.roleUpdateError'));
     },
     onSuccess: (_, variables) => {
-      toast.success(`Đã cập nhật quyền thành ${TRIP_COMPANIONS_CONFIG.ROLES[variables.role]}`);
+      toast.success(
+        t('planner.companions.toasts.roleUpdated', {
+          role: t(`planner.roles.${variables.role}`),
+        })
+      );
       queryClient.invalidateQueries({ queryKey: ['itineraries'] });
       queryClient.invalidateQueries({ queryKey: COMPANIONS_QUERY_KEYS.list(itineraryId) });
       queryClient.invalidateQueries({ queryKey: ['itineraries', 'detail', itineraryId] });
@@ -93,73 +100,78 @@ export function useUpdateMemberRole(itineraryId: string) {
 
 export function useRemoveMember(itineraryId: string) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   return useMutation({
     mutationFn: (userId: string) => tripCompanionService.removeMember(itineraryId, userId),
     onSuccess: () => {
-      toast.success('Đã xóa thành viên khỏi chuyến đi');
+      toast.success(t('planner.companions.toasts.memberRemoved'));
       queryClient.invalidateQueries({ queryKey: ['itineraries'] });
       queryClient.invalidateQueries({ queryKey: COMPANIONS_QUERY_KEYS.list(itineraryId) });
       queryClient.invalidateQueries({ queryKey: ['itineraries', 'detail', itineraryId] });
     },
     onError: (err: Error) => {
-      toast.error(err.message || 'Không thể xóa thành viên');
+      toast.error(err.message || t('planner.companions.toasts.memberRemoveError'));
     },
   });
 }
 
 export function useLeaveTrip(itineraryId: string) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   return useMutation({
     mutationFn: () => tripCompanionService.leaveTrip(itineraryId),
     onSuccess: () => {
-      toast.success('Bạn đã rời khỏi chuyến đi');
+      toast.success(t('planner.companions.toasts.leftTrip'));
       queryClient.invalidateQueries({ queryKey: ['itineraries'] });
     },
     onError: (err: Error) => {
-      toast.error(err.message || 'Không thể rời chuyến đi');
+      toast.error(err.message || t('planner.companions.toasts.leaveTripError'));
     },
   });
 }
 
 export function useAcceptInvitation() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   return useMutation({
     mutationFn: (invitationId: string) => tripCompanionService.acceptInvitation(invitationId),
     onSuccess: () => {
-      toast.success('Đã tham gia chuyến đi thành công!');
+      toast.success(t('planner.companions.toasts.invitationAccepted'));
       queryClient.invalidateQueries({ queryKey: ['itineraries'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
     onError: (err: Error) => {
-      toast.error(err.message || 'Không thể chấp nhận lời mời');
+      toast.error(err.message || t('planner.companions.toasts.invitationAcceptError'));
     },
   });
 }
 
 export function useDeclineInvitation() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   return useMutation({
     mutationFn: (invitationId: string) => tripCompanionService.declineInvitation(invitationId),
     onSuccess: () => {
-      toast.info('Đã từ chối lời mời');
+      toast.info(t('planner.companions.toasts.invitationDeclined'));
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
     onError: (err: Error) => {
-      toast.error(err.message || 'Không thể từ chối lời mời');
+      toast.error(err.message || t('planner.companions.toasts.invitationDeclineError'));
     },
   });
 }
 
 export function useRevokeInvitation(itineraryId: string) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   return useMutation({
     mutationFn: (invitationId: string) => tripCompanionService.revokeInvitation(invitationId),
     onSuccess: () => {
-      toast.success('Đã thu hồi lời mời');
+      toast.success(t('planner.companions.toasts.invitationRevoked'));
       queryClient.invalidateQueries({ queryKey: COMPANIONS_QUERY_KEYS.list(itineraryId) });
     },
     onError: (err: Error) => {
-      toast.error(err.message || 'Không thể thu hồi lời mời');
+      toast.error(err.message || t('planner.companions.toasts.invitationRevokeError'));
     },
   });
 }

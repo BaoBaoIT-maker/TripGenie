@@ -2,9 +2,12 @@
 
 import { useState } from 'react';
 import { AppModalPortal } from '@/components/common/AppModalPortal';
+import { useI18n } from '@/i18n';
 import { ITINERARY_META_LIMITS } from '../../constants/itinerary.constants';
 import { MANUAL_MAX_TRIP_DAYS } from '../../config/itinerary-wizard-options';
 import type { UpdateItineraryMetaRequest } from '@/types/itinerary';
+
+type MetaErrorKey = 'errEmptyTitle' | 'errInvalidDates' | 'errEndBeforeStart' | 'errMaxDays';
 
 interface EditItineraryMetaDialogProps {
   open: boolean;
@@ -56,6 +59,7 @@ function EditMetaForm({
   isSubmitting,
   onAskCopilot,
 }: EditMetaFormProps) {
+  const { t } = useI18n();
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState(initialDescription);
   const [startDate, setStartDate] = useState(initialStartDate);
@@ -63,7 +67,7 @@ function EditMetaForm({
   const [dayShiftMode, setDayShiftMode] = useState<'merge' | 'trim'>('merge');
   const [expandAction, setExpandAction] = useState<'copilot' | 'manual'>('copilot');
   const [confirmStep, setConfirmStep] = useState<'reduce' | 'expand' | null>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [errorKey, setErrorKey] = useState<MetaErrorKey | null>(null);
 
   const calculatedNewDays = calculateSpanDays(startDate, endDate) ?? initialTotalDays;
   const hasDaysChanged =
@@ -76,7 +80,7 @@ function EditMetaForm({
     e.preventDefault();
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
-      setErrorMsg('Tên lịch trình không được để trống.');
+      setErrorKey('errEmptyTitle');
       return;
     }
 
@@ -84,33 +88,33 @@ function EditMetaForm({
       const d1 = new Date(startDate);
       const d2 = new Date(endDate);
       if (isNaN(d1.getTime()) || isNaN(d2.getTime())) {
-        setErrorMsg('Ngày đi hoặc ngày về không hợp lệ.');
+        setErrorKey('errInvalidDates');
         return;
       }
       if (d2 < d1) {
-        setErrorMsg('Ngày kết thúc phải bằng hoặc sau ngày bắt đầu.');
+        setErrorKey('errEndBeforeStart');
         return;
       }
       const days = calculateSpanDays(startDate, endDate) || 1;
       if (days > MANUAL_MAX_TRIP_DAYS) {
-        setErrorMsg(`Thời gian chuyến đi tối đa là ${MANUAL_MAX_TRIP_DAYS} ngày.`);
+        setErrorKey('errMaxDays');
         return;
       }
 
       if (days < initialTotalDays) {
-        setErrorMsg(null);
+        setErrorKey(null);
         setConfirmStep('reduce');
         return;
       }
 
       if (days > initialTotalDays) {
-        setErrorMsg(null);
+        setErrorKey(null);
         setConfirmStep('expand');
         return;
       }
     }
 
-    setErrorMsg(null);
+    setErrorKey(null);
     void executeSave();
   };
 
@@ -136,7 +140,10 @@ function EditMetaForm({
     onClose();
 
     if (options?.triggerCopilotExpand && onAskCopilot) {
-      const prompt = `Lịch trình vừa được mở rộng lên ${calculatedNewDays} ngày (thêm Ngày ${initialTotalDays + 1} đến Ngày ${calculatedNewDays}). Hãy gợi ý cho tôi các địa điểm hấp dẫn và lộ trình di chuyển hợp lý cho những ngày mới này nhé!`;
+      const prompt = t('planner.editMeta.copilotExpandPrompt', {
+        newDays: calculatedNewDays,
+        fromDay: initialTotalDays + 1,
+      });
       onAskCopilot(prompt);
     }
   };
@@ -152,15 +159,15 @@ function EditMetaForm({
           <div>
             <h2 id="edit-meta-title" className="text-sm font-bold text-slate-900">
               {confirmStep === 'reduce'
-                ? 'Xác nhận rút ngắn lịch trình'
+                ? t('planner.editMeta.titleReduce')
                 : confirmStep === 'expand'
-                  ? 'Kéo dài thời gian chuyến đi'
-                  : 'Chỉnh sửa thông tin & ngày đi'}
+                  ? t('planner.editMeta.titleExpand')
+                  : t('planner.editMeta.titleDefault')}
             </h2>
             <p className="text-[11px] text-slate-500 mt-0.5">
               {confirmStep
-                ? 'Xử lý các ngày và điểm dừng khi số ngày chuyến đi thay đổi'
-                : 'Cập nhật tiêu đề, ngày khởi hành và ghi chú chuyến đi'}
+                ? t('planner.editMeta.subtitleConfirm')
+                : t('planner.editMeta.subtitleDefault')}
             </p>
           </div>
         </div>
@@ -168,7 +175,7 @@ function EditMetaForm({
           type="button"
           onClick={onClose}
           disabled={isSubmitting}
-          aria-label="Đóng hộp thoại"
+          aria-label={t('planner.common.closeDialog')}
           className="size-8 rounded-full text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
         >
           <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
@@ -182,11 +189,16 @@ function EditMetaForm({
             <i className="fa-solid fa-triangle-exclamation text-amber-600 text-sm mt-0.5 shrink-0" aria-hidden="true" />
             <div className="space-y-1">
               <p className="font-bold leading-snug">
-                Số ngày giảm từ {initialTotalDays} ngày xuống {calculatedNewDays} ngày
+                {t('planner.editMeta.reduceHeading', {
+                  oldDays: initialTotalDays,
+                  newDays: calculatedNewDays,
+                })}
               </p>
               <p className="text-[11px] text-amber-800 leading-relaxed">
-                Các địa điểm đã lên lịch từ <strong>Ngày {calculatedNewDays + 1}</strong> đến{' '}
-                <strong>Ngày {initialTotalDays}</strong> sẽ bị ảnh hưởng. Vui lòng chọn cách xử lý:
+                {t('planner.editMeta.reduceDesc', {
+                  fromDay: calculatedNewDays + 1,
+                  toDay: initialTotalDays,
+                })}
               </p>
             </div>
           </div>
@@ -209,13 +221,19 @@ function EditMetaForm({
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="font-bold text-[#10243A]">Dồn vào ngày cuối</span>
+                  <span className="font-bold text-[#10243A]">
+                    {t('planner.editMeta.mergeTitle')}
+                  </span>
                   <span className="px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                    Khuyên dùng - 0 mất dữ liệu
+                    {t('planner.editMeta.mergeBadge')}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                  Tất cả các điểm dừng từ Ngày {calculatedNewDays + 1} đến Ngày {initialTotalDays} sẽ được chuyển về Ngày {calculatedNewDays} để bạn tự do sắp xếp lại.
+                  {t('planner.editMeta.mergeDesc', {
+                    fromDay: calculatedNewDays + 1,
+                    toDay: initialTotalDays,
+                    targetDay: calculatedNewDays,
+                  })}
                 </p>
               </div>
             </label>
@@ -236,9 +254,12 @@ function EditMetaForm({
                 className="mt-0.5 text-rose-600 focus:ring-rose-500"
               />
               <div className="min-w-0 flex-1">
-                <span className="font-bold text-slate-900">Xóa các điểm vượt quá</span>
+                <span className="font-bold text-slate-900">{t('planner.editMeta.trimTitle')}</span>
                 <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                  Xóa bỏ toàn bộ các điểm dừng thuộc Ngày {calculatedNewDays + 1} đến Ngày {initialTotalDays} khỏi lịch trình.
+                  {t('planner.editMeta.trimDesc', {
+                    fromDay: calculatedNewDays + 1,
+                    toDay: initialTotalDays,
+                  })}
                 </p>
               </div>
             </label>
@@ -251,7 +272,7 @@ function EditMetaForm({
               disabled={isSubmitting}
               className="h-9 px-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 font-semibold text-slate-700 transition-colors cursor-pointer"
             >
-              Quay lại chỉnh sửa
+              {t('planner.editMeta.backToEdit')}
             </button>
             <button
               type="button"
@@ -264,7 +285,7 @@ function EditMetaForm({
               ) : (
                 <i className="fa-solid fa-check text-xs" aria-hidden="true" />
               )}
-              <span>Xác nhận dời ngày</span>
+              <span>{t('planner.editMeta.confirmShiftDays')}</span>
             </button>
           </div>
         </div>
@@ -277,11 +298,16 @@ function EditMetaForm({
             <i className="fa-solid fa-calendar-plus text-[#0194F3] text-sm mt-0.5 shrink-0" aria-hidden="true" />
             <div className="space-y-1">
               <p className="font-bold leading-snug">
-                Lịch trình được tăng từ {initialTotalDays} ngày lên {calculatedNewDays} ngày
+                {t('planner.editMeta.expandHeading', {
+                  oldDays: initialTotalDays,
+                  newDays: calculatedNewDays,
+                })}
               </p>
               <p className="text-[11px] text-slate-600 leading-relaxed">
-                Các ngày mới (từ <strong>Ngày {initialTotalDays + 1}</strong> đến{' '}
-                <strong>Ngày {calculatedNewDays}</strong>) hiện đang trống. Vui lòng chọn cách tiếp tục:
+                {t('planner.editMeta.expandDesc', {
+                  fromDay: initialTotalDays + 1,
+                  toDay: calculatedNewDays,
+                })}
               </p>
             </div>
           </div>
@@ -304,13 +330,18 @@ function EditMetaForm({
               />
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="font-bold text-[#10243A]">Nhờ Genie Copilot gợi ý điểm mới</span>
+                  <span className="font-bold text-[#10243A]">
+                    {t('planner.editMeta.copilotExpandTitle')}
+                  </span>
                   <span className="px-1.5 py-0.5 rounded-md bg-[#E5F2FF] text-[#0194F3] text-[10px] font-bold">
-                    Khuyên dùng
+                    {t('planner.editMeta.recommendedBadge')}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                  Tự động lưu ngày mới và mở khung chat để Copilot gợi ý địa điểm hấp dẫn cho Ngày {initialTotalDays + 1} đến Ngày {calculatedNewDays}.
+                  {t('planner.editMeta.copilotExpandDesc', {
+                    fromDay: initialTotalDays + 1,
+                    toDay: calculatedNewDays,
+                  })}
                 </p>
               </div>
             </label>
@@ -331,9 +362,11 @@ function EditMetaForm({
                 className="mt-0.5 text-[#0194F3] focus:ring-[#0194F3]"
               />
               <div className="min-w-0 flex-1">
-                <span className="font-bold text-slate-900">Tự thêm điểm sau</span>
+                <span className="font-bold text-slate-900">
+                  {t('planner.editMeta.manualExpandTitle')}
+                </span>
                 <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                  Cập nhật thời gian chuyến đi và tạo các ngày trống để bạn tự tra cứu và thêm địa điểm dừng theo ý muốn.
+                  {t('planner.editMeta.manualExpandDesc')}
                 </p>
               </div>
             </label>
@@ -346,7 +379,7 @@ function EditMetaForm({
               disabled={isSubmitting}
               className="h-9 px-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 font-semibold text-slate-700 transition-colors cursor-pointer"
             >
-              Quay lại chỉnh sửa
+              {t('planner.editMeta.backToEdit')}
             </button>
             <button
               type="button"
@@ -359,7 +392,7 @@ function EditMetaForm({
               ) : (
                 <i className="fa-solid fa-check text-xs" aria-hidden="true" />
               )}
-              <span>Xác nhận dời ngày</span>
+              <span>{t('planner.editMeta.confirmShiftDays')}</span>
             </button>
           </div>
         </div>
@@ -368,13 +401,17 @@ function EditMetaForm({
       {/* Main Form body */}
       {!confirmStep && (
         <div className="p-5 space-y-4 text-xs">
-          {errorMsg && (
+          {errorKey && (
             <div
               role="alert"
               className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-medium text-rose-700 flex items-center gap-2"
             >
               <i className="fa-solid fa-circle-exclamation shrink-0" aria-hidden="true" />
-              <span>{errorMsg}</span>
+              <span>
+                {errorKey === 'errMaxDays'
+                  ? t('planner.editMeta.errMaxDays', { max: MANUAL_MAX_TRIP_DAYS })
+                  : t(`planner.editMeta.${errorKey}`)}
+              </span>
             </div>
           )}
 
@@ -382,7 +419,7 @@ function EditMetaForm({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label htmlFor="itinerary-title-input" className="font-semibold text-slate-700">
-                Tên lịch trình <span className="text-rose-500">*</span>
+                {t('planner.editMeta.titleLabel')} <span className="text-rose-500">*</span>
               </label>
               <span className="text-[11px] text-slate-400 tabular-nums">
                 {title.length}/{ITINERARY_META_LIMITS.MAX_TITLE_LENGTH}
@@ -396,17 +433,21 @@ function EditMetaForm({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               disabled={isSubmitting}
-              placeholder="Ví dụ: Khám phá Hội An - Đà Nẵng 3N2Đ"
+              placeholder={t('planner.editMeta.titlePlaceholder')}
               className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0194F3]/30 focus:border-[#0194F3]"
             />
           </div>
 
           {/* Dates: Start Date & End Date */}
           <div className="space-y-1.5">
-            <label className="font-semibold text-slate-700">Thời gian chuyến đi</label>
+            <label className="font-semibold text-slate-700">
+              {t('planner.editMeta.datesLabel')}
+            </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <span className="text-[11px] text-slate-500">Ngày bắt đầu</span>
+                <span className="text-[11px] text-slate-500">
+                  {t('planner.editMeta.startDate')}
+                </span>
                 <input
                   type="date"
                   value={startDate}
@@ -416,7 +457,7 @@ function EditMetaForm({
                 />
               </div>
               <div className="space-y-1">
-                <span className="text-[11px] text-slate-500">Ngày kết thúc</span>
+                <span className="text-[11px] text-slate-500">{t('planner.editMeta.endDate')}</span>
                 <input
                   type="date"
                   value={endDate}
@@ -431,7 +472,13 @@ function EditMetaForm({
             {/* Dynamic trip length indicator */}
             <div className="pt-1 flex items-center justify-between text-[11px]">
               <span className="text-slate-500">
-                Thời lượng tính toán: <strong className="text-slate-800 tabular-nums">{calculatedNewDays} ngày {Math.max(0, calculatedNewDays - 1)} đêm</strong>
+                {t('planner.editMeta.calculatedDuration')}{' '}
+                <strong className="text-slate-800 tabular-nums">
+                  {t('planner.common.durationFull', {
+                    days: calculatedNewDays,
+                    nights: Math.max(0, calculatedNewDays - 1),
+                  })}
+                </strong>
               </span>
               {hasDaysChanged && (
                 <span
@@ -440,8 +487,12 @@ function EditMetaForm({
                   }`}
                 >
                   {calculatedNewDays < initialTotalDays
-                    ? `(Giảm ${initialTotalDays - calculatedNewDays} ngày)`
-                    : `(Tăng ${calculatedNewDays - initialTotalDays} ngày)`}
+                    ? t('planner.editMeta.daysReduced', {
+                        count: initialTotalDays - calculatedNewDays,
+                      })
+                    : t('planner.editMeta.daysIncreased', {
+                        count: calculatedNewDays - initialTotalDays,
+                      })}
                 </span>
               )}
             </div>
@@ -451,7 +502,7 @@ function EditMetaForm({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label htmlFor="itinerary-desc-input" className="font-semibold text-slate-700">
-                Mô tả ngắn (không bắt buộc)
+                {t('planner.editMeta.descriptionLabel')}
               </label>
               <span className="text-[11px] text-slate-400 tabular-nums">
                 {description.length}/{ITINERARY_META_LIMITS.MAX_DESCRIPTION_LENGTH}
@@ -464,7 +515,7 @@ function EditMetaForm({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               disabled={isSubmitting}
-              placeholder="Chia sẻ tiêu chí chuyến đi, lưu ý chung hoặc phong cách khám phá..."
+              placeholder={t('planner.editMeta.descriptionPlaceholder')}
               className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0194F3]/30 focus:border-[#0194F3] resize-none"
             />
           </div>
@@ -480,7 +531,7 @@ function EditMetaForm({
             disabled={isSubmitting}
             className="h-9 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors cursor-pointer disabled:opacity-50"
           >
-            Hủy
+            {t('common.cancel')}
           </button>
           <button
             type="submit"
@@ -492,7 +543,9 @@ function EditMetaForm({
             ) : (
               <i className="fa-solid fa-check text-xs" aria-hidden="true" />
             )}
-            <span>{isSubmitting ? 'Đang lưu...' : 'Lưu thay đổi'}</span>
+            <span>
+              {isSubmitting ? t('planner.common.saving') : t('planner.common.saveChanges')}
+            </span>
           </button>
         </div>
       )}

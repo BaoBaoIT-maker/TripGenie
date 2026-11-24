@@ -1,4 +1,10 @@
 import { ApiResponse } from '@/types/auth';
+import {
+  ACCEPT_LANGUAGE_HEADER,
+  getActiveClientLocale,
+  parseLocale,
+} from '@/i18n/config';
+import { getMessages, translateApiError } from '@/i18n';
 
 export class ApiClientError extends Error {
   constructor(
@@ -76,6 +82,14 @@ export async function apiClient<T = unknown>(
     headers.set('Content-Type', 'application/json');
   }
 
+  const activeLocale = headers.has(ACCEPT_LANGUAGE_HEADER)
+    ? parseLocale(headers.get(ACCEPT_LANGUAGE_HEADER))
+    : getActiveClientLocale();
+
+  if (!headers.has(ACCEPT_LANGUAGE_HEADER)) {
+    headers.set(ACCEPT_LANGUAGE_HEADER, activeLocale);
+  }
+
   const config: RequestInit = {
     ...options,
     headers,
@@ -87,7 +101,7 @@ export async function apiClient<T = unknown>(
     response = await fetch(url, config);
   } catch {
     throw new ApiClientError(
-      'Không thể kết nối tới máy chủ. Vui lòng kiểm tra lại kết nối mạng.',
+      getMessages(activeLocale).errors.NETWORK_UNREACHABLE,
       0,
     );
   }
@@ -106,7 +120,10 @@ export async function apiClient<T = unknown>(
       try {
         response = await fetch(url, config);
       } catch {
-        throw new ApiClientError('Lỗi kết nối khi gửi lại yêu cầu', 0);
+        throw new ApiClientError(
+          getMessages(activeLocale).errors.NETWORK_RETRY_FAILED,
+          0,
+        );
       }
     }
   }
@@ -122,7 +139,7 @@ export async function apiClient<T = unknown>(
   }
 
   if (!response.ok) {
-    let errorMessage = 'Đã có lỗi xảy ra. Vui lòng thử lại.';
+    let rawErrorMessage: string | undefined = undefined;
     let errorDetails: unknown = undefined;
     const errorCode = data && typeof data.code === 'string' ? data.code : undefined;
 
@@ -131,17 +148,26 @@ export async function apiClient<T = unknown>(
         errorDetails = data.errors;
       }
       if (typeof data.message === 'string') {
-        errorMessage = data.message;
+        rawErrorMessage = data.message;
       } else if (Array.isArray(data.message) && data.message.length > 0) {
-        errorMessage = String(data.message[0]);
+        rawErrorMessage = String(data.message[0]);
         if (!errorDetails) errorDetails = data.message;
       } else if (data.error) {
-        errorMessage = String(data.error);
+        rawErrorMessage = String(data.error);
       }
     }
 
+    const localizedMessage = translateApiError(
+      {
+        code: errorCode,
+        message: rawErrorMessage,
+        statusCode: response.status,
+      },
+      activeLocale,
+    );
+
     throw new ApiClientError(
-      errorMessage,
+      localizedMessage,
       response.status,
       errorDetails as string[] | Record<string, unknown> | undefined,
       errorCode,

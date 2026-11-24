@@ -3,11 +3,25 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useEffect, useCallback } from 'react';
+import { toast } from 'sonner';
+import {
+  getAuthTransitionMessages,
+  OAUTH_POPUP_CONFIG,
+} from '@/features/auth/components/AuthTransitionScreen';
 import { authService } from '@/services/auth.service';
 import { AuthUser } from '@/types/auth';
 
 const AUTH_QUERY_KEY = ['auth', 'me'];
 const AUTH_SYNC_KEY = 'tripgenie:auth_event';
+const USER_SCOPED_QUERY_PREFIXES = [
+  ['planners'],
+  ['saved-places'],
+  ['collections'],
+  ['itineraries'],
+  ['community'],
+  ['admin'],
+  ['user-preferences'],
+] as const;
 
 export function useAuth() {
   const queryClient = useQueryClient();
@@ -35,10 +49,10 @@ export function useAuth() {
       if (event.key === AUTH_SYNC_KEY) {
         if (event.newValue?.startsWith('logout')) {
           queryClient.setQueryData(AUTH_QUERY_KEY, null);
-          queryClient.removeQueries({ queryKey: ['itineraries'] });
-          queryClient.removeQueries({ queryKey: ['community'] });
-          queryClient.invalidateQueries();
-          router.push('/login');
+          for (const prefix of USER_SCOPED_QUERY_PREFIXES) {
+            queryClient.removeQueries({ queryKey: prefix });
+          }
+          router.replace(OAUTH_POPUP_CONFIG.POST_LOGOUT_REDIRECT);
         } else if (event.newValue?.startsWith('login')) {
           queryClient.removeQueries({ queryKey: ['itineraries'] });
           queryClient.removeQueries({ queryKey: ['community'] });
@@ -101,15 +115,17 @@ export function useAuth() {
   });
 
   const logoutMutation = useMutation({
-    mutationFn: authService.logout,
-    onSettled: () => {
+    mutationFn: () => authService.logout().catch(() => ({ message: 'OK' })),
+    onMutate: async () => {
+      // Optimistic 0ms logout: clear session & navigate to Home immediately without waiting for network
+      await queryClient.cancelQueries({ queryKey: AUTH_QUERY_KEY });
       queryClient.setQueryData(AUTH_QUERY_KEY, null);
-      queryClient.removeQueries({ queryKey: ['planners'] });
-      queryClient.removeQueries({ queryKey: ['saved-places'] });
-      queryClient.removeQueries({ queryKey: ['itineraries'] });
-      queryClient.removeQueries({ queryKey: ['community'] });
+      for (const prefix of USER_SCOPED_QUERY_PREFIXES) {
+        queryClient.removeQueries({ queryKey: prefix });
+      }
       broadcastAuthEvent('logout');
-      router.push('/login');
+      toast.success(getAuthTransitionMessages().LOGOUT_SUCCESS);
+      router.replace(OAUTH_POPUP_CONFIG.POST_LOGOUT_REDIRECT);
     },
   });
 

@@ -20,12 +20,12 @@ import {
 } from "@/features/community/hooks/use-community";
 import { formatVnd } from "@/features/planner/model/itinerary-format";
 import {
-  formatRelativeTime,
   formatTripDuration,
   getVideoThumbnailSrc,
   isVideoUrl,
   resolvePostAuthorSubtitle,
 } from "@/services/community.service";
+import { formatRelativeTime, useI18n } from "@/i18n";
 import { CloneItineraryPreviewModal } from "./CloneItineraryPreviewModal";
 import { CommunityModalPortal } from "./CommunityModalPortal";
 import { EditPostModal } from "./EditPostModal";
@@ -49,28 +49,22 @@ const DEFAULT_AVATAR =
 
 type ModerationStatus = "PENDING" | "FLAGGED" | "REJECTED";
 
-const MODERATION_BANNER_CONFIG: Record<
+const MODERATION_BANNER_STYLES: Record<
   ModerationStatus,
-  { icon: string; label: string; note: string; className: string }
+  { icon: string; className: string }
 > = {
   PENDING: {
     icon: "fa-regular fa-clock",
-    label: "Đang chờ kiểm duyệt (Chỉ bạn & Quản trị viên thấy)",
-    note: "AI đang xem xét bài viết trước khi hiển thị công khai trên cộng đồng.",
     className:
       "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/40 dark:border-amber-800/60 dark:text-amber-300",
   },
   FLAGGED: {
     icon: "fa-solid fa-flag",
-    label: "Chưa thể duyệt tự động (Chỉ bạn & Quản trị viên thấy)",
-    note: "Bài viết đang chờ Quản trị viên xem xét thủ công.",
     className:
       "bg-orange-50 border-orange-200 text-orange-800 dark:bg-orange-950/40 dark:border-orange-800/60 dark:text-orange-300",
   },
   REJECTED: {
     icon: "fa-solid fa-ban",
-    label: "Không được duyệt (Chỉ bạn & Quản trị viên thấy)",
-    note: "Bài viết vi phạm tiêu chuẩn cộng đồng. Bạn có thể chỉnh sửa để gửi duyệt lại hoặc xóa bài.",
     className:
       "bg-rose-50 border-rose-200 text-rose-800 dark:bg-rose-950/40 dark:border-rose-800/60 dark:text-rose-300",
   },
@@ -83,20 +77,23 @@ function ModerationStatusBanner({
   status: ModerationStatus;
   note?: string | null;
 }) {
-  const config = MODERATION_BANNER_CONFIG[status];
+  const { t } = useI18n();
+  const style = MODERATION_BANNER_STYLES[status];
+  const label = t(`community.post.moderation.${status}_label`);
+  const defaultNote = t(`community.post.moderation.${status}_note`);
   return (
     <div
-      className={`mx-5 mb-3 flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl border text-xs font-medium ${config.className}`}
+      className={`mx-5 mb-3 flex items-start gap-2.5 px-3.5 py-2.5 rounded-xl border text-xs font-medium ${style.className}`}
       role="status"
       aria-live="polite"
     >
       <i
-        className={`${config.icon} mt-0.5 shrink-0 text-[13px]`}
+        className={`${style.icon} mt-0.5 shrink-0 text-[13px]`}
         aria-hidden="true"
       />
       <div className="min-w-0">
-        <span className="font-bold">{config.label}.</span>{" "}
-        <span className="opacity-80">{note || config.note}</span>
+        <span className="font-bold">{label}.</span>{" "}
+        <span className="opacity-80">{note || defaultNote}</span>
       </div>
     </div>
   );
@@ -151,6 +148,7 @@ function PostCardComponent({
   onOpenEdit,
   onOpenReport,
 }: PostCardProps) {
+  const { locale, t } = useI18n();
   const { user } = useAuth();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -260,7 +258,7 @@ function PostCardComponent({
 
   const handleToggleLike = () => {
     if (!user) {
-      toast.error("Vui lòng đăng nhập để thả tim bài viết");
+      toast.error(t("community.toasts.loginToLike"));
       return;
     }
     toggleLikeMutation.mutate(post.id);
@@ -303,7 +301,7 @@ function PostCardComponent({
   const handleTriggerReport = () => {
     setIsMenuOpen(false);
     if (!user) {
-      toast.error("Vui lòng đăng nhập để báo cáo bài viết");
+      toast.error(t("community.toasts.loginToReport"));
       return;
     }
     videoRef.current?.pause();
@@ -332,9 +330,9 @@ function PostCardComponent({
     }
     try {
       await navigator.clipboard.writeText(shareUrl);
-      toast.success("Đã sao chép liên kết bài viết vào bộ nhớ tạm!");
+      toast.success(t("community.toasts.postLinkCopied"));
     } catch {
-      toast.info("Liên kết: " + shareUrl);
+      toast.info(t("community.toasts.linkFallback", { url: shareUrl }));
     }
   };
 
@@ -346,10 +344,15 @@ function PostCardComponent({
   const durationLabel = formatTripDuration(
     post.itinerary?.startDate,
     post.itinerary?.endDate,
-    false
+    false,
+    locale
   );
 
   const authorSubtitle = resolvePostAuthorSubtitle(post);
+  const authorContextLabel =
+    authorSubtitle.groupBadge && !authorSubtitle.groupBadge.isDefault
+      ? authorSubtitle.groupBadge.name
+      : t("community.defaultGroupName");
 
   return (
     <article
@@ -365,7 +368,7 @@ function PostCardComponent({
         <div className="flex items-center gap-3 min-w-0">
           <Link
             href={profileHref}
-            title={`Xem kênh của ${post.author.fullName}`}
+            title={t("community.viewCreatorTitle", { name: post.author.fullName })}
             className="shrink-0"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -388,13 +391,13 @@ function PostCardComponent({
               {post.author.isVerified && (
                 <i
                   className="fa-solid fa-circle-check text-[#0194F3] text-[13px] shrink-0"
-                  title="Thổ địa được xác thực"
-                  aria-label="Thổ địa được xác thực"
+                  title={t("community.verifiedLocalTitle")}
+                  aria-label={t("community.verifiedLocalTitle")}
                 />
               )}
               <span className="text-[11px] text-[#94A3B8]">
-                • {formatRelativeTime(post.createdAt)}
-                {isEdited ? " (Đã chỉnh sửa)" : ""}
+                • {formatRelativeTime(post.createdAt, locale)}
+                {isEdited ? t("community.post.editedTag") : ""}
               </span>
             </div>
             <div className="text-[12px] text-[#64748B] font-medium truncate">
@@ -413,7 +416,7 @@ function PostCardComponent({
                   {authorSubtitle.groupBadge.name}
                 </button>
               ) : (
-                <span>{authorSubtitle.contextLabel}</span>
+                <span>{authorContextLabel}</span>
               )}
             </div>
           </div>
@@ -424,7 +427,7 @@ function PostCardComponent({
           <button
             type="button"
             onClick={() => setIsMenuOpen((prev) => !prev)}
-            aria-label="Tùy chọn bài viết"
+            aria-label={t("community.post.optionsAria")}
             aria-expanded={isMenuOpen}
             className="border-none bg-transparent text-[14px] text-[#94A3B8] hover:text-[#0F172A] hover:bg-slate-100 rounded-full size-8 inline-flex items-center justify-center cursor-pointer transition-colors"
           >
@@ -443,7 +446,7 @@ function PostCardComponent({
                     className="fa-solid fa-pen text-[#64748B] w-4 text-center"
                     aria-hidden="true"
                   />
-                  <span>Chỉnh sửa bài viết</span>
+                  <span>{t("community.post.edit")}</span>
                 </button>
               )}
 
@@ -460,7 +463,7 @@ function PostCardComponent({
                     className="fa-solid fa-trash w-4 text-center"
                     aria-hidden="true"
                   />
-                  <span>Xóa bài viết</span>
+                  <span>{t("community.post.delete")}</span>
                 </button>
               )}
 
@@ -474,7 +477,7 @@ function PostCardComponent({
                     className="fa-solid fa-flag w-4 text-center"
                     aria-hidden="true"
                   />
-                  <span>Báo cáo bài viết</span>
+                  <span>{t("community.post.report")}</span>
                 </button>
               )}
 
@@ -490,7 +493,7 @@ function PostCardComponent({
                   className="fa-solid fa-link text-[#64748B] w-4 text-center"
                   aria-hidden="true"
                 />
-                <span>Sao chép liên kết</span>
+                <span>{t("community.post.copyLink")}</span>
               </button>
             </div>
           )}
@@ -628,7 +631,7 @@ function PostCardComponent({
                   />
                   {mediaList.length > 3 && (
                     <span className="absolute inset-0 bg-black/45 flex items-center justify-center text-white text-[12px] font-bold">
-                      +{mediaList.length - 3} tệp khác
+                      {t("community.post.moreFiles", { count: mediaList.length - 3 })}
                     </span>
                   )}
                 </div>
@@ -648,7 +651,7 @@ function PostCardComponent({
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 mb-0.5">
                 <span className="py-0.5 px-1.5 rounded-md bg-[#F0F7FF] text-[#0194F3] font-bold text-[10px] tracking-wide">
-                  Lộ trình đính kèm
+                  {t("community.post.attachedItinerary")}
                 </span>
                 {durationLabel && (
                   <span className="text-[11px] text-slate-500 font-medium">
@@ -663,9 +666,9 @@ function PostCardComponent({
                 {post.itinerary.title}
               </Link>
               <div className="text-[11px] text-slate-500 font-medium mt-0.5 truncate">
-                {post.itinerary.totalPlaces} Điểm đến
+                {t("community.post.placesCount", { count: post.itinerary.totalPlaces })}
                 {formattedEstimatedCost
-                  ? ` • Dự trù ~${formattedEstimatedCost}/người`
+                  ? t("community.post.estimatedPerPerson", { amount: formattedEstimatedCost })
                   : ""}
               </div>
             </div>
@@ -677,7 +680,7 @@ function PostCardComponent({
             className="h-8 px-3 text-xs font-semibold shrink-0 whitespace-nowrap rounded-lg inline-flex items-center justify-center gap-1.5 bg-[#0194F3] hover:bg-[#007FE3] active:scale-[0.98] text-white shadow-xs cursor-pointer transition-colors border-none"
           >
             <i className="fa-regular fa-clone" aria-hidden="true" />
-            <span>Nhân bản lịch trình</span>
+            <span>{t("community.post.cloneItinerary")}</span>
           </button>
         </div>
       )}
@@ -711,7 +714,7 @@ function PostCardComponent({
             className="flex items-center gap-1.5 bg-transparent border-none text-[12px] font-semibold text-[#64748B] hover:text-[#0F172A] cursor-pointer transition-colors"
           >
             <i className="fa-regular fa-comment text-[16px]" aria-hidden="true" />
-            <span>{post.commentCount} bình luận</span>
+            <span>{t("community.post.commentsCount", { count: post.commentCount })}</span>
           </button>
 
           {/* Cloned Count Badge */}
@@ -721,7 +724,7 @@ function PostCardComponent({
                 className="fa-solid fa-share-from-square text-[11px]"
                 aria-hidden="true"
               />
-              <span>{post.cloneCount} lượt nhân bản</span>
+              <span>{t("community.sidebar.cloneCount", { count: post.cloneCount })}</span>
             </div>
           )}
         </div>
@@ -736,7 +739,7 @@ function PostCardComponent({
             className="fa-solid fa-share-nodes text-[15px]"
             aria-hidden="true"
           />
-          <span>Chia sẻ</span>
+          <span>{t("community.post.share")}</span>
         </button>
       </div>
 
@@ -800,18 +803,13 @@ function PostCardComponent({
                   id="confirm-delete-title"
                   className="text-[15px] font-bold text-slate-900"
                 >
-                  Xác nhận xóa bài viết?
+                  {t("community.post.deleteConfirmTitle")}
                 </h3>
                 <p
                   id="confirm-delete-desc"
                   className="text-xs text-[#64748B] leading-relaxed"
                 >
-                  Bạn có chắc chắn muốn xóa bài viết{" "}
-                  <span className="font-bold text-[#0F172A]">
-                    &ldquo;{post.title}&rdquo;
-                  </span>
-                  ? Toàn bộ hình ảnh, tương tác và bình luận liên quan sẽ bị xóa
-                  vĩnh viễn và không thể khôi phục.
+                  {t("community.post.deleteConfirmBody", { title: post.title })}
                 </p>
               </div>
             </div>
@@ -823,7 +821,7 @@ function PostCardComponent({
                 onClick={() => setIsConfirmDeleteOpen(false)}
                 className="h-9 px-4 rounded-[10px] border border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-xs font-bold text-[#334155] transition-colors cursor-pointer disabled:opacity-50"
               >
-                Hủy
+                {t("common.cancel")}
               </button>
               <button
                 type="button"
@@ -841,7 +839,7 @@ function PostCardComponent({
                 {deletePostMutation.isPending && (
                   <Loader2 className="size-3.5 animate-spin" />
                 )}
-                <span>Xác nhận xóa</span>
+                <span>{t("community.post.deleteConfirmAction")}</span>
               </button>
             </div>
           </div>
@@ -855,7 +853,7 @@ function PostCardComponent({
           <div
             role="dialog"
             aria-modal="true"
-            aria-label="Xem ảnh và video chi tiết"
+            aria-label={t("community.post.lightboxAria")}
             className="fixed inset-0 z-[110] bg-[#0F172A]/95 flex flex-col items-center justify-center p-4 sm:p-6"
             onClick={() => setLightboxIndex(null)}
           >
@@ -870,7 +868,7 @@ function PostCardComponent({
                 type="button"
                 onClick={() => setLightboxIndex(null)}
                 className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full bg-white/15 hover:bg-white/25 transition-colors text-white cursor-pointer"
-                aria-label="Đóng xem chi tiết"
+                aria-label={t("community.post.lightboxCloseAria")}
               >
                 <X className="size-5" />
               </button>
@@ -893,7 +891,7 @@ function PostCardComponent({
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={mediaList[lightboxIndex]}
-                  alt={`${post.title} - Chi tiết`}
+                  alt={t("community.post.lightboxDetailAlt", { title: post.title })}
                   decoding="async"
                   className="max-h-[80vh] max-w-full rounded-xl object-contain shadow-2xl select-none"
                 />
@@ -912,7 +910,7 @@ function PostCardComponent({
                     )
                   }
                   className="absolute left-2 sm:-left-14 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full bg-black/65 hover:bg-black/85 text-white transition-colors cursor-pointer"
-                  aria-label="Ảnh trước"
+                  aria-label={t("community.post.prevPhotoAria")}
                 >
                   <ChevronLeft className="size-6" />
                 </button>
@@ -931,7 +929,7 @@ function PostCardComponent({
                     )
                   }
                   className="absolute right-2 sm:-right-14 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-full bg-black/65 hover:bg-black/85 text-white transition-colors cursor-pointer"
-                  aria-label="Ảnh tiếp theo"
+                  aria-label={t("community.post.nextPhotoAria")}
                 >
                   <ChevronRight className="size-6" />
                 </button>

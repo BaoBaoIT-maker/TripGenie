@@ -22,6 +22,7 @@ import {
   STYLE_PROFILE_MAP,
 } from '../constants/wizard.constants';
 import { PARTY_SIZE_BOUNDS } from '../constants/itinerary.constants';
+import { useI18n, type AppLocale } from '@/i18n';
 
 interface Props {
   isOpen: boolean;
@@ -39,13 +40,21 @@ function removeVietnameseAccents(str: string): string {
     .toLowerCase();
 }
 
-function formatDisplayDate(dateStr: string): string {
+function formatDisplayDate(dateStr: string, locale: AppLocale = 'vi'): string {
   if (!dateStr) return '';
   try {
     const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr.trim();
     const parts = cleanDate.split('-');
     if (parts.length === 3) {
       const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      if (locale === 'en') {
+        return d.toLocaleDateString('en-US', {
+          weekday: 'short',
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        });
+      }
       const dayNames = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
       const dayName = dayNames[d.getDay()];
       const day = String(d.getDate()).padStart(2, '0');
@@ -80,6 +89,7 @@ export default function ItineraryWizardModal({
   initialTemplate,
 }: Props) {
   const router = useRouter();
+  const { t, locale } = useI18n();
 
   // 1. Form States
   const [originCity, setOriginCity] = useState<string>(WIZARD_DEFAULTS.ORIGIN_CITY);
@@ -228,10 +238,10 @@ export default function ItineraryWizardModal({
         const clamped = new Date(s);
         clamped.setDate(clamped.getDate() + (MAX_TRIP_DAYS - 1));
         setEndDate(clamped.toISOString().slice(0, 10));
-        toast.info(`AI hỗ trợ lập lịch trình tối đa ${MAX_TRIP_DAYS} ngày.`);
+        toast.info(t('planner.wizard.maxDaysInfo', { max: MAX_TRIP_DAYS }));
       }
     },
-    [endDate]
+    [endDate, t]
   );
 
   const handleEndDateChange = useCallback(
@@ -244,13 +254,13 @@ export default function ItineraryWizardModal({
           const clamped = new Date(s);
           clamped.setDate(clamped.getDate() + (MAX_TRIP_DAYS - 1));
           setEndDate(clamped.toISOString().slice(0, 10));
-          toast.info(`AI hỗ trợ lập lịch trình tối đa ${MAX_TRIP_DAYS} ngày.`);
+          toast.info(t('planner.wizard.maxDaysInfo', { max: MAX_TRIP_DAYS }));
           return;
         }
       }
       setEndDate(newEnd);
     },
-    [startDate]
+    [startDate, t]
   );
 
   // Debounced input to avoid triggering transit engine requests on every keystroke
@@ -326,12 +336,12 @@ export default function ItineraryWizardModal({
       const cleanDest = destinationCity.split('/')[0].trim();
 
       if (!cleanOrigin || !cleanDest) {
-        toast.error('Vui lòng nhập điểm khởi hành và điểm đến');
+        toast.error(t('planner.wizard.missingLocationsError'));
         return;
       }
 
       if (totalDays > MAX_TRIP_DAYS) {
-        toast.error(`AI hỗ trợ tạo lịch trình tối đa ${MAX_TRIP_DAYS} ngày`);
+        toast.error(t('planner.wizard.maxDaysSubmitError', { max: MAX_TRIP_DAYS }));
         return;
       }
 
@@ -353,17 +363,17 @@ export default function ItineraryWizardModal({
         },
         {
           onSuccess: (data) => {
-            toast.success('Đã tạo lịch trình thành công!');
+            toast.success(t('planner.wizard.successToast'));
             onClose();
             router.push(`/itineraries/${data.id}`);
           },
           onError: (err) => {
             const errorMsg =
               err instanceof ApiError && err.status === 401
-                ? 'Vui lòng đăng nhập để tạo lịch trình.'
+                ? t('planner.wizard.loginError')
                 : err instanceof Error
                 ? err.message
-                : 'Có lỗi xảy ra khi tạo lịch trình. Vui lòng thử lại.';
+                : t('planner.wizard.genericError');
             setServerError(errorMsg);
             toast.error(errorMsg);
           },
@@ -386,6 +396,7 @@ export default function ItineraryWizardModal({
       customPrompt,
       onClose,
       router,
+      t,
     ]
   );
 
@@ -408,10 +419,10 @@ export default function ItineraryWizardModal({
             id="wizard-modal-title"
             className="text-base font-black text-[#10243A] tracking-tight"
           >
-            Lên kế hoạch chuyến đi
+            {t('planner.wizard.title')}
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Tối ưu tuyến đường, phân bổ thời gian và gợi ý điểm đến phù hợp
+            {t('planner.wizard.subtitle')}
           </p>
         </div>
 
@@ -420,7 +431,7 @@ export default function ItineraryWizardModal({
           onClick={onClose}
           disabled={generate.isPending}
           className="size-8 rounded-full text-slate-400 hover:bg-[#E2E8F0]/70 hover:text-[#10243A] flex items-center justify-center transition-colors cursor-pointer"
-          title="Đóng"
+          title={t('common.close')}
         >
           <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
         </button>
@@ -436,13 +447,17 @@ export default function ItineraryWizardModal({
           <div className="rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0194F3]">
-                Tuyến đường &amp; Lịch trình
+                {t('planner.wizard.routeSectionTitle')}
               </span>
               <span
                 className="text-xs font-bold text-[#0194F3] bg-[#E8F4FD] px-2.5 py-0.5 rounded-full border border-[#D0E7FF]"
-                title={`AI hỗ trợ lập lịch trình tối đa ${MAX_TRIP_DAYS} ngày`}
+                title={t('planner.wizard.durationBadgeTitle', { max: MAX_TRIP_DAYS })}
               >
-                {totalDays} ngày {totalNights} đêm (Tối đa {MAX_TRIP_DAYS}N)
+                {t('planner.wizard.durationBadge', {
+                  days: totalDays,
+                  nights: totalNights,
+                  max: MAX_TRIP_DAYS,
+                })}
               </span>
             </div>
 
@@ -452,7 +467,7 @@ export default function ItineraryWizardModal({
               <div className="p-3 pr-6 relative" ref={originWrapperRef}>
                 <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">
                   <i className="fa-solid fa-plane-departure text-[11px] text-[#0194F3]" aria-hidden="true" />
-                  <span>Khởi hành</span>
+                  <span>{t('planner.wizard.originLabel')}</span>
                 </div>
                 <input
                   type="text"
@@ -465,7 +480,7 @@ export default function ItineraryWizardModal({
                     setOriginCity(e.target.value);
                     setShowOriginDropdown(true);
                   }}
-                  placeholder="Điểm đi..."
+                  placeholder={t('planner.wizard.originPlaceholder')}
                   className="w-full bg-transparent text-sm font-bold text-[#10243A] focus:outline-none truncate"
                 />
 
@@ -473,7 +488,9 @@ export default function ItineraryWizardModal({
                 {showOriginDropdown && (
                   <div className="absolute top-full left-0 mt-2 z-50 w-64 bg-white rounded-xl border border-[#E2E8F0] shadow-lg max-h-48 overflow-y-auto divide-y divide-[#F1F5F9] text-xs">
                     {isLoadingAreas ? (
-                      <div className="p-3 text-slate-400 text-center">Đang tải địa điểm...</div>
+                      <div className="p-3 text-slate-400 text-center">
+                        {t('planner.wizard.loadingLocations')}
+                      </div>
                     ) : filteredOrigins.length > 0 ? (
                       filteredOrigins.map((loc) => (
                         <div
@@ -491,7 +508,9 @@ export default function ItineraryWizardModal({
                         </div>
                       ))
                     ) : (
-                      <div className="p-3 text-slate-400 text-center">Không tìm thấy địa điểm</div>
+                      <div className="p-3 text-slate-400 text-center">
+                        {t('planner.wizard.noLocationsFound')}
+                      </div>
                     )}
                   </div>
                 )}
@@ -502,7 +521,7 @@ export default function ItineraryWizardModal({
                 type="button"
                 onClick={handleSwapLocations}
                 className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-20 size-8 rounded-full bg-white border border-[#D0E7FF] text-[#0194F3] hover:bg-[#F0F7FF] hover:border-[#0194F3] shadow-md flex items-center justify-center transition-all cursor-pointer group shrink-0"
-                title="Đổi chiều điểm đi / điểm đến"
+                title={t('planner.wizard.swapLocationsTitle')}
               >
                 <i className="fa-solid fa-arrow-right-arrow-left text-xs transition-transform duration-300 group-hover:rotate-180" aria-hidden="true" />
               </button>
@@ -511,7 +530,7 @@ export default function ItineraryWizardModal({
               <div className="p-3 pl-6 relative" ref={destWrapperRef}>
                 <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">
                   <i className="fa-solid fa-plane-arrival text-[11px] text-[#0194F3]" aria-hidden="true" />
-                  <span>Điểm đến</span>
+                  <span>{t('planner.wizard.destLabel')}</span>
                 </div>
                 <input
                   type="text"
@@ -524,7 +543,7 @@ export default function ItineraryWizardModal({
                     setDestinationCity(e.target.value);
                     setShowDestDropdown(true);
                   }}
-                  placeholder="Điểm đến..."
+                  placeholder={t('planner.wizard.destPlaceholder')}
                   className="w-full bg-transparent text-sm font-bold text-[#10243A] focus:outline-none truncate"
                 />
 
@@ -532,7 +551,9 @@ export default function ItineraryWizardModal({
                 {showDestDropdown && (
                   <div className="absolute top-full right-0 mt-2 z-50 w-64 bg-white rounded-xl border border-[#E2E8F0] shadow-lg max-h-48 overflow-y-auto divide-y divide-[#F1F5F9] text-xs">
                     {isLoadingAreas ? (
-                      <div className="p-3 text-slate-400 text-center">Đang tải địa điểm...</div>
+                      <div className="p-3 text-slate-400 text-center">
+                        {t('planner.wizard.loadingLocations')}
+                      </div>
                     ) : filteredDests.length > 0 ? (
                       filteredDests.map((loc) => (
                         <div
@@ -550,7 +571,9 @@ export default function ItineraryWizardModal({
                         </div>
                       ))
                     ) : (
-                      <div className="p-3 text-slate-400 text-center">Không tìm thấy địa điểm</div>
+                      <div className="p-3 text-slate-400 text-center">
+                        {t('planner.wizard.noLocationsFound')}
+                      </div>
                     )}
                   </div>
                 )}
@@ -563,10 +586,10 @@ export default function ItineraryWizardModal({
               <div className="p-3 relative cursor-pointer group hover:bg-[#F8FAFC] transition-colors rounded-l-xl">
                 <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">
                   <i className="fa-regular fa-calendar text-[11px] text-[#0194F3]" aria-hidden="true" />
-                  <span>Ngày bắt đầu</span>
+                  <span>{t('planner.wizard.startDateLabel')}</span>
                 </div>
                 <div className="text-sm font-bold text-[#10243A]">
-                  {formatDisplayDate(startDate)}
+                  {formatDisplayDate(startDate, locale)}
                 </div>
                 <input
                   type="date"
@@ -580,10 +603,10 @@ export default function ItineraryWizardModal({
               <div className="p-3 relative cursor-pointer group hover:bg-[#F8FAFC] transition-colors rounded-r-xl">
                 <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">
                   <i className="fa-regular fa-calendar-check text-[11px] text-[#0194F3]" aria-hidden="true" />
-                  <span>Ngày kết thúc</span>
+                  <span>{t('planner.wizard.endDateLabel')}</span>
                 </div>
                 <div className="text-sm font-bold text-[#10243A]">
-                  {formatDisplayDate(endDate)}
+                  {formatDisplayDate(endDate, locale)}
                 </div>
                 <input
                   type="date"
@@ -601,16 +624,16 @@ export default function ItineraryWizardModal({
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-[#10243A]">
                   <i className="fa-solid fa-user-group text-[#0194F3] text-xs" aria-hidden="true" />
-                  <span>Số người tham gia</span>
+                  <span>{t('planner.wizard.partySizeLabel')}</span>
                 </div>
                 <p className="text-[11px] text-slate-500 tabular-nums mt-0.5">
-                  Tạm tính {Math.max(1, Math.ceil(partySize / 2))} phòng khách sạn
+                  {t('planner.wizard.estimatedRooms', { count: Math.max(1, Math.ceil(partySize / 2)) })}
                 </p>
               </div>
               <div className="inline-flex items-center gap-1 rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-0.5 shrink-0">
                 <button
                   type="button"
-                  aria-label="Giảm số người"
+                  aria-label={t('planner.wizard.decreasePartySize')}
                   disabled={partySize <= PARTY_SIZE_BOUNDS.MIN}
                   onClick={() => setPartySize((prev) => Math.max(PARTY_SIZE_BOUNDS.MIN, prev - 1))}
                   className="size-8 rounded-lg flex items-center justify-center text-[#10243A] hover:bg-white disabled:opacity-40 transition-colors cursor-pointer"
@@ -618,11 +641,11 @@ export default function ItineraryWizardModal({
                   <i className="fa-solid fa-minus text-[11px]" aria-hidden="true" />
                 </button>
                 <span className="min-w-[54px] text-center text-xs font-bold text-[#10243A] tabular-nums">
-                  {partySize} người
+                  {t('planner.common.peopleCount', { count: partySize })}
                 </span>
                 <button
                   type="button"
-                  aria-label="Tăng số người"
+                  aria-label={t('planner.wizard.increasePartySize')}
                   disabled={partySize >= PARTY_SIZE_BOUNDS.MAX}
                   onClick={() => setPartySize((prev) => Math.min(PARTY_SIZE_BOUNDS.MAX, prev + 1))}
                   className="size-8 rounded-lg flex items-center justify-center text-[#10243A] hover:bg-white disabled:opacity-40 transition-colors cursor-pointer"
@@ -637,14 +660,18 @@ export default function ItineraryWizardModal({
           <div className="rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] p-4 space-y-3">
             <div>
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0194F3]">
-                Phương tiện di chuyển
+                {t('planner.wizard.transitSectionTitle')}
               </span>
             </div>
 
-            {/* 4 Intercity Transit Cards (Tối giản: Chỉ Icon Font Awesome + Tên, không thừa thời gian) */}
+            {/* 4 Intercity Transit Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {VEHICLE_OPTIONS.map((v) => {
                 const isSelected = transitMode === v.id;
+                const vehicleLabel =
+                  v.id === 'PERSONAL_MOTORBIKE'
+                    ? t('planner.transitModes.PERSONAL_VEHICLE')
+                    : t(`planner.transitModes.${v.id}`);
 
                 return (
                   <button
@@ -668,7 +695,7 @@ export default function ItineraryWizardModal({
                       )}
                     </div>
                     <div className="mt-2 text-xs font-bold">
-                      {v.title}
+                      {vehicleLabel}
                     </div>
                   </button>
                 );
@@ -679,7 +706,7 @@ export default function ItineraryWizardModal({
             {isTransitLoading ? (
               <div className="p-3 rounded-xl bg-white border border-[#E2E8F0] text-xs flex items-center gap-2 text-slate-600">
                 <i className="fa-solid fa-circle-notch fa-spin text-[#0194F3] text-sm shrink-0" aria-hidden="true" />
-                <span>Đang tính toán cự ly và lộ trình di chuyển...</span>
+                <span>{t('planner.wizard.calculatingTransit')}</span>
               </div>
             ) : transitPreview ? (
               <TransitRouteBreakdown
@@ -692,7 +719,7 @@ export default function ItineraryWizardModal({
             {/* Intracity Mode / Local Transfer Options */}
             <div className="space-y-1.5 pt-1">
               <span className="block text-xs font-bold text-slate-500">
-                Đi lại tại điểm đến &amp; đưa rước
+                {t('planner.wizard.intracityLabel')}
               </span>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                 {INTRACITY_OPTIONS.map((opt) => {
@@ -708,9 +735,11 @@ export default function ItineraryWizardModal({
                           : 'border border-[#E2E8F0] bg-white hover:border-[#CBD5E1] text-[#10243A]'
                       }`}
                     >
-                      <div className="text-xs font-bold">{opt.title}</div>
+                      <div className="text-xs font-bold">
+                        {t(`planner.wizard.intracityOptions.${opt.id}.title`)}
+                      </div>
                       <div className="text-[11px] text-slate-500 mt-0.5 font-normal">
-                        {opt.priceText}
+                        {t(`planner.wizard.intracityOptions.${opt.id}.priceText`)}
                       </div>
                     </button>
                   );
@@ -723,10 +752,10 @@ export default function ItineraryWizardModal({
           <div className="rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] p-4 space-y-3.5">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0194F3]">
-                Ngân sách &amp; Trải nghiệm
+                {t('planner.wizard.budgetSectionTitle')}
               </span>
               <span className="text-xs text-slate-500 font-medium">
-                Cá nhân hóa
+                {t('planner.wizard.personalizedBadge')}
               </span>
             </div>
 
@@ -734,6 +763,7 @@ export default function ItineraryWizardModal({
             <div className="grid grid-cols-3 gap-1.5 p-1 bg-white rounded-xl border border-[#E2E8F0] text-xs font-semibold shadow-2xs">
               {BUDGET_OPTIONS.map((b) => {
                 const isSelected = budgetLevel === b.id;
+                const budgetKey = b.id as 'LOW' | 'MEDIUM' | 'HIGH';
                 return (
                   <button
                     key={b.id}
@@ -745,8 +775,12 @@ export default function ItineraryWizardModal({
                         : 'text-slate-500 hover:text-[#10243A]'
                     }`}
                   >
-                    <div className="font-bold">{b.title}</div>
-                    <div className="text-[10px] opacity-80 mt-0.5">{b.dailyCost}</div>
+                    <div className="font-bold">
+                      {t(`planner.wizard.budgetOptions.${budgetKey}.title`)}
+                    </div>
+                    <div className="text-[10px] opacity-80 mt-0.5">
+                      {t(`planner.wizard.budgetOptions.${budgetKey}.dailyCost`)}
+                    </div>
                   </button>
                 );
               })}
@@ -755,11 +789,11 @@ export default function ItineraryWizardModal({
             {/* Segmented 3-tier Travel Pace Switcher */}
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-500">
-                Nhịp độ lịch trình
+                {t('planner.wizard.paceLabel')}
               </label>
               <div
                 role="radiogroup"
-                aria-label="Nhịp độ lịch trình"
+                aria-label={t('planner.wizard.paceLabel')}
                 className="grid grid-cols-3 gap-1.5 p-1 bg-white rounded-xl border border-[#E2E8F0] text-xs font-semibold shadow-2xs"
               >
                 {PACE_OPTIONS.map((opt) => {
@@ -777,8 +811,12 @@ export default function ItineraryWizardModal({
                           : 'text-slate-500 hover:text-[#10243A]'
                       }`}
                     >
-                      <div className="font-bold">{opt.label}</div>
-                      <div className="text-[10px] opacity-80 mt-0.5">{opt.desc}</div>
+                      <div className="font-bold">
+                        {t(`planner.wizard.paceOptions.${opt.value}.label`)}
+                      </div>
+                      <div className="text-[10px] opacity-80 mt-0.5">
+                        {t(`planner.wizard.paceOptions.${opt.value}.desc`)}
+                      </div>
                     </button>
                   );
                 })}
@@ -788,7 +826,7 @@ export default function ItineraryWizardModal({
             {/* Travel Styles: Pure 3x2 Grid */}
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-500">
-                Phong cách trải nghiệm (Chọn nhiều)
+                {t('planner.wizard.stylesLabel')}
               </label>
               <div className="grid grid-cols-3 gap-2 text-xs">
                 {TRAVEL_STYLE_TAGS.map((tag) => {
@@ -804,7 +842,7 @@ export default function ItineraryWizardModal({
                           : 'border border-[#E2E8F0] bg-white text-slate-600 font-medium hover:border-[#CBD5E1] hover:text-[#10243A]'
                       }`}
                     >
-                      {tag}
+                      {t(`planner.wizard.styleTags.${tag}`)}
                     </button>
                   );
                 })}
@@ -817,7 +855,7 @@ export default function ItineraryWizardModal({
                 type="text"
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
-                placeholder="Yêu cầu riêng (VD: Thích hải sản tươi sống, đoàn có trẻ nhỏ...)"
+                placeholder={t('planner.wizard.customPromptPlaceholder')}
                 className="w-full rounded-xl border border-[#E2E8F0] bg-white px-3 py-2 text-xs text-[#10243A] placeholder-slate-400 focus:outline-none focus:border-[#0194F3] focus:ring-1 focus:ring-[#0194F3]"
               />
             </div>
@@ -835,7 +873,7 @@ export default function ItineraryWizardModal({
         ───────────────────────────────────────────────────────────── */}
         <div className="px-6 py-4 border-t border-[#F1F5F9] bg-[#F8FAFC] flex items-center justify-between shrink-0">
           <span className="text-xs text-slate-500">
-            Có thể tùy chỉnh chi tiết từng điểm sau khi tạo
+            {t('planner.wizard.footerHint')}
           </span>
 
           <div className="flex items-center gap-2.5">
@@ -845,7 +883,7 @@ export default function ItineraryWizardModal({
               disabled={generate.isPending}
               className="px-4 py-2 rounded-xl border border-[#E2E8F0] hover:bg-[#F1F5F9] text-xs font-bold text-slate-500 hover:text-[#10243A] transition-colors cursor-pointer"
             >
-              Hủy
+              {t('common.cancel')}
             </button>
 
             <button
@@ -856,10 +894,10 @@ export default function ItineraryWizardModal({
               {generate.isPending ? (
                 <>
                   <i className="fa-solid fa-circle-notch fa-spin text-sm" aria-hidden="true" />
-                  <span>Đang khởi tạo...</span>
+                  <span>{t('planner.wizard.creating')}</span>
                 </>
               ) : (
-                <span>Tạo lịch trình</span>
+                <span>{t('planner.wizard.createButton')}</span>
               )}
             </button>
           </div>

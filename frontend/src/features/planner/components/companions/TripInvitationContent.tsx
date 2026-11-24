@@ -17,6 +17,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/features/auth/hooks/use-auth';
+import { useI18n } from '@/i18n';
+import { formatTripDates } from '../../model/itinerary-format';
 import {
   useTripInvitation,
   useAcceptInvitation,
@@ -29,6 +31,7 @@ interface TripInvitationContentProps {
 
 export function TripInvitationContent({ invitationId }: TripInvitationContentProps) {
   const router = useRouter();
+  const { t, locale } = useI18n();
   const { user, isLoading: isAuthLoading } = useAuth();
   const { data: invitation, isLoading, isError, refetch } = useTripInvitation(invitationId);
 
@@ -56,22 +59,22 @@ export function TripInvitationContent({ invitationId }: TripInvitationContentPro
             <XCircle className="size-8" />
           </div>
           <h1 className="text-lg font-bold font-heading text-foreground">
-            Không tìm thấy lời mời
+            {t('planner.invitation.notFoundTitle')}
           </h1>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Lời mời này không tồn tại, đã bị thu hồi hoặc chuyến đi đã bị xóa.
+            {t('planner.invitation.notFoundDesc')}
           </p>
           <div className="flex items-center justify-center gap-3 pt-2">
             <Link href="/planner">
               <Button variant="outline" className="h-10 px-4 rounded-xl text-xs font-semibold cursor-pointer">
-                Về Kế hoạch
+                {t('planner.invitation.backShort')}
               </Button>
             </Link>
             <Button
               onClick={() => refetch()}
               className="h-10 px-4 rounded-xl text-xs font-semibold cursor-pointer"
             >
-              Thử lại
+              {t('planner.common.retry')}
             </Button>
           </div>
         </div>
@@ -90,15 +93,15 @@ export function TripInvitationContent({ invitationId }: TripInvitationContentPro
           </div>
           <div className="space-y-1">
             <h1 className="text-lg font-bold font-heading text-foreground">
-              Lời mời tham gia chuyến đi
+              {t('planner.invitation.guestTitle')}
             </h1>
             <p className="text-xs text-muted-foreground">
-              Vui lòng đăng nhập vào tài khoản TripGenie của bạn để xem và phản hồi lời mời.
+              {t('planner.invitation.guestDesc')}
             </p>
           </div>
           <Link href={`/login?next=${nextUrl}`}>
             <Button className="w-full h-11 rounded-xl text-xs font-semibold cursor-pointer shadow-xs">
-              Đăng nhập để tiếp tục
+              {t('planner.invitation.guestLoginBtn')}
             </Button>
           </Link>
         </div>
@@ -118,15 +121,15 @@ export function TripInvitationContent({ invitationId }: TripInvitationContentPro
           </div>
           <div className="space-y-1">
             <h1 className="text-lg font-bold font-heading text-foreground">
-              Bạn đã tham gia chuyến đi!
+              {t('planner.invitation.acceptedTitleExcl')}
             </h1>
             <p className="text-xs text-muted-foreground">
-              Bạn hiện là thành viên đồng hành của chuyến đi <strong>&ldquo;{itinerary.title}&rdquo;</strong>.
+              {t('planner.invitation.acceptedMemberBefore')} <strong>&ldquo;{itinerary.title}&rdquo;</strong>.
             </p>
           </div>
           <Link href={`/itineraries/${itinerary.id}`}>
             <Button className="w-full h-11 rounded-xl text-xs font-semibold gap-2 cursor-pointer shadow-xs">
-              <span>Xem lịch trình chi tiết</span>
+              <span>{t('planner.invitation.viewDetailedTrip')}</span>
               <ArrowRight className="size-4" />
             </Button>
           </Link>
@@ -144,14 +147,14 @@ export function TripInvitationContent({ invitationId }: TripInvitationContentPro
             <XCircle className="size-8" />
           </div>
           <h1 className="text-lg font-bold font-heading text-foreground">
-            Bạn đã từ chối lời mời này
+            {t('planner.invitation.declinedTitle')}
           </h1>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Nếu bạn muốn tham gia, hãy nhờ chủ chuyến đi gửi lại lời mời mới cho bạn nhé.
+            {t('planner.invitation.declinedDesc')}
           </p>
           <Link href="/planner">
             <Button variant="outline" className="h-10 px-5 rounded-xl text-xs font-semibold cursor-pointer">
-              Quay lại trang Kế hoạch
+              {t('planner.invitation.backToPlanner')}
             </Button>
           </Link>
         </div>
@@ -168,16 +171,16 @@ export function TripInvitationContent({ invitationId }: TripInvitationContentPro
             <Clock className="size-8" />
           </div>
           <h1 className="text-lg font-bold font-heading text-foreground">
-            Lời mời không còn khả dụng
+            {t('planner.invitation.unavailableTitle')}
           </h1>
           <p className="text-xs text-muted-foreground leading-relaxed">
             {status === 'EXPIRED'
-              ? 'Lời mời này đã quá thời hạn 7 ngày.'
-              : 'Lời mời này đã được người tạo chuyến đi thu hồi.'}
+              ? t('planner.invitation.expiredDesc')
+              : t('planner.invitation.revokedByOwnerDesc')}
           </p>
           <Link href="/planner">
             <Button variant="outline" className="h-10 px-5 rounded-xl text-xs font-semibold cursor-pointer">
-              Quay lại trang Kế hoạch
+              {t('planner.invitation.backToPlanner')}
             </Button>
           </Link>
         </div>
@@ -214,7 +217,7 @@ export function TripInvitationContent({ invitationId }: TripInvitationContentPro
             </AvatarFallback>
           </Avatar>
           <div>
-            <div className="text-xs text-muted-foreground">Lời mời đồng hành từ</div>
+            <div className="text-xs text-muted-foreground">{t('planner.invitation.invitedFromLabel')}</div>
             <div className="text-base font-bold font-heading text-foreground">
               {inviter.fullName}
             </div>
@@ -225,7 +228,7 @@ export function TripInvitationContent({ invitationId }: TripInvitationContentPro
         <div className="rounded-2xl border border-border bg-muted/20 p-5 space-y-3.5">
           <div className="flex items-center gap-2 text-primary text-xs font-bold uppercase tracking-wider">
             <Compass className="size-4" />
-            <span>Kế hoạch chuyến đi</span>
+            <span>{t('planner.invitation.tripPlanBadge')}</span>
           </div>
 
           <h2 className="text-lg font-bold font-heading text-foreground leading-snug">
@@ -242,17 +245,14 @@ export function TripInvitationContent({ invitationId }: TripInvitationContentPro
             {itinerary.startDate && (
               <span className="inline-flex items-center gap-1">
                 <CalendarDays className="size-3.5 text-primary shrink-0" />
-                <span>
-                  {itinerary.startDate}
-                  {itinerary.endDate ? ` - ${itinerary.endDate}` : ''}
-                </span>
+                <span>{formatTripDates(itinerary.startDate, itinerary.endDate, locale)}</span>
               </span>
             )}
           </div>
         </div>
 
         <p className="text-xs text-muted-foreground text-center leading-relaxed">
-          Tham gia để cùng theo dõi lịch trình, điểm dừng chân và đồng hành cùng {inviter.fullName} trong suốt chuyến đi.
+          {t('planner.invitation.joinDesc', { name: inviter.fullName })}
         </p>
 
         {/* Action Buttons */}
@@ -267,7 +267,7 @@ export function TripInvitationContent({ invitationId }: TripInvitationContentPro
             {declineMutation.isPending ? (
               <Loader2 className="size-3.5 animate-spin" />
             ) : (
-              'Từ chối'
+              t('planner.invitation.declineBtn')
             )}
           </Button>
 
@@ -282,7 +282,7 @@ export function TripInvitationContent({ invitationId }: TripInvitationContentPro
             ) : (
               <>
                 <UserPlus className="size-4" />
-                <span>Tham gia chuyến đi</span>
+                <span>{t('planner.invitation.joinTripBtn')}</span>
               </>
             )}
           </Button>

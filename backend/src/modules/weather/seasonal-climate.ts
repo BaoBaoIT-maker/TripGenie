@@ -1,5 +1,6 @@
 import { normalizeVietnamese } from '../../common/utils/string.util';
 import {
+  CONDITION_FALLBACK_LABEL_EN,
   DayWeather,
   WEATHER_THRESHOLDS,
   WeatherCondition,
@@ -458,6 +459,7 @@ export function buildSeasonalDayWeather(params: {
     isForecast: false,
     condition: entry.condition,
     labelVi: entry.summary,
+    labelEn: CONDITION_FALLBACK_LABEL_EN[entry.condition],
     tempMinC: entry.temp - swing,
     tempMaxC: entry.temp + swing,
     tempAvgC: entry.temp,

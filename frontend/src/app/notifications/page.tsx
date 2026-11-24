@@ -12,8 +12,10 @@ import {
   useMarkAllNotificationsRead,
 } from "@/features/notifications/hooks/use-notifications";
 import { NotificationList } from "@/features/notifications/components/NotificationList";
+import { useI18n } from "@/i18n";
 
 function NotificationsPageContent() {
+  const { t } = useI18n();
   const { user, isLoading: isAuthLoading } = useAuth();
   const [filter, setFilter] = useState<NotificationFilter>("ALL");
 
@@ -74,16 +76,16 @@ function NotificationsPageContent() {
             <i className="fa-regular fa-bell text-xl" aria-hidden="true" />
           </div>
           <h1 className="text-xl font-bold font-heading text-foreground">
-            Vui lòng đăng nhập để xem thông báo
+            {t("notifications.guestTitle")}
           </h1>
           <p className="text-xs text-muted-foreground leading-relaxed">
-            Đăng nhập để nhận thông báo tức thì khi có người thích, bình luận hoặc phản hồi bài viết cộng đồng của bạn.
+            {t("notifications.guestDescription")}
           </p>
           <div className="pt-2">
             <Link href="/login?next=/notifications">
               <Button className="rounded-xl font-semibold gap-2 px-6 h-10 text-xs cursor-pointer">
                 <i className="fa-solid fa-right-to-bracket text-xs" aria-hidden="true" />
-                <span>Đăng nhập ngay</span>
+                <span>{t("notifications.signInNow")}</span>
               </Button>
             </Link>
           </div>
@@ -113,7 +115,7 @@ function NotificationsPageContent() {
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
           >
-            Tất cả
+            {t("notifications.tabAll")}
           </button>
           <button
             type="button"
@@ -124,7 +126,7 @@ function NotificationsPageContent() {
                 : "text-muted-foreground hover:bg-muted hover:text-foreground"
             }`}
           >
-            Chưa đọc {badgeText && `(${badgeText})`}
+            {t("notifications.tabUnread")} {badgeText && `(${badgeText})`}
           </button>
         </div>
 
@@ -135,8 +137,8 @@ function NotificationsPageContent() {
           className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-primary hover:bg-primary/10 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
         >
           <i className="fa-solid fa-check-double text-xs" aria-hidden="true" />
-          <span className="hidden sm:inline">Đánh dấu tất cả đã đọc</span>
-          <span className="sm:hidden">Đã đọc tất cả</span>
+          <span className="hidden sm:inline">{t("notifications.markAllReadFull")}</span>
+          <span className="sm:hidden">{t("notifications.markAllReadShort")}</span>
         </button>
       </div>
 

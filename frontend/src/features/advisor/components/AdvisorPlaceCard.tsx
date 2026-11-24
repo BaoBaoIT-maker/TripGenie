@@ -3,7 +3,16 @@
 import * as React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ADVISOR_UI_CONSTANTS, AdvisorPlaceSummary } from '@/types/advisor';
+import { AdvisorPlaceSummary } from '@/types/advisor';
+import { useI18n, type TranslationKey } from '@/i18n';
+
+const PRICE_LEVEL_KEYS: Record<string, TranslationKey> = {
+  FREE: 'common.free',
+  LOW: 'profile.preferences.budgets.LOW.label',
+  MEDIUM: 'profile.preferences.budgets.MEDIUM.label',
+  HIGH: 'profile.preferences.budgets.HIGH.label',
+  LUXURY: 'profile.preferences.budgets.LUXURY.label',
+};
 
 interface AdvisorPlaceCardProps {
   place: AdvisorPlaceSummary;
@@ -11,10 +20,13 @@ interface AdvisorPlaceCardProps {
 }
 
 export function AdvisorPlaceCard({ place, onNavigate }: AdvisorPlaceCardProps) {
+  const { t } = useI18n();
   const [imgError, setImgError] = React.useState(false);
+  const priceKey = place.priceLevel ? PRICE_LEVEL_KEYS[place.priceLevel] : undefined;
   const priceLabel = place.priceLevel
-    ? ADVISOR_UI_CONSTANTS.PRICE_LEVEL_LABELS[place.priceLevel] ||
-      place.priceLevel
+    ? priceKey
+      ? t(priceKey)
+      : place.priceLevel
     : null;
 
   return (

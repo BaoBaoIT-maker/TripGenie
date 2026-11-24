@@ -1,6 +1,7 @@
 'use client';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useI18n, type MessageKey } from '@/i18n';
 import { TRIP_COMPANIONS_CONFIG } from '../../config/trip-companions.config';
 import type { GroupProposalItem, ProposalResolveAction } from '@/types/itinerary';
 
@@ -29,9 +30,11 @@ export function ProposalCard({
   isResolving = false,
   isWithdrawing = false,
 }: ProposalCardProps) {
+  const { t } = useI18n();
   const isPending = proposal.status === 'PENDING';
   const isProposer = Boolean(currentUserId && proposal.proposedBy === currentUserId);
   const statusMeta = TRIP_COMPANIONS_CONFIG.PROPOSAL_STATUS_META[proposal.status];
+  const statusLabel = t(`planner.proposals.status.${proposal.status}` as MessageKey);
   const denominator = Math.max(1, memberCount);
   const voteRatioPct = Math.min(100, Math.round((proposal.voteCount / denominator) * 100));
   const isBusy = isResolving || isWithdrawing;
@@ -57,7 +60,9 @@ export function ProposalCard({
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="px-2 py-0.5 rounded-md bg-[#F0F7FF] text-[#0194F3] text-[10px] font-bold">
-                {proposal.destinationId ? 'Đổi điểm dừng' : `Thêm vào Ngày ${proposal.dayNumber}`}
+                {proposal.destinationId
+                  ? t('planner.proposals.cardSwapBadge')
+                  : t('planner.proposals.cardAddBadge', { day: proposal.dayNumber })}
               </span>
               {proposal.place.categoryName && (
                 <span className="text-[11px] font-medium text-slate-500">
@@ -74,7 +79,7 @@ export function ProposalCard({
             <span
               className={`px-2 py-0.5 rounded-full border text-[10px] font-bold ${statusMeta.badgeClass}`}
             >
-              {statusMeta.label}
+              {statusLabel}
             </span>
           </div>
 
@@ -104,7 +109,8 @@ export function ProposalCard({
         <div className="text-[11px] text-slate-600 bg-slate-50 rounded-xl px-3 py-1.5 flex items-center gap-1.5 border border-slate-200/70">
           <i className="fa-solid fa-right-left text-[10px] text-[#0194F3] shrink-0" aria-hidden="true" />
           <span className="truncate">
-            Thay cho điểm hiện tại: <strong className="text-[#10243A]">{targetStopName}</strong>
+            {t('planner.proposals.replacesStopLabel')}{' '}
+            <strong className="text-[#10243A]">{targetStopName}</strong>
           </span>
         </div>
       )}
@@ -119,7 +125,8 @@ export function ProposalCard({
             </AvatarFallback>
           </Avatar>
           <span>
-            Đề xuất bởi <strong className="text-[#10243A]">{proposal.proposer.fullName}</strong>
+            {t('planner.proposals.proposedBy')}{' '}
+            <strong className="text-[#10243A]">{proposal.proposer.fullName}</strong>
           </span>
         </div>
 
@@ -135,7 +142,10 @@ export function ProposalCard({
         <div className="flex items-center justify-between gap-2 text-[11px]">
           <span className="font-semibold text-slate-700 tabular-nums">
             <i className="fa-solid fa-thumbs-up text-[#0194F3] mr-1.5" aria-hidden="true" />
-            {proposal.voteCount}/{denominator} thành viên đồng ý
+            {t('planner.proposals.votesSummary', {
+              votes: proposal.voteCount,
+              total: denominator,
+            })}
           </span>
 
           {proposal.voters.length > 0 && (
@@ -188,7 +198,9 @@ export function ProposalCard({
                 className={`${proposal.hasVoted ? 'fa-solid' : 'fa-regular'} fa-thumbs-up text-xs`}
                 aria-hidden="true"
               />
-              <span>{proposal.hasVoted ? 'Đã đồng ý' : 'Đồng ý'}</span>
+              <span>
+                {proposal.hasVoted ? t('planner.proposals.voted') : t('planner.proposals.vote')}
+              </span>
             </button>
 
             {isProposer && (
@@ -203,7 +215,7 @@ export function ProposalCard({
                 ) : (
                   <i className="fa-regular fa-trash-can text-[11px]" aria-hidden="true" />
                 )}
-                <span>Rút đề xuất</span>
+                <span>{t('planner.proposals.withdraw')}</span>
               </button>
             )}
           </div>
@@ -216,7 +228,7 @@ export function ProposalCard({
                 onClick={() => onResolve(proposal.id, 'REJECT')}
                 className="h-8 px-3 rounded-xl border border-slate-200 bg-white hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 text-xs font-semibold text-slate-600 transition-colors cursor-pointer disabled:opacity-50"
               >
-                Từ chối
+                {t('planner.proposals.reject')}
               </button>
               <button
                 type="button"
@@ -229,7 +241,7 @@ export function ProposalCard({
                 ) : (
                   <i className="fa-solid fa-check text-xs" aria-hidden="true" />
                 )}
-                <span>Chốt vào lịch trình</span>
+                <span>{t('planner.proposals.approveToItinerary')}</span>
               </button>
             </div>
           )}

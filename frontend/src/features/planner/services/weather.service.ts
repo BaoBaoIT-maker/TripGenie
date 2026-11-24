@@ -1,7 +1,9 @@
+import type { AppLocale } from '@/i18n';
 import {
   DESTINATION_CLIMATE_MAP,
   BASELINE_VIETNAM_CLIMATE,
   WEATHER_THEMES,
+  getWeatherConditionLabel,
   type ItineraryWeather,
   type MonthClimateEntry,
 } from '../constants/climate.constants';
@@ -54,7 +56,11 @@ function extractMonth(dateInput?: string | Date | null): number {
  * without touching caller UI components.
  */
 export interface WeatherResolverStrategy {
-  resolve(destination?: string | null, startDate?: string | Date | null): ItineraryWeather;
+  resolve(
+    destination?: string | null,
+    startDate?: string | Date | null,
+    locale?: AppLocale,
+  ): ItineraryWeather;
 }
 
 /**
@@ -63,7 +69,11 @@ export interface WeatherResolverStrategy {
  * Zero network latency, zero external API costs, zero database overhead.
  */
 export class SeasonalClimateResolver implements WeatherResolverStrategy {
-  resolve(destination?: string | null, startDate?: string | Date | null): ItineraryWeather {
+  resolve(
+    destination?: string | null,
+    startDate?: string | Date | null,
+    locale: AppLocale = 'vi',
+  ): ItineraryWeather {
     const key = normalizeDestinationKey(destination);
     const month = extractMonth(startDate);
 
@@ -75,11 +85,12 @@ export class SeasonalClimateResolver implements WeatherResolverStrategy {
     };
 
     const theme = WEATHER_THEMES[entry.condition] || WEATHER_THEMES.SUNNY;
+    const localizedSummary = getWeatherConditionLabel(entry.condition, locale, entry.summary);
 
     return {
       temperature: entry.temp,
       condition: entry.condition,
-      label: `${entry.temp}°C • ${entry.summary}`,
+      label: `${entry.temp}°C • ${localizedSummary}`,
       icon: theme.icon,
       iconUrl: theme.iconUrl,
       badgeClass: theme.badgeClass,
@@ -101,7 +112,8 @@ export const weatherService: WeatherResolverStrategy = new SeasonalClimateResolv
  */
 export function getItineraryWeather(
   destination?: string | null,
-  startDate?: string | Date | null
+  startDate?: string | Date | null,
+  locale: AppLocale = 'vi',
 ): ItineraryWeather {
-  return weatherService.resolve(destination, startDate);
+  return weatherService.resolve(destination, startDate, locale);
 }

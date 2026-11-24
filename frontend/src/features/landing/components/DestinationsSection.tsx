@@ -3,11 +3,17 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { SEASONAL_DESTINATIONS } from "../config/seasonal-destinations.config";
+import { useI18n } from "@/i18n/LocaleProvider";
 
 const CENTER_INDEX = Math.floor(SEASONAL_DESTINATIONS.length / 2);
 
 export function DestinationsSection() {
+  const { t, messages } = useI18n();
   const trackRef = useRef<HTMLDivElement>(null);
+  const seasonalCopy = messages.landing.destinations.items as Record<
+    string,
+    { title: string; weatherCondition: string; subtitle: string }
+  >;
   // Mặc định chọn thẻ chính giữa (Mã Pí Lèng) làm tâm điểm
   const [activeIndex, setActiveIndex] = useState(CENTER_INDEX);
 
@@ -115,14 +121,14 @@ export function DestinationsSection() {
         {/* Section Header */}
         <div className="text-center space-y-2 max-w-4xl mx-auto">
           <h2 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight leading-tight">
-            Những điểm đến đáng trải nghiệm
+            {t("landing.destinations.heading")}
           </h2>
           <div>
             <Link
               href="/explore"
               className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-500 hover:text-[#0194F3] transition-colors group"
             >
-              <span>Xem bản đồ 34 tỉnh thành</span>
+              <span>{t("landing.destinations.viewAllMap")}</span>
               <i className="fa-solid fa-arrow-right text-xs group-hover:translate-x-0.5 transition-transform" />
             </Link>
           </div>
@@ -134,7 +140,7 @@ export function DestinationsSection() {
           <button
             type="button"
             onClick={() => handleNavigate(-1)}
-            aria-label="Xem điểm đến trước"
+            aria-label={t("landing.destinations.prevAria")}
             className="absolute left-1 sm:left-3 top-1/2 -translate-y-1/2 z-40 size-8 sm:size-10 rounded-full bg-white/95 hover:bg-white text-slate-700 shadow-md border border-slate-200/80 flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95"
           >
             <i className="fa-solid fa-chevron-left text-xs sm:text-sm" />
@@ -143,7 +149,7 @@ export function DestinationsSection() {
           <button
             type="button"
             onClick={() => handleNavigate(1)}
-            aria-label="Xem điểm đến tiếp theo"
+            aria-label={t("landing.destinations.nextAria")}
             className="absolute right-1 sm:right-3 top-1/2 -translate-y-1/2 z-40 size-8 sm:size-10 rounded-full bg-white/95 hover:bg-white text-slate-700 shadow-md border border-slate-200/80 flex items-center justify-center transition-all cursor-pointer hover:scale-105 active:scale-95"
           >
             <i className="fa-solid fa-chevron-right text-xs sm:text-sm" />
@@ -156,6 +162,7 @@ export function DestinationsSection() {
             className="flex items-center justify-start sm:justify-center overflow-x-auto sm:overflow-visible scroll-smooth snap-x snap-mandatory touch-pan-x no-scrollbar py-6 px-[calc(50vw-95px)] sm:px-12 select-none"
           >
             {SEASONAL_DESTINATIONS.map((item, index) => {
+              const copy = seasonalCopy[item.id] ?? item;
               const distance = Math.abs(index - activeIndex);
               const isActive = index === activeIndex;
 
@@ -203,7 +210,7 @@ export function DestinationsSection() {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={item.imageUrl}
-                    alt={item.title}
+                    alt={copy.title}
                     className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 ease-out"
                     loading="lazy"
                   />
@@ -215,7 +222,7 @@ export function DestinationsSection() {
                   <div className="absolute bottom-0 inset-x-0 p-4 sm:p-5 md:p-6 space-y-1 sm:space-y-1.5 text-white pointer-events-none">
                     {/* Destination Title */}
                     <h3 className="text-base sm:text-lg md:text-xl font-bold text-white tracking-tight leading-snug drop-shadow-sm group-hover:text-sky-200 transition-colors">
-                      {item.title}
+                      {copy.title}
                     </h3>
 
                     {/* Expandable Details Panel: Bung ra khi thẻ ACTIVE */}
@@ -231,20 +238,20 @@ export function DestinationsSection() {
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={item.weatherIconUrl}
-                          alt={item.weatherCondition}
+                          alt={copy.weatherCondition}
                           className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 drop-shadow-sm"
                           loading="lazy"
                         />
                         <span>{item.weatherTemp}</span>
                         <span className="text-white/40">•</span>
                         <span className="text-white/90 font-normal">
-                          {item.weatherCondition}
+                          {copy.weatherCondition}
                         </span>
                       </div>
 
                       {/* Description */}
                       <p className="text-xs sm:text-sm text-slate-200/90 font-normal leading-relaxed line-clamp-2">
-                        {item.subtitle}
+                        {copy.subtitle}
                       </p>
                     </div>
                   </div>
@@ -256,26 +263,31 @@ export function DestinationsSection() {
 
         {/* Interactive Indicator Dots */}
         <div className="flex items-center justify-center gap-1.5 pt-1">
-          {SEASONAL_DESTINATIONS.map((dest, idx) => (
-            <button
-              key={dest.id}
-              type="button"
-              onClick={() => {
-                setActiveIndex(idx);
-                scrollToCard(idx);
-              }}
-              aria-label={`Xem thẻ mùa ${dest.title}`}
-              className="min-h-[44px] min-w-[20px] flex items-center justify-center cursor-pointer"
-            >
-              <span
-                className={`h-1.5 rounded-full transition-all duration-300 block ${
-                  activeIndex === idx
-                    ? "w-6 bg-[#0194F3]"
-                    : "w-1.5 bg-slate-300 hover:bg-slate-400"
-                }`}
-              />
-            </button>
-          ))}
+          {SEASONAL_DESTINATIONS.map((dest, idx) => {
+            const copy = seasonalCopy[dest.id] ?? dest;
+            return (
+              <button
+                key={dest.id}
+                type="button"
+                onClick={() => {
+                  setActiveIndex(idx);
+                  scrollToCard(idx);
+                }}
+                aria-label={t("landing.destinations.viewCardAria", {
+                  title: copy.title,
+                })}
+                className="min-h-[44px] min-w-[20px] flex items-center justify-center cursor-pointer"
+              >
+                <span
+                  className={`h-1.5 rounded-full transition-all duration-300 block ${
+                    activeIndex === idx
+                      ? "w-6 bg-[#0194F3]"
+                      : "w-1.5 bg-slate-300 hover:bg-slate-400"
+                  }`}
+                />
+              </button>
+            );
+          })}
         </div>
       </div>
     </section>

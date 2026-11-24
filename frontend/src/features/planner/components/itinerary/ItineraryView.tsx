@@ -7,13 +7,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/common/ErrorState';
 import { AppModalPortal } from '@/components/common/AppModalPortal';
 import { useAuth } from '@/features/auth/hooks/use-auth';
+import { useI18n } from '@/i18n';
 import { placeService } from '@/services/place.service';
 import { fetchDailyRouteSegments, type Coordinate } from '@/services/routing.service';
 import { getDayColor, type DiscoveryPlace, type ItineraryPathSegment } from '@/features/map/types';
 import {
   DEFAULT_MAP_CENTER,
   PARTY_SIZE_BOUNDS,
-  TRANSIT_MODE_LABELS,
   getDestinationCover,
   type WorkspaceTabKey,
 } from '../../constants/itinerary.constants';
@@ -93,11 +93,6 @@ const PRICE_LEVEL_NUMERIC: Record<string, number> = {
   LUXURY: 4,
 };
 
-const INITIAL_COPILOT_GREETING: CopilotMessageItem = {
-  sender: 'ai',
-  text: 'Chào bạn! Tôi là Genie Copilot. Tôi có thể giúp bạn đề xuất đổi quán ăn/điểm tham quan, điều chỉnh lịch trình hoặc giải đáp mọi thắc mắc về chuyến đi!',
-};
-
 function formatShortDate(isoString: string | null | undefined, dayIndex: number): string {
   if (!isoString) return '';
   try {
@@ -111,6 +106,7 @@ function formatShortDate(isoString: string | null | undefined, dayIndex: number)
 
 export default function ItineraryView({ id }: Props) {
   const router = useRouter();
+  const { t } = useI18n();
   const { user } = useAuth();
   const { data, isLoading, error } = useItineraryQuery(id);
   const { data: weatherData } = useItineraryWeatherQuery(id);
@@ -177,11 +173,14 @@ export default function ItineraryView({ id }: Props) {
   const [sessionId, setSessionId] = useState<string | undefined>(undefined);
   const { data: historyMessages } = useCopilotHistory(id, sessionId, isMemberOrOwner);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
-  const [copilotMessages, setCopilotMessages] = useState<CopilotMessageItem[]>([
-    INITIAL_COPILOT_GREETING,
-  ]);
+  const [copilotMessages, setCopilotMessages] = useState<CopilotMessageItem[]>([]);
   const [copilotInput, setCopilotInput] = useState('');
   const isHistoryLoadedRef = useRef(false);
+
+  const displayedCopilotMessages: CopilotMessageItem[] = useMemo(() => {
+    if (copilotMessages.length > 0) return copilotMessages;
+    return [{ sender: 'ai', text: t('planner.view.initialCopilotGreeting') }];
+  }, [copilotMessages, t]);
 
   useEffect(() => {
     if (!isHistoryLoadedRef.current && historyMessages && historyMessages.length > 0) {
@@ -340,7 +339,7 @@ export default function ItineraryView({ id }: Props) {
           slug: d.lodging.placeId,
           name: d.lodging.name,
           category: 'stay',
-          categoryLabel: 'Chỗ lưu trú',
+          categoryLabel: t('planner.lodging.dialogTitle'),
           areaSlug: '',
           areaName: data?.destination || '',
           address: d.lodging.address ?? '',
@@ -369,7 +368,7 @@ export default function ItineraryView({ id }: Props) {
             slug: a.placeId,
             name: a.placeName,
             category: 'itinerary',
-            categoryLabel: a.categoryName ?? 'Điểm đến',
+            categoryLabel: a.categoryName ?? t('planner.common.destinationFallback'),
             areaSlug: '',
             areaName: data?.destination || '',
             address: a.address ?? '',
@@ -396,7 +395,7 @@ export default function ItineraryView({ id }: Props) {
       .map((a) => [Number(a.longitude), Number(a.latitude)]);
 
     return { mapPlaces: places, markerLabels: labels, markerColors: colors, pathLine: fallbackLine };
-  }, [visibleDays, data?.destination]);
+  }, [visibleDays, data?.destination, t]);
 
   // Preview place for map inspection (Copilot proposals or chat place cards)
   const [previewPlace, setPreviewPlace] = useState<DiscoveryPlace | null>(null);
@@ -439,7 +438,7 @@ export default function ItineraryView({ id }: Props) {
           list.push({
             placeId: act.placeId,
             placeName: act.placeName,
-            categoryLabel: act.categoryName || 'Điểm đến',
+            categoryLabel: act.categoryName || t('planner.common.destinationFallback'),
             address: act.address ?? '',
             imageUrl: act.thumbnailUrl ?? act.imageUrl,
             rating: act.ratingAvg,
@@ -452,36 +451,36 @@ export default function ItineraryView({ id }: Props) {
       });
     });
     return list;
-  }, [visibleDays, finalMarkerLabels, finalMarkerColors]);
+  }, [visibleDays, finalMarkerLabels, finalMarkerColors, t]);
 
   const transitName = data?.intercityTransit?.mode
-    ? TRANSIT_MODE_LABELS[data.intercityTransit.mode] || data.intercityTransit.mode
-    : 'Máy bay';
+    ? t(`planner.transitModes.${data.intercityTransit.mode}`)
+    : t('planner.transitModes.FLIGHT');
 
   // Core Itinerary Handlers
   const handleDelete = async () => {
     try {
       await deleteMutation.mutateAsync(id);
-      toast.success('Đã xóa lịch trình thành công!');
+      toast.success(t('planner.view.toasts.deleteSuccess'));
       router.push('/planner');
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Không thể xóa lịch trình. Vui lòng thử lại!');
+      toast.error(err instanceof Error ? err.message : t('planner.view.toasts.deleteError'));
     }
   };
 
   const handleClone = async () => {
     if (!user) {
-      toast.error('Vui lòng đăng nhập để sao chép lịch trình vào tài khoản của bạn');
+      toast.error(t('planner.view.toasts.cloneLoginRequired'));
       router.push('/login');
       return;
     }
     try {
       const cloned = await cloneMutation.mutateAsync(id);
       setShowCloneModal(false);
-      toast.success('Đã sao chép lịch trình thành công vào chuyến đi của bạn!');
+      toast.success(t('planner.view.toasts.cloneSuccess'));
       router.push(`/itineraries/${cloned.id}`);
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Không thể sao chép lịch trình. Vui lòng thử lại!');
+      toast.error(err instanceof Error ? err.message : t('planner.view.toasts.cloneError'));
     }
   };
 
@@ -490,24 +489,20 @@ export default function ItineraryView({ id }: Props) {
     async (newMode: TransitMode) => {
       try {
         await updateTransitAsync({ id, transitMode: newMode });
-        toast.success('Đã cập nhật phương tiện di chuyển và tính lại chi phí!');
+        toast.success(t('planner.view.toasts.transitUpdated'));
       } catch (err: unknown) {
-        toast.error(
-          err instanceof Error
-            ? err.message
-            : 'Không thể cập nhật phương tiện di chuyển. Vui lòng thử lại!'
-        );
+        toast.error(err instanceof Error ? err.message : t('planner.view.toasts.transitError'));
       }
     },
-    [id, updateTransitAsync]
+    [id, updateTransitAsync, t]
   );
 
   const handleSaveCoverPhoto = async (newCoverUrl: string) => {
     try {
       await updateCoverMutation.mutateAsync(newCoverUrl);
-      toast.success('Đã cập nhật ảnh bìa lịch trình thành công!');
+      toast.success(t('planner.view.toasts.coverUpdated'));
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Không thể cập nhật ảnh bìa. Vui lòng thử lại!');
+      toast.error(err instanceof Error ? err.message : t('planner.view.toasts.coverError'));
       throw err;
     }
   };
@@ -529,12 +524,12 @@ export default function ItineraryView({ id }: Props) {
       const clamped = Math.min(PARTY_SIZE_BOUNDS.MAX, Math.max(PARTY_SIZE_BOUNDS.MIN, nextSize));
       try {
         await updateMetaAsync({ partySize: clamped });
-        toast.success(`Đã cập nhật quy mô ${clamped} người và tính lại dự toán!`);
+        toast.success(t('planner.view.toasts.partySizeUpdated', { count: clamped }));
       } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : 'Không thể cập nhật số người.');
+        toast.error(err instanceof Error ? err.message : t('planner.view.toasts.partySizeError'));
       }
     },
-    [isOwner, isUpdatingMeta, updateMetaAsync]
+    [isOwner, isUpdatingMeta, updateMetaAsync, t]
   );
 
   const handleSubmitEditMeta = useCallback(
@@ -543,15 +538,15 @@ export default function ItineraryView({ id }: Props) {
       setIsRefreshingSchedule(true);
       try {
         await updateMetaAsync(dto);
-        toast.success('Đã cập nhật thông tin chuyến đi!');
+        toast.success(t('planner.view.toasts.metaUpdated'));
       } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : 'Không thể cập nhật thông tin chuyến đi.');
+        toast.error(err instanceof Error ? err.message : t('planner.view.toasts.metaError'));
         throw err;
       } finally {
         setIsRefreshingSchedule(false);
       }
     },
-    [updateMetaAsync]
+    [updateMetaAsync, t]
   );
 
   const { mutateAsync: updateDestinationAsync } = updateDestinationMutation;
@@ -559,13 +554,13 @@ export default function ItineraryView({ id }: Props) {
     async (destinationId: string, dto: UpdateDestinationRequest) => {
       try {
         await updateDestinationAsync({ destinationId, dto });
-        toast.success('Đã cập nhật điểm dừng thành công!');
+        toast.success(t('planner.view.toasts.stopUpdated'));
       } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : 'Không thể cập nhật điểm dừng.');
+        toast.error(err instanceof Error ? err.message : t('planner.view.toasts.stopUpdateError'));
         throw err;
       }
     },
-    [updateDestinationAsync]
+    [updateDestinationAsync, t]
   );
 
   const { mutateAsync: moveDestinationAsync } = moveDestinationMutation;
@@ -576,12 +571,12 @@ export default function ItineraryView({ id }: Props) {
       try {
         await moveDestinationAsync({ destinationId, direction });
       } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : 'Không thể đổi thứ tự điểm dừng.');
+        toast.error(err instanceof Error ? err.message : t('planner.view.toasts.stopMoveError'));
       } finally {
         setMovingStopId(null);
       }
     },
-    [moveDestinationAsync, movingStopId]
+    [moveDestinationAsync, movingStopId, t]
   );
 
   // Stop Swap / Delete / Add / Propose Handlers
@@ -601,22 +596,26 @@ export default function ItineraryView({ id }: Props) {
         activity || days.flatMap((d) => d.activities).find((a) => a.placeId === placeId);
       if (!act) return;
       if (!act.id) {
-        toast.error(
-          'Điểm dừng mẫu này chưa được lưu thành bản ghi riêng — hãy nhờ Genie Copilot chỉnh sửa.'
-        );
+        toast.error(t('planner.view.toasts.stopNoRecordDelete'));
         return;
       }
-      if (!window.confirm(`Bạn có chắc muốn xóa "${act.placeName || 'địa điểm này'}" khỏi lịch trình?`)) {
+      if (
+        !window.confirm(
+          t('planner.view.toasts.stopDeleteConfirm', {
+            name: act.placeName || t('planner.copilot.assist.thisStopFallback'),
+          })
+        )
+      ) {
         return;
       }
       try {
         await removeDestinationAsync(act.id);
-        toast.success(`Đã xóa "${act.placeName}" khỏi lịch trình.`);
+        toast.success(t('planner.view.toasts.stopDeleted', { name: act.placeName }));
       } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : 'Không thể xóa địa điểm khỏi lịch trình.');
+        toast.error(err instanceof Error ? err.message : t('planner.view.toasts.stopDeleteError'));
       }
     },
-    [days, removeDestinationAsync]
+    [days, removeDestinationAsync, t]
   );
 
   const handleAddPlace = useCallback((dayNumber: number) => {
@@ -632,7 +631,7 @@ export default function ItineraryView({ id }: Props) {
       const act =
         activity || days.flatMap((d) => d.activities).find((a) => a.placeId === placeId);
       if (!act?.id) {
-        toast.error('Điểm dừng này chưa có mã bản ghi để mở bình chọn đổi điểm.');
+        toast.error(t('planner.view.toasts.stopNoRecordVote'));
         return;
       }
       const ownerDay = days.find((d) =>
@@ -646,17 +645,17 @@ export default function ItineraryView({ id }: Props) {
         targetStopName: act.placeName,
       });
     },
-    [days]
+    [days, t]
   );
 
   const handleDirectAddPlace = async (place: Place) => {
     const dayNumber = placeSearchState?.dayNumber ?? days[0]?.dayNumber ?? 1;
     try {
       await addDestinationMutation.mutateAsync({ placeId: place.id, dayNumber });
-      toast.success(`Đã thêm "${place.name}" vào Ngày ${dayNumber}!`);
+      toast.success(t('planner.view.toasts.stopAdded', { name: place.name, day: dayNumber }));
       setPlaceSearchState(null);
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Không thể thêm địa điểm vào lịch trình.');
+      toast.error(err instanceof Error ? err.message : t('planner.view.toasts.stopAddError'));
     }
   };
 
@@ -690,7 +689,10 @@ export default function ItineraryView({ id }: Props) {
     const msg = (textToSend || copilotInput).trim();
     if (!msg || chatMutation.isPending) return;
 
-    setCopilotMessages((prev) => [...prev, { sender: 'user', text: msg }]);
+    setCopilotMessages((prev) => [
+      ...(prev.length > 0 ? prev : [{ sender: 'ai' as const, text: t('planner.view.initialCopilotGreeting') }]),
+      { sender: 'user', text: msg },
+    ]);
     setCopilotInput('');
 
     try {
@@ -704,7 +706,7 @@ export default function ItineraryView({ id }: Props) {
       }
 
       if (res.modified && res.itinerary?.days) {
-        toast.success('AI đã tự động cập nhật lịch trình của bạn!');
+        toast.success(t('planner.view.toasts.copilotAutoUpdated'));
       }
 
       setCopilotMessages((prev) => [
@@ -724,12 +726,12 @@ export default function ItineraryView({ id }: Props) {
         },
       ]);
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Có lỗi khi trò chuyện với Genie Copilot.');
+      toast.error(err instanceof Error ? err.message : t('planner.view.toasts.copilotError'));
       setCopilotMessages((prev) => [
         ...prev,
         {
           sender: 'ai',
-          text: 'Xin lỗi bạn, kết nối tới Genie AI đang gặp sự cố. Vui lòng thử lại sau giây lát!',
+          text: t('planner.view.toasts.copilotFallbackReply'),
         },
       ]);
     }
@@ -744,13 +746,13 @@ export default function ItineraryView({ id }: Props) {
         proposalId: proposal.id,
       });
 
-      toast.success('Đã cập nhật lịch trình thành công!');
+      toast.success(t('planner.view.toasts.proposalApplied'));
 
       setCopilotMessages((prev) =>
         prev.map((msg, idx) => (idx === msgIndex ? { ...msg, proposalStatus: 'APPLIED' } : msg))
       );
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'Không thể cập nhật lịch trình. Vui lòng thử lại!');
+      toast.error(err instanceof Error ? err.message : t('planner.view.toasts.proposalApplyError'));
     } finally {
       setApplyingProposalId(null);
     }
@@ -760,13 +762,13 @@ export default function ItineraryView({ id }: Props) {
     setCopilotMessages((prev) =>
       prev.map((msg, idx) => (idx === msgIndex ? { ...msg, proposalStatus: 'REJECTED' } : msg))
     );
-    toast.info('Đã giữ nguyên lịch trình hiện tại.');
+    toast.info(t('planner.view.toasts.proposalRejected'));
   };
 
   const handleResetSession = () => {
     setSessionId(undefined);
-    setCopilotMessages([INITIAL_COPILOT_GREETING]);
-    toast.info('Đã làm mới phiên trò chuyện Copilot.');
+    setCopilotMessages([]);
+    toast.info(t('planner.view.toasts.sessionReset'));
   };
 
   // Map inspection & jump handlers
@@ -804,7 +806,7 @@ export default function ItineraryView({ id }: Props) {
       setActiveTab('itinerary');
       setSelectedPlaceId(existing.id);
       if (mobileTab === 'timeline') setMobileTab('map');
-      toast.success(`Đang mở vị trí "${existing.name}" trên bản đồ!`);
+      toast.success(t('planner.view.toasts.openingOnMap', { name: existing.name }));
       return;
     }
 
@@ -815,7 +817,7 @@ export default function ItineraryView({ id }: Props) {
         slug: previewId,
         name: target.name,
         category: 'itinerary',
-        categoryLabel: target.categoryName || 'Đề xuất đổi',
+        categoryLabel: target.categoryName || t('planner.view.proposedSwapLabel'),
         areaSlug: '',
         areaName: data?.destination || '',
         address: target.address || '',
@@ -836,7 +838,7 @@ export default function ItineraryView({ id }: Props) {
       setActiveTab('itinerary');
       setSelectedPlaceId(previewId);
       if (mobileTab === 'timeline') setMobileTab('map');
-      toast.success(`Đang mở vị trí "${target.name}" trên bản đồ!`);
+      toast.success(t('planner.view.toasts.openingOnMap', { name: target.name }));
       return;
     }
 
@@ -849,7 +851,7 @@ export default function ItineraryView({ id }: Props) {
           slug: found.slug,
           name: found.name,
           category: found.category || 'itinerary',
-          categoryLabel: found.categoryLabel || 'Điểm đến',
+          categoryLabel: found.categoryLabel || t('planner.common.destinationFallback'),
           areaSlug: '',
           areaName: found.city || data?.destination || '',
           address: found.address || '',
@@ -870,19 +872,19 @@ export default function ItineraryView({ id }: Props) {
         setActiveTab('itinerary');
         setSelectedPlaceId(found.id);
         if (mobileTab === 'timeline') setMobileTab('map');
-        toast.success(`Đang mở vị trí "${found.name}" trên bản đồ!`);
+        toast.success(t('planner.view.toasts.openingOnMap', { name: found.name }));
       } else {
-        toast.info(`Chưa có tọa độ chính xác của "${target.name}".`);
+        toast.info(t('planner.view.toasts.noExactCoords', { name: target.name }));
       }
     } catch {
-      toast.info(`Đang cập nhật vị trí "${target.name}"...`);
+      toast.info(t('planner.view.toasts.updatingLocation', { name: target.name }));
     }
   };
 
   function handleShareLink() {
     if (navigator.clipboard) {
       navigator.clipboard.writeText(window.location.href);
-      toast.success('Đã sao chép liên kết chuyến đi vào bộ nhớ tạm!');
+      toast.success(t('planner.view.toasts.linkCopied'));
     }
   }
 
@@ -892,10 +894,8 @@ export default function ItineraryView({ id }: Props) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center p-8 bg-[#F8FAFC]">
         <ErrorState
-          title="Không tìm thấy lịch trình"
-          message={
-            error instanceof Error ? error.message : 'Lịch trình không tồn tại hoặc đã bị xóa.'
-          }
+          title={t('planner.view.notFoundTitle')}
+          message={error instanceof Error ? error.message : t('planner.view.notFoundMessage')}
           onRetry={() => {
             router.push('/planner');
           }}
@@ -949,15 +949,15 @@ export default function ItineraryView({ id }: Props) {
             <span className="flex items-center gap-2">
               <i className="fa-solid fa-eye text-[#0194F3]" aria-hidden="true" />
               <span>
-                Bạn đang xem lịch trình chia sẻ công khai ở <strong>chế độ chỉ đọc</strong>. Nhấn{' '}
+                {t('planner.view.publicReadOnlyPrefix')}{' '}
                 <button
                   type="button"
                   onClick={() => setShowCloneModal(true)}
                   className="font-bold underline text-[#0194F3] hover:text-[#007AD0] cursor-pointer"
                 >
-                  Sao chép lịch trình
+                  {t('planner.view.publicReadOnlyCta')}
                 </button>{' '}
-                ở trên để tự do chỉnh sửa và dùng Genie Copilot.
+                {t('planner.view.publicReadOnlySuffix')}
               </span>
             </span>
           </div>
@@ -967,14 +967,14 @@ export default function ItineraryView({ id }: Props) {
         {effectiveTab === 'itinerary' && (
           <div
             role="tabpanel"
-            aria-label="Lịch trình và bản đồ"
+            aria-label={t('planner.view.itineraryMapAria')}
             className="space-y-4"
           >
             {/* Sticky Day Selector Rail (Universal: visible across both timeline & map on mobile and desktop) */}
             <div className="sticky top-[66px] z-20 py-2 bg-[#F8FAFC]/95 backdrop-blur-md">
               <div
                 role="tablist"
-                aria-label="Chọn ngày xem lịch trình"
+                aria-label={t('planner.view.daySelectorAria')}
                 className="inline-flex items-center gap-1 p-1 bg-white/90 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-2xs max-w-full overflow-x-auto no-scrollbar"
               >
                 <button
@@ -988,7 +988,7 @@ export default function ItineraryView({ id }: Props) {
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 font-semibold'
                   }`}
                 >
-                  <span>Tất cả</span>
+                  <span>{t('planner.view.allDays')}</span>
                   <span
                     className={`px-1.5 py-0.5 rounded-md text-[10px] tabular-nums transition-colors ${
                       dayScope === 'all'
@@ -996,7 +996,7 @@ export default function ItineraryView({ id }: Props) {
                         : 'bg-slate-100 text-slate-500 font-medium'
                     }`}
                   >
-                    {days.length} ngày
+                    {t('planner.common.daysCount', { count: days.length })}
                   </span>
                 </button>
 
@@ -1016,7 +1016,7 @@ export default function ItineraryView({ id }: Props) {
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/80 font-semibold'
                       }`}
                     >
-                      <span>Ngày {day.dayNumber}</span>
+                      <span>{t('planner.common.day', { n: day.dayNumber })}</span>
                       {shortDate && (
                         <span
                           className={`px-1.5 py-0.5 rounded-md text-[10px] tabular-nums transition-colors ${
@@ -1109,7 +1109,7 @@ export default function ItineraryView({ id }: Props) {
         )}
 
         {effectiveTab === 'budget' && (
-          <div role="tabpanel" aria-label="Bảng dự toán chi phí" className="max-w-5xl">
+          <div role="tabpanel" aria-label={t('planner.view.budgetAria')} className="max-w-5xl">
             {data.budgetBreakdown ? (
               <BudgetBreakdownCard
                 breakdown={data.budgetBreakdown}
@@ -1126,17 +1126,15 @@ export default function ItineraryView({ id }: Props) {
                 <div className="size-11 rounded-2xl bg-[#F0F7FF] text-[#0194F3] flex items-center justify-center mx-auto">
                   <i className="fa-solid fa-wallet text-base" aria-hidden="true" />
                 </div>
-                <p className="text-sm font-bold text-[#10243A]">Chưa có bảng dự toán chi tiết</p>
-                <p className="text-xs text-slate-500">
-                  Dự toán sẽ tự động được tổng hợp sau khi lịch trình có địa điểm và phương tiện di chuyển.
-                </p>
+                <p className="text-sm font-bold text-[#10243A]">{t('planner.view.noBudgetTitle')}</p>
+                <p className="text-xs text-slate-500">{t('planner.view.noBudgetDesc')}</p>
               </div>
             )}
           </div>
         )}
 
         {effectiveTab === 'voting' && isMemberOrOwner && (
-          <div role="tabpanel" aria-label="Bình chọn nhóm" className="max-w-4xl">
+          <div role="tabpanel" aria-label={t('planner.view.votingAria')} className="max-w-4xl">
             <TripProposalsPanel
               itineraryId={id}
               days={days}
@@ -1162,7 +1160,7 @@ export default function ItineraryView({ id }: Props) {
         {effectiveTab === 'group' && isMemberOrOwner && (
           <div
             role="tabpanel"
-            aria-label="Đoàn và hướng dẫn"
+            aria-label={t('planner.view.groupAria')}
             className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start"
           >
             <div className="lg:col-span-7">
@@ -1174,17 +1172,17 @@ export default function ItineraryView({ id }: Props) {
                 />
               ) : (
                 <section
-                  aria-label="Thông tin điều hành đoàn"
+                  aria-label={t('planner.view.noBriefingAria')}
                   className="bg-white border border-slate-200 rounded-2xl p-6 text-center space-y-2.5"
                 >
                   <div className="size-11 rounded-2xl bg-[#F0F7FF] text-[#0194F3] flex items-center justify-center mx-auto">
                     <i className="fa-solid fa-clipboard-list text-base" aria-hidden="true" />
                   </div>
                   <h3 className="text-sm font-semibold text-slate-900">
-                    Chưa có thông tin điều hành đoàn
+                    {t('planner.view.noBriefingTitle')}
                   </h3>
                   <p className="text-xs text-slate-500 max-w-md mx-auto">
-                    Trưởng đoàn chưa cập nhật giờ tập trung, điểm đón hoặc ghi chú liên hệ khẩn cấp cho chuyến đi này.
+                    {t('planner.view.noBriefingDesc')}
                   </p>
                 </section>
               )}
@@ -1208,7 +1206,7 @@ export default function ItineraryView({ id }: Props) {
             type="button"
             onClick={() => setIsCopilotOpen(true)}
             className="relative size-12 sm:size-14 rounded-full bg-[#0194F3] hover:bg-[#007AD0] text-white flex items-center justify-center shadow-lg shadow-blue-500/25 hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer border-2 border-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0194F3]"
-            aria-label="Mở Genie Copilot"
+            aria-label={t('planner.view.openCopilotAria')}
           >
             <i className="fa-solid fa-robot text-lg sm:text-xl" aria-hidden="true" />
           </button>
@@ -1226,7 +1224,7 @@ export default function ItineraryView({ id }: Props) {
         onClose={() => setIsCopilotOpen(false)}
         destination={data.destination || 'Đà Nẵng'}
         days={days}
-        messages={copilotMessages}
+        messages={displayedCopilotMessages}
         isPending={chatMutation.isPending}
         onSendMessage={handleSendCopilot}
         onConfirmProposal={handleConfirmProposal}
@@ -1250,17 +1248,21 @@ export default function ItineraryView({ id }: Props) {
             type="button"
             onClick={() => setMobileTab((prev) => (prev === 'timeline' ? 'map' : 'timeline'))}
             className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-900 text-white font-semibold text-xs shadow-lg hover:bg-slate-800 active:scale-95 transition-all cursor-pointer"
-            aria-label={mobileTab === 'timeline' ? 'Chuyển sang xem bản đồ' : 'Chuyển sang xem lịch trình'}
+            aria-label={
+              mobileTab === 'timeline'
+                ? t('planner.view.switchToMapAria')
+                : t('planner.view.switchToTimelineAria')
+            }
           >
             {mobileTab === 'timeline' ? (
               <>
                 <i className="fa-solid fa-map text-xs text-white" aria-hidden="true" />
-                <span>Bản đồ</span>
+                <span>{t('planner.view.mapButton')}</span>
               </>
             ) : (
               <>
                 <i className="fa-solid fa-list text-xs text-white" aria-hidden="true" />
-                <span>Lịch trình</span>
+                <span>{t('planner.view.timelineButton')}</span>
               </>
             )}
           </button>
@@ -1291,10 +1293,10 @@ export default function ItineraryView({ id }: Props) {
 
           <div className="space-y-2">
             <h3 id="delete-itinerary-modal-title" className="text-base font-bold text-slate-900">
-              Xóa lịch trình chuyến đi?
+              {t('planner.view.deleteModalTitle')}
             </h3>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Bạn có chắc chắn muốn xóa chuyến đi{' '}
+              {t('planner.view.deleteModalQuestion')}{' '}
               <strong className="text-[#10243A] font-semibold">&quot;{data.title}&quot;</strong>?
             </p>
             <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed flex items-start gap-2">
@@ -1303,9 +1305,9 @@ export default function ItineraryView({ id }: Props) {
                 aria-hidden="true"
               />
               <span>
-                <strong>Lưu ý:</strong> Chuyến đi sẽ được gỡ khỏi danh sách của bạn. Nếu có thành viên
-                hoặc người khác đã sao chép lịch trình này về tài khoản của họ thì bản sao của họ{' '}
-                <strong>hoàn toàn không bị mất</strong>.
+                <strong>{t('planner.view.deleteModalNoticeLabel')}</strong>{' '}
+                {t('planner.view.deleteModalNoticeBefore')}{' '}
+                <strong>{t('planner.view.deleteModalNoticeHighlight')}</strong>.
               </span>
             </p>
           </div>
@@ -1317,7 +1319,7 @@ export default function ItineraryView({ id }: Props) {
               onClick={() => setShowDeleteModal(false)}
               className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors cursor-pointer"
             >
-              Hủy bỏ
+              {t('planner.view.cancelAction')}
             </button>
             <button
               type="button"
@@ -1328,12 +1330,12 @@ export default function ItineraryView({ id }: Props) {
               {deleteMutation.isPending ? (
                 <>
                   <i className="fa-solid fa-circle-notch fa-spin text-xs" aria-hidden="true" />
-                  <span>Đang xóa...</span>
+                  <span>{t('planner.page.deleting')}</span>
                 </>
               ) : (
                 <>
                   <i className="fa-solid fa-trash-can text-xs" aria-hidden="true" />
-                  <span>Xác nhận xóa</span>
+                  <span>{t('planner.page.confirmDelete')}</span>
                 </>
               )}
             </button>
@@ -1356,11 +1358,12 @@ export default function ItineraryView({ id }: Props) {
 
           <div className="space-y-2">
             <h3 id="clone-itinerary-modal-title" className="text-base font-bold text-slate-900">
-              Sao chép lịch trình chuyến đi?
+              {t('planner.view.cloneModalTitle')}
             </h3>
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Bạn có chắc chắn muốn sao chép chuyến đi{' '}
-              <strong className="text-[#10243A] font-semibold">&quot;{data.title}&quot;</strong> vào tài khoản của mình không?
+              {t('planner.view.cloneModalQuestion')}{' '}
+              <strong className="text-[#10243A] font-semibold">&quot;{data.title}&quot;</strong>{' '}
+              {t('planner.view.cloneModalQuestionSuffix')}
             </p>
           </div>
 
@@ -1371,7 +1374,7 @@ export default function ItineraryView({ id }: Props) {
               onClick={() => setShowCloneModal(false)}
               className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors cursor-pointer"
             >
-              Hủy
+              {t('common.cancel')}
             </button>
             <button
               type="button"
@@ -1382,12 +1385,12 @@ export default function ItineraryView({ id }: Props) {
               {cloneMutation.isPending ? (
                 <>
                   <i className="fa-solid fa-circle-notch fa-spin text-xs" aria-hidden="true" />
-                  <span>Đang sao chép...</span>
+                  <span>{t('planner.view.cloning')}</span>
                 </>
               ) : (
                 <>
                   <i className="fa-regular fa-clone text-xs" aria-hidden="true" />
-                  <span>Xác nhận</span>
+                  <span>{t('planner.common.confirm')}</span>
                 </>
               )}
             </button>
@@ -1473,15 +1476,15 @@ export default function ItineraryView({ id }: Props) {
               destinationId: destId,
               newPlaceId,
             });
-            toast.success('Đã đổi địa điểm thành công!');
+            toast.success(t('planner.view.toasts.swapSuccess'));
             setSelectedActivityForSwap(null);
           } catch (err: unknown) {
-            toast.error(err instanceof Error ? err.message : 'Không thể đổi địa điểm. Vui lòng thử lại!');
+            toast.error(err instanceof Error ? err.message : t('planner.view.toasts.swapError'));
           }
         }}
         onProposeAlternative={async (newPlaceId) => {
           if (!selectedActivityForSwap?.id) {
-            toast.error('Điểm dừng này chưa hỗ trợ mở bình chọn đổi điểm.');
+            toast.error(t('planner.view.toasts.swapVoteUnsupported'));
             return;
           }
           const ownerDay = days.find((d) =>

@@ -1,6 +1,7 @@
 'use client';
 
 import { memo, useState } from 'react';
+import { useI18n } from '@/i18n';
 import { formatVnd } from '../../model/itinerary-format';
 import type { ItineraryDayLodging } from '@/types/itinerary';
 
@@ -23,15 +24,16 @@ export const LodgingAnchorBar = memo(function LodgingAnchorBar({
   onHoverLodging,
   onOpenPicker,
 }: LodgingAnchorBarProps) {
+  const { t } = useI18n();
   const [imageError, setImageError] = useState(false);
 
   if (!lodging) return null;
 
   const statusLabel = lodging.isCheckOutDay
-    ? `Trả phòng sáng Ngày ${dayNumber}`
+    ? t('planner.lodging.checkoutLabel', { day: dayNumber })
     : lodging.isAutoSuggested
-      ? 'Gợi ý chỗ ở'
-      : 'Chỗ ở đã chọn';
+      ? t('planner.lodging.autoSuggested')
+      : t('planner.lodging.selected');
 
   const hasValidImage = Boolean(lodging.imageUrl && !imageError);
 
@@ -75,7 +77,7 @@ export const LodgingAnchorBar = memo(function LodgingAnchorBar({
             </div>
           )}
           <span className="absolute top-1.5 left-1.5 px-1.5 h-5 rounded-md text-white text-[10px] font-bold flex items-center justify-center shadow-xs bg-[#0194F3] tracking-tight">
-            Đêm {lodging.nightNumber}
+            {t('planner.common.nightLabel', { n: lodging.nightNumber })}
           </span>
         </div>
 
@@ -92,7 +94,9 @@ export const LodgingAnchorBar = memo(function LodgingAnchorBar({
             {lodging.pricePerNight != null && lodging.pricePerNight > 0 && (
               <span className="shrink-0 tabular-nums font-semibold text-slate-800 text-xs sm:text-[13px]">
                 ~{formatVnd(lodging.pricePerNight)}
-                <span className="text-slate-500 font-normal text-[11px]">/đêm</span>
+                <span className="text-slate-500 font-normal text-[11px]">
+                  {t('planner.common.perNight')}
+                </span>
               </span>
             )}
           </div>
@@ -123,7 +127,9 @@ export const LodgingAnchorBar = memo(function LodgingAnchorBar({
                 </span>
                 <span className="inline-flex items-center gap-1 font-medium text-slate-600 tabular-nums">
                   <i className="fa-solid fa-route text-[10px] text-[#0194F3]" aria-hidden="true" />
-                  <span>Cách điểm đầu ~{lodging.distanceToFirstStopKm} km</span>
+                  <span>
+                    {t('planner.lodging.distanceFirstStop', { km: lodging.distanceToFirstStopKm })}
+                  </span>
                 </span>
               </>
             )}
@@ -145,7 +151,7 @@ export const LodgingAnchorBar = memo(function LodgingAnchorBar({
         <div className="flex items-center justify-between pt-2.5 border-t border-slate-100">
           <span className="text-[11px] text-slate-400 font-normal truncate hidden sm:inline">
             <i className="fa-solid fa-anchor text-[#0194F3] mr-1" aria-hidden="true" />
-            Điểm neo tính toán lộ trình &amp; di chuyển mỗi ngày
+            {t('planner.lodging.anchorHint')}
           </span>
           <button
             type="button"
@@ -156,7 +162,7 @@ export const LodgingAnchorBar = memo(function LodgingAnchorBar({
             className="h-8 px-3 rounded-lg border border-[#D0E7FF] bg-[#F5F9FF] hover:bg-[#F0F7FF] hover:border-[#0194F3] text-xs font-bold text-[#0194F3] transition-colors inline-flex items-center gap-1.5 shrink-0 shadow-2xs cursor-pointer ml-auto"
           >
             <i className="fa-solid fa-arrows-rotate text-[11px]" aria-hidden="true" />
-            <span>Đổi chỗ ở</span>
+            <span>{t('planner.lodging.changeLodging')}</span>
           </button>
         </div>
       )}

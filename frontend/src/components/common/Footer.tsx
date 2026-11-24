@@ -1,7 +1,12 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { useI18n } from "@/i18n/LocaleProvider";
 
 export function Footer() {
+  const { t } = useI18n();
+
   return (
     <footer className="bg-slate-50 border-t border-slate-200/80 py-12 px-4 sm:px-6 lg:px-8 mt-auto">
       <div className="max-w-7xl mx-auto space-y-8">
@@ -21,7 +26,7 @@ export function Footer() {
                   TripGenie
                 </span>
                 <p className="text-[10px] uppercase font-bold tracking-wider text-slate-500 -mt-0.5">
-                  Nền Tảng Du Lịch Thông Minh
+                  {t("common.brandTagline")}
                 </p>
               </div>
             </Link>
@@ -29,25 +34,25 @@ export function Footer() {
 
           <div className="flex flex-wrap items-center justify-center gap-6 sm:gap-8 text-sm font-bold text-slate-600">
             <Link href="/explore" className="hover:text-[#0194F3] transition-colors">
-              Khám phá
+              {t("nav.explore")}
             </Link>
             <Link href="/planner" className="hover:text-[#0194F3] transition-colors">
-              Lịch trình
+              {t("nav.planner")}
             </Link>
             <Link href="/community" className="hover:text-[#0194F3] transition-colors">
-              Cộng đồng
+              {t("nav.community")}
             </Link>
             <Link href="/collections" className="hover:text-[#0194F3] transition-colors">
-              Bộ sưu tập
+              {t("nav.collections")}
             </Link>
           </div>
         </div>
 
         <div className="pt-6 border-t border-slate-200/80 text-xs text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2026 TripGenie Platform. Thiết kế tinh gọn, chuẩn trải nghiệm du lịch hiện đại.</p>
+          <p>{t("footer.copyright")}</p>
           <div className="flex items-center gap-6 font-medium">
             <span className="text-slate-400 font-medium">
-              Phiên bản 2.0 • Đồng hành du lịch Việt Nam
+              {t("footer.versionBadge")}
             </span>
           </div>
         </div>

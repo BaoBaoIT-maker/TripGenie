@@ -10,6 +10,7 @@ import { useCloneCommunityItinerary } from "@/features/community/hooks/use-commu
 import { formatVnd } from "@/features/planner/model/itinerary-format";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { CommunityModalPortal } from "./CommunityModalPortal";
+import { useI18n } from "@/i18n";
 import { toast } from "sonner";
 
 interface CloneItineraryPreviewModalProps {
@@ -25,6 +26,7 @@ export function CloneItineraryPreviewModal({
   itinerarySummary,
   cloneCount,
 }: CloneItineraryPreviewModalProps) {
+  const { t } = useI18n();
   const router = useRouter();
   const { user } = useAuth();
   const [selectedDay, setSelectedDay] = useState<number | "all">("all");
@@ -51,7 +53,7 @@ export function CloneItineraryPreviewModal({
     itinerarySummary.areaName ||
     itinerarySummary.destination ||
     detail?.destination ||
-    "Việt Nam";
+    t("common.country");
 
   const totalDays = detail?.days?.length || detail?.totalDays || 0;
   const totalPlaces =
@@ -70,9 +72,7 @@ export function CloneItineraryPreviewModal({
 
   const handleConfirmClone = async () => {
     if (!user) {
-      toast.error(
-        "Vui lòng đăng nhập để nhân bản lịch trình về tài khoản của bạn"
-      );
+      toast.error(t("community.toasts.loginToClone"));
       return;
     }
     const cloned = await cloneMutation.mutateAsync(itinerarySummary.id);
@@ -104,13 +104,13 @@ export function CloneItineraryPreviewModal({
             </h3>
             <p className="text-[11px] text-[#64748B] truncate">
               {destinationLabel}
-              {totalDays > 0 ? ` • ${totalDays} ngày` : ""} • {totalPlaces} điểm
-              đến
+              {totalDays > 0 ? t("community.cloneModal.daysSummary", { count: totalDays }) : ""}
+              {t("community.cloneModal.placesSummary", { count: totalPlaces })}
               {estimatedTotal && estimatedTotal > 0
                 ? ` • ~${formatVnd(estimatedTotal)}`
                 : ""}
               {typeof cloneCount === "number" && cloneCount > 0
-                ? ` • ${cloneCount} lượt nhân bản`
+                ? ` • ${t("community.sidebar.cloneCount", { count: cloneCount })}`
                 : ""}
             </p>
           </div>
@@ -119,7 +119,7 @@ export function CloneItineraryPreviewModal({
           type="button"
           onClick={handleClose}
           disabled={cloneMutation.isPending}
-          aria-label="Đóng cửa sổ xem trước lịch trình"
+          aria-label={t("community.cloneModal.closeAria")}
           className="size-8 rounded-full bg-white border border-[#E2E8F0] hover:bg-[#F1F5F9] inline-flex items-center justify-center text-[#94A3B8] hover:text-[#0F172A] transition-colors cursor-pointer shrink-0 disabled:opacity-50"
         >
           <X className="size-4" />
@@ -138,7 +138,7 @@ export function CloneItineraryPreviewModal({
                 : "bg-[#F1F5F9] text-[#475569] hover:text-[#0F172A]"
             }`}
           >
-            Tất cả ({detail.days.length} ngày)
+            {t("community.cloneModal.allDays", { count: detail.days.length })}
           </button>
           {detail.days.map((d) => (
             <button
@@ -151,7 +151,7 @@ export function CloneItineraryPreviewModal({
                   : "bg-[#F1F5F9] text-[#475569] hover:text-[#0F172A]"
               }`}
             >
-              Ngày {d.dayNumber} ({d.activities.length})
+              {t("community.cloneModal.dayTab", { day: d.dayNumber, count: d.activities.length })}
             </button>
           ))}
         </div>
@@ -161,9 +161,9 @@ export function CloneItineraryPreviewModal({
       <div className="p-5 flex flex-col gap-4 max-h-[60vh] overflow-y-auto flex-1 custom-scroll">
         <div className="py-3 px-4 rounded-[14px] bg-[#F0F7FF] border border-[#BAE0FD] text-[12px] text-[#007FE3] leading-[1.5] font-medium">
           <i className="fa-regular fa-lightbulb mr-1.5" aria-hidden="true" />
-          Khi nhân bản, lộ trình này sẽ được sao chép vào mục{" "}
-          <strong>&ldquo;Lịch trình của tôi&rdquo;</strong> để bạn và nhóm bạn
-          tự do chỉnh sửa ngày đi, giờ giấc và bổ sung quán ăn yêu thích.
+          {t("community.cloneModal.infoTipPrefix")}{" "}
+          <strong>{t("community.cloneModal.infoTipStrong")}</strong>{" "}
+          {t("community.cloneModal.infoTipSuffix")}
         </div>
 
         {isLoading ? (
@@ -178,11 +178,10 @@ export function CloneItineraryPreviewModal({
         ) : isError ? (
           <div className="rounded-[14px] border border-[#E2E8F0] bg-[#F8FAFC] p-6 text-center space-y-2.5">
             <p className="text-xs font-extrabold text-[#0F172A]">
-              Không thể tải chi tiết lịch trình tóm gọn
+              {t("community.cloneModal.loadErrorTitle")}
             </p>
             <p className="text-[11px] text-[#64748B]">
-              Bạn vẫn có thể xác nhận nhân bản ngay hoặc thử tải lại chi tiết
-              các ngày.
+              {t("community.cloneModal.loadErrorDesc")}
             </p>
             <button
               type="button"
@@ -190,17 +189,16 @@ export function CloneItineraryPreviewModal({
               className="h-8 px-3.5 rounded-[10px] border border-[#CBD5E1] bg-white hover:bg-[#F1F5F9] text-[11px] font-bold text-[#334155] inline-flex items-center gap-1.5 cursor-pointer"
             >
               <RefreshCw className="size-3" />
-              <span>Thử lại</span>
+              <span>{t("common.retry")}</span>
             </button>
           </div>
         ) : visibleDays.length === 0 ? (
           <div className="rounded-[14px] border border-dashed border-[#CBD5E1] bg-[#F8FAFC] p-6 text-center space-y-1">
             <p className="text-xs font-extrabold text-[#0F172A]">
-              Lịch trình chưa có danh sách điểm dừng chi tiết
+              {t("community.cloneModal.emptyTitle")}
             </p>
             <p className="text-[11px] text-[#64748B]">
-              Khi nhân bản về tài khoản, bạn có thể dùng AI Copilot để bổ sung
-              địa điểm tự động.
+              {t("community.cloneModal.emptyDesc")}
             </p>
           </div>
         ) : (
@@ -213,14 +211,20 @@ export function CloneItineraryPreviewModal({
                     aria-hidden="true"
                   />
                   <span>
-                    Ngày {day.dayNumber}:{" "}
-                    {day.theme || `Khám phá ${destinationLabel}`}
+                    {t("community.cloneModal.dayHeader", {
+                      day: day.dayNumber,
+                      theme:
+                        day.theme ||
+                        t("community.cloneModal.exploreTheme", {
+                          destination: destinationLabel,
+                        }),
+                    })}
                   </span>
                 </div>
 
                 {day.activities.length === 0 ? (
                   <p className="text-[11px] text-[#64748B] pl-5">
-                    Chưa có hoạt động nào trong ngày này.
+                    {t("community.cloneModal.emptyDay")}
                   </p>
                 ) : (
                   <div className="flex flex-col gap-1.5 pl-3.5 border-l-2 border-[#E2E8F0] text-[12px] text-[#475569] ml-[5px]">
@@ -266,7 +270,7 @@ export function CloneItineraryPreviewModal({
           className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[#64748B] hover:text-[#0194F3] transition-colors"
         >
           <ExternalLink className="size-3.5" />
-          <span>Xem bản đồ đầy đủ</span>
+          <span>{t("community.cloneModal.viewFullMap")}</span>
         </Link>
 
         <div className="flex items-center gap-2 ml-auto">
@@ -276,7 +280,7 @@ export function CloneItineraryPreviewModal({
             disabled={cloneMutation.isPending}
             className="px-3.5 py-2 rounded-[10px] border border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-[12px] font-bold text-[#334155] transition-colors cursor-pointer disabled:opacity-50"
           >
-            Đóng
+            {t("common.close")}
           </button>
           <button
             type="button"
@@ -287,12 +291,12 @@ export function CloneItineraryPreviewModal({
             {cloneMutation.isPending ? (
               <>
                 <Loader2 className="size-3.5 animate-spin" />
-                <span>Đang nhân bản...</span>
+                <span>{t("community.cloneModal.cloning")}</span>
               </>
             ) : (
               <>
                 <i className="fa-regular fa-clone" aria-hidden="true" />
-                <span>Nhân bản vào chuyến đi của tôi</span>
+                <span>{t("community.cloneModal.cloneToMyTrips")}</span>
               </>
             )}
           </button>

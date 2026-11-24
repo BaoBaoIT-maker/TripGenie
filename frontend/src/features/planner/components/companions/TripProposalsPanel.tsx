@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/common/ErrorState';
+import { useI18n, type MessageKey } from '@/i18n';
 import { TRIP_COMPANIONS_CONFIG } from '../../config/trip-companions.config';
 import { useTripCompanions } from '../../hooks/use-trip-companions';
 import {
@@ -40,6 +41,7 @@ export function TripProposalsPanel({
   onOpenCreateProposal,
   onOpenCompanionsModal,
 }: TripProposalsPanelProps) {
+  const { t } = useI18n();
   const [showHistory, setShowHistory] = useState(false);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [withdrawingId, setWithdrawingId] = useState<string | null>(null);
@@ -56,10 +58,10 @@ export function TripProposalsPanel({
     if (!currentUser?.id) return null;
     return {
       userId: currentUser.id,
-      fullName: currentUser.fullName || 'Bạn',
+      fullName: currentUser.fullName || t('planner.common.you'),
       avatarUrl: currentUser.avatarUrl ?? null,
     };
-  }, [currentUser]);
+  }, [currentUser, t]);
 
   const voteMutation = useToggleProposalVote(itineraryId, currentParticipant);
   const resolveMutation = useResolveGroupProposal(itineraryId);
@@ -104,7 +106,7 @@ export function TripProposalsPanel({
         } else {
           swapMap.set(p.destinationId, {
             destinationId: p.destinationId,
-            targetName: target?.placeName || 'Điểm dừng đã chọn',
+            targetName: target?.placeName || t('planner.proposals.selectedStopFallback'),
             dayNumber: target?.dayNumber ?? p.dayNumber,
             items: [p],
           });
@@ -125,7 +127,7 @@ export function TripProposalsPanel({
       historyItems: history,
       pendingCount: pending,
     };
-  }, [proposals, stopLookup]);
+  }, [proposals, stopLookup, t]);
 
   const handleToggleVote = (proposalId: string) => {
     voteMutation.mutate(proposalId);
@@ -167,8 +169,8 @@ export function TripProposalsPanel({
   if (error) {
     return (
       <ErrorState
-        title="Không thể tải danh sách bình chọn"
-        message="Đã có lỗi khi đồng bộ các đề xuất của nhóm. Vui lòng thử lại."
+        title={t('planner.proposals.loadErrorTitle')}
+        message={t('planner.proposals.loadErrorMessage')}
         onRetry={() => refetch()}
         className="bg-white border-slate-200"
       />
@@ -183,10 +185,10 @@ export function TripProposalsPanel({
           <div>
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
               <i className="fa-solid fa-check-to-slot text-[#0194F3]" aria-hidden="true" />
-              <span>Bình chọn lịch trình nhóm ({pendingCount})</span>
+              <span>{t('planner.proposals.panelTitle', { count: pendingCount })}</span>
             </h2>
             <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-              Mọi thành viên bấm đồng ý để góp ý kiến. Chủ chuyến đi hoặc Editor có thể chốt hoặc từ chối bất kỳ lúc nào.
+              {t('planner.proposals.panelDesc')}
             </p>
           </div>
 
@@ -196,7 +198,7 @@ export function TripProposalsPanel({
             className="h-9 px-3.5 rounded-xl bg-[#0194F3] hover:bg-[#007AD0] text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer shrink-0"
           >
             <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
-            <span>Đề xuất điểm mới</span>
+            <span>{t('planner.proposals.proposeNewBtn')}</span>
           </button>
         </div>
 
@@ -208,10 +210,10 @@ export function TripProposalsPanel({
             </div>
             <div className="space-y-1 max-w-md mx-auto">
               <h3 className="text-sm font-semibold text-slate-900">
-                Chưa có đề xuất nào cần cả đoàn bình chọn
+                {t('planner.proposals.emptyTitle')}
               </h3>
               <p className="text-xs text-slate-500 leading-relaxed">
-                Hãy đề xuất thêm quán ăn, điểm tham quan mới hoặc chọn “Mở vote” trên từng điểm dừng trong lịch trình để hỏi ý kiến bạn đồng hành.
+                {t('planner.proposals.emptyDesc')}
               </p>
             </div>
             <button
@@ -220,7 +222,7 @@ export function TripProposalsPanel({
               className="h-9 px-4 rounded-xl bg-[#0194F3] hover:bg-[#007AD0] text-white text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
-              <span>Tạo đề xuất đầu tiên</span>
+              <span>{t('planner.proposals.createFirstBtn')}</span>
             </button>
           </div>
         )}
@@ -232,11 +234,14 @@ export function TripProposalsPanel({
               <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                 <i className="fa-solid fa-right-left text-[#0194F3]" aria-hidden="true" />
                 <span>
-                  Phương án thay thế cho: {group.targetName} (Ngày {group.dayNumber})
+                  {t('planner.proposals.swapGroupTitle', {
+                    name: group.targetName,
+                    day: group.dayNumber,
+                  })}
                 </span>
               </h3>
               <span className="text-[11px] font-semibold text-slate-500 tabular-nums">
-                {group.items.length} lựa chọn
+                {t('planner.proposals.optionsCount', { count: group.items.length })}
               </span>
             </div>
 
@@ -266,10 +271,10 @@ export function TripProposalsPanel({
             <div className="flex items-center justify-between px-1">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                 <i className="fa-regular fa-calendar-plus text-[#0194F3]" aria-hidden="true" />
-                <span>Đề xuất bổ sung vào Ngày {dayNumber}</span>
+                <span>{t('planner.proposals.addDayGroupTitle', { day: dayNumber })}</span>
               </h3>
               <span className="text-[11px] font-semibold text-slate-500 tabular-nums">
-                {items.length} điểm
+                {t('planner.common.stopsShort', { count: items.length })}
               </span>
             </div>
 
@@ -296,14 +301,14 @@ export function TripProposalsPanel({
         {pendingCount === 0 && historyItems.length > 0 && (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 text-center space-y-2">
             <p className="text-xs font-semibold text-slate-700">
-              Không còn đề xuất nào đang chờ duyệt.
+              {t('planner.proposals.noPendingNote')}
             </p>
             <button
               type="button"
               onClick={onOpenCreateProposal}
               className="text-xs font-bold text-[#0194F3] hover:underline cursor-pointer"
             >
-              + Đề xuất thêm địa điểm mới
+              {t('planner.proposals.proposeMoreLink')}
             </button>
           </div>
         )}
@@ -319,7 +324,9 @@ export function TripProposalsPanel({
             >
               <span className="flex items-center gap-2">
                 <i className="fa-solid fa-clock-rotate-left text-slate-400" aria-hidden="true" />
-                <span>Lịch sử đề xuất đã xử lý ({historyItems.length})</span>
+                <span>
+                  {t('planner.proposals.historyHeading', { count: historyItems.length })}
+                </span>
               </span>
               <i
                 className={`fa-solid fa-chevron-down text-[11px] text-slate-400 transition-transform ${
@@ -364,10 +371,12 @@ export function TripProposalsPanel({
             <div>
               <h3 className="text-sm font-bold text-[#10243A] flex items-center gap-2">
                 <i className="fa-solid fa-users text-[#0194F3]" aria-hidden="true" />
-                <span>Thành viên đoàn ({members.length})</span>
+                <span>{t('planner.proposals.groupMembersHeading', { count: members.length })}</span>
               </h3>
               <p className="text-[11px] text-slate-500 mt-0.5 tabular-nums">
-                Tự động đồng bộ mỗi {Math.round(TRIP_COMPANIONS_CONFIG.PROPOSALS_POLLING_INTERVAL_MS / 1000)} giây
+                {t('planner.proposals.autoSyncSubtitle', {
+                  seconds: Math.round(TRIP_COMPANIONS_CONFIG.PROPOSALS_POLLING_INTERVAL_MS / 1000),
+                })}
               </p>
             </div>
 
@@ -377,7 +386,7 @@ export function TripProposalsPanel({
                 onClick={onOpenCompanionsModal}
                 className="text-xs font-bold text-[#0194F3] hover:underline cursor-pointer shrink-0"
               >
-                Quản lý
+                {t('planner.common.manage')}
               </button>
             )}
           </div>
@@ -396,7 +405,9 @@ export function TripProposalsPanel({
                     <div className="font-semibold text-[#10243A] truncate">
                       {m.fullName}
                       {currentUser?.id === m.userId && (
-                        <span className="ml-1.5 text-[10px] font-semibold text-slate-500">(Bạn)</span>
+                        <span className="ml-1.5 text-[10px] font-semibold text-slate-500">
+                          {t('planner.common.youParen')}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -411,7 +422,7 @@ export function TripProposalsPanel({
                         : 'bg-slate-100 text-slate-600'
                   }`}
                 >
-                  {TRIP_COMPANIONS_CONFIG.ROLES[m.role]}
+                  {t(`planner.roles.${m.role}` as MessageKey)}
                 </span>
               </div>
             ))}

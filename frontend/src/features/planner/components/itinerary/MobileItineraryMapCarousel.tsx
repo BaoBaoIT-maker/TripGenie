@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useI18n } from '@/i18n';
 
 export interface MobileItineraryStop {
   placeId: string;
@@ -35,6 +36,7 @@ export function MobileItineraryMapCarousel({
   onJumpToTimeline,
   onNavigateDetail,
 }: MobileItineraryMapCarouselProps) {
+  const { t } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const isProgrammaticScrollRef = useRef(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -93,7 +95,7 @@ export function MobileItineraryMapCarousel({
       onScroll={handleScroll}
       className="flex gap-2.5 overflow-x-auto snap-x snap-mandatory px-4 py-2 scrollbar-none pointer-events-auto"
       role="region"
-      aria-label="Danh sách điểm dừng trên bản đồ"
+      aria-label={t('planner.mobileCarousel.regionAria')}
     >
       {stops.map((stop) => {
         const isSelected = stop.placeId === selectedPlaceId;
@@ -140,7 +142,7 @@ export function MobileItineraryMapCarousel({
             <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5 space-y-1">
               <div className="flex items-center justify-between gap-1">
                 <span className="text-[10px] font-bold text-[#0194F3] uppercase tracking-wider truncate">
-                  {stop.categoryLabel || 'Điểm đến'}
+                  {stop.categoryLabel || t('planner.common.destinationFallback')}
                 </span>
                 {typeof stop.rating === 'number' && stop.rating > 0 && (
                   <span className="flex items-center gap-0.5 text-[11px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md shrink-0">
@@ -175,10 +177,10 @@ export function MobileItineraryMapCarousel({
                     onJumpToTimeline(stop.placeId);
                   }}
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-50 hover:bg-sky-100 text-[#0194F3] text-[10px] font-bold border border-sky-200 transition-colors cursor-pointer"
-                  title="Xem điểm này trong danh sách lịch trình"
+                  title={t('planner.mobileCarousel.viewTimelineTitle')}
                 >
                   <i className="fa-solid fa-list text-[9px]" aria-hidden="true" />
-                  <span>Lịch trình</span>
+                  <span>{t('planner.mobileCarousel.timelineBtn')}</span>
                 </button>
                 {onNavigateDetail && (
                   <button
@@ -188,9 +190,9 @@ export function MobileItineraryMapCarousel({
                       onNavigateDetail(stop.placeId);
                     }}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 text-[10px] font-semibold border border-slate-200 transition-colors cursor-pointer"
-                    title="Xem chi tiết địa điểm"
+                    title={t('planner.mobileCarousel.viewDetailTitle')}
                   >
-                    <span>Chi tiết</span>
+                    <span>{t('planner.mobileCarousel.detailBtn')}</span>
                     <i className="fa-solid fa-chevron-right text-[8px]" aria-hidden="true" />
                   </button>
                 )}

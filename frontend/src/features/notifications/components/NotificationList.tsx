@@ -5,8 +5,7 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { NotificationFilter, NotificationItem } from "@/types/notification";
-import { formatRelativeTime } from "@/services/community.service";
-import { NOTIFICATION_CONFIG } from "../config/notification.config";
+import { formatRelativeTime, useI18n } from "@/i18n";
 import { useMarkNotificationRead } from "../hooks/use-notifications";
 
 interface NotificationListProps {
@@ -28,7 +27,9 @@ const GLYPH_BADGE_BASE =
 const ACTION_BADGE_BASE =
   "absolute -bottom-0.5 -right-0.5 z-10 size-3.5 sm:size-4 rounded-full flex items-center justify-center ring-2 ring-background shadow-2xs";
 
-function getDateGroupLabel(isoDate: string): string {
+type DateGroupKey = "today" | "yesterday" | "earlier";
+
+function getDateGroupKey(isoDate: string): DateGroupKey {
   const d = new Date(isoDate);
   const now = new Date();
 
@@ -37,7 +38,7 @@ function getDateGroupLabel(isoDate: string): string {
     d.getMonth() === now.getMonth() &&
     d.getFullYear() === now.getFullYear();
 
-  if (isToday) return "Hôm nay";
+  if (isToday) return "today";
 
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
@@ -46,9 +47,9 @@ function getDateGroupLabel(isoDate: string): string {
     d.getMonth() === yesterday.getMonth() &&
     d.getFullYear() === yesterday.getFullYear();
 
-  if (isYesterday) return "Hôm qua";
+  if (isYesterday) return "yesterday";
 
-  return "Trước đó";
+  return "earlier";
 }
 
 function NotificationRow({
@@ -58,6 +59,7 @@ function NotificationRow({
   item: NotificationItem;
   onClick: (item: NotificationItem) => void;
 }) {
+  const { locale, t } = useI18n();
   const isUnread = !item.readAt;
   const isModerationType =
     item.type === "POST_APPROVED" ||
@@ -66,10 +68,10 @@ function NotificationRow({
   const actorName =
     item.actor?.fullName ||
     (isModerationType
-      ? NOTIFICATION_CONFIG.SYSTEM_ACTOR_NAME
-      : NOTIFICATION_CONFIG.ACTOR_FALLBACK_NAME);
-  const postTitle = item.post?.title || "bài viết";
-  const tripTitle = item.itinerary?.title || "chuyến đi";
+      ? t("notifications.fallbacks.system")
+      : t("notifications.fallbacks.actor"));
+  const postTitle = item.post?.title || t("notifications.fallbacks.post");
+  const tripTitle = item.itinerary?.title || t("notifications.fallbacks.trip");
   const targetUrl = item.post?.id
     ? `/community?postId=${item.post.id}${item.commentId ? `&commentId=${item.commentId}` : ""}`
     : item.invitationId
@@ -84,7 +86,7 @@ function NotificationRow({
         return (
           <>
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
-            đã thích bài viết{" "}
+            {t("notifications.actions.postLiked")}{" "}
             <span className="font-medium text-foreground italic">
               &ldquo;{postTitle}&rdquo;
             </span>
@@ -94,7 +96,7 @@ function NotificationRow({
         return (
           <>
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
-            đã bình luận về bài viết{" "}
+            {t("notifications.actions.postCommented")}{" "}
             <span className="font-medium text-foreground italic">
               &ldquo;{postTitle}&rdquo;
             </span>
@@ -104,7 +106,7 @@ function NotificationRow({
         return (
           <>
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
-            đã trả lời bình luận của bạn trong{" "}
+            {t("notifications.actions.commentReplied")}{" "}
             <span className="font-medium text-foreground italic">
               &ldquo;{postTitle}&rdquo;
             </span>
@@ -114,7 +116,7 @@ function NotificationRow({
         return (
           <>
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
-            đã mời bạn cùng tham gia chuyến đi{" "}
+            {t("notifications.actions.tripInvited")}{" "}
             <span className="font-medium text-foreground italic">
               &ldquo;{tripTitle}&rdquo;
             </span>
@@ -124,7 +126,7 @@ function NotificationRow({
         return (
           <>
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
-            đã đồng ý tham gia chuyến đi{" "}
+            {t("notifications.actions.tripAccepted")}{" "}
             <span className="font-medium text-foreground italic">
               &ldquo;{tripTitle}&rdquo;
             </span>
@@ -134,7 +136,7 @@ function NotificationRow({
         return (
           <>
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
-            đã từ chối lời mời tham gia chuyến đi{" "}
+            {t("notifications.actions.tripDeclined")}{" "}
             <span className="font-medium text-foreground italic">
               &ldquo;{tripTitle}&rdquo;
             </span>
@@ -143,32 +145,32 @@ function NotificationRow({
       case "POST_APPROVED":
         return (
           <>
-            Bài viết{" "}
+            {t("notifications.actions.postPrefix")}{" "}
             <span className="font-medium text-foreground italic">
               &ldquo;{postTitle}&rdquo;
             </span>{" "}
-            {NOTIFICATION_CONFIG.MODERATION_MESSAGES.POST_APPROVED_SUFFIX}
+            {t("notifications.actions.postApprovedSuffix")}
           </>
         );
       case "POST_FLAGGED":
         return (
           <>
-            Bài viết{" "}
+            {t("notifications.actions.postPrefix")}{" "}
             <span className="font-medium text-foreground italic">
               &ldquo;{postTitle}&rdquo;
             </span>{" "}
-            {NOTIFICATION_CONFIG.MODERATION_MESSAGES.POST_FLAGGED_SUFFIX}
+            {t("notifications.actions.postFlaggedSuffix")}
             {item.post?.moderationNote ? `: "${item.post.moderationNote}"` : "."}
           </>
         );
       case "POST_REJECTED":
         return (
           <>
-            Bài viết{" "}
+            {t("notifications.actions.postPrefix")}{" "}
             <span className="font-medium text-foreground italic">
               &ldquo;{postTitle}&rdquo;
             </span>{" "}
-            {NOTIFICATION_CONFIG.MODERATION_MESSAGES.POST_REJECTED_SUFFIX}
+            {t("notifications.actions.postRejectedSuffix")}
             {item.post?.moderationNote ? `: "${item.post.moderationNote}"` : "."}
           </>
         );
@@ -176,7 +178,7 @@ function NotificationRow({
         return (
           <>
             <span className="font-semibold text-foreground">{actorName}</span>{" "}
-            đã tương tác với bạn
+            {t("notifications.actions.defaultInteraction")}
           </>
         );
     }
@@ -280,14 +282,14 @@ function NotificationRow({
           {renderContent()}
         </p>
         <span className="text-[11px] sm:text-xs text-muted-foreground mt-1 inline-block">
-          {formatRelativeTime(item.createdAt)}
+          {formatRelativeTime(item.createdAt, locale)}
         </span>
       </div>
 
       {isUnread && (
         <span
           className="size-2 sm:size-2.5 rounded-full bg-[#0194F3] shrink-0 mt-1.5 shadow-xs"
-          aria-label="Chưa đọc"
+          aria-label={t("notifications.unreadDotAria")}
         />
       )}
     </Link>
@@ -306,6 +308,7 @@ export function NotificationList({
   onItemClick,
   showDateGroups = false,
 }: NotificationListProps) {
+  const { t } = useI18n();
   const markReadMutation = useMarkNotificationRead();
 
   const handleRowClick = (item: NotificationItem) => {
@@ -318,27 +321,33 @@ export function NotificationList({
   // Group items by date if showDateGroups is true
   const groupedItems = useMemo(() => {
     if (!showDateGroups) return null;
-    const groups: { label: string; list: NotificationItem[] }[] = [];
-    let currentLabel = "";
+    const groups: { key: DateGroupKey; label: string; list: NotificationItem[] }[] = [];
+    let currentKey: DateGroupKey | null = null;
     let currentList: NotificationItem[] = [];
 
+    const getGroupTitle = (key: DateGroupKey) => {
+      if (key === "today") return t("notifications.dateGroups.today");
+      if (key === "yesterday") return t("notifications.dateGroups.yesterday");
+      return t("notifications.dateGroups.earlier");
+    };
+
     for (const item of items) {
-      const label = getDateGroupLabel(item.createdAt);
-      if (label !== currentLabel) {
-        if (currentList.length > 0) {
-          groups.push({ label: currentLabel, list: currentList });
+      const key = getDateGroupKey(item.createdAt);
+      if (key !== currentKey) {
+        if (currentList.length > 0 && currentKey) {
+          groups.push({ key: currentKey, label: getGroupTitle(currentKey), list: currentList });
         }
-        currentLabel = label;
+        currentKey = key;
         currentList = [item];
       } else {
         currentList.push(item);
       }
     }
-    if (currentList.length > 0) {
-      groups.push({ label: currentLabel, list: currentList });
+    if (currentList.length > 0 && currentKey) {
+      groups.push({ key: currentKey, label: getGroupTitle(currentKey), list: currentList });
     }
     return groups;
-  }, [items, showDateGroups]);
+  }, [items, showDateGroups, t]);
 
   if (isLoading && items.length === 0) {
     return (
@@ -364,7 +373,7 @@ export function NotificationList({
           aria-hidden="true"
         />
         <p className="text-sm text-muted-foreground">
-          Không thể tải danh sách thông báo
+          {t("notifications.loadError")}
         </p>
         {onRetry && (
           <button
@@ -372,7 +381,7 @@ export function NotificationList({
             onClick={onRetry}
             className="text-xs font-semibold text-primary hover:underline cursor-pointer"
           >
-            Thử lại
+            {t("common.retry")}
           </button>
         )}
       </div>
@@ -384,8 +393,8 @@ export function NotificationList({
       <div className="p-8 text-center text-muted-foreground">
         <p className="text-sm font-medium">
           {filter === "UNREAD"
-            ? "Bạn đã đọc hết thông báo"
-            : "Bạn chưa có thông báo nào"}
+            ? t("notifications.emptyUnread")
+            : t("notifications.emptyAll")}
         </p>
       </div>
     );
@@ -395,7 +404,7 @@ export function NotificationList({
     <div className="space-y-2">
       {showDateGroups && groupedItems ? (
         groupedItems.map((group) => (
-          <div key={group.label} className="space-y-1">
+          <div key={group.key} className="space-y-1">
             <div className="px-3.5 py-1.5 text-xs font-bold text-muted-foreground uppercase tracking-wider">
               {group.label}
             </div>
@@ -431,10 +440,10 @@ export function NotificationList({
             {isFetchingNextPage ? (
               <>
                 <i className="fa-solid fa-spinner animate-spin text-xs" aria-hidden="true" />
-                Đang tải thêm...
+                {t("notifications.loadingMore")}
               </>
             ) : (
-              "Tải thêm thông báo"
+              t("notifications.loadMore")
             )}
           </button>
         </div>

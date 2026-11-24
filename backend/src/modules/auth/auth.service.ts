@@ -33,6 +33,7 @@ import {
   UserResponse,
 } from './interfaces/auth.interface';
 import { MailService } from './services/mail.service';
+import { AppLocale, DEFAULT_LOCALE } from '@/common/i18n/locale.util';
 import { OtpService } from './services/otp.service';
 import { PasswordResetService } from './services/password-reset.service';
 import { TokenBlacklistService } from './services/token-blacklist.service';
@@ -90,7 +91,10 @@ export class AuthService {
    * Lưu draft trong Redis với thời hạn 30 phút, gửi email link xác thực.
    * KHÔNG phát phiên hoặc cấp token khi chưa xác thực email.
    */
-  async register(dto: RegisterDto): Promise<RegisterResult> {
+  async register(
+    dto: RegisterDto,
+    locale: AppLocale = DEFAULT_LOCALE,
+  ): Promise<RegisterResult> {
     const normalizedEmail = dto.email.toLowerCase().trim();
     const existingUser =
       await this.usersRepository.findByEmail(normalizedEmail);
@@ -151,7 +155,7 @@ export class AuthService {
     // Dispatch email job to BullMQ queue — returns in ~20ms, worker retries on failure
     await this.mailQueue.add(
       'send-verification-email',
-      { email: normalizedEmail, verificationUrl },
+      { email: normalizedEmail, verificationUrl, locale },
       { attempts: 3, backoff: { type: 'exponential', delay: 1000 } },
     );
 
@@ -271,7 +275,10 @@ export class AuthService {
   /**
    * Gửi lại email xác thực: Vô hiệu hóa link cũ và cấp link mới.
    */
-  async resendVerificationEmail(registrationId: string): Promise<{
+  async resendVerificationEmail(
+    registrationId: string,
+    locale: AppLocale = DEFAULT_LOCALE,
+  ): Promise<{
     message: string;
     expiresIn: number;
     retryAfter: number;
@@ -332,7 +339,7 @@ export class AuthService {
     // Dispatch email job to BullMQ queue
     await this.mailQueue.add(
       'send-verification-email',
-      { email: draft.email, verificationUrl },
+      { email: draft.email, verificationUrl, locale },
       { attempts: 3, backoff: { type: 'exponential', delay: 1000 } },
     );
 
@@ -484,8 +491,9 @@ export class AuthService {
 
   async forgotPassword(
     dto: ForgotPasswordDto,
+    locale: AppLocale = DEFAULT_LOCALE,
   ): Promise<{ message: string; expiresIn: number; retryAfter: number }> {
-    return this.passwordResetService.forgotPassword(dto.email);
+    return this.passwordResetService.forgotPassword(dto.email, locale);
   }
 
   async verifyResetOtp(

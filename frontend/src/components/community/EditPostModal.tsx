@@ -19,6 +19,7 @@ import {
   isVideoUrl,
 } from "@/services/community.service";
 import { CommunityModalPortal } from "./CommunityModalPortal";
+import { useI18n } from "@/i18n";
 import type {
   CommunityGroupSummary,
   CommunityPostItem,
@@ -37,6 +38,7 @@ export function EditPostModal({
   post,
   groups: providedGroups,
 }: EditPostModalProps) {
+  const { t } = useI18n();
   const [title, setTitle] = useState(post.title);
   const [caption, setCaption] = useState(post.caption || "");
   const [tagsInput, setTagsInput] = useState((post.tags || []).join(" "));
@@ -119,10 +121,10 @@ export function EditPostModal({
               id="edit-post-modal-title"
               className="text-[15px] font-bold text-slate-900"
             >
-              Chỉnh sửa bài chia sẻ
+              {t("community.editPost.title")}
             </h2>
             <p className="text-[11px] text-[#64748B]">
-              Cập nhật tiêu đề, nội dung chia sẻ hoặc thẻ chủ đề bài viết
+              {t("community.editPost.subtitle")}
             </p>
           </div>
         </div>
@@ -130,7 +132,7 @@ export function EditPostModal({
           type="button"
           onClick={handleClose}
           disabled={updatePostMutation.isPending}
-          aria-label="Đóng cửa sổ chỉnh sửa bài viết"
+          aria-label={t("community.editPost.closeAria")}
           className="size-8 rounded-full bg-white border border-[#E2E8F0] hover:bg-[#F1F5F9] inline-flex items-center justify-center text-[#64748B] hover:text-[#0F172A] transition-colors cursor-pointer disabled:opacity-50"
         >
           <X className="size-4" />
@@ -149,7 +151,7 @@ export function EditPostModal({
             className="flex items-center gap-1.5 text-xs font-extrabold text-[#0F172A]"
           >
             <Users className="size-3.5 text-[#0194F3]" />
-            <span>Nhóm cộng đồng</span>
+            <span>{t("community.editPost.groupLabel")}</span>
           </label>
           <select
             id="edit-post-group"
@@ -160,12 +162,14 @@ export function EditPostModal({
             {communityGroups.length > 0 ? (
               communityGroups.map((grp) => (
                 <option key={grp.id} value={grp.slug}>
-                  {grp.name} {grp.isDefault ? "(Mặc định)" : ""}
+                  {grp.isDefault
+                    ? `${t("community.defaultGroupName")} ${t("community.editPost.defaultSuffix")}`
+                    : grp.name}
                 </option>
               ))
             ) : (
               <option value={COMMUNITY_UI_CONSTANTS.DEFAULT_GROUP_SLUG}>
-                Cộng đồng chung TripGenie
+                {t("community.defaultGroupName")}
               </option>
             )}
           </select>
@@ -175,7 +179,7 @@ export function EditPostModal({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs font-extrabold text-[#0F172A]">
             <label htmlFor="edit-post-title">
-              Tiêu đề bài viết <span className="text-rose-500">*</span>
+              {t("community.createPost.titleLabel")} <span className="text-rose-500">*</span>
             </label>
             <span className="text-[11px] font-medium text-[#94A3B8]">
               {title.length}/{COMMUNITY_UI_CONSTANTS.MAX_TITLE_LENGTH}
@@ -187,7 +191,7 @@ export function EditPostModal({
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="VD: Review 3N2Đ Đà Lạt săn mây đồi chè Cầu Đất..."
+            placeholder={t("community.editPost.titlePlaceholder")}
             maxLength={COMMUNITY_UI_CONSTANTS.MAX_TITLE_LENGTH}
             className="w-full h-10 px-3.5 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] text-[13px] text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#0194F3] focus:bg-white transition-colors"
           />
@@ -196,7 +200,7 @@ export function EditPostModal({
         {/* Post Caption */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between text-xs font-extrabold text-[#0F172A]">
-            <label htmlFor="edit-post-caption">Nội dung chi tiết</label>
+            <label htmlFor="edit-post-caption">{t("community.editPost.captionLabel")}</label>
             <span className="text-[11px] font-medium text-[#94A3B8]">
               {caption.length}/{COMMUNITY_UI_CONSTANTS.MAX_CAPTION_LENGTH}
             </span>
@@ -206,7 +210,7 @@ export function EditPostModal({
             rows={4}
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
-            placeholder="Chia sẻ thêm lưu ý về ăn uống, trang phục, mẹo di chuyển..."
+            placeholder={t("community.editPost.captionPlaceholder")}
             maxLength={COMMUNITY_UI_CONSTANTS.MAX_CAPTION_LENGTH}
             className="w-full p-3.5 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] text-[13px] text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#0194F3] focus:bg-white resize-none leading-relaxed transition-colors"
           />
@@ -218,7 +222,7 @@ export function EditPostModal({
             htmlFor="edit-post-tags"
             className="text-xs font-extrabold text-[#0F172A] block"
           >
-            Hashtags (cách nhau bằng khoảng trắng)
+            {t("community.editPost.tagsLabel")}
           </label>
           <input
             id="edit-post-tags"
@@ -247,12 +251,10 @@ export function EditPostModal({
         <div className="rounded-[14px] border border-[#BAE0FD] bg-[#F0F7FF]/60 p-3.5 space-y-2.5 text-xs">
           <div className="flex items-center gap-1.5 font-extrabold text-[#0F172A]">
             <Lock className="size-3.5 text-[#0194F3] shrink-0" />
-            <span>Tệp đính kèm được bảo vệ (Không thể thay đổi)</span>
+            <span>{t("community.editPost.protectedTitle")}</span>
           </div>
           <p className="text-[11px] text-[#475569] leading-relaxed">
-            Theo quy chuẩn minh bạch cộng đồng, ảnh/video và lịch trình đính kèm
-            được giữ nguyên để bảo đảm tính toàn vẹn cho các thành viên đã thảo
-            luận và nhân bản.
+            {t("community.editPost.protectedDesc")}
           </p>
 
           {/* Read-only Media Previews */}
@@ -271,7 +273,7 @@ export function EditPostModal({
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={url}
-                      alt={`Ảnh đính kèm ${idx + 1}`}
+                      alt={t("community.editPost.attachedImageAlt", { index: idx + 1 })}
                       loading="lazy"
                       decoding="async"
                       className="w-full h-full object-cover"
@@ -280,7 +282,7 @@ export function EditPostModal({
                 </div>
               ))}
               <span className="text-[11px] text-[#64748B] font-semibold pl-1">
-                ({mediaList.length} tệp)
+                {t("community.editPost.filesCount", { count: mediaList.length })}
               </span>
             </div>
           )}
@@ -293,7 +295,7 @@ export function EditPostModal({
                 {post.itinerary.title}
               </span>
               <span className="text-[#64748B] font-medium ml-auto shrink-0">
-                {post.itinerary.totalPlaces} địa điểm
+                {t("community.editPost.placesCount", { count: post.itinerary.totalPlaces })}
               </span>
             </div>
           )}
@@ -307,7 +309,7 @@ export function EditPostModal({
             disabled={updatePostMutation.isPending}
             className="h-9 px-4 rounded-[10px] border border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-xs font-bold text-[#334155] transition-colors cursor-pointer disabled:opacity-50"
           >
-            Hủy
+            {t("common.cancel")}
           </button>
           <button
             type="submit"
@@ -317,10 +319,10 @@ export function EditPostModal({
             {updatePostMutation.isPending ? (
               <>
                 <Loader2 className="size-3.5 animate-spin" />
-                <span>Đang lưu...</span>
+                <span>{t("community.editPost.saving")}</span>
               </>
             ) : (
-              <span>Lưu thay đổi</span>
+              <span>{t("community.editPost.saveChanges")}</span>
             )}
           </button>
         </div>

@@ -28,12 +28,12 @@ import {
 import { formatVnd } from "@/features/planner/model/itinerary-format";
 import {
   COMMUNITY_UI_CONSTANTS,
-  formatRelativeTime,
   formatTripDuration,
   getVideoThumbnailSrc,
   isVideoUrl,
   resolvePostAuthorSubtitle,
 } from "@/services/community.service";
+import { formatRelativeTime, useI18n } from "@/i18n";
 import { CommunityModalPortal } from "./CommunityModalPortal";
 import { MediaGridTileContent } from "./PostCard";
 
@@ -77,6 +77,7 @@ const CommentBubble = memo(function CommentBubble({
   onSelectReply,
   onRequestDelete,
 }: CommentBubbleProps) {
+  const { locale, t } = useI18n();
   const canDelete =
     Boolean(currentUserId) &&
     !cmt.isOptimistic &&
@@ -128,13 +129,13 @@ const CommentBubble = memo(function CommentBubble({
             {isAuthorVerified && (
               <i
                 className="fa-solid fa-circle-check text-[#0194F3] text-[11px]"
-                title="Thổ địa xác thực"
+                title={t("community.verifiedLocalTitle")}
                 aria-hidden="true"
               />
             )}
             {cmt.userId === postOwnerId && (
               <span className="px-2 py-0.5 rounded-[6px] bg-[#F0F7FF] text-[#0194F3] text-[10px] font-bold">
-                Tác giả
+                {t("community.comments.authorBadge")}
               </span>
             )}
             {isReply && cmt.replyToName && (
@@ -156,8 +157,8 @@ const CommentBubble = memo(function CommentBubble({
         <div className="flex items-center gap-3 pl-2 pt-1 text-[11px] text-[#64748B]">
           <span className="font-medium">
             {cmt.isOptimistic
-              ? "Đang gửi..."
-              : formatRelativeTime(cmt.createdAt)}
+              ? t("community.comments.sending")
+              : formatRelativeTime(cmt.createdAt, locale)}
           </span>
           {!cmt.isOptimistic && (
             <button
@@ -165,7 +166,7 @@ const CommentBubble = memo(function CommentBubble({
               onClick={() => onSelectReply(cmt.id, cmt.author.fullName)}
               className="font-bold text-[#475569] hover:text-[#0194F3] hover:underline bg-transparent border-none p-0 cursor-pointer"
             >
-              Phản hồi
+              {t("community.comments.replyAction")}
             </button>
           )}
           {canDelete && (
@@ -174,9 +175,9 @@ const CommentBubble = memo(function CommentBubble({
               disabled={isDeleting}
               onClick={() => onRequestDelete(cmt.id)}
               className="font-semibold text-[#94A3B8] hover:text-rose-600 bg-transparent border-none p-0 cursor-pointer opacity-0 group-hover/cmt:opacity-100 focus:opacity-100 transition-opacity"
-              title="Xóa bình luận"
+              title={t("community.comments.deleteTitle")}
             >
-              Xóa
+              {t("community.comments.delete")}
             </button>
           )}
         </div>
@@ -196,6 +197,7 @@ function StickyCommentComposer({
   replyTarget,
   onCancelReply,
 }: StickyCommentComposerProps) {
+  const { t } = useI18n();
   const { user } = useAuth();
   const [commentText, setCommentText] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -228,14 +230,14 @@ function StickyCommentComposer({
     return (
       <div className="shrink-0 border-t border-[#E2E8F0] bg-[#F8FAFC] px-5 py-3 flex items-center justify-between gap-3">
         <p className="text-xs font-medium text-[#64748B]">
-          Đăng nhập để tham gia bình luận và đặt câu hỏi cho tác giả bài viết.
+          {t("community.comments.guestDetailPrompt")}
         </p>
         <button
           type="button"
           onClick={() => useAuthModalStore.getState().openAuthModal("login")}
           className="h-9 px-4 rounded-xl bg-[#0194F3] hover:bg-[#007FE3] text-white text-xs font-bold inline-flex items-center justify-center shrink-0 transition-colors cursor-pointer"
         >
-          Đăng nhập
+          {t("nav.signIn")}
         </button>
       </div>
     );
@@ -247,7 +249,7 @@ function StickyCommentComposer({
         <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-[#F0F7FF] border border-[#BAE0FD] text-xs">
           <div className="flex items-center gap-1.5 text-[#334155] truncate">
             <CornerDownRight className="size-3.5 text-[#0194F3] shrink-0" />
-            <span>Đang phản hồi</span>
+            <span>{t("community.comments.respondingTo")}</span>
             <span className="font-extrabold text-[#0194F3] truncate">
               @{replyTarget.replyToName}
             </span>
@@ -257,7 +259,7 @@ function StickyCommentComposer({
             onClick={onCancelReply}
             className="text-xs font-bold text-[#64748B] hover:text-[#0F172A] cursor-pointer"
           >
-            Hủy
+            {t("common.cancel")}
           </button>
         </div>
       )}
@@ -279,15 +281,15 @@ function StickyCommentComposer({
             onChange={(e) => setCommentText(e.target.value)}
             placeholder={
               replyTarget
-                ? `Viết phản hồi cho @${replyTarget.replyToName}...`
-                : `Viết bình luận dưới tên ${user.fullName}...`
+                ? t("community.comments.respondPlaceholder", { name: replyTarget.replyToName })
+                : t("community.comments.commentAsPlaceholder", { name: user.fullName })
             }
             className="flex-1 bg-transparent text-[13px] text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none"
           />
           <button
             type="submit"
             disabled={!commentText.trim() || createCommentMutation.isPending}
-            aria-label="Gửi bình luận"
+            aria-label={t("community.comments.sendAria")}
             className="ml-2 text-[#0194F3] hover:text-[#007FE3] disabled:text-[#CBD5E1] transition-colors cursor-pointer bg-transparent border-none p-1"
           >
             <i className="fa-solid fa-paper-plane text-[14px]" aria-hidden="true" />
@@ -306,6 +308,7 @@ export function PostDetailModal({
   onOpenClonePreview,
   highlightCommentId,
 }: PostDetailModalProps) {
+  const { locale, t } = useI18n();
   const { user } = useAuth();
   const hasScrolledRef = useRef(false);
 
@@ -332,9 +335,9 @@ export function PostDetailModal({
 
   useEffect(() => {
     if (isContextError) {
-      toast.info("Bình luận không còn tồn tại hoặc đã bị xóa");
+      toast.info(t("community.toasts.commentNotFound"));
     }
-  }, [isContextError]);
+  }, [isContextError, t]);
 
   useEffect(() => {
     if (!open) {
@@ -370,10 +373,15 @@ export function PostDetailModal({
   const durationLabel = formatTripDuration(
     post.itinerary?.startDate,
     post.itinerary?.endDate,
-    false
+    false,
+    locale
   );
 
   const authorSubtitle = resolvePostAuthorSubtitle(post);
+  const authorContextLabel =
+    authorSubtitle.groupBadge && !authorSubtitle.groupBadge.isDefault
+      ? authorSubtitle.groupBadge.name
+      : t("community.defaultGroupName");
 
   const allComments = useMemo(() => {
     const map = new Map<string, CommunityCommentItem>();
@@ -437,7 +445,7 @@ export function PostDetailModal({
 
   const handleToggleLike = () => {
     if (!user) {
-      toast.error("Vui lòng đăng nhập để thả tim bài viết");
+      toast.error(t("community.toasts.loginToLike"));
       return;
     }
     toggleLikeMutation.mutate(post.id);
@@ -461,9 +469,9 @@ export function PostDetailModal({
     }
     try {
       await navigator.clipboard.writeText(shareUrl);
-      toast.success("Đã sao chép liên kết bài viết vào bộ nhớ tạm!");
+      toast.success(t("community.toasts.postLinkCopied"));
     } catch {
-      toast.info("Liên kết: " + shareUrl);
+      toast.info(t("community.toasts.linkFallback", { url: shareUrl }));
     }
   };
 
@@ -472,7 +480,7 @@ export function PostDetailModal({
     targetAuthorName: string
   ) => {
     if (!user) {
-      toast.error("Vui lòng đăng nhập để phản hồi bình luận");
+      toast.error(t("community.toasts.loginToRespond"));
       return;
     }
     setReplyTarget({
@@ -499,13 +507,13 @@ export function PostDetailModal({
           id="post-detail-modal-title"
           className="text-[15px] font-bold text-slate-900 tracking-tight text-center truncate max-w-[75%]"
         >
-          Bài viết của {post.author.fullName}
+          {t("community.comments.postByTitle", { name: post.author.fullName })}
         </h2>
         <button
           type="button"
           onClick={onClose}
           className="absolute right-4 top-1/2 -translate-y-1/2 size-9 rounded-full bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#475569] hover:text-[#0F172A] inline-flex items-center justify-center transition-colors cursor-pointer"
-          aria-label="Đóng xem chi tiết bài viết"
+          aria-label={t("community.comments.closeDetailAria")}
         >
           <X className="size-4" />
         </button>
@@ -536,23 +544,23 @@ export function PostDetailModal({
                 {isAuthorVerified && (
                   <>
                     <span className="py-0.5 px-1.5 rounded-[5px] bg-[#F0F7FF] text-[#0194F3] text-[10px] font-bold">
-                      Thổ địa
+                      {t("community.verifiedLocal")}
                     </span>
                     <i
                       className="fa-solid fa-circle-check text-[#0194F3] text-[13px] shrink-0"
-                      title="Thổ địa xác thực"
+                      title={t("community.verifiedLocalTitle")}
                       aria-hidden="true"
                     />
                   </>
                 )}
                 <span className="text-[11px] text-[#94A3B8]">
-                  • {formatRelativeTime(post.createdAt)}
+                  • {formatRelativeTime(post.createdAt, locale)}
                 </span>
               </div>
               <p className="text-[12px] text-[#64748B] font-medium truncate">
                 <span>{authorSubtitle.handle}</span>
                 {" • "}
-                <span>{authorSubtitle.contextLabel}</span>
+                <span>{authorContextLabel}</span>
               </p>
             </div>
           </div>
@@ -623,7 +631,7 @@ export function PostDetailModal({
                     className="px-2.5 py-1 rounded-full bg-black/65 hover:bg-black/85 text-white text-[11px] font-bold cursor-pointer inline-flex items-center gap-1"
                   >
                     <X className="size-3.5" />
-                    <span>Thu gọn lưới</span>
+                    <span>{t("community.comments.collapseGrid")}</span>
                   </button>
                 </div>
                 {mediaList.length > 1 && (
@@ -639,7 +647,7 @@ export function PostDetailModal({
                             : 0
                         )
                       }
-                      aria-label="Tệp trước"
+                      aria-label={t("community.comments.prevFileAria")}
                       className="absolute left-2.5 top-1/2 -translate-y-1/2 size-8 rounded-full bg-black/60 hover:bg-black/80 text-white inline-flex items-center justify-center cursor-pointer"
                     >
                       <ChevronLeft className="size-4" />
@@ -655,7 +663,7 @@ export function PostDetailModal({
                             : 0
                         )
                       }
-                      aria-label="Tệp tiếp theo"
+                      aria-label={t("community.comments.nextFileAria")}
                       className="absolute right-2.5 top-1/2 -translate-y-1/2 size-8 rounded-full bg-black/60 hover:bg-black/80 text-white inline-flex items-center justify-center cursor-pointer"
                     >
                       <ChevronRight className="size-4" />
@@ -739,7 +747,7 @@ export function PostDetailModal({
                     />
                     {mediaList.length > 3 && (
                       <div className="absolute inset-0 bg-black/45 flex items-center justify-center text-white text-sm font-bold">
-                        +{mediaList.length - 3} tệp khác
+                        {t("community.post.moreFiles", { count: mediaList.length - 3 })}
                       </div>
                     )}
                   </div>
@@ -759,7 +767,7 @@ export function PostDetailModal({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-0.5">
                   <span className="py-0.5 px-1.5 rounded-md bg-[#F0F7FF] text-[#0194F3] font-bold text-[10px] tracking-wide">
-                    Lộ trình đính kèm
+                    {t("community.post.attachedItinerary")}
                   </span>
                   {durationLabel && (
                     <span className="text-[11px] text-slate-500 font-medium">
@@ -775,9 +783,9 @@ export function PostDetailModal({
                   {post.itinerary.title}
                 </Link>
                 <div className="text-[11px] text-slate-500 font-medium mt-0.5 truncate">
-                  {post.itinerary.totalPlaces} Điểm đến
+                  {t("community.post.placesCount", { count: post.itinerary.totalPlaces })}
                   {formattedEstimatedCost
-                    ? ` • Dự trù ~${formattedEstimatedCost}/người`
+                    ? t("community.post.estimatedPerPerson", { amount: formattedEstimatedCost })
                     : ""}
                 </div>
               </div>
@@ -793,7 +801,7 @@ export function PostDetailModal({
                 className="h-8 px-3 text-xs font-semibold shrink-0 whitespace-nowrap rounded-lg inline-flex items-center justify-center gap-1.5 bg-[#0194F3] hover:bg-[#007FE3] active:scale-[0.98] text-white shadow-xs cursor-pointer transition-colors border-none"
               >
                 <i className="fa-regular fa-clone" aria-hidden="true" />
-                <span>Xem &amp; Nhân bản</span>
+                <span>{t("community.post.previewAndClone")}</span>
               </button>
             ) : (
               <Link
@@ -801,7 +809,7 @@ export function PostDetailModal({
                 onClick={onClose}
                 className="h-8 px-3 text-xs font-semibold shrink-0 whitespace-nowrap rounded-lg inline-flex items-center justify-center gap-1.5 bg-[#0194F3] hover:bg-[#007FE3] active:scale-[0.98] text-white shadow-xs transition-colors"
               >
-                <span>Xem chi tiết</span>
+                <span>{t("community.post.viewDetails")}</span>
               </Link>
             )}
           </div>
@@ -825,18 +833,18 @@ export function PostDetailModal({
                 } fa-heart text-[16px]`}
                 aria-hidden="true"
               />
-              <span>{post.likeCount} lượt thích</span>
+              <span>{t("community.post.likesCount", { count: post.likeCount })}</span>
             </button>
 
             <div className="flex items-center gap-1.5 text-[#64748B]">
               <i className="fa-regular fa-comment text-[16px]" aria-hidden="true" />
-              <span>{allComments.length} bình luận</span>
+              <span>{t("community.post.commentsCount", { count: allComments.length })}</span>
             </div>
 
             {(post.itinerary || post.cloneCount > 0) && (
               <span className="inline-flex items-center gap-1.5 text-[#0194F3] font-extrabold bg-[#F0F7FF] py-0.5 px-2.5 rounded-full text-[11px]">
                 <i className="fa-solid fa-share-from-square text-[11px]" aria-hidden="true" />
-                <span>{post.cloneCount} nhân bản</span>
+                <span>{t("community.post.clonesShort", { count: post.cloneCount })}</span>
               </span>
             )}
           </div>
@@ -847,14 +855,14 @@ export function PostDetailModal({
             className="flex items-center gap-1.5 bg-transparent border-none text-[12px] font-semibold text-[#64748B] hover:text-[#0F172A] cursor-pointer transition-colors"
           >
             <i className="fa-solid fa-share-nodes text-[14px]" aria-hidden="true" />
-            <span>Chia sẻ</span>
+            <span>{t("community.post.share")}</span>
           </button>
         </div>
 
         {/* Comments Header & Sort Switcher */}
         <div className="flex items-center justify-between pt-1">
           <span className="text-[13px] font-extrabold text-[#0F172A]">
-            Bình luận ({allComments.length})
+            {t("community.comments.heading", { count: allComments.length })}
           </span>
           <div className="flex items-center gap-1 text-xs">
             <button
@@ -866,7 +874,7 @@ export function PostDetailModal({
                   : "text-[#64748B] hover:text-[#0F172A]"
               }`}
             >
-              Mới nhất
+              {t("community.comments.sortNewest")}
             </button>
             <button
               type="button"
@@ -877,7 +885,7 @@ export function PostDetailModal({
                   : "text-[#64748B] hover:text-[#0F172A]"
               }`}
             >
-              Tất cả bình luận
+              {t("community.comments.sortOldest")}
             </button>
           </div>
         </div>
@@ -899,11 +907,10 @@ export function PostDetailModal({
               aria-hidden="true"
             />
             <p className="text-xs font-extrabold text-[#0F172A]">
-              Chưa có bình luận nào
+              {t("community.comments.emptyTitle")}
             </p>
             <p className="text-[11px] text-[#64748B]">
-              Hãy là người đầu tiên đặt câu hỏi hoặc chia sẻ cảm nhận về chuyến
-              đi này!
+              {t("community.comments.emptyDesc")}
             </p>
           </div>
         ) : (
@@ -975,10 +982,10 @@ export function PostDetailModal({
               </div>
               <div className="space-y-1">
                 <h3 className="text-sm font-bold text-slate-900">
-                  Xác nhận xóa bình luận?
+                  {t("community.comments.deleteConfirmTitle")}
                 </h3>
                 <p className="text-xs text-[#64748B] leading-relaxed">
-                  Bình luận này sẽ bị xóa vĩnh viễn khỏi bài viết.
+                  {t("community.comments.deleteConfirmShortDesc")}
                 </p>
               </div>
             </div>
@@ -991,7 +998,7 @@ export function PostDetailModal({
                 onClick={() => setDeletingCommentId(null)}
                 className="h-9 px-4 rounded-[10px] text-xs font-semibold cursor-pointer"
               >
-                Hủy
+                {t("common.cancel")}
               </Button>
               <button
                 type="button"
@@ -1012,7 +1019,7 @@ export function PostDetailModal({
                 {deleteCommentMutation.isPending && (
                   <Loader2 className="size-3.5 animate-spin" />
                 )}
-                <span>Xóa bình luận</span>
+                <span>{t("community.comments.deleteTitle")}</span>
               </button>
             </div>
           </div>

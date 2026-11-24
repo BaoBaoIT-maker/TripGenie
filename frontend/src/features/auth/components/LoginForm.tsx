@@ -7,15 +7,18 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Mail, Lock, Eye, EyeOff, Loader2, AlertCircle, Info } from 'lucide-react';
 import { toast } from 'sonner';
-import { loginSchema, LoginFormData } from '../schemas/auth.schema';
+import { createLoginSchema, LoginFormData } from '../schemas/auth.schema';
 import { useAuth } from '../hooks/use-auth';
 import { GoogleAuthButton } from './GoogleAuthButton';
 import { getSafeRedirectUrl, resolvePostLoginRedirect } from '@/lib/safe-redirect';
 import { ApiClientError } from '@/lib/api-client';
+import { useI18n } from '@/i18n/LocaleProvider';
 
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { locale, messages } = useI18n();
+  const a = messages.auth;
   const rawNext = searchParams.get('next');
   const nextUrl = getSafeRedirectUrl(rawNext, '/');
   const errorParam = searchParams.get('error');
@@ -26,24 +29,28 @@ export function LoginForm() {
 
   const initialOAuthError = React.useMemo(() => {
     if (errorParam === 'oauth_failed') {
-      return 'Đăng nhập với Google thất bại. Vui lòng thử lại.';
+      return a.googleOAuthFailedRetry;
     }
     if (errorParam === 'account_collision') {
-      return 'Email này đã thuộc về một tài khoản khác. Vui lòng đăng nhập bằng mật khẩu.';
+      return a.accountCollision;
     }
     return null;
-  }, [errorParam]);
+  }, [errorParam, a.googleOAuthFailedRetry, a.accountCollision]);
 
   const displayError = formError || initialOAuthError;
 
   const { login, isLoggingIn } = useAuth();
+  const resolver = React.useMemo(
+    () => zodResolver(createLoginSchema(locale)),
+    [locale],
+  );
 
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
+    resolver,
     defaultValues: {
       identifier: '',
       password: '',
@@ -59,18 +66,18 @@ export function LoginForm() {
         identifier: data.identifier,
         password: data.password,
       });
-      toast.success('Đăng nhập thành công!');
+      toast.success(a.messages.loginSuccess);
       const targetUrl = resolvePostLoginRedirect(res?.user?.role, rawNext, '/');
       router.push(targetUrl);
       router.refresh();
     } catch (err: unknown) {
       if (err instanceof ApiClientError && err.code === 'EMAIL_NOT_VERIFIED') {
         setIsUnverified(true);
-        setFormError('Tài khoản chưa được kích hoạt qua email. Vui lòng kiểm tra hộp thư đến để nhấn vào liên kết xác thực.');
+        setFormError(a.messages.unverifiedAccount);
         return;
       }
       const message =
-        err instanceof Error ? err.message : 'Tài khoản/email hoặc mật khẩu không chính xác';
+        err instanceof Error ? err.message : a.messages.invalidCredentials;
       setFormError(message);
     }
   };
@@ -94,7 +101,7 @@ export function LoginForm() {
             <p className="font-semibold">{displayError}</p>
             {isUnverified && (
               <p className="text-xs text-muted-foreground">
-                Nếu bạn không tìm thấy thư kích hoạt, hãy kiểm tra thư mục Spam hoặc thực hiện đăng ký lại để nhận liên kết mới.
+                {a.messages.unverifiedHint}
               </p>
             )}
           </div>
@@ -105,7 +112,7 @@ export function LoginForm() {
         {/* Identifier Field */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-foreground tracking-wide">
-            Địa chỉ Email hoặc Tên đăng nhập
+            {a.fields.identifierFullLabel}
           </label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
@@ -113,7 +120,7 @@ export function LoginForm() {
               {...register('identifier')}
               type="text"
               autoComplete="username"
-              placeholder="vd: traveler@example.com"
+              placeholder={a.fields.identifierPlaceholder}
               className="w-full h-10 pl-9 pr-3.5 rounded-xl border border-input bg-background/50 text-sm placeholder:text-muted-foreground/60 transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>
@@ -126,13 +133,13 @@ export function LoginForm() {
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <label className="text-xs font-semibold text-foreground tracking-wide">
-              Mật khẩu
+              {a.fields.passwordLabel}
             </label>
             <Link
               href="/forgot-password"
               className="text-xs text-primary hover:underline font-medium"
             >
-              Quên mật khẩu?
+              {a.actions.forgotPassword}
             </Link>
           </div>
           <div className="relative">
@@ -141,14 +148,14 @@ export function LoginForm() {
               {...register('password')}
               type={showPassword ? 'text' : 'password'}
               autoComplete="current-password"
-              placeholder="Tối thiểu 8 ký tự"
+              placeholder={a.fields.passwordPlaceholder}
               className="w-full h-10 pl-9 pr-10 rounded-xl border border-input bg-background/50 text-sm placeholder:text-muted-foreground/60 transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-1.5 top-1/2 -translate-y-1/2 size-8 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg transition-colors cursor-pointer"
-              aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              aria-label={showPassword ? a.hidePassword : a.showPassword}
             >
               {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
@@ -167,7 +174,7 @@ export function LoginForm() {
             className="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
           />
           <label htmlFor="rememberMe" className="text-xs text-muted-foreground cursor-pointer select-none">
-            Ghi nhớ phiên đăng nhập trên thiết bị này
+            {a.fields.rememberMe}
           </label>
         </div>
 
@@ -180,10 +187,10 @@ export function LoginForm() {
           {isLoggingIn ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              <span>Đang đăng nhập...</span>
+              <span>{a.actions.signingIn}</span>
             </>
           ) : (
-            <span>Đăng nhập</span>
+            <span>{a.actions.signIn}</span>
           )}
         </button>
       </form>
@@ -195,22 +202,22 @@ export function LoginForm() {
         </div>
         <div className="relative flex justify-center text-xs uppercase">
           <span className="bg-card px-3 text-muted-foreground font-medium tracking-wider">
-            hoặc
+            {a.or}
           </span>
         </div>
       </div>
 
       {/* Google OAuth Button */}
-      <GoogleAuthButton label="Đăng nhập bằng Google" />
+      <GoogleAuthButton label={a.signInWithGoogle} />
 
       {/* Switch to Register */}
       <p className="text-center text-xs text-muted-foreground pt-2">
-        Chưa có tài khoản?{' '}
+        {a.actions.noAccountYet}{' '}
         <Link
           href={nextUrl && nextUrl !== '/' && nextUrl !== '/explore' ? `/register?next=${encodeURIComponent(nextUrl)}` : '/register'}
           className="text-primary font-semibold hover:underline"
         >
-          Đăng ký tài khoản mới
+          {a.actions.registerNew}
         </Link>
       </p>
     </div>

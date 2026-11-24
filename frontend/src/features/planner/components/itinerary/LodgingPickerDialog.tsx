@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { AppModalPortal } from '@/components/common/AppModalPortal';
+import { useI18n } from '@/i18n';
 import { placeService } from '@/services/place.service';
 import {
   useLodgingSuggestionsQuery,
@@ -56,31 +57,19 @@ type TargetSelectionMode = 'all' | number;
 
 const GROUP_TABS: ReadonlyArray<{
   key: SuggestionGroupKey;
-  label: string;
-  shortLabel: string;
   icon: string;
-  desc: string;
 }> = [
   {
     key: 'nearest',
-    label: 'Gần lịch trình',
-    shortLabel: 'Gần nhất',
     icon: 'fa-solid fa-location-crosshairs',
-    desc: 'Tối ưu quãng đường di chuyển tới các điểm trong ngày đang chọn',
   },
   {
     key: 'bestValue',
-    label: 'Đáng tiền nhất',
-    shortLabel: 'Giá tốt',
     icon: 'fa-solid fa-scale-balanced',
-    desc: 'Cân bằng giữa ngân sách, chất lượng và vị trí',
   },
   {
     key: 'topRated',
-    label: 'Đánh giá cao',
-    shortLabel: 'Đánh giá cao',
     icon: 'fa-solid fa-award',
-    desc: 'Điểm đánh giá thực tế và lượt nhận xét nổi bật',
   },
 ];
 
@@ -94,6 +83,7 @@ export function LodgingPickerDialog({
   destinationCity,
   days = [],
 }: LodgingPickerDialogProps) {
+  const { t } = useI18n();
   const rawTotalNights = Number(totalNights);
   const clampedTotalNights =
     Number.isFinite(rawTotalNights) && rawTotalNights >= 1
@@ -279,11 +269,11 @@ export function LodgingPickerDialog({
 
       if (isAll || clampedTotalNights === 1) {
         toast.success(
-          `Đã áp dụng chỗ lưu trú cho toàn bộ chuyến đi (${clampedTotalNights} đêm) và tối ưu lại lộ trình!`,
+          t('planner.lodging.appliedAllToast', { nights: clampedTotalNights }),
         );
       } else {
         toast.success(
-          `Đã cập nhật chỗ lưu trú cho Đêm ${validSelected} (Ngày ${validSelected}) và tối ưu lại lộ trình!`,
+          t('planner.lodging.appliedSingleToast', { night: validSelected }),
         );
       }
       onClose();
@@ -291,7 +281,7 @@ export function LodgingPickerDialog({
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Không thể cập nhật chỗ lưu trú. Vui lòng thử lại.',
+          : t('planner.lodging.updateError'),
       );
     } finally {
       setSelectingId(null);
@@ -303,8 +293,8 @@ export function LodgingPickerDialog({
   const isSearchMode = searchQuery.trim().length >= 2;
   const actionButtonLabel =
     targetMode === 'all' || clampedTotalNights === 1
-      ? 'Áp dụng'
-      : 'Chọn';
+      ? t('planner.common.apply')
+      : t('planner.common.select');
 
   return (
     <AppModalPortal
@@ -321,14 +311,14 @@ export function LodgingPickerDialog({
           id="lodging-picker-title"
           className="text-base sm:text-lg font-bold text-slate-900 tracking-tight"
         >
-          Chỗ lưu trú
+          {t('planner.lodging.dialogTitle')}
         </h2>
 
         <button
           type="button"
           onClick={onClose}
           disabled={updateLodgingMutation.isPending}
-          aria-label="Đóng hộp thoại chọn chỗ ở"
+          aria-label={t('planner.lodging.closeDialogAria')}
           className="size-8 rounded-xl text-slate-400 hover:bg-slate-100 hover:text-[#10243A] flex items-center justify-center transition-colors cursor-pointer"
         >
           <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
@@ -350,7 +340,7 @@ export function LodgingPickerDialog({
               }`}
             >
               <i className="fa-solid fa-layer-group text-[11px]" aria-hidden="true" />
-              <span>Tất cả</span>
+              <span>{t('planner.lodging.allNights')}</span>
             </button>
 
             {nightList.map((nightNum) => {
@@ -367,9 +357,13 @@ export function LodgingPickerDialog({
                       ? 'bg-[#0194F3] text-white shadow-sm'
                       : 'bg-slate-100 hover:bg-slate-200/80 text-slate-700'
                   }`}
-                  title={assigned ? `Đã chọn: ${assigned.name}` : `Đêm ${nightNum}`}
+                  title={
+                    assigned
+                      ? t('planner.lodging.chosenTitle', { name: assigned.name })
+                      : t('planner.common.nightLabel', { n: nightNum })
+                  }
                 >
-                  <span>Đêm {nightNum}</span>
+                  <span>{t('planner.common.nightLabel', { n: nightNum })}</span>
                   {assigned && (
                     <span
                       className={`size-1.5 rounded-full ${
@@ -394,14 +388,14 @@ export function LodgingPickerDialog({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Tìm khách sạn, homestay..."
+            placeholder={t('planner.lodging.searchPlaceholder')}
             className="w-full h-10 pl-9 pr-8 rounded-xl border border-[#CBD5E1] bg-white text-xs font-medium text-[#10243A] placeholder:text-slate-400 focus:outline-none focus:border-[#0194F3] focus:ring-2 focus:ring-[#0194F3]/20"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              aria-label="Xóa từ khóa tìm kiếm"
+              aria-label={t('planner.lodging.clearSearchAria')}
               className="absolute right-2.5 top-1/2 -translate-y-1/2 size-6 rounded-lg text-slate-400 hover:text-slate-700 flex items-center justify-center cursor-pointer"
             >
               <i className="fa-solid fa-xmark text-xs" aria-hidden="true" />
@@ -412,7 +406,7 @@ export function LodgingPickerDialog({
         {isSearchMode ? (
           <div className="space-y-2">
             <div className="text-xs font-bold text-slate-600">
-              Kết quả tìm kiếm cho &ldquo;{searchQuery.trim()}&rdquo;
+              {t('planner.lodging.searchResultsTitle', { query: searchQuery.trim() })}
             </div>
             {isSearching ? (
               <div className="space-y-2">
@@ -425,7 +419,7 @@ export function LodgingPickerDialog({
               </div>
             ) : searchResults.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-6 text-center text-xs text-slate-600">
-                Không tìm thấy chỗ lưu trú phù hợp với từ khóa này.
+                {t('planner.lodging.noSearchResults')}
               </div>
             ) : (
               <div className="space-y-2">
@@ -452,7 +446,7 @@ export function LodgingPickerDialog({
                         onClick={() => handleSelectPlace(place)}
                         className="h-8 sm:h-9 px-3 sm:px-3.5 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] disabled:opacity-50 text-white text-xs font-bold shrink-0 cursor-pointer transition-colors"
                       >
-                        {isBusy ? 'Đang lưu...' : actionButtonLabel}
+                        {isBusy ? t('planner.common.saving') : actionButtonLabel}
                       </button>
                     </div>
                   );
@@ -478,15 +472,20 @@ export function LodgingPickerDialog({
                     }`}
                   >
                     <i className={`${tab.icon} text-[11px] shrink-0`} aria-hidden="true" />
-                    <span className="sm:hidden text-[11px] whitespace-nowrap">{tab.shortLabel}</span>
-                    <span className="hidden sm:inline truncate">{tab.label}</span>
+                    <span className="sm:hidden text-[11px] whitespace-nowrap">
+                      {t(`planner.lodging.groups.${tab.key}.shortLabel`)}
+                    </span>
+                    <span className="hidden sm:inline truncate">
+                      {t(`planner.lodging.groups.${tab.key}.label`)}
+                    </span>
                   </button>
                 );
               })}
             </div>
 
             <p className="text-xs text-slate-600">
-              {GROUP_TABS.find((t) => t.key === activeGroup)?.desc} (tính từ tâm điểm dừng Ngày {selectedNight})
+              {t(`planner.lodging.groups.${activeGroup}.desc`)}{' '}
+              {t('planner.lodging.groupDescSuffix', { day: selectedNight })}
             </p>
 
             {/* 4-State Resilience: Loading, Error, Empty, Data */}
@@ -502,19 +501,19 @@ export function LodgingPickerDialog({
             ) : isError ? (
               <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-4 text-center space-y-2">
                 <p className="text-xs font-semibold text-rose-800">
-                  Không thể tải danh sách gợi ý chỗ lưu trú.
+                  {t('planner.lodging.loadError')}
                 </p>
                 <button
                   type="button"
                   onClick={() => refetch()}
                   className="px-3.5 py-1.5 rounded-xl bg-white border border-rose-300 text-xs font-bold text-rose-700 hover:bg-rose-100 cursor-pointer"
                 >
-                  Thử lại
+                  {t('planner.common.retry')}
                 </button>
               </div>
             ) : activeItems.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-6 text-center text-xs text-slate-600">
-                Chưa có gợi ý lưu trú khác trong khu vực này. Bạn có thể dùng ô tìm kiếm phía trên.
+                {t('planner.lodging.noSuggestions')}
               </div>
             ) : (
               <div className="space-y-2.5">
@@ -568,7 +567,7 @@ export function LodgingPickerDialog({
                               ·
                             </span>
                             <span className="font-semibold text-[#0194F3] tabular-nums">
-                              Cách tâm ~{item.distanceKm} km
+                              {t('planner.lodging.distanceFromCenter', { km: item.distanceKm })}
                             </span>
                             {item.pricePerNight != null && item.pricePerNight > 0 && (
                               <>
@@ -576,7 +575,7 @@ export function LodgingPickerDialog({
                                   ·
                                 </span>
                                 <span className="font-semibold text-slate-700 tabular-nums">
-                                  ~{formatVnd(item.pricePerNight)}/đêm
+                                  ~{formatVnd(item.pricePerNight)}{t('planner.common.perNight')}
                                 </span>
                               </>
                             )}
@@ -596,7 +595,7 @@ export function LodgingPickerDialog({
                         onClick={() => handleSelectPlace(item)}
                         className="h-8 sm:h-9 px-3 sm:px-3.5 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] disabled:opacity-50 text-white text-xs font-bold shrink-0 cursor-pointer transition-colors shadow-[0_2px_8px_rgba(1,148,243,0.25)]"
                       >
-                        {isBusy ? 'Đang lưu...' : actionButtonLabel}
+                        {isBusy ? t('planner.common.saving') : actionButtonLabel}
                       </button>
                     </div>
                   );

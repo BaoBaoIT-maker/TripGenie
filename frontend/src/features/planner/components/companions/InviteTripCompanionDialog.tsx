@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { AppModalPortal } from '@/components/common/AppModalPortal';
+import { useI18n } from '@/i18n';
 import { useInviteCompanion } from '../../hooks/use-trip-companions';
 
 interface InviteTripCompanionDialogProps {
@@ -15,6 +16,7 @@ export function InviteTripCompanionDialog({
   onClose,
   itineraryId,
 }: InviteTripCompanionDialogProps) {
+  const { t } = useI18n();
   const [email, setEmail] = useState('');
   const inviteMutation = useInviteCompanion(itineraryId);
 
@@ -46,14 +48,14 @@ export function InviteTripCompanionDialog({
             <i className="fa-solid fa-user-plus text-xs" aria-hidden="true" />
           </div>
           <h2 id="invite-companion-title" className="text-sm font-bold">
-            Mời bạn đồng hành
+            {t('planner.companions.inviteDialogTitle')}
           </h2>
         </div>
         <button
           type="button"
           onClick={onClose}
           disabled={inviteMutation.isPending}
-          aria-label="Đóng hộp thoại"
+          aria-label={t('planner.common.closeDialog')}
           className="size-8 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 flex items-center justify-center transition-colors cursor-pointer"
         >
           <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
@@ -63,7 +65,7 @@ export function InviteTripCompanionDialog({
       <form onSubmit={handleSubmit} className="p-6 space-y-4">
         <div className="space-y-1.5">
           <label htmlFor="companion-email" className="block text-xs font-semibold text-slate-800">
-            Địa chỉ email tài khoản TripGenie
+            {t('planner.companions.emailLabel')}
           </label>
           <div className="relative">
             <i
@@ -78,13 +80,15 @@ export function InviteTripCompanionDialog({
               spellCheck={false}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="banbe@gmail.com"
+              placeholder={t('planner.companions.emailPlaceholder')}
               disabled={inviteMutation.isPending}
               className="w-full h-10 pl-9 pr-4 rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0194F3]/30 focus:border-[#0194F3] transition-colors disabled:opacity-50"
             />
           </div>
           <p className="text-[11px] text-slate-500 leading-relaxed pt-1">
-            Người được mời sẽ nhận thông báo trong ứng dụng với quyền <strong>Chỉ xem</strong> (có thể tham gia bình chọn ngay). Bạn có thể cấp quyền chỉnh sửa bất kỳ lúc nào.
+            {t('planner.companions.inviteHintBefore')}{' '}
+            <strong>{t('planner.roles.VIEWER')}</strong>{' '}
+            {t('planner.companions.inviteHintAfter')}
           </p>
         </div>
 
@@ -95,7 +99,7 @@ export function InviteTripCompanionDialog({
             disabled={inviteMutation.isPending}
             className="h-9 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer"
           >
-            Hủy
+            {t('common.cancel')}
           </button>
           <button
             type="submit"
@@ -105,7 +109,7 @@ export function InviteTripCompanionDialog({
             {inviteMutation.isPending && (
               <i className="fa-solid fa-circle-notch fa-spin text-xs" aria-hidden="true" />
             )}
-            <span>Gửi lời mời</span>
+            <span>{t('planner.companions.sendInviteBtn')}</span>
           </button>
         </div>
       </form>

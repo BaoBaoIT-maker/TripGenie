@@ -8,23 +8,30 @@ import { useRouter } from 'next/navigation';
 import { Mail, ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  forgotPasswordSchema,
+  createForgotPasswordSchema,
   ForgotPasswordFormData,
 } from '../schemas/auth.schema';
 import { useAuth } from '../hooks/use-auth';
+import { useI18n } from '@/i18n/LocaleProvider';
 
 export function ForgotPasswordForm() {
   const router = useRouter();
+  const { locale, messages } = useI18n();
+  const a = messages.auth;
   const [serverError, setServerError] = React.useState<string | null>(null);
 
   const { forgotPassword, isSubmittingForgotPassword } = useAuth();
+  const resolver = React.useMemo(
+    () => zodResolver(createForgotPasswordSchema(locale)),
+    [locale],
+  );
 
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<ForgotPasswordFormData>({
-    resolver: zodResolver(forgotPasswordSchema),
+    resolver,
     defaultValues: {
       email: '',
     },
@@ -33,11 +40,11 @@ export function ForgotPasswordForm() {
   const onSubmit = async (data: ForgotPasswordFormData) => {
     setServerError(null);
     try {
-      const response = await forgotPassword({
+      await forgotPassword({
         email: data.email,
       });
 
-      toast.success(response.message || 'Mã OTP đã được gửi đến email của bạn!');
+      toast.success(a.messages.otpSent);
 
       const query = new URLSearchParams({
         email: data.email,
@@ -46,9 +53,7 @@ export function ForgotPasswordForm() {
       router.push(`/verify-otp?${query.toString()}`);
     } catch (err: unknown) {
       const message =
-        err instanceof Error
-          ? err.message
-          : 'Không thể gửi yêu cầu đặt lại mật khẩu. Vui lòng thử lại sau.';
+        err instanceof Error ? err.message : a.messages.otpSendFailed;
       setServerError(message);
     }
   };
@@ -56,7 +61,7 @@ export function ForgotPasswordForm() {
   return (
     <div className="space-y-6">
       <p className="text-xs text-muted-foreground leading-relaxed">
-        Nhập địa chỉ email liên kết với tài khoản TripGenie của bạn. Chúng tôi sẽ gửi một mã OTP gồm 6 chữ số để xác minh quyền truy cập và đặt lại mật khẩu.
+        {a.messages.forgotDescription}
       </p>
 
       {serverError && (
@@ -70,7 +75,7 @@ export function ForgotPasswordForm() {
         {/* Email Field */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-foreground tracking-wide">
-            Địa chỉ email
+            {a.fields.emailLabel}
           </label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
@@ -78,7 +83,7 @@ export function ForgotPasswordForm() {
               {...register('email')}
               type="email"
               autoComplete="email"
-              placeholder="nhap.email@vidu.com"
+              placeholder={a.fields.emailPlaceholder}
               className="w-full h-10 pl-9 pr-3.5 rounded-xl border border-input bg-background/50 text-sm placeholder:text-muted-foreground/60 transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>
@@ -96,10 +101,10 @@ export function ForgotPasswordForm() {
           {isSubmittingForgotPassword ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              <span>Đang gửi mã xác thực...</span>
+              <span>{a.actions.sendingOtp}</span>
             </>
           ) : (
-            <span>Gửi mã xác thực OTP</span>
+            <span>{a.actions.sendOtp}</span>
           )}
         </button>
       </form>
@@ -111,7 +116,7 @@ export function ForgotPasswordForm() {
           className="inline-flex items-center gap-1.5 text-xs text-primary font-semibold hover:underline"
         >
           <ArrowLeft className="size-3.5" />
-          <span>Quay lại trang đăng nhập</span>
+          <span>{a.actions.backToLoginPage}</span>
         </Link>
       </div>
     </div>

@@ -5,6 +5,7 @@
  */
 
 import type { WeatherCondition, DayWeather } from '@/types/itinerary';
+import type { AppLocale } from '@/i18n';
 
 export const MSN_WEATHER_BASE_URL =
   'https://assets.msn.com/weathermapdata/1/static/weather/Icons/taskbar_v10/Condition_Card';
@@ -232,11 +233,38 @@ export interface DayWeatherAdvice {
   isCold: boolean;
 }
 
+export const WEATHER_CONDITION_LABELS: Record<AppLocale, Record<WeatherCondition, string>> = {
+  vi: {
+    SUNNY: 'Nắng đẹp',
+    MILD: 'Dịu mát',
+    RAINY: 'Có mưa rào',
+    COLD: 'Se lạnh',
+  },
+  en: {
+    SUNNY: 'Sunny & clear',
+    MILD: 'Mild & pleasant',
+    RAINY: 'Rain showers',
+    COLD: 'Cool & crisp',
+  },
+};
+
+export function getWeatherConditionLabel(
+  condition: WeatherCondition,
+  locale: AppLocale = 'vi',
+  viSummary?: string | null,
+): string {
+  if (locale === 'vi' && viSummary) return viSummary;
+  return WEATHER_CONDITION_LABELS[locale][condition] ?? WEATHER_CONDITION_LABELS[locale].SUNNY;
+}
+
 /**
  * Pure, deterministic day-level climate advice generator for travellers.
  * Provides concise, non-repetitive micro-guidance without invoking LLMs.
  */
-export function getDayWeatherAdvice(dayWeather: DayWeather): DayWeatherAdvice {
+export function getDayWeatherAdvice(
+  dayWeather: DayWeather,
+  locale: AppLocale = 'vi',
+): DayWeatherAdvice {
   const isHighRain =
     (dayWeather.precipitationProbabilityMax ?? 0) >= CLIMATE_THRESHOLDS.HIGH_RAIN_PROB ||
     dayWeather.condition === 'RAINY';
@@ -249,13 +277,25 @@ export function getDayWeatherAdvice(dayWeather: DayWeather): DayWeatherAdvice {
 
   let advice: string;
   if (isHighRain) {
-    advice = 'Khả năng có mưa rào, bạn nên mang theo ô/áo mưa gọn nhẹ và ưu tiên hoạt động trong nhà hoặc nơi có mái che.';
+    advice =
+      locale === 'en'
+        ? 'Rain showers are likely — bring a compact umbrella or raincoat and prioritize indoor or covered stops.'
+        : 'Khả năng có mưa rào, bạn nên mang theo ô/áo mưa gọn nhẹ và ưu tiên hoạt động trong nhà hoặc nơi có mái che.';
   } else if (isHeatOrHighUv) {
-    advice = 'Buổi trưa nắng gắt và chỉ số UV cao, bạn nên bôi kem chống nắng, đội mũ và ưu tiên ăn trưa, nghỉ ngơi khung 11:30–14:00.';
+    advice =
+      locale === 'en'
+        ? 'Strong midday sun and high UV — wear sunscreen and a hat, and schedule lunch or indoor rest between 11:30 and 14:00.'
+        : 'Buổi trưa nắng gắt và chỉ số UV cao, bạn nên bôi kem chống nắng, đội mũ và ưu tiên ăn trưa, nghỉ ngơi khung 11:30–14:00.';
   } else if (isCold) {
-    advice = 'Thời tiết se lạnh, đừng quên mang theo áo ấm nhẹ hoặc khăn choàng khi đi vào sáng sớm và đêm muộn.';
+    advice =
+      locale === 'en'
+        ? 'Cool temperatures expected — pack a light jacket or scarf for early mornings and late evenings.'
+        : 'Thời tiết se lạnh, đừng quên mang theo áo ấm nhẹ hoặc khăn choàng khi đi vào sáng sớm và đêm muộn.';
   } else {
-    advice = 'Thời tiết thuận lợi và dễ chịu, rất thích hợp cho các hoạt động tham quan, khám phá ngoài trời.';
+    advice =
+      locale === 'en'
+        ? 'Pleasant and comfortable weather — ideal for outdoor sightseeing and exploration.'
+        : 'Thời tiết thuận lợi và dễ chịu, rất thích hợp cho các hoạt động tham quan, khám phá ngoài trời.';
   }
 
   return {

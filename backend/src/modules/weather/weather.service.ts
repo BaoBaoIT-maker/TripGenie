@@ -4,6 +4,7 @@ import axios, { AxiosInstance } from 'axios';
 import type Redis from 'ioredis';
 import { WEATHER_DEFAULTS, weatherConfig } from '../../config/weather.config';
 import { ITINERARY_PLANNING_CONFIG } from '../../config/itinerary-planning.config';
+import { AppLocale, DEFAULT_LOCALE } from '../../common/i18n/locale.util';
 import {
   DayWeather,
   TripWeatherResponse,
@@ -44,6 +45,7 @@ export interface TripWeatherParams {
   startDate?: string | Date | null;
   totalDays: number;
   now?: Date;
+  locale?: AppLocale;
 }
 
 export interface CoordinateSourceInput {
@@ -257,6 +259,7 @@ export class WeatherService {
           isForecast: true,
           condition: wmo.condition,
           labelVi: wmo.labelVi,
+          labelEn: wmo.labelEn,
           tempMinC: Math.round(forecastEntry.tempMinC),
           tempMaxC: Math.round(forecastEntry.tempMaxC),
           tempAvgC,
@@ -284,7 +287,7 @@ export class WeatherService {
       timezone: this.cfg.timezone,
       hasForecastDays: days.some((d) => d.source === WeatherSource.FORECAST),
       days,
-      guidance: buildWeatherGuidance(days),
+      guidance: buildWeatherGuidance(days, params.locale ?? DEFAULT_LOCALE),
     };
   }
 

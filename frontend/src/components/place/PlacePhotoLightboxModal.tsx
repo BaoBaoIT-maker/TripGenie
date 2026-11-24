@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useI18n } from "@/i18n/LocaleProvider";
 
 interface PlacePhotoLightboxModalProps {
   placeName: string;
@@ -27,6 +28,8 @@ export function PlacePhotoLightboxModal({
   onClose,
   onContributePhoto,
 }: PlacePhotoLightboxModalProps) {
+  const { t, messages } = useI18n();
+  const lb = messages.place.lightbox;
   const total = images.length;
   const safeIndex = total > 0 ? ((activeIndex % total) + total) % total : 0;
 
@@ -98,14 +101,14 @@ export function PlacePhotoLightboxModal({
                   className="fa-solid fa-camera text-[#0194F3] text-xs"
                   aria-hidden="true"
                 />
-                <span className="hidden sm:inline">Đóng góp thêm ảnh</span>
+                <span className="hidden sm:inline">{lb.contributeMore}</span>
               </button>
             )}
 
             <button
               type="button"
               onClick={onClose}
-              aria-label="Đóng trình xem ảnh"
+              aria-label={lb.closeAria}
               className="size-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 hover:text-[#10243A] inline-flex items-center justify-center transition-colors cursor-pointer"
             >
               <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
@@ -118,7 +121,7 @@ export function PlacePhotoLightboxModal({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={currentUrl}
-            alt={`${placeName} - Ảnh ${safeIndex + 1}`}
+            alt={t("place.lightbox.imageAlt", { name: placeName, index: safeIndex + 1 })}
             className="max-h-full max-w-full w-full h-full object-contain"
           />
 
@@ -127,7 +130,7 @@ export function PlacePhotoLightboxModal({
               <button
                 type="button"
                 onClick={handlePrev}
-                aria-label="Ảnh trước"
+                aria-label={lb.prevAria}
                 className="absolute left-3 top-1/2 -translate-y-1/2 size-11 rounded-full bg-white/90 hover:bg-white text-[#10243A] shadow-md border border-slate-200/80 inline-flex items-center justify-center transition-transform active:scale-95 cursor-pointer"
               >
                 <i
@@ -139,7 +142,7 @@ export function PlacePhotoLightboxModal({
               <button
                 type="button"
                 onClick={handleNext}
-                aria-label="Ảnh tiếp theo"
+                aria-label={lb.nextAria}
                 className="absolute right-3 top-1/2 -translate-y-1/2 size-11 rounded-full bg-white/90 hover:bg-white text-[#10243A] shadow-md border border-slate-200/80 inline-flex items-center justify-center transition-transform active:scale-95 cursor-pointer"
               >
                 <i
@@ -155,7 +158,7 @@ export function PlacePhotoLightboxModal({
         {total > 1 && (
           <div
             role="tablist"
-            aria-label="Danh sách ảnh thu nhỏ"
+            aria-label={lb.thumbnailsAria}
             className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5"
           >
             {images.map((imgUrl, idx) => {
@@ -166,7 +169,7 @@ export function PlacePhotoLightboxModal({
                   type="button"
                   role="tab"
                   aria-selected={isCurrent}
-                  aria-label={`Xem ảnh ${idx + 1}`}
+                  aria-label={t("place.lightbox.viewImageAria", { index: idx + 1 })}
                   onClick={() => onActiveIndexChange(idx)}
                   className={`relative h-14 w-20 shrink-0 rounded-lg overflow-hidden border transition-all cursor-pointer ${
                     isCurrent

@@ -7,18 +7,22 @@ import { Bookmark } from "lucide-react";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
 import { UserAccountMenu } from "@/components/common/UserAccountMenu";
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
 import { MobileNavSheet } from "@/components/common/MobileNavSheet";
 import { useAuthModalStore } from "@/features/auth/stores/auth-modal.store";
+import { useI18n } from "@/i18n/LocaleProvider";
+import type { TranslationKey } from "@/i18n";
 
-const NAV_LINKS = [
-  { href: "/explore", label: "Khám phá" },
-  { href: "/planner", label: "Lịch trình" },
-  { href: "/community", label: "Cộng đồng" },
+const NAV_LINKS: ReadonlyArray<{ href: string; labelKey: TranslationKey }> = [
+  { href: "/explore", labelKey: "nav.explore" },
+  { href: "/planner", labelKey: "nav.planner" },
+  { href: "/community", labelKey: "nav.community" },
 ];
 
 export function LandingNavbar() {
   const { user, isLoading } = useAuth();
+  const { t } = useI18n();
   const openAuthModal = useAuthModalStore((state) => state.openAuthModal);
 
   return (
@@ -40,7 +44,7 @@ export function LandingNavbar() {
               TripGenie
             </span>
             <span className="block text-[10px] uppercase font-semibold tracking-wider text-slate-200 -mt-0.5">
-              Nền Tảng Du Lịch Thông Minh
+              {t("common.brandTagline")}
             </span>
           </div>
         </Link>
@@ -54,13 +58,15 @@ export function LandingNavbar() {
             href={link.href}
             className="hover:text-[#38BDF8] transition-colors drop-shadow-xs"
           >
-            {link.label}
+            {t(link.labelKey)}
           </Link>
         ))}
       </div>
 
       {/* Action area: User controls when logged in, Auth buttons when logged out */}
       <div className="flex items-center justify-end gap-2 sm:gap-3">
+        <LanguageSwitcher variant="transparent" className="hidden md:inline-flex" />
+
         {isLoading ? (
           <div className="flex items-center gap-1.5 sm:gap-2.5">
             <div className="hidden sm:block size-10 rounded-xl bg-white/10 animate-pulse" />
@@ -75,7 +81,7 @@ export function LandingNavbar() {
                 variant="ghost"
                 size="icon"
                 className="size-10 rounded-xl text-white/90 hover:text-white hover:bg-white/15 transition-all cursor-pointer shadow-xs drop-shadow-sm"
-                title="Bộ sưu tập"
+                title={t("nav.collections")}
               >
                 <Bookmark className="size-5" />
               </Button>
@@ -99,14 +105,14 @@ export function LandingNavbar() {
               onClick={() => openAuthModal("login")}
               className="hidden sm:inline-flex px-4 py-2 text-sm font-bold text-white hover:text-[#38BDF8] transition-colors cursor-pointer drop-shadow-xs"
             >
-              Đăng nhập
+              {t("nav.signIn")}
             </button>
             <button
               type="button"
               onClick={() => openAuthModal("register")}
               className="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl text-xs sm:text-sm font-bold bg-[#0194F3] hover:bg-[#0084DE] text-white transition-all shadow-lg shadow-blue-500/30 active:scale-[0.98] cursor-pointer"
             >
-              Bắt đầu miễn phí
+              {t("nav.getStarted")}
             </button>
 
             {/* Mobile Navigation Drawer Trigger */}

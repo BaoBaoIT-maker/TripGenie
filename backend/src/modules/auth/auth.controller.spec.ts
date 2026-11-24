@@ -78,7 +78,7 @@ describe('AuthController', () => {
         fullName: 'Test',
       };
       const res = await controller.register(dto);
-      expect(mockAuthService.register).toHaveBeenCalledWith(dto);
+      expect(mockAuthService.register).toHaveBeenCalledWith(dto, 'vi');
       expect(res.registrationId).toBe('reg-uuid-1');
     });
   });
@@ -100,6 +100,7 @@ describe('AuthController', () => {
       const res = await controller.resendVerificationEmail(dto);
       expect(mockAuthService.resendVerificationEmail).toHaveBeenCalledWith(
         'reg-uuid-1',
+        'vi',
       );
       expect(res.expiresIn).toBe(1800);
     });
@@ -147,7 +148,7 @@ describe('AuthController', () => {
     it('nên gọi AuthService.forgotPassword', async () => {
       const dto = { email: 'test@example.com' };
       const res = await controller.forgotPassword(dto);
-      expect(mockAuthService.forgotPassword).toHaveBeenCalledWith(dto);
+      expect(mockAuthService.forgotPassword).toHaveBeenCalledWith(dto, 'vi');
       expect(res.message).toBeDefined();
     });
 

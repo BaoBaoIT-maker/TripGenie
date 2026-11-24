@@ -45,9 +45,11 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Place } from "@/types/place";
+import { getPlaceCategoryLabel, useI18n } from "@/i18n";
 import { toast } from "sonner";
 
 export default function CollectionsPage() {
+  const { locale, t } = useI18n();
   const { user, isLoading: isAuthLoading } = useAuth();
   const isAuthenticated = Boolean(user);
 
@@ -101,26 +103,46 @@ export default function CollectionsPage() {
 
   // Search debounce using 3-tier search engine
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      setIsSearching(false);
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
       return;
     }
 
+    let cancelled = false;
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await placeService.searchPlaces({ keyword: searchQuery.trim(), limit: 6 });
-        setSearchResults(res.places || []);
+        const res = await placeService.searchPlaces({ keyword: trimmed, limit: 6 });
+        if (!cancelled) {
+          setSearchResults(res.places || []);
+        }
       } catch {
-        setSearchResults([]);
+        if (!cancelled) {
+          setSearchResults([]);
+        }
       } finally {
-        setIsSearching(false);
+        if (!cancelled) {
+          setIsSearching(false);
+        }
       }
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [searchQuery]);
+
+  const handleSearchQueryChange = (value: string) => {
+    setSearchQuery(value);
+    if (!value.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+    }
+  };
+
+  const getDisplayCollectionTitle = (title: string) =>
+    title === DEFAULT_COLLECTION_TITLE ? t("collections.defaultTitle") : title;
 
   const existingPlaceIds = useMemo(() => {
     return new Set(collectionDetail?.places.map((p) => p.placeId) || []);
@@ -150,7 +172,7 @@ export default function CollectionsPage() {
 
   const handleOpenEditModal = () => {
     if (!collectionDetail) return;
-    setEditTitle(collectionDetail.title);
+    setEditTitle(getDisplayCollectionTitle(collectionDetail.title));
     setEditDescription(collectionDetail.description || "");
     setEditIsPublic(collectionDetail.isPublic);
     setIsEditOpen(true);
@@ -179,7 +201,7 @@ export default function CollectionsPage() {
 
   const handleDeleteActiveCollection = () => {
     if (!selectedCollectionId) return;
-    if (confirm("Bạn có chắc chắn muốn xóa bộ sưu tập này không?")) {
+    if (confirm(t("collections.deleteConfirm"))) {
       deleteMutation.mutate(selectedCollectionId, {
         onSuccess: () => {
           setActiveCollectionId(null);
@@ -193,9 +215,9 @@ export default function CollectionsPage() {
     const shareUrl = `${window.location.origin}/collections/${selectedCollectionId}`;
     if (navigator.clipboard) {
       navigator.clipboard.writeText(shareUrl);
-      toast.success("Đã sao chép liên kết chia sẻ vào bộ nhớ tạm!");
+      toast.success(t("collections.toasts.linkCopied"));
     } else {
-      toast.info(`Liên kết: ${shareUrl}`);
+      toast.info(t("collections.toasts.linkFallback", { url: shareUrl }));
     }
   };
 
@@ -207,7 +229,9 @@ export default function CollectionsPage() {
       await addPlaceMutation.mutateAsync({
         collectionId: selectedCollectionId,
         placeId,
-        collectionName: collectionDetail?.title,
+        collectionName: collectionDetail
+          ? getDisplayCollectionTitle(collectionDetail.title)
+          : undefined,
       });
     } finally {
       setAddingPlaceId(null);
@@ -223,10 +247,10 @@ export default function CollectionsPage() {
         </div>
         <div className="max-w-md mx-auto space-y-2">
           <h1 className="text-2xl sm:text-3xl font-bold font-heading text-foreground">
-            Lưu giữ những điểm đến yêu thích
+            {t("collections.guestTitle")}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Đăng nhập để xem danh sách địa điểm đã lưu, tạo các bộ sưu tập riêng và lên lịch trình một cách dễ dàng.
+            {t("collections.guestDescription")}
           </p>
         </div>
         <div className="pt-2">
@@ -237,7 +261,7 @@ export default function CollectionsPage() {
             })}
           >
             <LogIn className="size-4" />
-            <span>Đăng nhập ngay</span>
+            <span>{t("collections.signInNow")}</span>
           </Link>
         </div>
       </div>
@@ -250,10 +274,10 @@ export default function CollectionsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-5">
         <div className="space-y-1">
           <h1 className="text-2xl sm:text-3xl font-bold tracking-tight font-heading text-foreground">
-            Bộ sưu tập & Địa điểm đã lưu
+            {t("collections.pageTitle")}
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground">
-            Quản lý và sắp xếp các điểm đến ưa thích cho chuyến đi sắp tới.
+            {t("collections.pageSubtitle")}
           </p>
         </div>
 
@@ -265,28 +289,28 @@ export default function CollectionsPage() {
                 className="h-10 px-4 rounded-xl font-semibold gap-2 border-primary/30 text-primary hover:bg-primary/10"
               >
                 <Plus className="size-4" />
-                <span>Tạo bộ sưu tập</span>
+                <span>{t("collections.createButton")}</span>
               </Button>
             }
           />
           <DialogContent className="sm:max-w-md">
             <form onSubmit={handleCreateCollection} className="space-y-4">
               <DialogHeader>
-                <DialogTitle className="font-heading text-xl">Tạo bộ sưu tập mới</DialogTitle>
+                <DialogTitle className="font-heading text-xl">{t("collections.createModalTitle")}</DialogTitle>
                 <DialogDescription className="text-xs text-muted-foreground">
-                  Gom nhóm các địa điểm theo chủ đề như Quán cafe, Chuyến đi Đà Lạt, v.v.
+                  {t("collections.createModalDescription")}
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-3 py-2">
                 <div className="space-y-1.5">
                   <label htmlFor="createCollectionTitle" className="text-xs font-semibold text-foreground">
-                    Tên bộ sưu tập <span className="text-rose-500">*</span>
+                    {t("collections.titleLabel")} <span className="text-rose-500">*</span>
                   </label>
                   <Input
                     id="createCollectionTitle"
                     required
-                    placeholder="VD: Quán cafe chụp ảnh đẹp"
+                    placeholder={t("collections.titlePlaceholder")}
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
                     maxLength={100}
@@ -296,11 +320,11 @@ export default function CollectionsPage() {
 
                 <div className="space-y-1.5">
                   <label htmlFor="createCollectionDescription" className="text-xs font-semibold text-foreground">
-                    Mô tả (tùy chọn)
+                    {t("collections.descriptionLabelOptional")}
                   </label>
                   <Input
                     id="createCollectionDescription"
-                    placeholder="Ghi chú thêm về bộ sưu tập..."
+                    placeholder={t("collections.descriptionPlaceholder")}
                     value={newDescription}
                     onChange={(e) => setNewDescription(e.target.value)}
                     maxLength={200}
@@ -317,7 +341,7 @@ export default function CollectionsPage() {
                     className="size-4 rounded border-border text-primary focus:ring-primary"
                   />
                   <label htmlFor="isPublicCheck" className="text-xs text-muted-foreground cursor-pointer">
-                    Cho phép chia sẻ công khai với bạn bè
+                    {t("collections.publicCheckbox")}
                   </label>
                 </div>
               </div>
@@ -329,7 +353,7 @@ export default function CollectionsPage() {
                   onClick={() => setIsCreateOpen(false)}
                   disabled={createMutation.isPending}
                 >
-                  Hủy
+                  {t("common.cancel")}
                 </Button>
                 <Button
                   type="submit"
@@ -337,7 +361,7 @@ export default function CollectionsPage() {
                   className="gap-2"
                 >
                   {createMutation.isPending && <Loader2 className="size-4 animate-spin" />}
-                  <span>Tạo ngay</span>
+                  <span>{t("collections.createSubmit")}</span>
                 </Button>
               </DialogFooter>
             </form>
@@ -365,10 +389,10 @@ export default function CollectionsPage() {
       {isCollectionsError && (
         <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 text-center space-y-3">
           <p className="text-sm font-medium text-destructive">
-            Không thể tải danh sách bộ sưu tập. Vui lòng thử lại.
+            {t("collections.loadError")}
           </p>
           <Button variant="outline" size="sm" onClick={() => refetchCollections()}>
-            Thử lại
+            {t("common.retry")}
           </Button>
         </div>
       )}
@@ -397,7 +421,7 @@ export default function CollectionsPage() {
                   ) : (
                     <Folder className="size-3.5" />
                   )}
-                  <span>{col.title}</span>
+                  <span>{getDisplayCollectionTitle(col.title)}</span>
                   <span
                     className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                       isSelected
@@ -418,7 +442,7 @@ export default function CollectionsPage() {
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-base font-bold font-heading text-foreground">
-                    {collectionDetail.title}
+                    {getDisplayCollectionTitle(collectionDetail.title)}
                   </h2>
                   <span
                     className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-md ${
@@ -430,12 +454,12 @@ export default function CollectionsPage() {
                     {collectionDetail.isPublic ? (
                       <>
                         <Globe className="size-3" />
-                        <span>Công khai</span>
+                        <span>{t("collections.publicBadge")}</span>
                       </>
                     ) : (
                       <>
                         <Lock className="size-3" />
-                        <span>Riêng tư</span>
+                        <span>{t("collections.privateBadge")}</span>
                       </>
                     )}
                   </span>
@@ -456,10 +480,10 @@ export default function CollectionsPage() {
                     size="sm"
                     onClick={handleShareCollection}
                     className="h-9 min-h-[44px] sm:min-h-0 px-3 rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
-                    title="Sao chép liên kết chia sẻ"
+                    title={t("collections.shareTooltip")}
                   >
                     <Share2 className="size-3.5 text-primary" />
-                    <span>Chia sẻ</span>
+                    <span>{t("collections.share")}</span>
                   </Button>
                 )}
 
@@ -472,15 +496,15 @@ export default function CollectionsPage() {
                         className="h-9 min-h-[44px] sm:min-h-0 px-3 rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
                       >
                         <Plus className="size-3.5" />
-                        <span>Thêm địa điểm</span>
+                        <span>{t("collections.addPlace")}</span>
                       </Button>
                     }
                   />
                   <DialogContent className="sm:max-w-lg p-6 space-y-4">
                     <DialogHeader>
-                      <DialogTitle className="font-heading text-xl">Thêm địa điểm vào bộ sưu tập</DialogTitle>
+                      <DialogTitle className="font-heading text-xl">{t("collections.addPlaceModalTitle")}</DialogTitle>
                       <DialogDescription className="text-xs text-muted-foreground">
-                        Tìm kiếm địa điểm bằng tên quán, địa chỉ hoặc từ khóa AI (áp dụng công nghệ tìm kiếm 3 tầng).
+                        {t("collections.addPlaceModalDescription")}
                       </DialogDescription>
                     </DialogHeader>
 
@@ -489,10 +513,10 @@ export default function CollectionsPage() {
                       <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                       <Input
                         autoFocus
-                        aria-label="Tìm kiếm địa điểm để thêm vào bộ sưu tập"
-                        placeholder="VD: Cà phê Trứng, Bạch Đằng, Bánh mì Phượng..."
+                        aria-label={t("collections.searchAria")}
+                        placeholder={t("collections.searchPlaceholder")}
                         value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        onChange={(e) => handleSearchQueryChange(e.target.value)}
                         className="pl-10 h-11 rounded-xl text-sm"
                       />
                       {isSearching && (
@@ -511,8 +535,8 @@ export default function CollectionsPage() {
                       ) : searchResults.length === 0 ? (
                         <p className="text-xs text-muted-foreground text-center py-8">
                           {searchQuery.trim()
-                            ? "Không tìm thấy địa điểm nào khớp với từ khóa."
-                            : "Gõ từ khóa để bắt đầu tìm kiếm địa điểm..."}
+                            ? t("collections.searchNoResults")
+                            : t("collections.searchPrompt")}
                         </p>
                       ) : (
                         searchResults.map((p) => {
@@ -544,7 +568,7 @@ export default function CollectionsPage() {
                                   <h4 className="text-xs font-bold text-foreground truncate">{p.name}</h4>
                                   <p className="text-[11px] text-muted-foreground truncate">{p.address}</p>
                                   <div className="flex items-center gap-2 text-[10px] text-muted-foreground mt-0.5">
-                                    <span className="text-primary font-medium">{p.categoryLabel}</span>
+                                    <span className="text-primary font-medium">{getPlaceCategoryLabel(p, locale)}</span>
                                     {p.rating > 0 && (
                                       <span className="flex items-center gap-0.5">
                                         <Star className="size-2.5 text-amber-500 fill-amber-500" />
@@ -559,7 +583,7 @@ export default function CollectionsPage() {
                                 {isAlreadyIn ? (
                                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg">
                                     <Check className="size-3" />
-                                    <span>Đã có</span>
+                                    <span>{t("collections.alreadyAdded")}</span>
                                   </span>
                                 ) : (
                                   <Button
@@ -573,7 +597,7 @@ export default function CollectionsPage() {
                                     ) : (
                                       <Plus className="size-3" />
                                     )}
-                                    <span>Thêm</span>
+                                    <span>{t("collections.add")}</span>
                                   </Button>
                                 )}
                               </div>
@@ -591,10 +615,10 @@ export default function CollectionsPage() {
                   size="sm"
                   onClick={handleOpenEditModal}
                   className="h-9 min-h-[44px] sm:min-h-0 px-3 rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
-                  title="Chỉnh sửa thông tin bộ sưu tập"
+                  title={t("collections.editTooltip")}
                 >
                   <Pencil className="size-3.5" />
-                  <span>Chỉnh sửa</span>
+                  <span>{t("collections.edit")}</span>
                 </Button>
 
                 {/* Delete Button (Except DEFAULT_COLLECTION_TITLE) */}
@@ -605,10 +629,10 @@ export default function CollectionsPage() {
                     onClick={handleDeleteActiveCollection}
                     disabled={deleteMutation.isPending}
                     className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-9 min-h-[44px] sm:min-h-0 px-2.5 rounded-xl gap-1 text-xs cursor-pointer"
-                    title="Xóa bộ sưu tập"
+                    title={t("collections.deleteTooltip")}
                   >
                     <Trash2 className="size-3.5" />
-                    <span className="hidden sm:inline">Xóa</span>
+                    <span className="hidden sm:inline">{t("collections.delete")}</span>
                   </Button>
                 )}
               </div>
@@ -620,16 +644,16 @@ export default function CollectionsPage() {
             <DialogContent className="sm:max-w-md">
               <form onSubmit={handleUpdateCollection} className="space-y-4">
                 <DialogHeader>
-                  <DialogTitle className="font-heading text-xl">Chỉnh sửa bộ sưu tập</DialogTitle>
+                  <DialogTitle className="font-heading text-xl">{t("collections.editModalTitle")}</DialogTitle>
                   <DialogDescription className="text-xs text-muted-foreground">
-                    Cập nhật tên, mô tả hoặc chuyển đổi trạng thái hiển thị của bộ sưu tập.
+                    {t("collections.editModalDescription")}
                   </DialogDescription>
                 </DialogHeader>
 
                 <div className="space-y-3 py-2">
                   <div className="space-y-1.5">
                     <label htmlFor="editCollectionTitle" className="text-xs font-semibold text-foreground">
-                      Tên bộ sưu tập <span className="text-rose-500">*</span>
+                      {t("collections.titleLabel")} <span className="text-rose-500">*</span>
                     </label>
                     <Input
                       id="editCollectionTitle"
@@ -642,18 +666,18 @@ export default function CollectionsPage() {
                     />
                     {collectionDetail?.title === DEFAULT_COLLECTION_TITLE && (
                       <p className="text-[11px] text-muted-foreground">
-                        Bộ sưu tập mặc định &ldquo;{DEFAULT_COLLECTION_TITLE}&rdquo; không thể đổi tên.
+                        {t("collections.defaultRenameHint", { title: t("collections.defaultTitle") })}
                       </p>
                     )}
                   </div>
 
                   <div className="space-y-1.5">
                     <label htmlFor="editCollectionDescription" className="text-xs font-semibold text-foreground">
-                      Mô tả
+                      {t("collections.descriptionLabel")}
                     </label>
                     <Input
                       id="editCollectionDescription"
-                      placeholder="Ghi chú thêm về bộ sưu tập..."
+                      placeholder={t("collections.descriptionPlaceholder")}
                       value={editDescription}
                       onChange={(e) => setEditDescription(e.target.value)}
                       maxLength={200}
@@ -670,7 +694,7 @@ export default function CollectionsPage() {
                       className="size-4 rounded border-border text-primary focus:ring-primary"
                     />
                     <label htmlFor="editPublicCheck" className="text-xs text-muted-foreground cursor-pointer">
-                      Cho phép chia sẻ công khai với bạn bè
+                      {t("collections.publicCheckbox")}
                     </label>
                   </div>
                 </div>
@@ -682,7 +706,7 @@ export default function CollectionsPage() {
                     onClick={() => setIsEditOpen(false)}
                     disabled={updateMutation.isPending}
                   >
-                    Hủy
+                    {t("common.cancel")}
                   </Button>
                   <Button
                     type="submit"
@@ -690,7 +714,7 @@ export default function CollectionsPage() {
                     className="gap-2"
                   >
                     {updateMutation.isPending && <Loader2 className="size-4 animate-spin" />}
-                    <span>Lưu thay đổi</span>
+                    <span>{t("collections.saveChanges")}</span>
                   </Button>
                 </DialogFooter>
               </form>
@@ -707,10 +731,10 @@ export default function CollectionsPage() {
           ) : isDetailError ? (
             <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-6 text-center space-y-3">
               <p className="text-sm font-medium text-destructive">
-                Không thể tải danh sách địa điểm trong bộ sưu tập.
+                {t("collections.detailLoadError")}
               </p>
               <Button variant="outline" size="sm" onClick={() => refetchDetail()}>
-                Thử lại
+                {t("common.retry")}
               </Button>
             </div>
           ) : collectionDetail?.places && collectionDetail.places.length > 0 ? (
@@ -722,7 +746,7 @@ export default function CollectionsPage() {
                     key={place.id}
                     place={place}
                     currentCollectionId={selectedCollectionId}
-                    collectionName={collectionDetail.title}
+                    collectionName={getDisplayCollectionTitle(collectionDetail.title)}
                   />
                 );
               })}
@@ -735,10 +759,10 @@ export default function CollectionsPage() {
               </div>
               <div className="space-y-1">
                 <h3 className="text-base font-semibold text-foreground">
-                  Chưa có địa điểm nào trong bộ sưu tập này
+                  {t("collections.emptyTitle")}
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  Bấm "+ Thêm địa điểm" ở trên hoặc bấm biểu tượng trái tim trên các thẻ địa điểm để lưu lại.
+                  {t("collections.emptyHint")}
                 </p>
               </div>
               <div className="flex items-center justify-center gap-3">
@@ -747,7 +771,7 @@ export default function CollectionsPage() {
                   className="rounded-xl text-xs font-semibold gap-1.5"
                 >
                   <Plus className="size-3.5" />
-                  <span>Tìm và thêm địa điểm</span>
+                  <span>{t("collections.findAndAdd")}</span>
                 </Button>
                 <Link
                   href="/places"
@@ -756,7 +780,7 @@ export default function CollectionsPage() {
                     className: "rounded-xl text-xs font-semibold inline-flex items-center",
                   })}
                 >
-                  Khám phá địa điểm
+                  {t("collections.explorePlaces")}
                 </Link>
               </div>
             </div>

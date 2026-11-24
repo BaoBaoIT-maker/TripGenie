@@ -30,7 +30,7 @@ import {
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { toast } from 'sonner';
 import ItineraryWizardModal from '@/features/planner/components/ItineraryWizardModal';
-import { formatVnd, formatDateVi, formatTripDates } from '@/features/planner/model/itinerary-format';
+import { formatVnd, formatTripDates } from '@/features/planner/model/itinerary-format';
 import { getItineraryWeather } from '@/features/planner/services/weather.service';
 import { TripCard } from '@/features/planner/components/TripCard';
 import { WeatherIcon } from '@/features/planner/components/itinerary/WeatherIcon';
@@ -38,9 +38,9 @@ import {
   getDestinationCover,
   ITINERARY_SCOPE_OPTIONS,
   DEFAULT_TRIP_DAYS,
-  DEFAULT_BUDGET_FALLBACK_TEXT,
   type ItineraryScope,
 } from '@/features/planner/constants/itinerary.constants';
+import { useI18n } from '@/i18n';
 import type { ItineraryDetail } from '@/types/itinerary';
 
 function isPastTrip(endDate?: string | null, startDate?: string | null): boolean {
@@ -56,6 +56,7 @@ function isPastTrip(endDate?: string | null, startDate?: string | null): boolean
 
 export default function PlannerListPage() {
   const router = useRouter();
+  const { t, locale } = useI18n();
   const { user } = useAuth();
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [wizardPreselectedDest, setWizardPreselectedDest] = useState<string | undefined>(undefined);
@@ -151,11 +152,10 @@ export default function PlannerListPage() {
     if (!deletingItin) return;
     try {
       await deleteMutation.mutateAsync(deletingItin.id);
-      toast.success(`Đã xóa lịch trình "${deletingItin.title}" thành công!`);
+      toast.success(t('planner.page.deleteSuccessNamed', { title: deletingItin.title }));
       setDeletingItin(null);
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error ? err.message : 'Không thể xóa lịch trình. Vui lòng thử lại!';
+      const msg = err instanceof Error ? err.message : t('planner.page.deleteError');
       toast.error(msg);
     }
   };
@@ -194,22 +194,19 @@ export default function PlannerListPage() {
     try {
       const countToDelete = selectedIds.length;
       await bulkDeleteMutation.mutateAsync(selectedIds);
-      toast.success(`Đã xóa thành công ${countToDelete} lịch trình!`);
+      toast.success(t('planner.page.bulkDeleteSuccess', { count: countToDelete }));
       setSelectedIds([]);
       setIsSelectMode(false);
       setShowBulkDeleteModal(false);
     } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : 'Không thể xóa các lịch trình đã chọn. Vui lòng thử lại!';
+      const msg = err instanceof Error ? err.message : t('planner.page.bulkDeleteError');
       toast.error(msg);
     }
   };
 
   function handleOpenWizard(dest?: string) {
     if (!user) {
-      toast.error('Vui lòng đăng nhập để tạo và lưu trữ lịch trình cá nhân!');
+      toast.error(t('planner.page.loginCreateError'));
       router.push('/login');
       return;
     }
@@ -226,18 +223,21 @@ export default function PlannerListPage() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 pb-2 border-b border-slate-200/80">
           <div className="space-y-1">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 flex items-center gap-3">
-              <span>Lịch trình của bạn</span>
+              <span>{t('planner.page.title')}</span>
               <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                {allItineraries.length} chuyến đi
+                {t('planner.page.tripsCount', { count: allItineraries.length })}
               </span>
               {isSelectMode && (
                 <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-[#0194F3] text-white animate-in fade-in">
-                  Đã chọn {selectedIds.length}/{searchFilteredItineraries.length}
+                  {t('planner.page.selectedFraction', {
+                    selected: selectedIds.length,
+                    total: searchFilteredItineraries.length,
+                  })}
                 </span>
               )}
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 max-w-xl">
-              Quản lý toàn bộ hành trình du lịch cá nhân và các chuyến đi đồng hành cùng bạn bè.
+              {t('planner.page.subtitle')}
             </p>
           </div>
 
@@ -255,8 +255,8 @@ export default function PlannerListPage() {
                       <CheckCheck className="size-3.5 text-[#0194F3]" />
                       <span>
                         {selectedIds.length === searchFilteredItineraries.length
-                          ? 'Bỏ chọn tất cả'
-                          : `Chọn tất cả (${searchFilteredItineraries.length})`}
+                          ? t('planner.page.deselectAll')
+                          : t('planner.page.selectAll', { count: searchFilteredItineraries.length })}
                       </span>
                     </button>
 
@@ -266,7 +266,7 @@ export default function PlannerListPage() {
                       className="inline-flex items-center gap-1.5 h-10 px-3.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer shadow-2xs"
                     >
                       <X className="size-3.5" />
-                      <span>Hủy chọn</span>
+                      <span>{t('planner.page.cancelSelect')}</span>
                     </button>
                   </>
                 ) : (
@@ -276,7 +276,7 @@ export default function PlannerListPage() {
                     className="inline-flex items-center gap-1.5 h-10 px-3.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-xl transition-all shadow-2xs cursor-pointer"
                   >
                     <CheckSquare className="size-4 text-[#0194F3]" />
-                    <span>Chọn nhiều</span>
+                    <span>{t('planner.page.selectMultiple')}</span>
                   </button>
                 )}
               </>
@@ -288,7 +288,7 @@ export default function PlannerListPage() {
               className="inline-flex items-center gap-2 h-10 px-5 bg-[#0194F3] hover:bg-[#007FE3] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-xs shadow-blue-500/20 shrink-0 cursor-pointer active:scale-95"
             >
               <Plus className="size-4" />
-              <span>Tạo chuyến đi mới</span>
+              <span>{t('planner.page.createTripBtn')}</span>
             </button>
           </div>
         </div>
@@ -348,19 +348,21 @@ export default function PlannerListPage() {
                     )}
 
                     <span className="px-3 py-1 rounded-full bg-white/20 text-white text-xs font-semibold backdrop-blur-md border border-white/15">
-                      {spotlightTrip.totalDays || spotlightTrip.days?.length || DEFAULT_TRIP_DAYS}N
-                      {Math.max(
-                        0,
-                        (spotlightTrip.totalDays || spotlightTrip.days?.length || DEFAULT_TRIP_DAYS) - 1
-                      )}
-                      Đ
+                      {t('planner.common.durationCompact', {
+                        days: spotlightTrip.totalDays || spotlightTrip.days?.length || DEFAULT_TRIP_DAYS,
+                        nights: Math.max(
+                          0,
+                          (spotlightTrip.totalDays || spotlightTrip.days?.length || DEFAULT_TRIP_DAYS) - 1
+                        ),
+                      })}
                     </span>
 
                     {/* Semantic Dynamic Weather Tag */}
                     {(() => {
                       const weather = getItineraryWeather(
                         spotlightTrip.destination,
-                        spotlightTrip.startDate
+                        spotlightTrip.startDate,
+                        locale
                       );
                       return (
                         <span
@@ -372,7 +374,7 @@ export default function PlannerListPage() {
                             className="w-4 h-4 object-contain shrink-0"
                           />
                           <span>
-                            {spotlightTrip.destination || 'Điểm đến'} • {weather.label}
+                            {spotlightTrip.destination || t('planner.common.destinationFallback')} • {weather.label}
                           </span>
                         </span>
                       );
@@ -390,7 +392,7 @@ export default function PlannerListPage() {
                         );
                       }}
                       className="size-8 rounded-full bg-black/40 hover:bg-black/60 text-white backdrop-blur-md flex items-center justify-center transition-all border border-white/20 cursor-pointer"
-                      title="Tùy chọn"
+                      title={t('planner.page.optionsTitle')}
                     >
                       <MoreVertical className="size-4" />
                     </button>
@@ -405,7 +407,7 @@ export default function PlannerListPage() {
                           className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold hover:bg-sky-50 hover:text-[#0194F3] transition-colors"
                         >
                           <Eye className="size-3.5 text-slate-400" />
-                          <span>Xem chi tiết</span>
+                          <span>{t('planner.tripCard.viewDetail')}</span>
                         </Link>
 
                         <button
@@ -417,7 +419,7 @@ export default function PlannerListPage() {
                           className="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold hover:bg-sky-50 hover:text-[#0194F3] transition-colors cursor-pointer"
                         >
                           <CheckSquare className="size-3.5 text-slate-400" />
-                          <span>Chọn chuyến đi này</span>
+                          <span>{t('planner.page.selectThisTrip')}</span>
                         </button>
 
                         {(spotlightTrip.isOwner !== false ||
@@ -433,7 +435,7 @@ export default function PlannerListPage() {
                               className="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                             >
                               <Trash2 className="size-3.5 text-rose-500" />
-                              <span>Xóa lịch trình</span>
+                              <span>{t('planner.tripCard.delete')}</span>
                             </button>
                           </>
                         )}
@@ -451,18 +453,18 @@ export default function PlannerListPage() {
 
                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs sm:text-sm text-slate-200">
                       <span>
-                        Thời gian:{' '}
+                        {t('planner.page.spotlightDatesLabel')}{' '}
                         <span className="text-white font-medium">
-                          {formatTripDates(spotlightTrip.startDate, spotlightTrip.endDate)}
+                          {formatTripDates(spotlightTrip.startDate, spotlightTrip.endDate, locale)}
                         </span>
                       </span>
                       <span className="text-white/40 hidden sm:inline">•</span>
                       <span>
-                        Dự toán:{' '}
+                        {t('planner.page.spotlightBudgetLabel')}{' '}
                         <span className="text-white font-medium">
                           {spotlightTrip.budgetBreakdown?.totalEstimated
                             ? formatVnd(spotlightTrip.budgetBreakdown.totalEstimated)
-                            : DEFAULT_BUDGET_FALLBACK_TEXT}
+                            : t('planner.common.actualCostFallback')}
                         </span>
                       </span>
                     </div>
@@ -483,7 +485,7 @@ export default function PlannerListPage() {
                         <div className="flex items-center gap-2 text-xs text-slate-300 pt-0.5">
                           <Landmark className="size-3.5 text-sky-400 shrink-0" />
                           <span className="font-semibold text-white shrink-0">
-                            {totalActivities} điểm tham quan:
+                            {t('planner.page.spotlightAttractions', { count: totalActivities })}
                           </span>
                           {samplePlaces.length > 0 && (
                             <span className="text-slate-200 truncate">
@@ -521,7 +523,7 @@ export default function PlannerListPage() {
                                     {m.avatarUrl ? (
                                       <img
                                         src={m.avatarUrl}
-                                        alt={m.fullName || 'Thành viên'}
+                                        alt={m.fullName || t('planner.common.memberFallback')}
                                         className="w-full h-full object-cover"
                                       />
                                     ) : (
@@ -536,9 +538,9 @@ export default function PlannerListPage() {
                             <span className="text-xs font-medium text-slate-200">
                               {isSharedRole
                                 ? spotlightTrip.viewerRole === 'EDITOR'
-                                  ? `Đồng hành (${memberCount} người - Có quyền sửa)`
-                                  : `Đồng hành (${memberCount} người - Chỉ xem)`
-                                : `Chuyến đi nhóm (${memberCount} người đi)`}
+                                  ? t('planner.page.sharedEditorBadge', { count: memberCount })
+                                  : t('planner.page.sharedViewerBadge', { count: memberCount })
+                                : t('planner.page.groupTripBadge', { count: memberCount })}
                             </span>
                           </div>
                         );
@@ -548,7 +550,7 @@ export default function PlannerListPage() {
                         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/15 self-start sm:self-auto">
                           <User className="size-3.5 text-white/80" />
                           <span className="text-xs font-medium text-slate-200">
-                            Chuyến đi cá nhân
+                            {t('planner.page.soloTripBadge')}
                           </span>
                         </div>
                       );
@@ -560,7 +562,7 @@ export default function PlannerListPage() {
                       onClick={(e) => e.stopPropagation()}
                       className="inline-flex items-center justify-center gap-2 h-11 sm:h-10 px-5 bg-[#0194F3] hover:bg-[#007FE3] text-white text-xs sm:text-sm font-bold rounded-xl transition-all shadow-md shadow-blue-500/25 cursor-pointer w-full sm:w-auto shrink-0"
                     >
-                      <span>Xem lịch trình chi tiết</span>
+                      <span>{t('planner.page.viewDetailCta')}</span>
                       <ArrowRight className="size-3.5" />
                     </Link>
                   </div>
@@ -596,7 +598,7 @@ export default function PlannerListPage() {
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <span>{opt.label}</span>
+                  <span>{t(`planner.scopes.${opt.key}`)}</span>
                   <span
                     className={`text-[11px] px-1.5 py-0.2 rounded-full font-bold ${
                       isActive
@@ -618,13 +620,14 @@ export default function PlannerListPage() {
               type="text"
               value={searchKeyword}
               onChange={(e) => setSearchKeyword(e.target.value)}
-              placeholder="Tìm theo tên chuyến đi, điểm đến..."
+              placeholder={t('planner.page.searchPlaceholder')}
               className="w-full h-9 pl-9 pr-8 rounded-xl text-xs sm:text-sm bg-white border border-slate-200 text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0194F3]/20 focus:border-[#0194F3] transition-all placeholder:text-slate-400 shadow-2xs"
             />
             {searchKeyword && (
               <button
                 type="button"
                 onClick={() => setSearchKeyword('')}
+                aria-label={t('planner.page.clearSearch')}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
               >
                 <X className="size-3.5" />
@@ -666,11 +669,10 @@ export default function PlannerListPage() {
             </div>
             <div className="space-y-1.5">
               <h3 className="text-lg sm:text-xl font-bold text-slate-900">
-                Chưa có kế hoạch chuyến đi nào
+                {t('planner.page.emptyAllTitle')}
               </h3>
               <p className="text-xs sm:text-sm text-slate-500 leading-relaxed max-w-sm mx-auto">
-                Bắt đầu hành trình tiếp theo của bạn ngay hôm nay! Hãy để Genie AI thiết kế lộ trình
-                thông minh chỉ trong vài giây.
+                {t('planner.page.emptyAllDesc')}
               </p>
             </div>
             <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
@@ -680,13 +682,13 @@ export default function PlannerListPage() {
                 className="px-5 py-2.5 rounded-xl bg-[#0194F3] hover:bg-[#007FE3] text-white text-xs sm:text-sm font-bold transition-all shadow-xs shadow-blue-500/20 flex items-center gap-2 cursor-pointer"
               >
                 <Sparkles className="size-4" />
-                <span>Tạo lịch trình với AI</span>
+                <span>{t('planner.page.emptyAiBtn')}</span>
               </button>
               <Link
                 href="/community"
                 className="px-5 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-semibold transition-colors"
               >
-                Khám phá Cộng đồng
+                {t('planner.page.exploreCommunityBtn')}
               </Link>
             </div>
           </div>
@@ -702,14 +704,14 @@ export default function PlannerListPage() {
             <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center max-w-md mx-auto space-y-3 my-6">
               <Search className="size-8 text-slate-300 mx-auto" />
               <p className="text-sm font-semibold text-slate-800">
-                Không tìm thấy chuyến đi nào với từ khóa &quot;{searchKeyword}&quot;
+                {t('planner.page.emptySearchNamed', { keyword: searchKeyword })}
               </p>
               <button
                 type="button"
                 onClick={() => setSearchKeyword('')}
                 className="text-xs font-bold text-[#0194F3] hover:underline cursor-pointer"
               >
-                Xóa tìm kiếm để xem tất cả
+                {t('planner.page.clearSearchViewAll')}
               </button>
             </div>
           )}
@@ -720,7 +722,9 @@ export default function PlannerListPage() {
         {!isLoading && (upcomingTrips.length > 0 || !searchKeyword) && (
           <div className="space-y-4">
             <div className="flex items-center gap-2 border-b border-slate-200/80 pb-2">
-              <h2 className="text-base font-bold text-slate-800">Chuyến đi sắp tới</h2>
+              <h2 className="text-base font-bold text-slate-800">
+                {t('planner.page.upcomingSectionTitle')}
+              </h2>
               <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-sky-50 text-[#0194F3] border border-sky-200">
                 {upcomingTrips.length}
               </span>
@@ -766,10 +770,10 @@ export default function PlannerListPage() {
                   <Plus className="size-6" />
                 </div>
                 <div className="text-sm font-bold text-slate-800 group-hover:text-[#0194F3] transition-colors text-center">
-                  Lập kế hoạch mới
+                  {t('planner.page.quickCardTitle')}
                 </div>
                 <p className="text-xs text-slate-400 text-center mt-1 max-w-[180px] leading-relaxed">
-                  Tạo nhanh bằng Genie AI hoặc xếp lịch thủ công
+                  {t('planner.page.quickCardDesc')}
                 </p>
               </div>
             </div>
@@ -782,7 +786,9 @@ export default function PlannerListPage() {
         {!isLoading && pastTrips.length > 0 && (
           <div className="space-y-4 pt-4">
             <div className="flex items-center gap-2 border-b border-slate-200/80 pb-2">
-              <h2 className="text-base font-bold text-slate-800">Kỷ niệm các chuyến đi trước</h2>
+              <h2 className="text-base font-bold text-slate-800">
+                {t('planner.page.pastSectionTitle')}
+              </h2>
               <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
                 {pastTrips.length}
               </span>
@@ -816,7 +822,7 @@ export default function PlannerListPage() {
             <span className="size-6 rounded-full bg-[#0194F3] text-white font-bold flex items-center justify-center text-xs">
               {selectedIds.length}
             </span>
-            <span>Đã chọn {selectedIds.length} lịch trình</span>
+            <span>{t('planner.page.selectedCount', { count: selectedIds.length })}</span>
           </div>
 
           <div className="h-5 w-px bg-slate-700" />
@@ -828,7 +834,7 @@ export default function PlannerListPage() {
               disabled={selectedIds.length === 0}
               className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 disabled:hover:bg-transparent transition-all cursor-pointer"
             >
-              Bỏ chọn
+              {t('planner.page.deselectShort')}
             </button>
 
             <button
@@ -838,7 +844,9 @@ export default function PlannerListPage() {
               className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-md shadow-rose-900/30 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer active:scale-95"
             >
               <Trash2 className="size-3.5" />
-              <span>Xóa {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}</span>
+              <span>
+                {t('planner.page.deleteShort')} {selectedIds.length > 0 ? `(${selectedIds.length})` : ''}
+              </span>
             </button>
           </div>
         </div>
@@ -862,21 +870,21 @@ export default function PlannerListPage() {
 
             <div className="space-y-2">
               <h3 className="text-lg font-bold text-slate-900">
-                Xóa hàng loạt {selectedIds.length} lịch trình?
+                {t('planner.page.bulkDeleteModalTitle', { count: selectedIds.length })}
               </h3>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                Bạn có chắc chắn muốn xóa{' '}
+                {t('planner.page.bulkDeleteModalDescBefore')}{' '}
                 <strong className="text-slate-900 font-semibold">
-                  {selectedIds.length} lịch trình
+                  {t('planner.page.bulkDeleteModalDescCount', { count: selectedIds.length })}
                 </strong>{' '}
-                đã chọn? Hành động này sẽ gỡ bỏ chúng khỏi danh sách của bạn.
+                {t('planner.page.bulkDeleteModalDescAfter')}
               </p>
               <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed flex items-start gap-1.5">
                 <Info className="size-4 text-[#0194F3] shrink-0 mt-0.5" aria-hidden="true" />
                 <span>
-                  <strong>Bảo vệ bản sao (Clone-safe):</strong> Nếu bất kỳ lịch trình nào trong số
-                  này đã được người khác sao chép (clone) về chuyến đi của họ, thì bản sao của họ{' '}
-                  <strong>hoàn toàn an toàn và không bị ảnh hưởng</strong>.
+                  <strong>{t('planner.page.bulkDeleteSafeLabel')}</strong>{' '}
+                  {t('planner.page.bulkDeleteSafeBefore')}{' '}
+                  <strong>{t('planner.page.bulkDeleteSafeHighlight')}</strong>.
                 </span>
               </p>
             </div>
@@ -888,7 +896,7 @@ export default function PlannerListPage() {
                 onClick={() => setShowBulkDeleteModal(false)}
                 className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors cursor-pointer"
               >
-                Hủy bỏ
+                {t('planner.view.cancelAction')}
               </button>
               <button
                 type="button"
@@ -899,12 +907,12 @@ export default function PlannerListPage() {
                 {bulkDeleteMutation.isPending ? (
                   <>
                     <Loader2 className="size-3.5 animate-spin" />
-                    <span>Đang xóa {selectedIds.length} mục...</span>
+                    <span>{t('planner.page.bulkDeleting', { count: selectedIds.length })}</span>
                   </>
                 ) : (
                   <>
                     <Trash2 className="size-3.5" />
-                    <span>Xác nhận xóa ({selectedIds.length})</span>
+                    <span>{t('planner.page.confirmBulkDelete', { count: selectedIds.length })}</span>
                   </>
                 )}
               </button>
@@ -930,9 +938,11 @@ export default function PlannerListPage() {
             </div>
 
             <div className="space-y-2">
-              <h3 className="text-lg font-bold text-slate-900">Xóa lịch trình chuyến đi?</h3>
+              <h3 className="text-lg font-bold text-slate-900">
+                {t('planner.page.deleteModalTitle')}
+              </h3>
               <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                Bạn có chắc chắn muốn xóa chuyến đi{' '}
+                {t('planner.page.deleteModalDesc')}{' '}
                 <strong className="text-slate-900 font-semibold">
                   &quot;{deletingItin.title}&quot;
                 </strong>
@@ -941,9 +951,9 @@ export default function PlannerListPage() {
               <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed flex items-start gap-1.5">
                 <Info className="size-4 text-[#0194F3] shrink-0 mt-0.5" aria-hidden="true" />
                 <span>
-                  <strong>Lưu ý:</strong> Chuyến đi sẽ được gỡ khỏi danh sách của bạn. Nếu có người
-                  khác đã sao chép (clone) lịch trình này về tài khoản của họ thì bản sao của họ{' '}
-                  <strong>hoàn toàn không bị mất</strong>.
+                  <strong>{t('planner.view.deleteModalNoticeLabel')}</strong>{' '}
+                  {t('planner.view.deleteModalNoticeBefore')}{' '}
+                  <strong>{t('planner.view.deleteModalNoticeHighlight')}</strong>.
                 </span>
               </p>
             </div>
@@ -955,7 +965,7 @@ export default function PlannerListPage() {
                 onClick={() => setDeletingItin(null)}
                 className="px-4 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors cursor-pointer"
               >
-                Hủy bỏ
+                {t('planner.view.cancelAction')}
               </button>
               <button
                 type="button"
@@ -966,12 +976,12 @@ export default function PlannerListPage() {
                 {deleteMutation.isPending ? (
                   <>
                     <Loader2 className="size-3.5 animate-spin" />
-                    <span>Đang xóa...</span>
+                    <span>{t('planner.page.deleting')}</span>
                   </>
                 ) : (
                   <>
                     <Trash2 className="size-3.5" />
-                    <span>Xác nhận xóa</span>
+                    <span>{t('planner.page.confirmDelete')}</span>
                   </>
                 )}
               </button>

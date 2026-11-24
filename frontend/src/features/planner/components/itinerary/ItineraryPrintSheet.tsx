@@ -1,6 +1,8 @@
+'use client';
+
 import { memo } from 'react';
+import { useI18n, type MessageKey } from '@/i18n';
 import type { ItineraryDetail, TourBriefing } from '@/types/itinerary';
-import { BUDGET_LABEL } from '../../itinerary-labels';
 import { PARTY_SIZE_BOUNDS } from '../../constants/itinerary.constants';
 import {
   TOUR_BRIEFING_UI_CONSTANTS,
@@ -23,6 +25,7 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
   options,
   transitName,
 }: ItineraryPrintSheetProps) {
+  const { t, locale } = useI18n();
   const totalDays = data.days.length || data.totalDays || 1;
   const totalNights = Math.max(0, totalDays - 1);
   const partySize = Math.max(
@@ -39,22 +42,35 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
   const meetingPoint = options.blankHandwritingMode ? '' : briefing.meetingPoint?.trim() || '';
   const groupNotes = options.blankHandwritingMode ? '' : briefing.notes?.trim() || '';
 
+  const budgetLevelLabel =
+    data.budgetLevel && ['LOW', 'MEDIUM', 'HIGH', 'LUXURY'].includes(data.budgetLevel)
+      ? t(`planner.budgetLevels.${data.budgetLevel}` as MessageKey)
+      : t('planner.budgetLevels.MEDIUM');
+
+  const durationCompact = t('planner.common.durationCompact', {
+    days: totalDays,
+    nights: totalNights,
+  });
+
   return (
     <article
-      aria-label="Phiếu hành trình và hướng dẫn đoàn khổ A4"
+      aria-label={t('planner.printSheet.sheetAria')}
       className="bg-white text-slate-900 w-full max-w-[794px] mx-auto p-6 sm:p-10 print:p-0 print:max-w-none print:shadow-none print:border-none font-sans"
     >
       {/* 1A. OFFICIAL TOUR SHEET MASTHEAD */}
       <header className="border-b-2 border-slate-900 pb-4">
         <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] font-bold uppercase tracking-wider text-sky-900">
-          <span>TRIPGENIE.VN — PHIẾU HÀNH TRÌNH &amp; HƯỚNG DẪN ĐOÀN</span>
+          <span>{t('planner.printSheet.masthead')}</span>
           <span className="text-slate-600 font-semibold tabular-nums">
-            MÃ HÀNH TRÌNH: #{docCode}
+            {t('planner.printSheet.codeLabel', { code: docCode })}
           </span>
         </div>
 
         <h1 className="font-heading text-2xl sm:text-3xl font-bold text-slate-950 mt-1.5 leading-tight">
-          {data.title || `Hành trình khám phá ${data.destination || 'Việt Nam'}`}
+          {data.title ||
+            t('planner.briefing.fallbackTripTitle', {
+              dest: data.destination || t('planner.common.vietnamFallback'),
+            })}
         </h1>
 
         {data.description && (
@@ -65,57 +81,55 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
         <div className="mt-3 py-2 px-3 bg-slate-50 border border-slate-300 rounded-md grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs text-slate-800">
           <div>
             <span className="text-slate-500 block text-[10px] uppercase font-semibold">
-              Điểm đến
+              {t('planner.briefing.specDestination')}
             </span>
             <strong className="font-bold text-slate-950">
-              {data.destination || 'Việt Nam'}
+              {data.destination || t('planner.common.vietnamFallback')}
             </strong>
           </div>
           <div>
             <span className="text-slate-500 block text-[10px] uppercase font-semibold tabular-nums">
-              Thời gian ({totalDays}N{totalNights}Đ)
+              {t('planner.printSheet.specDuration', { duration: durationCompact })}
             </span>
             <strong className="font-bold text-slate-950 tabular-nums">
-              {formatDateRangeVi(data.startDate, data.endDate)}
+              {formatDateRangeVi(data.startDate, data.endDate, locale)}
             </strong>
           </div>
           <div>
             <span className="text-slate-500 block text-[10px] uppercase font-semibold">
-              Quy mô đoàn
+              {t('planner.briefing.specGroupSize')}
             </span>
             <strong className="font-bold text-slate-950 tabular-nums">
-              {partySize} thành viên
+              {t('planner.common.membersCount', { count: partySize })}
             </strong>
           </div>
           <div>
             <span className="text-slate-500 block text-[10px] uppercase font-semibold">
-              Phương tiện chính
+              {t('planner.printSheet.specMainTransit')}
             </span>
             <strong className="font-bold text-slate-950">{transitName}</strong>
           </div>
           <div>
             <span className="text-slate-500 block text-[10px] uppercase font-semibold">
-              Mức ngân sách
+              {t('planner.printSheet.specBudget')}
             </span>
-            <strong className="font-bold text-slate-950">
-              {BUDGET_LABEL[data.budgetLevel] || 'Tiêu chuẩn'}
-            </strong>
+            <strong className="font-bold text-slate-950">{budgetLevelLabel}</strong>
           </div>
         </div>
       </header>
 
       {/* 1B. FRAMED TOUR LEADER & ASSEMBLY BRIEFING BOX */}
       <section
-        aria-label="Thông tin điều hành đoàn và điểm tập trung"
+        aria-label={t('planner.printSheet.briefingBoxAria')}
         className="mt-4 border-2 border-slate-900 rounded-lg p-3.5 bg-white break-inside-avoid"
       >
         <div className="flex items-center justify-between border-b border-slate-200 pb-1.5 mb-2.5">
           <h2 className="text-xs font-bold uppercase tracking-wide text-slate-950 flex items-center gap-1.5">
             <i className="fa-solid fa-user-check text-xs text-[#0068B8] shrink-0" aria-hidden="true" />
-            <span>THÔNG TIN ĐIỀU HÀNH ĐOÀN &amp; ĐIỂM TẬP TRUNG</span>
+            <span>{t('planner.printSheet.briefingBoxTitle')}</span>
           </h2>
           <span className="text-[10px] font-medium text-slate-500">
-            Vui lòng có mặt đúng giờ quy định
+            {t('planner.printSheet.beOnTime')}
           </span>
         </div>
 
@@ -123,14 +137,14 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
           {/* Leader Name */}
           <div className="flex items-baseline gap-2">
             <span className="font-semibold text-slate-600 shrink-0">
-              Trưởng đoàn / Phụ trách:
+              {t('planner.printSheet.leaderLabel')}
             </span>
             {leaderName ? (
               <strong className="font-bold text-slate-950">{leaderName}</strong>
             ) : (
               <span
                 className="flex-1 border-b border-dotted border-slate-400 min-w-[120px] h-4 inline-block"
-                aria-label="Dòng trống để ghi tên trưởng đoàn"
+                aria-label={t('planner.printSheet.blankLeaderAria')}
               />
             )}
           </div>
@@ -138,7 +152,7 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
           {/* Leader Phone */}
           <div className="flex items-baseline gap-2">
             <span className="font-semibold text-slate-600 shrink-0">
-              Hotline liên hệ (24/7):
+              {t('planner.printSheet.phoneLabel')}
             </span>
             {leaderPhone ? (
               <strong className="font-bold text-slate-950 tracking-wide tabular-nums">
@@ -147,7 +161,7 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
             ) : (
               <span
                 className="flex-1 border-b border-dotted border-slate-400 min-w-[120px] h-4 inline-block"
-                aria-label="Dòng trống để ghi số điện thoại"
+                aria-label={t('planner.printSheet.blankPhoneAria')}
               />
             )}
           </div>
@@ -155,14 +169,14 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
           {/* Meeting Point & Time */}
           <div className="sm:col-span-2 flex items-baseline gap-2">
             <span className="font-semibold text-slate-600 shrink-0">
-              Điểm &amp; Giờ tập trung:
+              {t('planner.printSheet.meetingLabel')}
             </span>
             {meetingPoint ? (
               <strong className="font-bold text-slate-950">{meetingPoint}</strong>
             ) : (
               <span
                 className="flex-1 border-b border-dotted border-slate-400 min-w-[180px] h-4 inline-block"
-                aria-label="Dòng trống để ghi điểm và giờ tập trung"
+                aria-label={t('planner.printSheet.blankMeetingAria')}
               />
             )}
           </div>
@@ -170,7 +184,7 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
           {/* Group Notes */}
           <div className="sm:col-span-2 flex items-baseline gap-2">
             <span className="font-semibold text-slate-600 shrink-0">
-              Dặn dò / Lưu ý đoàn:
+              {t('planner.printSheet.notesLabel')}
             </span>
             {groupNotes ? (
               <span className="text-slate-900 font-medium leading-relaxed whitespace-pre-line">
@@ -179,7 +193,7 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
             ) : (
               <span
                 className="flex-1 border-b border-dotted border-slate-400 min-w-[180px] h-4 inline-block"
-                aria-label="Dòng trống để ghi lưu ý đoàn"
+                aria-label={t('planner.printSheet.blankNotesAria')}
               />
             )}
           </div>
@@ -189,7 +203,7 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
       {/* 1C. FULL MULTI-DAY CHECKLIST TIMELINE (ALL DAYS SEQUENTIALLY) */}
       <div className="mt-5 space-y-6">
         {data.days.map((day, dayIdx) => {
-          const dateLabel = formatDayDateLabel(data.startDate, dayIdx);
+          const dateLabel = formatDayDateLabel(data.startDate, dayIdx, locale);
           const shouldBreakBefore = options.pageBreakPerDay && dayIdx > 0;
 
           return (
@@ -201,7 +215,9 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
               <div className="bg-slate-900 text-white px-3.5 py-2 rounded-md flex flex-wrap items-center justify-between gap-2 break-inside-avoid [break-after:avoid]">
                 <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wide">
                   <span className="tabular-nums">
-                    NGÀY {String(day.dayNumber).padStart(2, '0')}
+                    {t('planner.common.dayPadded', {
+                      n: String(day.dayNumber).padStart(2, '0'),
+                    })}
                     {dateLabel ? ` (${dateLabel})` : ''}
                   </span>
                   {day.theme && (
@@ -211,7 +227,7 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
                   )}
                 </div>
                 <span className="text-[11px] text-slate-300 tabular-nums">
-                  {day.activities.length} điểm dừng
+                  {t('planner.common.stopsCount', { count: day.activities.length })}
                 </span>
               </div>
 
@@ -220,21 +236,24 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
                 <div className="mt-2.5 px-3 py-2 rounded-md border border-dashed border-slate-400 bg-slate-50 text-xs text-slate-800 flex flex-wrap items-center justify-between gap-2 break-inside-avoid">
                   <div>
                     <strong className="font-bold text-slate-950">
-                      Di chuyển liên tỉnh ({transitName}):{' '}
+                      {t('planner.printSheet.intercityLabel', { mode: transitName })}{' '}
                     </strong>
                     <span>
                       {data.intercityTransit.originName} → {data.intercityTransit.destName}
                     </span>
                     {data.intercityTransit.details?.carriers && (
                       <span className="text-slate-600">
-                        {' '}
-                        • Hãng gợi ý: {data.intercityTransit.details.carriers}
+                        {t('planner.printSheet.suggestedCarriers', {
+                          carriers: data.intercityTransit.details.carriers,
+                        })}
                       </span>
                     )}
                   </div>
                   <span className="text-[11px] font-semibold text-slate-700 tabular-nums">
-                    ~{Math.round(data.intercityTransit.distanceKm)} km • Khứ hồi dự kiến:{' '}
-                    {formatVnd(data.intercityTransit.estimatedPriceRoundTrip)}
+                    {t('planner.printSheet.roundTripEstimate', {
+                      km: Math.round(data.intercityTransit.distanceKm),
+                      price: formatVnd(data.intercityTransit.estimatedPriceRoundTrip, locale),
+                    })}
                   </span>
                 </div>
               )}
@@ -246,11 +265,12 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
                   const timeSlot =
                     act.startTime && act.endTime
                       ? `${act.startTime} – ${act.endTime}`
-                      : act.startTime || `Điểm ${actIdx + 1}`;
-                  const travelModeLabel = act.travelModeToNext
-                    ? TOUR_BRIEFING_UI_CONSTANTS.TRAVEL_MODE_LABELS[act.travelModeToNext] ||
-                      act.travelModeToNext
-                    : 'Di chuyển';
+                      : act.startTime || t('planner.printSheet.stopNumber', { n: actIdx + 1 });
+                  const travelModeLabel =
+                    act.travelModeToNext &&
+                    ['WALK', 'BIKE', 'CAR'].includes(act.travelModeToNext)
+                      ? t(`planner.travelModes.${act.travelModeToNext}` as MessageKey)
+                      : act.travelModeToNext || t('planner.travelModes.DEFAULT');
 
                   return (
                     <div
@@ -271,7 +291,9 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
                           </div>
                           {act.durationMinutes && (
                             <div className="text-[10px] text-slate-500 tabular-nums">
-                              Thời lượng: {act.durationMinutes}p
+                              {t('planner.printSheet.durationShort', {
+                                mins: act.durationMinutes,
+                              })}
                             </div>
                           )}
                         </div>
@@ -295,23 +317,28 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
 
                         {act.address && (
                           <p className="text-xs text-slate-700 font-medium mt-0.5 leading-snug">
-                            <span className="text-slate-500">Địa chỉ: </span>
+                            <span className="text-slate-500">
+                              {t('planner.printSheet.addressPrefix')}
+                            </span>
                             {act.address}
                           </p>
                         )}
 
                         {act.notes && (
                           <p className="text-[11px] text-slate-600 italic mt-1 leading-relaxed">
-                            Lưu ý: {act.notes}
+                            {t('planner.printSheet.notesPrefix', { notes: act.notes })}
                           </p>
                         )}
 
                         {act.distanceToNextKm !== null &&
                           act.distanceToNextKm !== undefined && (
                             <div className="mt-1.5 text-[11px] text-slate-600 tabular-nums">
-                              ↳ Chặng tiếp theo: ~{act.distanceToNextKm} km
+                              {t('planner.printSheet.nextLeg', { km: act.distanceToNextKm })}
                               {act.durationToNextMinutes
-                                ? ` (~${act.durationToNextMinutes} phút • ${travelModeLabel})`
+                                ? t('planner.printSheet.nextLegDuration', {
+                                    mins: act.durationToNextMinutes,
+                                    mode: travelModeLabel,
+                                  })
                                 : ''}
                             </div>
                           )}
@@ -320,9 +347,11 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
                       {/* Column 3: Estimated Cost */}
                       <div className="text-right shrink-0 w-24">
                         <span className="text-xs font-semibold text-slate-900 tabular-nums block">
-                          {formatVnd(act.estimatedCost)}
+                          {formatVnd(act.estimatedCost, locale)}
                         </span>
-                        <span className="text-[10px] text-slate-500 block">Dự kiến</span>
+                        <span className="text-[10px] text-slate-500 block">
+                          {t('planner.common.estimated')}
+                        </span>
                       </div>
                     </div>
                   );
@@ -336,53 +365,62 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
       {/* 1D. COST SUMMARY TABLE & HANDWRITTEN FIELD NOTES FOOTER */}
       {options.showCostTable && data.budgetBreakdown && (
         <section
-          aria-label="Bảng tổng hợp dự toán kinh phí"
+          aria-label={t('planner.printSheet.costTableAria')}
           className="mt-6 border border-slate-300 rounded-lg overflow-hidden break-inside-avoid"
         >
           <div className="bg-slate-100 px-3.5 py-2 border-b border-slate-300 flex items-center justify-between">
             <h2 className="text-xs font-bold uppercase tracking-wide text-slate-900 tabular-nums">
               {partySize > 1
-                ? `BẢNG TỔNG HỢP DỰ TOÁN KINH PHÍ (${partySize} NGƯỜI)`
-                : 'BẢNG TỔNG HỢP DỰ TOÁN KINH PHÍ (TÍNH TRÊN 01 NGƯỜI)'}
+                ? t('planner.printSheet.costTableTitleGroup', { count: partySize })
+                : t('planner.printSheet.costTableTitleSolo')}
             </h2>
             <span className="text-[10px] text-slate-500 font-medium">
-              Đơn vị tính: VNĐ
+              {t('planner.printSheet.currencyUnit')}
             </span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-5 divide-y sm:divide-y-0 sm:divide-x divide-slate-200 text-xs bg-white">
             <div className="p-2.5">
-              <span className="text-[10px] text-slate-500 block">Di chuyển khứ hồi</span>
+              <span className="text-[10px] text-slate-500 block">
+                {t('planner.printSheet.costTransit')}
+              </span>
               <strong className="font-bold text-slate-900 tabular-nums">
-                {formatVnd(data.budgetBreakdown.transitRoundTrip)}
+                {formatVnd(data.budgetBreakdown.transitRoundTrip, locale)}
               </strong>
             </div>
             <div className="p-2.5">
-              <span className="text-[10px] text-slate-500 block">Lưu trú dự kiến</span>
+              <span className="text-[10px] text-slate-500 block">
+                {t('planner.printSheet.costAccommodation')}
+              </span>
               <strong className="font-bold text-slate-900 tabular-nums">
-                {formatVnd(data.budgetBreakdown.accommodation)}
+                {formatVnd(data.budgetBreakdown.accommodation, locale)}
               </strong>
             </div>
             <div className="p-2.5">
-              <span className="text-[10px] text-slate-500 block">Ẩm thực &amp; Đặc sản</span>
+              <span className="text-[10px] text-slate-500 block">
+                {t('planner.printSheet.costFood')}
+              </span>
               <strong className="font-bold text-slate-900 tabular-nums">
-                {formatVnd(data.budgetBreakdown.food)}
+                {formatVnd(data.budgetBreakdown.food, locale)}
               </strong>
             </div>
             <div className="p-2.5">
-              <span className="text-[10px] text-slate-500 block">Vé &amp; Đi lại nội đô</span>
+              <span className="text-[10px] text-slate-500 block">
+                {t('planner.printSheet.costTicketsLocal')}
+              </span>
               <strong className="font-bold text-slate-900 tabular-nums">
                 {formatVnd(
                   (data.budgetBreakdown.tickets || 0) +
                     (data.budgetBreakdown.localTransit || 0),
+                  locale,
                 )}
               </strong>
             </div>
             <div className="p-2.5 bg-slate-50 col-span-2 sm:col-span-1">
               <span className="text-[10px] font-bold uppercase text-sky-900 block">
-                TỔNG DỰ KIẾN
+                {t('planner.printSheet.costTotal')}
               </span>
               <strong className="text-sm font-bold text-slate-950 tabular-nums">
-                {formatVnd(data.budgetBreakdown.totalEstimated)}
+                {formatVnd(data.budgetBreakdown.totalEstimated, locale)}
               </strong>
             </div>
           </div>
@@ -392,7 +430,7 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
       {/* Handwritten Field Notes Area */}
       <section className="mt-5 pt-3 border-t border-slate-300 break-inside-avoid">
         <div className="text-[11px] font-bold uppercase tracking-wide text-slate-700 mb-2">
-          Ghi chú phát sinh thực tế của đoàn:
+          {t('planner.printSheet.fieldNotesTitle')}
         </div>
         <div className="space-y-4">
           {Array.from({ length: TOUR_BRIEFING_UI_CONSTANTS.HANDWRITING_NOTES_LINES }).map(
@@ -405,8 +443,8 @@ export const ItineraryPrintSheet = memo(function ItineraryPrintSheet({
           )}
         </div>
         <footer className="mt-4 flex items-center justify-between text-[10px] text-slate-500 tabular-nums">
-          <span>Xuất từ nền tảng lập kế hoạch du lịch thông minh TripGenie</span>
-          <span>Mã lịch trình: #{docCode}</span>
+          <span>{t('planner.printSheet.footerBrand')}</span>
+          <span>{t('planner.printSheet.footerCode', { code: docCode })}</span>
         </footer>
       </section>
     </article>

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppModalPortal } from '@/components/common/AppModalPortal';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/i18n';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,7 +20,6 @@ import {
   useLeaveTrip,
   useRevokeInvitation,
 } from '../../hooks/use-trip-companions';
-import { TRIP_COMPANIONS_CONFIG } from '../../config/trip-companions.config';
 import { InviteTripCompanionDialog } from './InviteTripCompanionDialog';
 
 interface TripCompanionsPanelProps {
@@ -37,6 +37,7 @@ interface CompanionRoleSelectProps {
 }
 
 function CompanionRoleSelect({ value, onChange, disabled }: CompanionRoleSelectProps) {
+  const { t } = useI18n();
   const isEditor = value === 'EDITOR';
 
   return (
@@ -50,18 +51,18 @@ function CompanionRoleSelect({ value, onChange, disabled }: CompanionRoleSelectP
             : 'border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100 hover:text-slate-900',
           disabled && 'opacity-50 cursor-not-allowed',
         )}
-        aria-label="Thay đổi vai trò thành viên"
-        title="Nhấn để đổi vai trò thành viên"
+        aria-label={t('planner.companions.changeRoleAria')}
+        title={t('planner.companions.changeRoleTitle')}
       >
         {isEditor ? (
           <>
             <i className="fa-solid fa-pen text-[10px]" aria-hidden="true" />
-            <span>Chỉnh sửa</span>
+            <span>{t('planner.roles.EDITOR')}</span>
           </>
         ) : (
           <>
             <i className="fa-regular fa-eye text-[10px]" aria-hidden="true" />
-            <span>Chỉ xem</span>
+            <span>{t('planner.roles.VIEWER')}</span>
           </>
         )}
         <i className="fa-solid fa-chevron-down text-[9px] opacity-70" aria-hidden="true" />
@@ -79,7 +80,7 @@ function CompanionRoleSelect({ value, onChange, disabled }: CompanionRoleSelectP
         >
           <div className="flex items-center gap-2">
             <i className="fa-regular fa-eye text-xs text-slate-500" aria-hidden="true" />
-            <span>Chỉ xem</span>
+            <span>{t('planner.roles.VIEWER')}</span>
           </div>
           {!isEditor && <i className="fa-solid fa-check text-xs text-[#0194F3]" aria-hidden="true" />}
         </DropdownMenuItem>
@@ -95,7 +96,7 @@ function CompanionRoleSelect({ value, onChange, disabled }: CompanionRoleSelectP
         >
           <div className="flex items-center gap-2">
             <i className="fa-solid fa-pen text-xs text-[#0194F3]" aria-hidden="true" />
-            <span>Chỉnh sửa</span>
+            <span>{t('planner.roles.EDITOR')}</span>
           </div>
           {isEditor && <i className="fa-solid fa-check text-xs text-[#0194F3]" aria-hidden="true" />}
         </DropdownMenuItem>
@@ -111,6 +112,7 @@ export function TripCompanionsPanel({
   canManageMembers,
   currentUserId,
 }: TripCompanionsPanelProps) {
+  const { t } = useI18n();
   const router = useRouter();
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
 
@@ -129,13 +131,13 @@ export function TripCompanionsPanel({
   };
 
   const handleRemoveMember = (userId: string, name: string) => {
-    if (window.confirm(TRIP_COMPANIONS_CONFIG.CONFIRMATIONS.REMOVE_MEMBER(name))) {
+    if (window.confirm(t('planner.companions.confirmRemove', { name }))) {
       removeMemberMutation.mutate(userId);
     }
   };
 
   const handleLeaveTrip = () => {
-    if (window.confirm(TRIP_COMPANIONS_CONFIG.CONFIRMATIONS.LEAVE_TRIP)) {
+    if (window.confirm(t('planner.companions.confirmLeave'))) {
       leaveTripMutation.mutate(undefined, {
         onSuccess: () => {
           onClose();
@@ -166,13 +168,13 @@ export function TripCompanionsPanel({
               <i className="fa-solid fa-users text-xs" aria-hidden="true" />
             </div>
             <h2 id="companions-panel-title" className="text-sm font-bold text-slate-900 tabular-nums">
-              Bạn đồng hành ({members.length})
+              {t('planner.companions.cardTitle', { count: members.length })}
             </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            aria-label="Đóng bảng bạn đồng hành"
+            aria-label={t('planner.companions.panelCloseAria')}
             className="size-8 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 flex items-center justify-center transition-colors cursor-pointer"
           >
             <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
@@ -185,7 +187,7 @@ export function TripCompanionsPanel({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                Thành viên tham gia
+                {t('planner.companions.activeMembersHeading')}
               </span>
               {canManageMembers && (
                 <Button
@@ -196,7 +198,7 @@ export function TripCompanionsPanel({
                   className="h-8 px-3 rounded-lg text-xs font-semibold gap-1.5 text-[#0194F3] border-[#D0E7FF] hover:bg-[#F0F7FF] cursor-pointer"
                 >
                   <i className="fa-solid fa-user-plus text-xs" aria-hidden="true" />
-                  <span>Mời thêm</span>
+                  <span>{t('planner.companions.inviteMore')}</span>
                 </Button>
               )}
             </div>
@@ -231,7 +233,7 @@ export function TripCompanionsPanel({
                             </span>
                             {isSelf && (
                               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
-                                Bạn
+                                {t('planner.common.you')}
                               </span>
                             )}
                           </div>
@@ -239,17 +241,17 @@ export function TripCompanionsPanel({
                             {isOwnerRole ? (
                               <span className="inline-flex items-center gap-1 text-amber-600 font-semibold text-[11px]">
                                 <i className="fa-solid fa-crown text-[10px]" aria-hidden="true" />
-                                <span>{TRIP_COMPANIONS_CONFIG.ROLES.OWNER}</span>
+                                <span>{t('planner.roles.OWNER')}</span>
                               </span>
                             ) : member.role === 'EDITOR' ? (
                               <span className="inline-flex items-center gap-1 text-[#0194F3] font-semibold text-[11px]">
                                 <i className="fa-solid fa-pen text-[10px]" aria-hidden="true" />
-                                <span>{TRIP_COMPANIONS_CONFIG.ROLES.EDITOR}</span>
+                                <span>{t('planner.roles.EDITOR')}</span>
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-1 text-slate-500 font-medium text-[11px]">
                                 <i className="fa-regular fa-eye text-[10px]" aria-hidden="true" />
-                                <span>{TRIP_COMPANIONS_CONFIG.ROLES.VIEWER}</span>
+                                <span>{t('planner.roles.VIEWER')}</span>
                               </span>
                             )}
                           </div>
@@ -270,8 +272,10 @@ export function TripCompanionsPanel({
                               type="button"
                               onClick={() => handleRemoveMember(member.userId, member.fullName)}
                               disabled={removeMemberMutation.isPending}
-                              title="Xóa thành viên"
-                              aria-label={`Xóa thành viên ${member.fullName}`}
+                              title={t('planner.companions.removeMemberTitle')}
+                              aria-label={t('planner.companions.removeMemberAria', {
+                                name: member.fullName,
+                              })}
                               className="p-2 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                             >
                               <i className="fa-regular fa-trash-can text-xs" aria-hidden="true" />
@@ -287,7 +291,7 @@ export function TripCompanionsPanel({
                             className="h-8 px-2.5 rounded-lg text-xs font-medium text-rose-600 border-rose-200 hover:bg-rose-50 cursor-pointer gap-1"
                           >
                             <i className="fa-solid fa-right-from-bracket text-xs" aria-hidden="true" />
-                            <span>Rời chuyến</span>
+                            <span>{t('planner.companions.leaveTripBtn')}</span>
                           </Button>
                         ) : null}
                       </div>
@@ -302,12 +306,14 @@ export function TripCompanionsPanel({
           {canManageMembers && (
             <div className="space-y-3 pt-2 border-t border-slate-100">
               <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider tabular-nums">
-                Lời mời đang chờ ({pendingInvitations.length})
+                {t('planner.companions.pendingInvitationsHeading', {
+                  count: pendingInvitations.length,
+                })}
               </span>
 
               {pendingInvitations.length === 0 ? (
                 <p className="text-xs text-slate-500">
-                  Không có lời mời nào đang chờ phản hồi.
+                  {t('planner.companions.noPendingInvitations')}
                 </p>
               ) : (
                 <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white overflow-hidden">
@@ -327,7 +333,7 @@ export function TripCompanionsPanel({
                         )}
                         <div className="inline-flex items-center gap-1 text-[10px] text-amber-600 mt-0.5 font-medium">
                           <i className="fa-regular fa-clock" aria-hidden="true" />
-                          <span>Đang chờ phản hồi</span>
+                          <span>{t('planner.companions.waitingResponse')}</span>
                         </div>
                       </div>
 
@@ -340,7 +346,7 @@ export function TripCompanionsPanel({
                         className="h-7 px-2 rounded-lg text-xs font-medium text-slate-500 hover:text-rose-600 hover:bg-rose-50 cursor-pointer gap-1"
                       >
                         <i className="fa-solid fa-rotate-left text-[11px]" aria-hidden="true" />
-                        <span>Thu hồi</span>
+                        <span>{t('planner.companions.revokeBtn')}</span>
                       </Button>
                     </div>
                   ))}

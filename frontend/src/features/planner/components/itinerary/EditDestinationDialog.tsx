@@ -2,9 +2,12 @@
 
 import { useState } from 'react';
 import { AppModalPortal } from '@/components/common/AppModalPortal';
+import { useI18n } from '@/i18n';
 import { ModalCopilotAssist } from './ModalCopilotAssist';
 import { DESTINATION_TIME_DEFAULTS } from '../../constants/itinerary.constants';
 import type { ItineraryActivity, ItineraryDay, UpdateDestinationRequest } from '@/types/itinerary';
+
+type ValidationErrorKey = 'errNoRecord' | 'errMissingTime' | 'errInvalidRange';
 
 interface EditDestinationDialogProps {
   open: boolean;
@@ -43,6 +46,7 @@ function EditDestinationForm({
   canEdit = true,
   onAskCopilot,
 }: EditDestinationFormProps) {
+  const { t } = useI18n();
   const [dayNumber, setDayNumber] = useState<number>(() => findInitialDayNumber(activity, days));
   const [startTime, setStartTime] = useState(
     activity.startTime || DESTINATION_TIME_DEFAULTS.DEFAULT_START,
@@ -51,24 +55,24 @@ function EditDestinationForm({
     activity.endTime || DESTINATION_TIME_DEFAULTS.DEFAULT_END,
   );
   const [notes, setNotes] = useState(activity.notes ?? '');
-  const [validationError, setValidationError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<ValidationErrorKey | null>(null);
 
   const destinationId = activity.id;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!destinationId) {
-      setValidationError('Điểm dừng này chưa đồng bộ mã bản ghi, không thể chỉnh trực tiếp.');
+      setValidationError('errNoRecord');
       return;
     }
 
     if (!startTime || !endTime) {
-      setValidationError('Vui lòng chọn đầy đủ giờ bắt đầu và giờ kết thúc.');
+      setValidationError('errMissingTime');
       return;
     }
 
     if (endTime <= startTime) {
-      setValidationError('Giờ kết thúc phải sau giờ bắt đầu.');
+      setValidationError('errInvalidRange');
       return;
     }
 
@@ -91,7 +95,7 @@ function EditDestinationForm({
           </div>
           <div className="min-w-0">
             <h2 id="edit-destination-title" className="text-sm font-bold text-slate-900">
-              Chỉnh sửa giờ &amp; ghi chú điểm dừng
+              {t('planner.editDestination.title')}
             </h2>
             <p className="text-xs text-slate-500 truncate mt-0.5">{activity.placeName}</p>
           </div>
@@ -100,7 +104,7 @@ function EditDestinationForm({
           type="button"
           onClick={onClose}
           disabled={isSubmitting}
-          aria-label="Đóng hộp thoại"
+          aria-label={t('planner.common.closeDialog')}
           className="size-8 rounded-full text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
         >
           <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
@@ -115,14 +119,14 @@ function EditDestinationForm({
             className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-medium text-rose-700 flex items-center gap-2"
           >
             <i className="fa-solid fa-circle-exclamation shrink-0" aria-hidden="true" />
-            <span>{validationError}</span>
+            <span>{t(`planner.editDestination.${validationError}`)}</span>
           </div>
         )}
 
         {days.length > 1 && (
           <div className="space-y-1.5">
             <label htmlFor="dest-day-select" className="block font-semibold text-slate-700">
-              Thuộc ngày trong lịch trình
+              {t('planner.editDestination.dayLabel')}
             </label>
             <select
               id="dest-day-select"
@@ -133,7 +137,7 @@ function EditDestinationForm({
             >
               {days.map((d) => (
                 <option key={d.dayNumber} value={d.dayNumber}>
-                  Ngày {d.dayNumber}
+                  {t('planner.common.day', { n: d.dayNumber })}
                   {d.theme ? ` — ${d.theme}` : ''}
                 </option>
               ))}
@@ -144,7 +148,7 @@ function EditDestinationForm({
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <label htmlFor="dest-start-time" className="block font-semibold text-slate-700">
-              Giờ bắt đầu
+              {t('planner.editDestination.startTimeLabel')}
             </label>
             <input
               id="dest-start-time"
@@ -159,7 +163,7 @@ function EditDestinationForm({
 
           <div className="space-y-1.5">
             <label htmlFor="dest-end-time" className="block font-semibold text-slate-700">
-              Giờ kết thúc
+              {t('planner.editDestination.endTimeLabel')}
             </label>
             <input
               id="dest-end-time"
@@ -176,7 +180,7 @@ function EditDestinationForm({
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <label htmlFor="dest-notes" className="font-semibold text-slate-700">
-              Ghi chú cho cả đoàn
+              {t('planner.editDestination.notesLabel')}
             </label>
             <span className="text-[11px] text-slate-400 tabular-nums">
               {notes.length}/{DESTINATION_TIME_DEFAULTS.MAX_NOTES_LENGTH}
@@ -189,7 +193,7 @@ function EditDestinationForm({
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             disabled={isSubmitting}
-            placeholder="Ví dụ: Nên đi sớm để tránh nắng, đặt bàn trước 1 ngày..."
+            placeholder={t('planner.editDestination.notesPlaceholder')}
             className="w-full rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0194F3]/30 focus:border-[#0194F3] resize-none"
           />
         </div>
@@ -218,7 +222,7 @@ function EditDestinationForm({
           disabled={isSubmitting}
           className="h-9 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 transition-colors cursor-pointer disabled:opacity-50"
         >
-          Hủy
+          {t('common.cancel')}
         </button>
         <button
           type="submit"
@@ -230,7 +234,7 @@ function EditDestinationForm({
           ) : (
             <i className="fa-solid fa-check text-xs" aria-hidden="true" />
           )}
-          <span>{isSubmitting ? 'Đang lưu...' : 'Lưu thay đổi'}</span>
+          <span>{isSubmitting ? t('planner.common.saving') : t('planner.common.saveChanges')}</span>
         </button>
       </div>
     </form>

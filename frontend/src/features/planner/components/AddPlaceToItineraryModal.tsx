@@ -34,6 +34,7 @@ import {
   type AddablePlace,
   type ItineraryTimeSlotId,
 } from "@/features/planner/utils/itinerary-schedule.util";
+import { useI18n } from "@/i18n";
 import type { ItineraryDetail } from "@/types/itinerary";
 
 export {
@@ -57,6 +58,7 @@ export function AddPlaceToItineraryModal({
   onClose,
 }: AddPlaceToItineraryModalProps) {
   const router = useRouter();
+  const { t } = useI18n();
   const {
     data: itineraries = [],
     isLoading,
@@ -106,6 +108,7 @@ export function AddPlaceToItineraryModal({
 
   const isAlreadyInSelectedDay = existingDaysWithPlace.has(safeDay);
   const previewImage = place.coverImage || place.primaryImage || null;
+  const localizedSlotLabel = t(`planner.timeSlots.${selectedTimeSlot}`);
 
   const handleConfirmAdd = () => {
     if (!activeItinerary || isAlreadyInSelectedDay || addPlaceMutation.isPending) return;
@@ -121,14 +124,19 @@ export function AddPlaceToItineraryModal({
       {
         onSuccess: (res) => {
           if (!res.success) {
-            toast.error(res.message || "Không thể thêm địa điểm vào lịch trình.");
+            toast.error(res.message || t("planner.addPlaceModal.errorToast"));
             return;
           }
           toast.success(
-            res.message || `Đã thêm "${place.name}" vào Ngày ${safeDay} (${selectedTimeSlot})!`,
+            res.message ||
+              t("planner.addPlaceModal.successNamedToast", {
+                place: place.name,
+                day: safeDay,
+                slot: localizedSlotLabel,
+              }),
             {
               action: {
-                label: "Xem lịch trình",
+                label: t("planner.addPlaceModal.viewTripAction"),
                 onClick: () =>
                   router.push(
                     `${ITINERARY_SCHEDULE_CONSTANTS.ITINERARY_DETAIL_ROUTE_PREFIX}/${activeItinerary.id}`
@@ -142,7 +150,7 @@ export function AddPlaceToItineraryModal({
           toast.error(
             err instanceof Error
               ? err.message
-              : "Không thể thêm địa điểm vào lịch trình. Vui lòng thử lại."
+              : t("planner.addPlaceModal.errorToast")
           );
         },
       }
@@ -155,10 +163,10 @@ export function AddPlaceToItineraryModal({
         <DialogHeader className="space-y-1 pr-6 min-w-0">
           <DialogTitle className="font-heading text-lg sm:text-xl flex items-center gap-2 min-w-0">
             <CalendarPlus className="size-5 text-primary shrink-0" aria-hidden="true" />
-            <span className="truncate">Thêm vào lịch trình</span>
+            <span className="truncate">{t("planner.addPlaceModal.title")}</span>
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
-            Chọn chuyến đi, ngày và khung giờ bạn muốn ghé thăm địa điểm này.
+            {t("planner.addPlaceModal.subtitle")}
           </DialogDescription>
         </DialogHeader>
 
@@ -185,14 +193,14 @@ export function AddPlaceToItineraryModal({
               {place.address ||
                 place.city ||
                 place.areaName ||
-                ITINERARY_SCHEDULE_CONSTANTS.DEFAULT_FALLBACK_LOCATION}
+                t("planner.common.vietnamFallback")}
             </p>
           </div>
         </div>
 
         {/* 4-State Content Area */}
         {isLoading ? (
-          <div className="space-y-2.5 py-2 min-w-0" aria-label="Đang tải danh sách lịch trình">
+          <div className="space-y-2.5 py-2 min-w-0" aria-label={t("planner.addPlaceModal.loadingTrips")}>
             {Array.from(
               { length: ITINERARY_SCHEDULE_CONSTANTS.LOADING_SKELETON_COUNT },
               (_, i) => (
@@ -207,10 +215,10 @@ export function AddPlaceToItineraryModal({
             </div>
             <div className="space-y-1">
               <p className="text-xs font-semibold text-foreground">
-                Không thể tải danh sách lịch trình
+                {t("planner.addPlaceModal.loadErrorTitle")}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                Vui lòng kiểm tra kết nối mạng hoặc đăng nhập lại để tiếp tục.
+                {t("planner.addPlaceModal.loadErrorDesc")}
               </p>
             </div>
             <Button
@@ -220,7 +228,7 @@ export function AddPlaceToItineraryModal({
               onClick={() => refetch()}
               className="rounded-xl text-xs cursor-pointer"
             >
-              Thử lại
+              {t("planner.common.retry")}
             </Button>
           </div>
         ) : sortedItineraries.length === 0 ? (
@@ -230,10 +238,10 @@ export function AddPlaceToItineraryModal({
             </div>
             <div className="space-y-1">
               <p className="text-xs font-bold text-foreground">
-                Bạn chưa có lịch trình nào
+                {t("planner.addPlaceModal.noTripsTitle")}
               </p>
               <p className="text-[11px] text-muted-foreground leading-relaxed">
-                Hãy khởi tạo một lịch trình chuyến đi trước, sau đó bạn có thể thêm bất kỳ địa điểm nào từ bản đồ vào từng ngày.
+                {t("planner.addPlaceModal.noTripsDesc")}
               </p>
             </div>
             <Button
@@ -244,7 +252,7 @@ export function AddPlaceToItineraryModal({
               }}
               className="rounded-xl text-xs font-semibold cursor-pointer"
             >
-              Đến trang Lịch trình
+              {t("planner.addPlaceModal.goToPlannerBtn")}
             </Button>
           </div>
         ) : (
@@ -252,7 +260,7 @@ export function AddPlaceToItineraryModal({
             {/* Step 1: Select Itinerary */}
             <div className="space-y-1.5 min-w-0">
               <label className="text-xs font-semibold text-foreground block">
-                1. Chọn chuyến đi ({sortedItineraries.length})
+                {t("planner.addPlaceModal.selectTripStep", { count: sortedItineraries.length })}
               </label>
               <div className="space-y-1.5 max-h-36 overflow-y-auto overflow-x-hidden pr-1">
                 {sortedItineraries.map((it) => {
@@ -279,7 +287,7 @@ export function AddPlaceToItineraryModal({
                           </span>
                           {isAreaMatch && (
                             <span className="shrink-0 rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-secondary-foreground whitespace-nowrap">
-                              Cùng điểm đến
+                              {t("planner.addPlaceModal.sameDestinationBadge")}
                             </span>
                           )}
                         </div>
@@ -287,12 +295,13 @@ export function AddPlaceToItineraryModal({
                           <span className="inline-flex items-center gap-1 min-w-0 truncate">
                             <MapPin className="size-3 shrink-0" aria-hidden="true" />
                             <span className="truncate">
-                              {it.destination ||
-                                ITINERARY_SCHEDULE_CONSTANTS.DEFAULT_FALLBACK_LOCATION}
+                              {it.destination || t("planner.common.vietnamFallback")}
                             </span>
                           </span>
                           <span className="shrink-0">•</span>
-                          <span className="shrink-0 whitespace-nowrap">{it.totalDays} ngày</span>
+                          <span className="shrink-0 whitespace-nowrap">
+                            {t("planner.common.daysCount", { count: it.totalDays })}
+                          </span>
                         </div>
                       </div>
                       <div
@@ -313,7 +322,7 @@ export function AddPlaceToItineraryModal({
             {/* Step 2: Select Day */}
             <div className="space-y-1.5 min-w-0">
               <label className="text-xs font-semibold text-foreground block">
-                2. Chọn ngày trong lịch trình
+                {t("planner.addPlaceModal.selectDayStep")}
               </label>
               <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
                 {Array.from({ length: totalDays }, (_, idx) => {
@@ -331,13 +340,13 @@ export function AddPlaceToItineraryModal({
                           : "border-border/80 bg-background hover:bg-muted text-foreground"
                       }`}
                     >
-                      <span>Ngày {dayNum}</span>
+                      <span>{t("planner.common.day", { n: dayNum })}</span>
                       {alreadyInThisDay && (
                         <Check
                           className={`size-3 shrink-0 ${
                             isDaySelected ? "text-primary-foreground" : "text-primary"
                           }`}
-                          aria-label="Đã có trong ngày này"
+                          aria-label={t("planner.addPlaceModal.alreadyInDayAria")}
                         />
                       )}
                     </button>
@@ -349,7 +358,7 @@ export function AddPlaceToItineraryModal({
             {/* Step 3: Select Time Slot */}
             <div className="space-y-1.5 min-w-0">
               <label className="text-xs font-semibold text-foreground block">
-                3. Chọn buổi ghé thăm
+                {t("planner.addPlaceModal.selectSlotStep")}
               </label>
               <div className="grid grid-cols-2 gap-1.5 min-w-0">
                 {ITINERARY_TIME_SLOTS.map((slot) => {
@@ -369,7 +378,9 @@ export function AddPlaceToItineraryModal({
                     >
                       <Icon className="size-4 shrink-0 text-primary" aria-hidden="true" />
                       <div className="min-w-0 flex-1 overflow-hidden">
-                        <div className="text-xs leading-tight truncate">{slot.label}</div>
+                        <div className="text-xs leading-tight truncate">
+                          {t(`planner.timeSlots.${slot.id}`)}
+                        </div>
                         <div className="text-[10px] text-muted-foreground font-normal truncate">
                           {previewSlot.start} – {previewSlot.end}
                         </div>
@@ -380,14 +391,18 @@ export function AddPlaceToItineraryModal({
               </div>
               {activeSlotResolved.shifted && !isAlreadyInSelectedDay && (
                 <p className="text-[11px] text-primary bg-primary/5 border border-primary/20 rounded-xl px-2.5 py-1.5">
-                  Khung giờ dự kiến: <strong>{activeSlotResolved.start} – {activeSlotResolved.end}</strong> (tự động xếp nối tiếp để không trùng lịch đã có trong Ngày {safeDay}).
+                  {t("planner.addPlaceModal.shiftedPreviewBefore")}{" "}
+                  <strong>
+                    {activeSlotResolved.start} – {activeSlotResolved.end}
+                  </strong>{" "}
+                  {t("planner.addPlaceModal.shiftedPreviewAfter", { day: safeDay })}
                 </p>
               )}
             </div>
 
             {isAlreadyInSelectedDay && (
               <p className="text-[11px] font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 border border-amber-500/25 rounded-xl px-3 py-2">
-                Địa điểm này đã có trong Ngày {safeDay} của chuyến đi. Hãy chọn một ngày khác.
+                {t("planner.addPlaceModal.alreadyInDayNotice", { day: safeDay })}
               </p>
             )}
 
@@ -399,7 +414,7 @@ export function AddPlaceToItineraryModal({
                 onClick={onClose}
                 className="rounded-xl text-xs cursor-pointer shrink-0"
               >
-                Đóng
+                {t("common.close")}
               </Button>
               <Button
                 type="button"
@@ -414,10 +429,13 @@ export function AddPlaceToItineraryModal({
                 )}
                 <span className="truncate">
                   {addPlaceMutation.isPending
-                    ? "Đang thêm..."
+                    ? t("planner.addPlaceModal.submitting")
                     : isAlreadyInSelectedDay
-                      ? "Địa điểm đã có trong ngày này"
-                      : `Thêm vào Ngày ${safeDay} (${selectedTimeSlot})`}
+                      ? t("planner.addPlaceModal.alreadyInDayBtn")
+                      : t("planner.addPlaceModal.submitWithSlot", {
+                          day: safeDay,
+                          slot: localizedSlotLabel,
+                        })}
                 </span>
               </Button>
             </div>

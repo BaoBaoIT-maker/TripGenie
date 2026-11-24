@@ -50,6 +50,7 @@ import { PostDetailModal } from "./PostDetailModal";
 import { CloneItineraryPreviewModal } from "./CloneItineraryPreviewModal";
 import { PostCard } from "./PostCard";
 import { CreatorProfileSkeleton } from "./CreatorProfileSkeleton";
+import { useI18n } from "@/i18n";
 
 interface CreatorProfileClientShellProps {
   initialProfile?: CreatorProfileData | null;
@@ -60,6 +61,7 @@ export function CreatorProfileClientShell({
   initialProfile,
   identifier,
 }: CreatorProfileClientShellProps) {
+  const { t } = useI18n();
   const { user: currentUser } = useAuth();
   const { data: liveProfile, isLoading } = useCreatorProfile(
     identifier,
@@ -134,16 +136,21 @@ export function CreatorProfileClientShell({
     if (navigator.share) {
       navigator
         .share({
-          title: `${targetUser.fullName} (${displayHandle}) • Hồ sơ Thổ địa | TripGenie`,
-          text: `Khám phá các bài chia sẻ và lộ trình du lịch thực tế của ${targetUser.fullName} trên TripGenie!`,
+          title: t("community.creatorProfile.shareTitle", {
+            name: targetUser.fullName,
+            handle: displayHandle,
+          }),
+          text: t("community.creatorProfile.shareText", {
+            name: targetUser.fullName,
+          }),
           url: currentUrl,
         })
         .catch(() => {});
     } else {
       navigator.clipboard.writeText(currentUrl);
-      toast.success("Đã sao chép liên kết trang cá nhân vào bộ nhớ tạm!");
+      toast.success(t("community.toasts.profileLinkCopied"));
     }
-  }, [targetUser, displayHandle]);
+  }, [targetUser, displayHandle, t]);
 
   if (!profile || !targetUser || !stats) {
     if (isLoading) {
@@ -158,10 +165,10 @@ export function CreatorProfileClientShell({
             <i className="fa-solid fa-user-slash" aria-hidden="true" />
           </div>
           <h1 className="text-lg font-bold text-[#0F172A]">
-            Không tìm thấy trang cá nhân
+            {t("community.creatorProfile.notFoundTitle")}
           </h1>
           <p className="text-[13px] text-[#64748B] leading-relaxed">
-            Tài khoản <span className="font-semibold text-[#0F172A]">@{cleanIdentifier}</span> không tồn tại hoặc đã ngừng hoạt động.
+            {t("community.creatorProfile.notFoundDesc", { identifier: cleanIdentifier })}
           </p>
           <div className="pt-2">
             <Link
@@ -169,7 +176,7 @@ export function CreatorProfileClientShell({
               className="inline-flex items-center gap-2 h-10 px-5 rounded-[10px] bg-[#0F172A] hover:bg-[#1E293B] text-white text-[13px] font-semibold transition-colors"
             >
               <ArrowLeft className="size-4" />
-              <span>Quay lại Cộng đồng</span>
+              <span>{t("community.creatorProfile.backToCommunity")}</span>
             </Link>
           </div>
         </div>
@@ -187,7 +194,7 @@ export function CreatorProfileClientShell({
             className="inline-flex items-center gap-2 text-[13px] font-semibold text-[#475569] hover:text-[#0F172A] transition-colors"
           >
             <ArrowLeft className="size-4" />
-            <span>Cộng đồng TripGenie</span>
+            <span>{t("community.creatorProfile.headerBrand")}</span>
           </Link>
         </div>
       </header>
@@ -226,7 +233,7 @@ export function CreatorProfileClientShell({
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(true)}
-                  title="Cập nhật ảnh đại diện"
+                  title={t("community.creatorProfile.updateAvatarTitle")}
                   className="absolute bottom-0.5 right-0.5 size-7 rounded-full bg-[#0194F3] text-white flex items-center justify-center text-[12px] border-2 border-white cursor-pointer hover:scale-105 transition-transform"
                 >
                   <Camera className="size-3.5" />
@@ -241,8 +248,8 @@ export function CreatorProfileClientShell({
               </h1>
               {(targetUser.isVerifiedCreator ?? targetUser.isVerified) && (
                 <span
-                  title="Thổ địa được xác thực bởi TripGenie"
-                  aria-label="Thổ địa được xác thực bởi TripGenie"
+                  title={t("community.verifiedLocalFull")}
+                  aria-label={t("community.verifiedLocalFull")}
                   className="text-brand-blue text-[16px] inline-flex items-center shrink-0"
                 >
                   <i
@@ -259,12 +266,10 @@ export function CreatorProfileClientShell({
             </div>
 
             <p className="text-[13.5px] text-[#475569] leading-relaxed mb-5 max-w-[500px]">
-              {targetUser.bio ||
-                "Người đam mê xê dịch, chia sẻ lộ trình du lịch thực tế và điểm đến bản địa trên TripGenie."}
+              {targetUser.bio || t("community.creatorProfile.defaultBio")}
             </p>
 
             {/* TẦNG 3: BỘ 3 CHỈ SỐ STATS (BÀI ĐĂNG - LƯỢT THÍCH - NHÂN BẢN) */}
-            {/* Đã bỏ hoàn toàn icon ở số nhân bản theo chỉ đạo */}
             <div className="grid grid-cols-3 w-full max-w-[440px] py-3 px-4 rounded-[14px] bg-[#F8FAFC] border border-[#E2E8F0] mb-5">
               {/* Cột 1: Bài đăng */}
               <div className="text-center">
@@ -272,7 +277,7 @@ export function CreatorProfileClientShell({
                   {stats.postCount}
                 </div>
                 <div className="text-[12px] font-medium text-[#64748B] mt-0.5">
-                  Bài đăng
+                  {t("community.creatorProfile.statsPosts")}
                 </div>
               </div>
 
@@ -284,26 +289,24 @@ export function CreatorProfileClientShell({
                     : stats.totalLikesReceived}
                 </div>
                 <div className="text-[12px] font-medium text-[#64748B] mt-0.5">
-                  Lượt thích
+                  {t("community.creatorProfile.statsLikes")}
                 </div>
               </div>
 
-              {/* Cột 3: Nhân bản (KHÔNG CÓ ICON) */}
+              {/* Cột 3: Nhân bản */}
               <div className="text-center">
                 <div className="text-[17px] font-bold text-[#0F172A]">
                   {stats.totalClonesReceived}
                 </div>
                 <div className="text-[12px] font-medium text-[#64748B] mt-0.5">
-                  Nhân bản
+                  {t("community.creatorProfile.statsClones")}
                 </div>
               </div>
             </div>
 
             {/* TẦNG 4: HÀNG NÚT HÀNH ĐỘNG (ACTION BUTTONS ROW) */}
             {isMe ? (
-              // Dành cho chủ tài khoản (Owner View)
               <div className="flex items-center justify-center gap-2 w-full max-w-[460px]">
-                {/* Nút 1: Chỉnh sửa hồ sơ */}
                 <button
                   type="button"
                   onClick={() => setIsEditModalOpen(true)}
@@ -313,23 +316,21 @@ export function CreatorProfileClientShell({
                     className="fa-regular fa-pen-to-square text-[13px]"
                     aria-hidden="true"
                   />
-                  <span>Chỉnh sửa hồ sơ</span>
+                  <span>{t("community.creatorProfile.editProfile")}</span>
                 </button>
 
-                {/* Nút 2: Thêm bài viết */}
                 <button
                   type="button"
                   onClick={() => setIsCreateModalOpen(true)}
                   className="flex-1 h-[38px] rounded-[10px] bg-[#0F172A] hover:bg-[#1E293B] text-white text-[13px] font-semibold inline-flex items-center justify-center gap-2 cursor-pointer shadow-[0_1px_3px_rgba(15,23,42,0.1)] transition-all"
                 >
                   <Plus className="size-4" />
-                  <span>Thêm bài viết</span>
+                  <span>{t("community.creatorProfile.addPost")}</span>
                 </button>
 
-                {/* Nút 3: Bánh răng Cài đặt tài khoản (Đứng trước nút chia sẻ) */}
                 <Link
                   href="/profile"
-                  title="Cài đặt tài khoản tổng"
+                  title={t("community.creatorProfile.accountSettingsTitle")}
                   className="size-[38px] shrink-0 rounded-[10px] border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] hover:border-[#CBD5E1] text-[#475569] hover:text-[#0F172A] inline-flex items-center justify-center transition-colors"
                 >
                   <i
@@ -338,11 +339,10 @@ export function CreatorProfileClientShell({
                   />
                 </Link>
 
-                {/* Nút 4: Chia sẻ hồ sơ (fa-solid fa-share) */}
                 <button
                   type="button"
                   onClick={handleShareProfile}
-                  title="Chia sẻ trang cá nhân này"
+                  title={t("community.creatorProfile.shareProfileTitle")}
                   className="size-[38px] shrink-0 rounded-[10px] border border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] hover:border-[#CBD5E1] text-[#475569] hover:text-[#0F172A] inline-flex items-center justify-center cursor-pointer transition-colors"
                 >
                   <i
@@ -352,7 +352,6 @@ export function CreatorProfileClientShell({
                 </button>
               </div>
             ) : (
-              // Dành cho khách xem (Visitor View)
               <div className="flex items-center justify-center gap-2.5 w-full max-w-[440px]">
                 <button
                   type="button"
@@ -363,7 +362,7 @@ export function CreatorProfileClientShell({
                     className="fa-solid fa-map-location-dot text-[14px]"
                     aria-hidden="true"
                   />
-                  <span>Khám phá lịch trình</span>
+                  <span>{t("community.creatorProfile.exploreItineraries")}</span>
                 </button>
 
                 <button
@@ -375,7 +374,7 @@ export function CreatorProfileClientShell({
                     className="fa-solid fa-share text-[14px]"
                     aria-hidden="true"
                   />
-                  <span>Chia sẻ hồ sơ</span>
+                  <span>{t("community.creatorProfile.shareProfile")}</span>
                 </button>
               </div>
             )}
@@ -392,7 +391,6 @@ export function CreatorProfileClientShell({
           {/* Tab Navigation Header */}
           <div className="flex items-center justify-between border-b border-[#E2E8F0] mb-5 flex-wrap gap-2">
             <div className="flex items-center gap-1 sm:gap-2">
-              {/* Tab 1: Bài đăng */}
               <button
                 type="button"
                 onClick={() => setActiveTab("posts")}
@@ -406,7 +404,7 @@ export function CreatorProfileClientShell({
                   className="fa-solid fa-table-cells text-[14px]"
                   aria-hidden="true"
                 />
-                <span>Bài đăng</span>
+                <span>{t("community.creatorProfile.tabPosts")}</span>
                 <span
                   className={`text-[11.5px] font-semibold px-2 py-0.5 rounded-full ${
                     activeTab === "posts"
@@ -418,7 +416,6 @@ export function CreatorProfileClientShell({
                 </span>
               </button>
 
-              {/* Tab 2: Lịch trình công khai */}
               <button
                 type="button"
                 onClick={() => setActiveTab("itineraries")}
@@ -432,7 +429,7 @@ export function CreatorProfileClientShell({
                   className="fa-solid fa-map-location-dot text-[14px]"
                   aria-hidden="true"
                 />
-                <span>Lịch trình công khai</span>
+                <span>{t("community.creatorProfile.tabPublicItineraries")}</span>
                 <span
                   className={`text-[11.5px] font-semibold px-2 py-0.5 rounded-full ${
                     activeTab === "itineraries"
@@ -445,13 +442,12 @@ export function CreatorProfileClientShell({
               </button>
             </div>
 
-            {/* Toggle chế độ xem Grid / Feed khi ở Tab Bài đăng */}
             {activeTab === "posts" && posts.length > 0 && (
               <div className="flex items-center gap-1 p-1 bg-[#F1F5F9] rounded-[8px]">
                 <button
                   type="button"
                   onClick={() => setPostsLayout("grid")}
-                  title="Xem dạng Lưới ảnh 3 cột Instagram"
+                  title={t("community.creatorProfile.gridViewTitle")}
                   className={`size-8 rounded-[6px] inline-flex items-center justify-center text-[13px] transition-all cursor-pointer ${
                     postsLayout === "grid"
                       ? "bg-white text-[#0F172A] shadow-sm font-bold"
@@ -463,7 +459,7 @@ export function CreatorProfileClientShell({
                 <button
                   type="button"
                   onClick={() => setPostsLayout("feed")}
-                  title="Xem dạng Danh sách bài viết đầy đủ"
+                  title={t("community.creatorProfile.feedViewTitle")}
                   className={`size-8 rounded-[6px] inline-flex items-center justify-center text-[13px] transition-all cursor-pointer ${
                     postsLayout === "feed"
                       ? "bg-white text-[#0F172A] shadow-sm font-bold"
@@ -485,12 +481,12 @@ export function CreatorProfileClientShell({
                     <i className="fa-solid fa-camera" aria-hidden="true" />
                   </div>
                   <h3 className="text-[15px] font-bold text-[#0F172A] mb-1">
-                    Chưa có bài viết nào
+                    {t("community.creatorProfile.noPostsTitle")}
                   </h3>
                   <p className="text-[12.5px] text-[#64748B] max-w-[340px] mx-auto mb-4">
                     {isMe
-                      ? "Chia sẻ chuyến đi, trải nghiệm săn mây hoặc ẩm thực đầu tiên của bạn!"
-                      : "Tác giả chưa chia sẻ bài viết nào trên cộng đồng."}
+                      ? t("community.creatorProfile.noPostsOwner")
+                      : t("community.creatorProfile.noPostsVisitor")}
                   </p>
                   {isMe && (
                     <button
@@ -499,7 +495,7 @@ export function CreatorProfileClientShell({
                       className="h-9 px-4 rounded-[10px] bg-[#0194F3] hover:bg-[#007FE3] text-white text-[12.5px] font-semibold inline-flex items-center gap-1.5 cursor-pointer shadow-sm"
                     >
                       <Plus className="size-4" />
-                      <span>Tạo bài viết ngay</span>
+                      <span>{t("community.creatorProfile.createPostNow")}</span>
                     </button>
                   )}
                 </div>
@@ -599,12 +595,12 @@ export function CreatorProfileClientShell({
                     <Route className="size-7" />
                   </div>
                   <h3 className="text-[15px] font-bold text-[#0F172A] mb-1">
-                    Chưa có lịch trình công khai
+                    {t("community.creatorProfile.noItinerariesTitle")}
                   </h3>
                   <p className="text-[12.5px] text-[#64748B] max-w-[340px] mx-auto">
                     {isMe
-                      ? "Tạo và công khai lịch trình du lịch của bạn trong Trình lập kế hoạch (Planner) để cộng đồng cùng nhân bản trải nghiệm!"
-                      : "Thổ địa chưa chia sẻ lịch trình công khai nào."}
+                      ? t("community.creatorProfile.noItinerariesOwner")
+                      : t("community.creatorProfile.noItinerariesVisitor")}
                   </p>
                 </div>
               ) : (

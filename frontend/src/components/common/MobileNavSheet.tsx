@@ -24,20 +24,27 @@ import {
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useAuthModalStore } from "@/features/auth/stores/auth-modal.store";
 import { DEFAULT_AVATAR } from "@/config/avatars";
+import { useI18n } from "@/i18n/LocaleProvider";
+import type { TranslationKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 interface MobileNavSheetProps {
   triggerVariant?: "light" | "transparent";
 }
 
-const NAV_ITEMS = [
-  { href: "/explore", label: "Khám phá", icon: Compass },
-  { href: "/planner", label: "Lịch trình", icon: CalendarDays },
-  { href: "/community", label: "Cộng đồng", icon: Users },
-  { href: "/collections", label: "Bộ sưu tập đã lưu", icon: Bookmark },
+const NAV_ITEMS: ReadonlyArray<{
+  href: string;
+  labelKey: TranslationKey;
+  icon: typeof Compass;
+}> = [
+  { href: "/explore", labelKey: "nav.explore", icon: Compass },
+  { href: "/planner", labelKey: "nav.planner", icon: CalendarDays },
+  { href: "/community", labelKey: "nav.community", icon: Users },
+  { href: "/collections", labelKey: "nav.savedCollections", icon: Bookmark },
 ];
 
 function getUserInitials(fullName?: string | null): string {
@@ -51,6 +58,7 @@ export function MobileNavSheet({ triggerVariant = "light" }: MobileNavSheetProps
   const [open, setOpen] = React.useState(false);
   const pathname = usePathname();
   const { user, isLoading, logout } = useAuth();
+  const { t } = useI18n();
   const openAuthModal = useAuthModalStore((state) => state.openAuthModal);
   const userInitials = getUserInitials(user?.fullName);
 
@@ -76,8 +84,8 @@ export function MobileNavSheet({ triggerVariant = "light" }: MobileNavSheetProps
                 ? "text-white/95 hover:text-white hover:bg-white/15 drop-shadow-sm"
                 : "text-slate-700 hover:text-slate-900 hover:bg-slate-100"
             )}
-            title="Menu điều hướng"
-            aria-label="Mở menu điều hướng di động"
+            title={t("nav.mobileMenuTooltip")}
+            aria-label={t("nav.mobileMenuOpenAria")}
           >
             <Menu className="size-5.5" />
           </Button>
@@ -103,14 +111,14 @@ export function MobileNavSheet({ triggerVariant = "light" }: MobileNavSheetProps
                   TripGenie
                 </SheetTitle>
                 <SheetDescription className="text-[10px] uppercase font-bold tracking-wider text-slate-500">
-                  Nền Tảng Du Lịch Thông Minh
+                  {t("common.brandTagline")}
                 </SheetDescription>
               </div>
             </div>
           </SheetHeader>
 
           {/* Main Navigation List */}
-          <nav className="p-4 space-y-1.5" aria-label="Menu chính trên di động">
+          <nav className="p-4 space-y-1.5" aria-label={t("nav.mobileMenuAria")}>
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
               const isActive = pathname.startsWith(item.href);
@@ -132,11 +140,19 @@ export function MobileNavSheet({ triggerVariant = "light" }: MobileNavSheetProps
                       isActive ? "text-[#0194F3]" : "text-slate-400"
                     )}
                   />
-                  <span>{item.label}</span>
+                  <span>{t(item.labelKey)}</span>
                 </Link>
               );
             })}
           </nav>
+
+          {/* Language Switcher Dropdown inside Mobile Slide Drawer */}
+          <div className="px-4 pt-2 pb-4 space-y-1.5">
+            <p className="px-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+              {t("common.languageLabel")}
+            </p>
+            <LanguageSwitcher variant="mobile" />
+          </div>
         </div>
 
         {/* Footer Drawer: User Status or Guest Actions */}
@@ -167,7 +183,7 @@ export function MobileNavSheet({ triggerVariant = "light" }: MobileNavSheetProps
                 </Avatar>
                 <div className="flex-1 min-w-0 text-left">
                   <p className="text-sm font-bold text-slate-900 truncate group-hover:text-[#0194F3] transition-colors">
-                    {user.fullName || "Người dùng"}
+                    {user.fullName || t("common.userFallback")}
                   </p>
                   <p className="text-xs text-slate-500 truncate">{user.email}</p>
                 </div>
@@ -180,7 +196,7 @@ export function MobileNavSheet({ triggerVariant = "light" }: MobileNavSheetProps
                   className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition-colors"
                 >
                   <UserIcon className="size-3.5" />
-                  <span>Hồ sơ</span>
+                  <span>{t("nav.profileShort")}</span>
                 </Link>
                 <button
                   type="button"
@@ -188,7 +204,7 @@ export function MobileNavSheet({ triggerVariant = "light" }: MobileNavSheetProps
                   className="flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-sky-50 hover:text-[#0194F3] hover:border-blue-200 transition-colors cursor-pointer"
                 >
                   <LogOut className="size-3.5" />
-                  <span>Đăng xuất</span>
+                  <span>{t("nav.signOut")}</span>
                 </button>
               </div>
             </div>
@@ -203,7 +219,7 @@ export function MobileNavSheet({ triggerVariant = "light" }: MobileNavSheetProps
                 className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <LogIn className="size-4" />
-                <span>Đăng nhập</span>
+                <span>{t("nav.signIn")}</span>
               </button>
               <button
                 type="button"
@@ -213,7 +229,7 @@ export function MobileNavSheet({ triggerVariant = "light" }: MobileNavSheetProps
                 }}
                 className="flex items-center justify-center w-full py-2.5 rounded-xl text-sm font-bold bg-[#0194F3] hover:bg-[#0073D1] text-white shadow-md shadow-blue-500/20 transition-colors cursor-pointer"
               >
-                <span>Bắt đầu miễn phí</span>
+                <span>{t("nav.getStarted")}</span>
               </button>
             </div>
           )}

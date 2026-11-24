@@ -2,6 +2,7 @@
 
 import { CONTRIBUTED_PHOTO_STATES } from "@/types/place";
 import type { ContributedPhotoItem } from "@/components/place/use-place-photo-contributions";
+import { useI18n } from "@/i18n/LocaleProvider";
 
 interface PendingContributedPhotosStripProps {
   placeName: string;
@@ -16,6 +17,8 @@ export function PendingContributedPhotosStrip({
   onRetry,
   onDismiss,
 }: PendingContributedPhotosStripProps) {
+  const { t, messages } = useI18n();
+  const ps = messages.place.pendingStrip;
   if (photos.length === 0) return null;
 
   const uploadingCount = photos.filter(
@@ -26,6 +29,11 @@ export function PendingContributedPhotosStrip({
   ).length;
   const pendingCount = photos.length - uploadingCount - errorCount;
 
+  const pendingSuffix =
+    pendingCount > 0
+      ? t("place.pendingStrip.pendingSuffix", { count: pendingCount })
+      : "";
+
   const containerToneClass =
     errorCount > 0
       ? "border-rose-200/90 bg-rose-50/40"
@@ -35,7 +43,7 @@ export function PendingContributedPhotosStrip({
 
   return (
     <section
-      aria-label="Ảnh đóng góp của bạn"
+      aria-label={ps.sectionAria}
       className={`rounded-2xl border p-4 space-y-2.5 transition-colors ${containerToneClass}`}
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -59,19 +67,19 @@ export function PendingContributedPhotosStrip({
 
           <span className="text-xs font-bold text-[#10243A] tabular-nums">
             {uploadingCount > 0
-              ? `Đang tải lên ${uploadingCount} ảnh${pendingCount > 0 ? ` • ${pendingCount} ảnh chờ duyệt` : ""}`
+              ? `${t("place.pendingStrip.uploadingTitle", { count: uploadingCount })}${pendingSuffix}`
               : errorCount > 0
-                ? `${errorCount} ảnh tải lên thất bại${pendingCount > 0 ? ` • ${pendingCount} ảnh chờ duyệt` : ""}`
-                : `Ảnh bạn đã đóng góp — Đang chờ Quản trị viên duyệt (${pendingCount})`}
+                ? `${t("place.pendingStrip.errorTitle", { count: errorCount })}${pendingSuffix}`
+                : t("place.pendingStrip.pendingOnlyTitle", { count: pendingCount })}
           </span>
         </div>
 
         <span className="text-[11px] font-medium text-slate-600">
           {uploadingCount > 0
-            ? "Đang gửi lên hệ thống, vui lòng giữ nguyên trang"
+            ? ps.uploadingHint
             : errorCount > 0
-              ? "Bấm Thử lại trên ảnh lỗi mà không cần chọn lại tệp"
-              : "Chỉ mình bạn nhìn thấy cho đến khi được phê duyệt"}
+              ? ps.errorHint
+              : ps.pendingHint}
         </span>
       </div>
 
@@ -96,7 +104,7 @@ export function PendingContributedPhotosStrip({
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={item.imageUrl}
-                alt={item.caption || `Ảnh đóng góp cho ${placeName}`}
+                alt={item.caption || t("place.pendingStrip.photoAlt", { name: placeName })}
                 loading="lazy"
                 className={`w-full h-full object-cover transition-opacity ${
                   isUploading
@@ -115,11 +123,11 @@ export function PendingContributedPhotosStrip({
                       aria-hidden="true"
                     />
                     <span className="text-[11px] font-bold tracking-tight">
-                      Đang tải lên...
+                      {ps.uploadingOverlay}
                     </span>
                   </div>
                   <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-sky-100/95 text-[#0369A1] border border-sky-300/80 text-[10px] font-extrabold">
-                    Đang gửi
+                    {ps.sendingBadge}
                   </span>
                 </>
               )}
@@ -127,7 +135,7 @@ export function PendingContributedPhotosStrip({
               {isError && (
                 <div className="absolute inset-0 bg-[#10243A]/65 backdrop-blur-[1px] flex flex-col items-center justify-center gap-2 p-2 text-center">
                   <span className="text-[11px] font-bold text-white leading-tight line-clamp-2">
-                    Tải lên thất bại
+                    {ps.failedOverlay}
                   </span>
                   <div className="flex items-center gap-1.5">
                     <button
@@ -139,12 +147,12 @@ export function PendingContributedPhotosStrip({
                         className="fa-solid fa-rotate-left text-[10px]"
                         aria-hidden="true"
                       />
-                      <span>Thử lại</span>
+                      <span>{ps.retry}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => onDismiss(item.clientKey)}
-                      aria-label="Xóa ảnh lỗi"
+                      aria-label={ps.dismissAria}
                       className="inline-flex items-center justify-center rounded-lg bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 transition-colors cursor-pointer"
                     >
                       <i
@@ -158,7 +166,7 @@ export function PendingContributedPhotosStrip({
 
               {!isUploading && !isError && (
                 <span className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-full bg-amber-100/95 text-amber-900 border border-amber-300/80 text-[10px] font-extrabold">
-                  Chờ duyệt
+                  {ps.pendingBadge}
                 </span>
               )}
             </div>

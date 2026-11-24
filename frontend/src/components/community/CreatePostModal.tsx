@@ -25,6 +25,7 @@ import {
   normalizeKeyword,
 } from "@/features/community/config/community-suggestions";
 import { CommunityModalPortal } from "./CommunityModalPortal";
+import { useI18n } from "@/i18n";
 import type {
   CommunityGroupSummary,
   UploadedMediaItem,
@@ -47,6 +48,7 @@ export function CreatePostModal({
   defaultGroupId,
   groups: providedGroups,
 }: CreatePostModalProps) {
+  const { t } = useI18n();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const itinerarySelectRef = useRef<HTMLSelectElement | null>(null);
   const hasProcessedInitialFilesRef = useRef(false);
@@ -124,9 +126,9 @@ export function CreatePostModal({
       fileInputRef.current.value = "";
     }
     if (showToast) {
-      toast.info("Đã hủy tải tệp lên");
+      toast.info(t("community.toasts.uploadCancelled"));
     }
-  }, []);
+  }, [t]);
 
   const uploadFiles = useCallback(async (files: File[]) => {
     if (files.length === 0) return;
@@ -135,7 +137,9 @@ export function CreatePostModal({
     setIsUploading(true);
     setUploadProgress(0);
     setUploadingFileName(
-      files.length === 1 ? files[0].name : `${files.length} tệp`
+      files.length === 1
+        ? files[0].name
+        : t("community.createPost.multipleFiles", { count: files.length })
     );
 
     try {
@@ -156,7 +160,7 @@ export function CreatePostModal({
       if ((err as Error)?.name === "AbortError") {
         return;
       }
-      toast.error((err as Error)?.message || "Tải lên ảnh/video thất bại");
+      toast.error((err as Error)?.message || t("community.toasts.uploadFailed"));
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -166,7 +170,7 @@ export function CreatePostModal({
         fileInputRef.current.value = "";
       }
     }
-  }, []);
+  }, [t]);
 
   const createPostMutation = useCreateCommunityPost();
 
@@ -318,10 +322,10 @@ export function CreatePostModal({
               id="create-post-modal-title"
               className="text-[15px] font-bold text-slate-900 tracking-tight"
             >
-              Tạo bài chia sẻ mới
+              {t("community.createPost.title")}
             </h2>
             <p className="text-[11px] text-[#64748B]">
-              Chia sẻ ảnh, video và lộ trình thực tế cùng cộng đồng TripGenie
+              {t("community.createPost.subtitle")}
             </p>
           </div>
         </div>
@@ -330,7 +334,7 @@ export function CreatePostModal({
           onClick={handleClose}
           disabled={createPostMutation.isPending}
           className="size-8 rounded-full bg-white border border-[#E2E8F0] hover:bg-[#F1F5F9] inline-flex items-center justify-center text-[#64748B] hover:text-[#0F172A] transition-colors cursor-pointer disabled:opacity-50"
-          aria-label="Đóng hộp thoại tạo bài viết"
+          aria-label={t("community.createPost.closeAria")}
         >
           <X className="size-4" />
         </button>
@@ -348,7 +352,7 @@ export function CreatePostModal({
             className="flex items-center gap-1.5 text-[12px] font-extrabold text-[#0F172A]"
           >
             <Users className="size-3.5 text-[#0194F3]" />
-            <span>Nhóm cộng đồng đăng bài</span>
+            <span>{t("community.createPost.groupLabel")}</span>
           </label>
           <select
             id="post-group-select"
@@ -359,12 +363,14 @@ export function CreatePostModal({
             {communityGroups.length > 0 ? (
               communityGroups.map((grp) => (
                 <option key={grp.id} value={grp.slug}>
-                  {grp.name} {grp.isDefault ? "(Mặc định - Tất cả)" : ""}
+                  {grp.isDefault
+                    ? `${t("community.defaultGroupName")} ${t("community.createPost.defaultAllSuffix")}`
+                    : grp.name}
                 </option>
               ))
             ) : (
               <option value={COMMUNITY_UI_CONSTANTS.DEFAULT_GROUP_SLUG}>
-                Cộng đồng chung TripGenie (Mặc định)
+                {t("community.defaultGroupWithTag")}
               </option>
             )}
           </select>
@@ -377,7 +383,7 @@ export function CreatePostModal({
               htmlFor="post-title-input"
               className="block text-[12px] font-extrabold text-[#0F172A]"
             >
-              Tiêu đề bài viết <span className="text-rose-500">*</span>
+              {t("community.createPost.titleLabel")} <span className="text-rose-500">*</span>
             </label>
             <span className="text-[11px] text-[#94A3B8]">
               {title.length}/{COMMUNITY_UI_CONSTANTS.MAX_TITLE_LENGTH}
@@ -390,7 +396,7 @@ export function CreatePostModal({
             maxLength={COMMUNITY_UI_CONSTANTS.MAX_TITLE_LENGTH}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="Ví dụ: Đà Lạt 3N2Đ săn mây Cầu Đất & lẩu gà lá é chiều mưa"
+            placeholder={t("community.createPost.titlePlaceholder")}
             className="w-full h-10 px-3.5 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] text-[13px] text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#0194F3] focus:bg-white transition-colors"
           />
         </div>
@@ -402,7 +408,7 @@ export function CreatePostModal({
               htmlFor="post-caption-input"
               className="block text-[12px] font-extrabold text-[#0F172A]"
             >
-              Nội dung chia sẻ kinh nghiệm
+              {t("community.createPost.captionLabel")}
             </label>
             <span className="text-[11px] text-[#94A3B8]">
               {caption.length}/{COMMUNITY_UI_CONSTANTS.MAX_CAPTION_LENGTH}
@@ -414,7 +420,7 @@ export function CreatePostModal({
             maxLength={COMMUNITY_UI_CONSTANTS.MAX_CAPTION_LENGTH}
             value={caption}
             onChange={(e) => setCaption(e.target.value)}
-            placeholder="Chia sẻ cảm nhận thực tế, thời điểm đẹp nhất trong ngày, chi phí ăn uống hoặc lưu ý di chuyển..."
+            placeholder={t("community.createPost.captionPlaceholder")}
             className="w-full p-3.5 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] text-[13px] text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#0194F3] focus:bg-white leading-relaxed transition-colors resize-y"
           />
         </div>
@@ -423,11 +429,13 @@ export function CreatePostModal({
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <label className="block text-[12px] font-extrabold text-[#0F172A]">
-              Ảnh / Video ngắn từ thiết bị ({uploadedItems.length}/
-              {COMMUNITY_UI_CONSTANTS.MAX_MEDIA_FILES})
+              {t("community.createPost.mediaLabel", {
+                count: uploadedItems.length,
+                max: COMMUNITY_UI_CONSTANTS.MAX_MEDIA_FILES,
+              })}
             </label>
             <span className="text-[11px] text-[#64748B]">
-              JPG, PNG, WebP, MP4, MOV (tối đa 50MB/tệp)
+              {t("community.createPost.mediaHint")}
             </span>
           </div>
 
@@ -447,7 +455,9 @@ export function CreatePostModal({
                 <div className="flex items-center gap-2 min-w-0 pr-2">
                   <Loader2 className="size-4 animate-spin text-brand-blue shrink-0" />
                   <span className="font-bold text-foreground truncate">
-                    Đang tải {uploadingFileName || "tệp"} lên máy chủ...
+                    {t("community.createPost.uploadingPrefix", {
+                      name: uploadingFileName || t("community.createPost.fileFallback"),
+                    })}
                   </span>
                 </div>
                 <div className="flex items-center gap-2.5 shrink-0">
@@ -458,10 +468,10 @@ export function CreatePostModal({
                     type="button"
                     onClick={() => cancelUpload(true)}
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white hover:bg-rose-50 text-rose-600 border border-rose-200 text-xs font-bold transition-colors cursor-pointer shadow-xs"
-                    title="Hủy tải lên"
+                    title={t("community.createPost.cancelUploadTitle")}
                   >
                     <X className="size-3.5 stroke-[2.5]" />
-                    <span>Hủy tải</span>
+                    <span>{t("community.createPost.cancelUpload")}</span>
                   </button>
                 </div>
               </div>
@@ -475,11 +485,11 @@ export function CreatePostModal({
               </div>
 
               <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-                <span>Bạn có thể nhấn Hủy bất cứ lúc nào</span>
+                <span>{t("community.createPost.cancelAnytimeHint")}</span>
                 <span>
                   {uploadProgress === 100
-                    ? "Đang hoàn tất xử lý..."
-                    : `${uploadProgress}% hoàn tất`}
+                    ? t("community.createPost.finalizing")
+                    : t("community.createPost.percentComplete", { percent: uploadProgress })}
                 </span>
               </div>
             </div>
@@ -490,14 +500,14 @@ export function CreatePostModal({
                 uploadedItems.length >= COMMUNITY_UI_CONSTANTS.MAX_MEDIA_FILES
               }
               onClick={() => fileInputRef.current?.click()}
-              aria-label="Chọn ảnh hoặc video từ thiết bị"
+              aria-label={t("community.createPost.pickMediaAria")}
               className="w-full py-3.5 px-4 rounded-[16px] border-2 border-dashed border-border hover:border-brand-blue bg-muted/40 hover:bg-secondary/40 transition-colors flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 min-h-[54px]"
             >
               <div className="flex items-center gap-2 text-brand-blue text-[12px] font-bold">
                 <Upload className="size-4" />
                 <ImageIcon className="size-4" />
                 <Film className="size-4" />
-                <span>Nhấn để chọn ảnh hoặc video từ thiết bị</span>
+                <span>{t("community.createPost.pickMediaButton")}</span>
               </div>
             </button>
           )}
@@ -521,7 +531,7 @@ export function CreatePostModal({
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={item.url}
-                      alt="Tệp đa phương tiện đã tải lên"
+                      alt={t("community.createPost.uploadedMediaAlt")}
                       loading="lazy"
                       decoding="async"
                       className="w-full h-full object-cover"
@@ -531,12 +541,14 @@ export function CreatePostModal({
                     type="button"
                     onClick={() => handleRemoveMedia(item.url)}
                     className="absolute top-1.5 right-1.5 size-7 inline-flex items-center justify-center rounded-lg bg-black/70 text-white hover:bg-rose-600 transition-colors cursor-pointer"
-                    aria-label="Gỡ tệp đa phương tiện này"
+                    aria-label={t("community.createPost.removeMediaAria")}
                   >
                     <Trash2 className="size-3.5" />
                   </button>
                   <span className="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-md bg-black/65 text-white text-[10px] font-bold">
-                    {item.mediaType === "VIDEO" ? "Video" : "Ảnh"}
+                    {item.mediaType === "VIDEO"
+                      ? t("community.createPost.videoTag")
+                      : t("community.createPost.photoTag")}
                   </span>
                 </div>
               ))}
@@ -552,7 +564,7 @@ export function CreatePostModal({
               className="flex items-center gap-1.5 text-[12px] font-extrabold text-[#0F172A]"
             >
               <CalendarDays className="size-3.5 text-[#0194F3]" />
-              <span>Đính kèm lịch trình (Tùy chọn)</span>
+              <span>{t("community.createPost.attachItineraryLabel")}</span>
             </label>
             <select
               ref={itinerarySelectRef}
@@ -566,10 +578,13 @@ export function CreatePostModal({
                   "border-[#0194F3] bg-[#F0F7FF]/40 ring-2 ring-[#0194F3]/20"
               )}
             >
-              <option value="">-- Không đính kèm lịch trình --</option>
+              <option value="">{t("community.createPost.noItineraryOption")}</option>
               {myItineraries.map((itin) => (
                 <option key={itin.id} value={itin.id}>
-                  {itin.title} ({itin.destination || `${itin.totalDays} ngày`})
+                  {itin.title} (
+                  {itin.destination ||
+                    t("community.createPost.daysCount", { count: itin.totalDays })}
+                  )
                 </option>
               ))}
             </select>
@@ -580,7 +595,7 @@ export function CreatePostModal({
               htmlFor="post-tags-input"
               className="block text-[12px] font-extrabold text-[#0F172A]"
             >
-              Thẻ chủ đề (Hashtags)
+              {t("community.createPost.tagsLabel")}
             </label>
             <div className="relative">
               <input
@@ -611,7 +626,7 @@ export function CreatePostModal({
                   className="absolute left-0 right-0 top-full mt-1.5 z-50 rounded-[12px] border border-[#E2E8F0] bg-white shadow-xl p-2 space-y-1.5"
                 >
                   <div className="px-1 text-[10px] font-bold text-[#64748B] uppercase tracking-wider">
-                    Gợi ý thẻ chủ đề phổ biến
+                    {t("community.createPost.suggestedTagsHeading")}
                   </div>
                   <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto custom-scroll">
                     {suggestedTags.map((tag) => (
@@ -640,7 +655,7 @@ export function CreatePostModal({
             disabled={createPostMutation.isPending}
             className="h-9 px-4 rounded-[10px] border border-border bg-card hover:bg-muted text-[12px] font-bold text-foreground transition-colors cursor-pointer disabled:opacity-50"
           >
-            Hủy
+            {t("common.cancel")}
           </button>
           <button
             type="submit"
@@ -654,7 +669,7 @@ export function CreatePostModal({
             {createPostMutation.isPending && (
               <Loader2 className="size-3.5 animate-spin" />
             )}
-            <span>Đăng lên Cộng đồng</span>
+            <span>{t("community.createPost.submitButton")}</span>
           </button>
         </div>
       </form>

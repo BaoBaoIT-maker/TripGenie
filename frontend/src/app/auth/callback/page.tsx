@@ -2,15 +2,48 @@
 
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  AUTH_TRANSITION_MESSAGES,
+  AuthTransitionScreen,
+  completeOAuthLoginSession,
+  consumeOAuthPopupPendingFlag,
+  OAUTH_POPUP_CONFIG,
+  type OAuthCallbackSignal,
+} from '@/features/auth/components/AuthTransitionScreen';
 import { useAuth } from '@/features/auth/hooks/use-auth';
 import { apiClient } from '@/lib/api-client';
+import { consumeOAuthReturnUrl } from '@/lib/safe-redirect';
 
-import {
-  consumeOAuthReturnUrl,
-  resolvePostLoginRedirect,
-} from '@/lib/safe-redirect';
+function notifyOpenerAndClose(
+  isPopupContext: boolean,
+  signal: OAuthCallbackSignal,
+): boolean {
+  if (!isPopupContext || typeof window === 'undefined') return false;
+
+  try {
+    localStorage.setItem(
+      OAUTH_POPUP_CONFIG.STORAGE_KEY,
+      JSON.stringify(signal),
+    );
+  } catch {
+    // Ignore storage quota/privacy mode errors
+  }
+
+  try {
+    window.opener?.postMessage(signal, window.location.origin);
+  } catch {
+    // Ignore cross-origin opener errors
+  }
+
+  try {
+    window.close();
+  } catch {
+    // Ignore close errors
+  }
+
+  return true;
+}
 
 function SafeCallbackHandler() {
   const router = useRouter();
@@ -23,11 +56,23 @@ function SafeCallbackHandler() {
   const { refetchUser } = useAuth();
 
   React.useEffect(() => {
+    const isPopupContext = consumeOAuthPopupPendingFlag();
+
     async function handleCallback() {
       if (error) {
+        if (
+          notifyOpenerAndClose(isPopupContext, {
+            type: OAUTH_POPUP_CONFIG.MESSAGE_TYPE,
+            status: 'error',
+            error,
+            timestamp: Date.now(),
+          })
+        ) {
+          return;
+        }
         consumeOAuthReturnUrl(rawNext);
-        toast.error('Đăng nhập với Google không thành công.');
-        router.push('/login');
+        toast.error(AUTH_TRANSITION_MESSAGES.GOOGLE_OAUTH_FAILED);
+        router.replace(OAUTH_POPUP_CONFIG.LOGIN_ERROR_REDIRECT);
         return;
       }
 
@@ -41,54 +86,40 @@ function SafeCallbackHandler() {
             window.history.replaceState({}, '', window.location.pathname);
           }
         } catch {
-          // fallback to refetchUser
+          // fallback to cookies set by backend redirect
         }
       }
 
-      try {
-        const result = await refetchUser();
-        if (result.data) {
-          toast.success(`Chào mừng trở lại, ${result.data.fullName || 'bạn'}!`);
-          const consumedNext = consumeOAuthReturnUrl(rawNext, '/');
-          const target = resolvePostLoginRedirect(
-            result.data.role,
-            consumedNext,
-            '/',
-          );
-          router.push(target);
-          router.refresh();
-        } else {
-          router.push('/login');
-        }
-      } catch {
-        toast.error('Lỗi khi thiết lập phiên làm việc.');
-        router.push('/login');
+      if (
+        notifyOpenerAndClose(isPopupContext, {
+          type: OAUTH_POPUP_CONFIG.MESSAGE_TYPE,
+          status: 'success',
+          timestamp: Date.now(),
+        })
+      ) {
+        return;
       }
+
+      await completeOAuthLoginSession({
+        refetchUser,
+        rawNext,
+        defaultPath: '/',
+        onNavigate: (target) => router.replace(target),
+        onError: () => router.replace(OAUTH_POPUP_CONFIG.LOGIN_ERROR_REDIRECT),
+      });
     }
 
-    handleCallback();
+    void handleCallback();
   }, [error, rawNext, accessToken, refreshToken, refetchUser, router]);
 
-  return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-background text-foreground space-y-4">
-      <div className="size-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
-        <Loader2 className="size-6 animate-spin" />
-      </div>
-      <div className="text-center space-y-1">
-        <h2 className="text-base font-bold font-heading">Đang hoàn tất đăng nhập Google...</h2>
-        <p className="text-xs text-muted-foreground">Vui lòng chờ trong giây lát trong khi chúng tôi chuẩn bị dữ liệu của bạn.</p>
-      </div>
-    </div>
-  );
+  return <AuthTransitionScreen title={AUTH_TRANSITION_MESSAGES.VERIFYING} />;
 }
 
 export default function AuthCallbackPage() {
   return (
     <React.Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center">
-          <Loader2 className="size-6 animate-spin text-primary" />
-        </div>
+        <AuthTransitionScreen title={AUTH_TRANSITION_MESSAGES.VERIFYING} />
       }
     >
       <SafeCallbackHandler />

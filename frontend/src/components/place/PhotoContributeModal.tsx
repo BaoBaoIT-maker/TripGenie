@@ -14,12 +14,10 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { ApiClientError } from "@/lib/api-client";
 import { placeService } from "@/services/place.service";
-import {
-  PLACE_PHOTO_UPLOAD_CONFIG,
-  PLACE_PHOTO_UPLOAD_MESSAGES,
-} from "@/features/admin/admin.constants";
+import { PLACE_PHOTO_UPLOAD_CONFIG } from "@/features/admin/admin.constants";
 import type { EnqueuePhotoUploadPayload } from "@/components/place/use-place-photo-contributions";
 import type { PendingContributedPhoto, Place } from "@/types/place";
+import { useI18n } from "@/i18n/LocaleProvider";
 
 interface PhotoContributeModalProps {
   place: Place | null;
@@ -38,6 +36,8 @@ export function PhotoContributeModal({
   onEnqueueUpload,
   onPhotoSubmitted,
 }: PhotoContributeModalProps) {
+  const { t, messages } = useI18n();
+  const pm = messages.place.photoModal;
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [caption, setCaption] = useState("");
@@ -66,22 +66,22 @@ export function PhotoContributeModal({
 
     const mime = (selected.type || "").toLowerCase().trim();
     if (mime.startsWith("video/")) {
-      toast.error(
-        "Không hỗ trợ tải lên video. Vui lòng chỉ chọn tệp hình ảnh (JPG, PNG, WebP)."
-      );
+      toast.error(pm.errorVideoNotSupported);
       e.target.value = "";
       return;
     }
 
     if (!PLACE_PHOTO_UPLOAD_CONFIG.ALLOWED_IMAGE_MIME_TYPES.includes(mime)) {
-      toast.error("Định dạng không hợp lệ. Chỉ chấp nhận hình ảnh JPG, PNG hoặc WebP.");
+      toast.error(pm.errorInvalidFormat);
       e.target.value = "";
       return;
     }
 
     if (selected.size > PLACE_PHOTO_UPLOAD_CONFIG.MAX_FILE_SIZE_BYTES) {
       toast.error(
-        `Ảnh vượt quá dung lượng tối đa ${PLACE_PHOTO_UPLOAD_CONFIG.MAX_FILE_SIZE_MB}MB.`
+        t("place.photoModal.errorFileTooLarge", {
+          maxMb: PLACE_PHOTO_UPLOAD_CONFIG.MAX_FILE_SIZE_MB,
+        })
       );
       e.target.value = "";
       return;
@@ -101,11 +101,11 @@ export function PhotoContributeModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!place?.id) {
-      toast.error("Không xác định được địa điểm để đóng góp ảnh.");
+      toast.error(pm.errorMissingPlace);
       return;
     }
     if (!file) {
-      toast.error("Vui lòng chọn 1 tệp hình ảnh để đóng góp.");
+      toast.error(pm.errorMissingFile);
       return;
     }
 
@@ -137,14 +137,14 @@ export function PhotoContributeModal({
         });
       }
       setSubmitted(true);
-      toast.success(res.message || PLACE_PHOTO_UPLOAD_MESSAGES.UPLOAD_SUCCESS);
+      toast.success(pm.uploadSuccess);
     } catch (err) {
       if (err instanceof ApiClientError && err.statusCode === 401) {
-        toast.error(PLACE_PHOTO_UPLOAD_MESSAGES.UNAUTHORIZED);
+        toast.error(pm.errorUnauthorized);
       } else if (err instanceof Error && err.message) {
         toast.error(err.message);
       } else {
-        toast.error(PLACE_PHOTO_UPLOAD_MESSAGES.UPLOAD_FAILED_FALLBACK);
+        toast.error(pm.errorUploadFallback);
       }
     } finally {
       setSubmitting(false);
@@ -157,10 +157,10 @@ export function PhotoContributeModal({
         <DialogHeader>
           <div className="flex items-center gap-2 text-[#0194F3] font-bold text-xs uppercase tracking-wider">
             <i className="fa-solid fa-camera text-xs" aria-hidden="true" />
-            <span>Đóng góp ảnh thực tế</span>
+            <span>{pm.eyebrow}</span>
           </div>
           <DialogTitle className="text-lg font-extrabold text-[#10243A]">
-            {place?.name || "Địa điểm"}
+            {place?.name || pm.fallbackPlace}
           </DialogTitle>
           <DialogDescription className="text-xs text-slate-500">
             {place?.address || place?.city}
@@ -173,10 +173,10 @@ export function PhotoContributeModal({
               <i className="fa-solid fa-circle-check text-xl" aria-hidden="true" />
             </div>
             <h4 className="text-base font-extrabold text-[#10243A]">
-              Đã gửi ảnh chờ kiểm duyệt
+              {pm.submittedTitle}
             </h4>
             <p className="text-xs text-slate-600 max-w-xs leading-relaxed">
-              Cảm ơn bạn đã đóng góp cho cộng đồng TripGenie. Ảnh của bạn đã được chuyển vào hàng đợi duyệt của Quản trị viên.
+              {pm.submittedDesc}
             </p>
             <div className="rounded-xl bg-[#F8FAFC] p-3 border border-slate-200 text-xs text-left space-y-1 w-full mt-2">
               <div className="flex items-center gap-1.5 font-bold text-[#10243A]">
@@ -184,10 +184,10 @@ export function PhotoContributeModal({
                   className="fa-solid fa-shield-halved text-xs text-[#0194F3]"
                   aria-hidden="true"
                 />
-                <span>Quy trình kiểm duyệt chất lượng</span>
+                <span>{pm.moderationTitle}</span>
               </div>
               <p className="text-[11px] text-slate-500 leading-relaxed">
-                Quản trị viên sẽ xác minh ảnh thực tế trước khi hiển thị công khai trên trang chi tiết địa điểm.
+                {pm.moderationDesc}
               </p>
             </div>
             <Button
@@ -195,7 +195,7 @@ export function PhotoContributeModal({
               onClick={handleClose}
               className="mt-3 w-full rounded-xl bg-[#0194F3] hover:bg-[#0084DE] text-white font-bold"
             >
-              Hoàn tất
+              {pm.done}
             </Button>
           </div>
         ) : (
@@ -206,7 +206,7 @@ export function PhotoContributeModal({
                 aria-hidden="true"
               />
               <p className="text-[11px] leading-relaxed">
-                <strong>Lưu ý:</strong> Chỉ chấp nhận <strong>hình ảnh thực tế</strong> (JPG, PNG, WebP — không hỗ trợ video). Ảnh sẽ được Quản trị viên duyệt trước khi hiển thị.
+                <strong>{pm.noteLabel}</strong> {pm.noteText}
               </p>
             </div>
 
@@ -215,14 +215,14 @@ export function PhotoContributeModal({
                 htmlFor="photo-input"
                 className="text-xs font-bold text-[#10243A] block"
               >
-                Chọn hình ảnh từ thiết bị
+                {pm.selectFromDevice}
               </label>
               {preview ? (
                 <div className="relative aspect-video w-full rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={preview}
-                    alt="Xem trước ảnh đóng góp"
+                    alt={pm.previewAlt}
                     className="w-full h-full object-cover"
                   />
                   <button
@@ -235,7 +235,7 @@ export function PhotoContributeModal({
                     }}
                     className="absolute top-2 right-2 rounded-lg bg-[#10243A]/80 hover:bg-[#10243A] text-white text-xs font-semibold px-2.5 py-1 transition-colors cursor-pointer disabled:opacity-50"
                   >
-                    Thay ảnh khác
+                    {pm.changePhoto}
                   </button>
                 </div>
               ) : (
@@ -248,11 +248,12 @@ export function PhotoContributeModal({
                     aria-hidden="true"
                   />
                   <span className="text-xs font-bold text-[#10243A]">
-                    Bấm để chọn ảnh từ máy
+                    {pm.pickFromDevice}
                   </span>
                   <span className="text-[11px] text-slate-500 mt-0.5 tabular-nums">
-                    Chỉ hỗ trợ JPG, PNG, WebP (Tối đa{" "}
-                    {PLACE_PHOTO_UPLOAD_CONFIG.MAX_FILE_SIZE_MB}MB — Không nhận video)
+                    {t("place.photoModal.formatHint", {
+                      maxMb: PLACE_PHOTO_UPLOAD_CONFIG.MAX_FILE_SIZE_MB,
+                    })}
                   </span>
                   <input
                     id="photo-input"
@@ -270,7 +271,7 @@ export function PhotoContributeModal({
                 htmlFor="photo-caption"
                 className="text-xs font-bold text-[#10243A] block"
               >
-                Mô tả ngắn (Tùy chọn)
+                {pm.captionLabel}
               </label>
               <Input
                 id="photo-caption"
@@ -281,7 +282,7 @@ export function PhotoContributeModal({
                 autoCorrect="off"
                 autoCapitalize="off"
                 onChange={(e) => setCaption(e.target.value)}
-                placeholder="Ví dụ: Góc chụp mặt tiền, không gian bên trong..."
+                placeholder={pm.captionPlaceholder}
                 className="text-xs h-10 rounded-xl border-slate-200"
               />
             </div>
@@ -295,7 +296,7 @@ export function PhotoContributeModal({
                 disabled={submitting}
                 className="rounded-xl"
               >
-                Hủy bỏ
+                {pm.cancel}
               </Button>
               <Button
                 type="submit"
@@ -309,7 +310,7 @@ export function PhotoContributeModal({
                     aria-hidden="true"
                   />
                 )}
-                <span>{submitting ? "Đang tải lên..." : "Gửi ảnh kiểm duyệt"}</span>
+                <span>{submitting ? pm.uploading : pm.submit}</span>
               </Button>
             </DialogFooter>
           </form>

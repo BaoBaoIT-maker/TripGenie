@@ -3,6 +3,7 @@
 import React, { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { AppModalPortal } from '@/components/common/AppModalPortal';
+import { useI18n, type MessageKey } from '@/i18n';
 import { COVER_PHOTO_PRESETS } from '../../constants/itinerary.constants';
 
 async function compressImageToFit(file: File, maxStringLength = 65000): Promise<string> {
@@ -133,6 +134,7 @@ function CoverPhotoModalBody({
   onSave: (newCoverUrl: string) => Promise<void>;
   isSaving: boolean;
 }) {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'presets' | 'upload' | 'url'>('presets');
   const [selectedUrl, setSelectedUrl] = useState<string>(currentCover);
   const [customUrlInput, setCustomUrlInput] = useState<string>('');
@@ -142,15 +144,15 @@ function CoverPhotoModalBody({
   const handleApplyCustomUrl = () => {
     const trimmed = customUrlInput.trim();
     if (!trimmed) {
-      toast.error('Vui lòng nhập đường dẫn hình ảnh hợp lệ');
+      toast.error(t('planner.coverPhoto.toasts.invalidUrl'));
       return;
     }
     if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://') && !trimmed.startsWith('data:image')) {
-      toast.error('Đường dẫn ảnh phải bắt đầu bằng http:// hoặc https://');
+      toast.error(t('planner.coverPhoto.toasts.urlProtocol'));
       return;
     }
     setSelectedUrl(trimmed);
-    toast.success('Đã áp dụng ảnh xem trước!');
+    toast.success(t('planner.coverPhoto.toasts.previewApplied'));
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,12 +160,12 @@ function CoverPhotoModalBody({
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      toast.error('Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, WebP)');
+      toast.error(t('planner.coverPhoto.toasts.invalidFileType'));
       return;
     }
 
     if (file.size > 30 * 1024 * 1024) {
-      toast.error('Kích thước ảnh tối đa là 30MB');
+      toast.error(t('planner.coverPhoto.toasts.fileTooLarge'));
       return;
     }
 
@@ -171,9 +173,9 @@ function CoverPhotoModalBody({
     try {
       const compressed = await compressImageToFit(file);
       setSelectedUrl(compressed);
-      toast.success('Đã tự động nén và tối ưu hóa ảnh thành công!');
+      toast.success(t('planner.coverPhoto.toasts.compressedSuccess'));
     } catch {
-      toast.error('Lỗi khi đọc và xử lý file ảnh từ thiết bị');
+      toast.error(t('planner.coverPhoto.toasts.readFileError'));
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
@@ -184,7 +186,7 @@ function CoverPhotoModalBody({
 
   const handleSave = async () => {
     if (!selectedUrl) {
-      toast.error('Vui lòng chọn hoặc tải lên một hình ảnh');
+      toast.error(t('planner.coverPhoto.toasts.noImageSelected'));
       return;
     }
     try {
@@ -206,18 +208,16 @@ function CoverPhotoModalBody({
           </div>
           <div>
             <h2 id="cover-photo-modal-title" className="text-base font-bold text-slate-900">
-              Chỉnh sửa ảnh bìa lịch trình
+              {t('planner.coverPhoto.title')}
             </h2>
-            <p className="text-xs text-slate-500">
-              Tùy chỉnh ảnh đại diện toàn cảnh cho hành trình của bạn
-            </p>
+            <p className="text-xs text-slate-500">{t('planner.coverPhoto.subtitle')}</p>
           </div>
         </div>
         <button
           type="button"
           onClick={onClose}
           disabled={isSaving}
-          aria-label="Đóng hộp thoại"
+          aria-label={t('planner.common.closeDialog')}
           className="size-8 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
         >
           <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
@@ -227,19 +227,19 @@ function CoverPhotoModalBody({
       {/* Live Preview Box */}
       <div className="px-6 pt-5 pb-2 shrink-0">
         <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-          Xem trước ảnh bìa
+          {t('planner.coverPhoto.previewLabel')}
         </p>
         <div className="relative h-36 sm:h-44 w-full rounded-2xl overflow-hidden bg-slate-100 border border-slate-200 group">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={selectedUrl || currentCover}
-            alt="Xem trước ảnh bìa lịch trình"
+            alt={t('planner.coverPhoto.previewAlt')}
             className="w-full h-full object-cover"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-900/20 to-transparent" />
           <div className="absolute bottom-3 left-4 text-white text-xs font-semibold flex items-center gap-1.5">
             <i className="fa-regular fa-image text-xs" aria-hidden="true" />
-            <span>Giao diện hiển thị thực tế trên đầu trang</span>
+            <span>{t('planner.coverPhoto.previewOverlay')}</span>
           </div>
         </div>
       </div>
@@ -257,7 +257,7 @@ function CoverPhotoModalBody({
             }`}
           >
             <i className="fa-regular fa-images text-xs" aria-hidden="true" />
-            <span>Gợi ý điểm đến</span>
+            <span>{t('planner.coverPhoto.tabPresets')}</span>
           </button>
           <button
             type="button"
@@ -269,7 +269,7 @@ function CoverPhotoModalBody({
             }`}
           >
             <i className="fa-solid fa-upload text-xs" aria-hidden="true" />
-            <span>Tải từ thiết bị</span>
+            <span>{t('planner.coverPhoto.tabUpload')}</span>
           </button>
           <button
             type="button"
@@ -281,7 +281,7 @@ function CoverPhotoModalBody({
             }`}
           >
             <i className="fa-solid fa-link text-xs" aria-hidden="true" />
-            <span>Dán liên kết</span>
+            <span>{t('planner.coverPhoto.tabUrl')}</span>
           </button>
         </div>
       </div>
@@ -292,6 +292,10 @@ function CoverPhotoModalBody({
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {COVER_PHOTO_PRESETS.map((preset) => {
               const isChosen = selectedUrl === preset.url;
+              const presetTitle = t(`planner.coverPhoto.presets.${preset.id}.title` as MessageKey);
+              const presetLocation = t(
+                `planner.coverPhoto.presets.${preset.id}.location` as MessageKey,
+              );
               return (
                 <button
                   key={preset.id}
@@ -306,7 +310,7 @@ function CoverPhotoModalBody({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={preset.url}
-                    alt={preset.title}
+                    alt={presetTitle}
                     className="w-full h-full object-cover"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent" />
@@ -316,8 +320,8 @@ function CoverPhotoModalBody({
                     </div>
                   )}
                   <div className="absolute bottom-1.5 left-2 right-2 text-white text-[11px] leading-tight">
-                    <p className="font-bold truncate">{preset.title}</p>
-                    <p className="text-[10px] text-slate-300 truncate">{preset.location}</p>
+                    <p className="font-bold truncate">{presetTitle}</p>
+                    <p className="text-[10px] text-slate-300 truncate">{presetLocation}</p>
                   </div>
                 </button>
               );
@@ -343,10 +347,10 @@ function CoverPhotoModalBody({
               )}
             </div>
             <h3 className="text-sm font-semibold text-slate-900 mb-1">
-              Tải ảnh bìa từ máy tính hoặc điện thoại
+              {t('planner.coverPhoto.uploadHeading')}
             </h3>
             <p className="text-xs text-slate-500 text-center max-w-xs mb-4">
-              Hỗ trợ định dạng JPG, PNG, WebP. Ảnh được tự động nén gọn giữ độ nét banner.
+              {t('planner.coverPhoto.uploadDesc')}
             </p>
             <button
               type="button"
@@ -355,7 +359,7 @@ function CoverPhotoModalBody({
               className="px-4 py-2 bg-[#0194F3] hover:bg-[#007AD0] text-white text-xs font-bold rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
             >
               <i className="fa-solid fa-camera text-xs" aria-hidden="true" />
-              <span>Chọn ảnh từ thiết bị</span>
+              <span>{t('planner.coverPhoto.chooseFile')}</span>
             </button>
           </div>
         )}
@@ -364,7 +368,7 @@ function CoverPhotoModalBody({
           <div className="space-y-3 py-2">
             <div>
               <label htmlFor="cover-custom-url-input" className="block text-xs font-bold text-slate-700 mb-1.5">
-                Đường dẫn ảnh trực tiếp (Image URL)
+                {t('planner.coverPhoto.urlLabel')}
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -380,11 +384,11 @@ function CoverPhotoModalBody({
                   onClick={handleApplyCustomUrl}
                   className="h-10 px-3.5 bg-[#10243A] hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer"
                 >
-                  Xem thử
+                  {t('planner.coverPhoto.previewUrlBtn')}
                 </button>
               </div>
               <p className="text-[11px] text-slate-500 mt-1.5">
-                Sao chép link ảnh ngang chất lượng cao để banner hiển thị sắc nét nhất.
+                {t('planner.coverPhoto.urlHint')}
               </p>
             </div>
           </div>
@@ -399,7 +403,7 @@ function CoverPhotoModalBody({
           disabled={isSaving}
           className="h-9 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold transition-colors cursor-pointer"
         >
-          Hủy
+          {t('common.cancel')}
         </button>
         <button
           type="button"
@@ -410,12 +414,12 @@ function CoverPhotoModalBody({
           {isSaving ? (
             <>
               <i className="fa-solid fa-circle-notch fa-spin text-xs" aria-hidden="true" />
-              <span>Đang lưu...</span>
+              <span>{t('planner.common.saving')}</span>
             </>
           ) : (
             <>
               <i className="fa-solid fa-check text-xs" aria-hidden="true" />
-              <span>Lưu thay đổi</span>
+              <span>{t('planner.common.saveChanges')}</span>
             </>
           )}
         </button>

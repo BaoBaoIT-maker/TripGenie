@@ -22,6 +22,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuth } from '../hooks/use-auth';
 import { useUpdateProfile } from '../hooks/use-update-profile';
 import { DEFAULT_AVATAR } from '@/config/avatars';
+import { useI18n } from '@/i18n';
 import { AvatarPickerModal } from './AvatarPickerModal';
 
 interface AccountSecuritySectionProps {
@@ -29,6 +30,7 @@ interface AccountSecuritySectionProps {
 }
 
 export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySectionProps = {}) {
+  const { t } = useI18n();
   const { user, logout, isLoggingOut } = useAuth();
   const updateProfileMutation = useUpdateProfile();
   const [internalModalOpen, setInternalModalOpen] = React.useState(false);
@@ -36,12 +38,13 @@ export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySec
   const [fullName, setFullName] = React.useState(user?.fullName || '');
   const [bio, setBio] = React.useState(user?.bio || '');
 
-  React.useEffect(() => {
-    if (user) {
-      setFullName(user.fullName || '');
-      setBio(user.bio || '');
-    }
-  }, [user?.id, user?.fullName, user?.bio]);
+  const userSyncKey = `${user?.id ?? ''}|${user?.fullName ?? ''}|${user?.bio ?? ''}`;
+  const [prevUserSyncKey, setPrevUserSyncKey] = React.useState(userSyncKey);
+  if (user && userSyncKey !== prevUserSyncKey) {
+    setPrevUserSyncKey(userSyncKey);
+    setFullName(user.fullName || '');
+    setBio(user.bio || '');
+  }
 
   const isGoogleAuth = user?.authMethods?.includes('GOOGLE');
   const hasLocalPassword = user?.authMethods?.includes('LOCAL');
@@ -62,7 +65,7 @@ export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySec
     e.preventDefault();
     const trimmedName = fullName.trim();
     if (!trimmedName || trimmedName.length < 2) {
-      toast.error('Họ và tên phải có ít nhất 2 ký tự');
+      toast.error(t('profile.account.nameMinError'));
       return;
     }
 
@@ -71,9 +74,9 @@ export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySec
         fullName: trimmedName,
         bio: bio.trim(),
       });
-      toast.success('Cập nhật thông tin hồ sơ thành công');
+      toast.success(t('profile.account.updateSuccess'));
     } catch {
-      toast.error('Không thể cập nhật hồ sơ. Vui lòng thử lại.');
+      toast.error(t('profile.account.updateError'));
     }
   };
 
@@ -97,13 +100,13 @@ export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySec
         <div className="border-b border-border pb-4 space-y-1">
           <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase text-primary tracking-wider">
             <User className="size-4" />
-            <span>Thông tin cá nhân</span>
+            <span>{t('profile.account.eyebrow')}</span>
           </div>
           <h2 className="text-xl font-bold font-heading text-foreground">
-            Hồ sơ người dùng
+            {t('profile.account.title')}
           </h2>
           <p className="text-xs text-muted-foreground">
-            Chỉnh sửa họ tên và thông tin giới thiệu của bạn trên hệ thống TripGenie.
+            {t('profile.account.subtitle')}
           </p>
         </div>
 
@@ -115,12 +118,12 @@ export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySec
                 type="button"
                 onClick={handleOpenModal}
                 className="outline-none cursor-pointer rounded-full transition-transform hover:scale-105 active:scale-95 group shrink-0"
-                title="Nhấn để đổi ảnh đại diện"
+                title={t('profile.changeAvatarTooltip')}
               >
                 <Avatar className="size-14 border-2 border-primary/20 group-hover:border-primary transition-colors">
                   <AvatarImage
                     src={user?.avatarUrl || DEFAULT_AVATAR}
-                    alt={user?.fullName || 'Avatar'}
+                    alt={user?.fullName || t('profile.avatarAlt')}
                   />
                   <AvatarFallback className="text-sm font-bold bg-primary text-primary-foreground">
                     {userInitials}
@@ -130,16 +133,16 @@ export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySec
               <div className="min-w-0">
                 <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                   <Camera className="size-3.5 text-primary" />
-                  Ảnh đại diện
+                  {t('profile.account.avatarLabel')}
                 </span>
                 <p className="text-xs font-bold text-foreground truncate mt-0.5">
                   {user?.avatarUrl?.startsWith('http') && user?.avatarUrl?.includes('cloudinary')
-                    ? 'Ảnh tải lên Cloudinary'
+                    ? t('profile.account.avatarCloudinary')
                     : user?.avatarUrl?.startsWith('data:')
-                    ? 'Ảnh tự tải lên'
+                    ? t('profile.account.avatarUploaded')
                     : user?.avatarUrl?.includes('avatar-')
-                    ? 'Ảnh có sẵn'
-                    : 'Ảnh mặc định'}
+                    ? t('profile.account.avatarPreset')
+                    : t('profile.account.avatarDefault')}
                 </p>
               </div>
             </div>
@@ -150,7 +153,7 @@ export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySec
               onClick={handleOpenModal}
               className="text-xs rounded-xl h-9 px-4 shrink-0 cursor-pointer self-start sm:self-center"
             >
-              Đổi ảnh đại diện
+              {t('profile.account.changeAvatar')}
             </Button>
           </div>
 
@@ -161,14 +164,14 @@ export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySec
               className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"
             >
               <User className="size-3.5 text-primary" />
-              <span>Họ và tên *</span>
+              <span>{t('profile.account.fullNameLabel')}</span>
             </label>
             <Input
               id="profile-full-name"
               type="text"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              placeholder="Nhập họ và tên hiển thị..."
+              placeholder={t('profile.account.fullNamePlaceholder')}
               className="h-11 rounded-xl text-sm bg-background border-border/80 focus-visible:border-primary px-3.5"
               maxLength={100}
               required
@@ -182,18 +185,18 @@ export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySec
               className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5"
             >
               <FileText className="size-3.5 text-primary" />
-              <span>Tiểu sử / Giới thiệu ngắn</span>
+              <span>{t('profile.account.bioLabel')}</span>
             </label>
             <textarea
               id="profile-bio"
               value={bio}
               onChange={(e) => setBio(e.target.value)}
-              placeholder="Chia sẻ đôi nét về gu du lịch hoặc niềm đam mê khám phá của bạn..."
+              placeholder={t('profile.account.bioPlaceholder')}
               className="w-full min-h-[88px] rounded-xl text-sm bg-background border border-border/80 focus:border-primary focus:ring-1 focus:ring-primary p-3 outline-none transition-colors resize-none placeholder:text-muted-foreground"
               maxLength={250}
             />
             <p className="text-[11px] text-muted-foreground text-right">
-              {bio.length}/250 ký tự
+              {t('profile.account.bioCount', { count: bio.length })}
             </p>
           </div>
         </div>
@@ -201,7 +204,7 @@ export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySec
         {/* Save Button Bar */}
         <div className="pt-3 border-t border-border flex items-center justify-between">
           <p className="text-xs text-muted-foreground">
-            {isDirty ? 'Bạn có thay đổi chưa lưu' : 'Thông tin hồ sơ đã được đồng bộ'}
+            {isDirty ? t('profile.account.unsavedChanges') : t('profile.account.syncedStatus')}
           </p>
           <Button
             type="submit"
@@ -213,7 +216,7 @@ export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySec
             ) : (
               <Save className="size-3.5" />
             )}
-            <span>Lưu thay đổi</span>
+            <span>{t('profile.account.saveChanges')}</span>
           </Button>
         </div>
       </form>
@@ -223,13 +226,13 @@ export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySec
         <div className="border-b border-border pb-4 space-y-1">
           <div className="inline-flex items-center gap-1.5 text-xs font-bold uppercase text-primary tracking-wider">
             <ShieldCheck className="size-4" />
-            <span>Phương thức đăng nhập & Định danh</span>
+            <span>{t('profile.account.securityEyebrow')}</span>
           </div>
           <h2 className="text-xl font-bold font-heading text-foreground">
-            Bảo mật tài khoản
+            {t('profile.account.securityTitle')}
           </h2>
           <p className="text-xs text-muted-foreground">
-            Phương thức xác thực dùng để đăng nhập vào TripGenie.
+            {t('profile.account.securitySubtitle')}
           </p>
         </div>
 
@@ -239,18 +242,18 @@ export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySec
             <div className="flex items-center justify-between">
               <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
                 <Mail className="size-3.5 text-primary" />
-                Địa chỉ Email
+                {t('profile.account.emailLabel')}
               </span>
               {user?.isVerified && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                   <CheckCircle2 className="size-3" />
-                  Đã xác thực
+                  {t('profile.account.verifiedBadge')}
                 </span>
               )}
             </div>
             <p className="text-sm font-bold text-foreground truncate">
               {user?.email || (
-                <span className="text-muted-foreground italic font-normal">Chưa có email</span>
+                <span className="text-muted-foreground italic font-normal">{t('profile.account.noEmail')}</span>
               )}
             </p>
           </div>
@@ -259,19 +262,19 @@ export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySec
           <div className="p-4 rounded-2xl border border-border/80 bg-muted/20 space-y-2">
             <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
               <KeyRound className="size-3.5 text-primary" />
-              Phương thức xác thực
+              {t('profile.account.authMethodLabel')}
             </span>
             <div className="flex flex-wrap items-center gap-2">
               {hasLocalPassword && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary border border-primary/20">
                   <Lock className="size-3" />
-                  Mật khẩu
+                  {t('profile.account.passwordMethod')}
                 </span>
               )}
               {isGoogleAuth && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
                   <Mail className="size-3" />
-                  Google OAuth
+                  {t('profile.account.googleMethod')}
                 </span>
               )}
             </div>
@@ -281,10 +284,10 @@ export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySec
           <div className="p-4 rounded-2xl border border-border/80 bg-muted/20 space-y-2">
             <span className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
               <Shield className="size-3.5 text-primary" />
-              Vai trò hệ thống
+              {t('profile.account.roleLabel')}
             </span>
             <p className="text-sm font-bold text-foreground">
-              {user?.role === 'ADMIN' ? 'Quản trị viên (Admin)' : 'Thành viên du lịch'}
+              {user?.role === 'ADMIN' ? t('profile.account.roleAdmin') : t('profile.account.roleMember')}
             </p>
           </div>
         </div>
@@ -304,7 +307,7 @@ export function AccountSecuritySection({ onOpenAvatarModal }: AccountSecuritySec
           ) : (
             <i className="fa-solid fa-arrow-right-from-bracket text-xs" aria-hidden="true" />
           )}
-          <span>Đăng xuất tài khoản</span>
+          <span>{t('profile.account.logoutButton')}</span>
         </Button>
       </div>
 

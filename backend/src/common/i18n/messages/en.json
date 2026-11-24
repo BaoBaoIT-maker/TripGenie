@@ -1,0 +1,76 @@
+{
+  "mail": {
+    "common": {
+      "greeting": "Hello,",
+      "footer": "This is an automated email from TripGenie. Please do not reply to this message."
+    },
+    "otp": {
+      "resetSubject": "[TripGenie] Password Reset OTP: {otp}",
+      "verifySubject": "[TripGenie] Account Verification OTP: {otp}",
+      "resetTitle": "Reset Your TripGenie Password",
+      "verifyTitle": "TripGenie Verification Code",
+      "resetMessage": "We received a request to reset the password for your <strong>TripGenie</strong> account.",
+      "verifyMessage": "Thank you for registering with <strong>TripGenie</strong> — Your Smart Travel Planning Platform.",
+      "expiry": "This OTP code is valid for <strong>10 minutes</strong>.",
+      "resetNote": "If you did not request a password reset, please ignore this email or contact support to keep your account safe.",
+      "verifyNote": "Please do not share this code with anyone to keep your account secure."
+    },
+    "verification": {
+      "subject": "[TripGenie] Activate Your Account",
+      "heading": "Verify Your TripGenie Account",
+      "intro": "Thank you for signing up for <strong>TripGenie</strong> — Your Smart Travel Planning Platform.",
+      "instruction": "Please click the button below to verify your email address and activate your account:",
+      "cta": "Verify Account",
+      "expiry": "This verification link is valid for <strong>30 minutes</strong>.",
+      "fallbackLink": "If the button above does not work, copy and paste this link into your browser:"
+    }
+  },
+  "advisor": {
+    "fallback": {
+      "networkError": "TripGenie AI Advisor is experiencing a temporary connection issue. Please try again in a moment!",
+      "circuitBreaker": "I have compiled the most relevant details from our verified travel data. Would you like me to clarify anything further?",
+      "missingApiKey": "The AI Advisor service is not yet configured with an API key. Please check the server configuration."
+    }
+  },
+  "copilot": {
+    "proposals": {
+      "swapActivityDay": "Swap stop on Day {day}",
+      "swapActivity": "Swap stop proposal",
+      "swapDaysRange": "Swap Day {dayA} and Day {dayB}",
+      "swapDays": "Swap days proposal",
+      "addActivityDay": "Add stop to Day {day}",
+      "addActivity": "Add stop proposal",
+      "removeActivityDay": "Remove stop from Day {day}",
+      "removeActivity": "Remove stop proposal",
+      "moveActivity": "Move stop to another day",
+      "changeDestination": "Change destination",
+      "default": "Itinerary change proposal"
+    },
+    "changeDestinationFallback": "the new destination",
+    "changeDestinationMessage": "Switching to {dest} requires creating a new itinerary to recalculate routes, stays, and intercity transit. Click the button below to plan a fresh trip to {dest}!",
+    "unsupportedTool": "Tool {toolName} is not supported.",
+    "fallbackDirectReply": "Genie has noted your request. Would you like to adjust any other stops in your itinerary?",
+    "fallbackError": "Genie is temporarily busy optimizing data. Please try again or use the Swap button directly on a stop card!"
+  },
+  "planner": {
+    "fallback": {
+      "title": "{days}-Day {dest} Discovery Trip",
+      "description": "An optimized {days}-day itinerary covering top highlights in {dest}.",
+      "dayTheme": "Discover {dest} Highlights — Day {day}",
+      "emptyDayTheme": "Explore {dest} — Day {day}",
+      "activityNote": "Visit & enjoy {placeName}"
+    }
+  },
+  "weather": {
+    "sourceForecast": "Forecast",
+    "sourceSeasonal": "Seasonal climate trend, not a live forecast",
+    "dayLine": "- Day {day}{datePart} [{source}]: {label}, {min}-{max}°C{rainPart}{uvPart}{hintPart}",
+    "rainPart": ", rain probability {prob}%",
+    "uvPart": ", max UV {uv}",
+    "hintRain": "PRIORITIZE indoor/covered stops (museums, cafes, workshops, dining, malls), limit prolonged outdoor exposure, and suggest rain backups in notes",
+    "hintHeat": "High heat/UV: schedule outdoor stops early morning (07:30-10:30) or late afternoon/evening (>=16:00); prioritize lunch, rest, and air-conditioned venues between 11:30-15:00",
+    "hintCold": "Cool weather: prioritize warm dishes and cozy venues; remind travelers to dress warmly in early mornings/evenings",
+    "seasonalNote": "\nNote: Data above reflects seasonal averages (outside the live forecast window); use it for pacing and packing guidance rather than exact hourly predictions.",
+    "guidanceHeading": "DAILY WEATHER AT DESTINATION:\n{lines}{seasonalNote}"
+  }
+}

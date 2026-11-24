@@ -5,11 +5,11 @@ import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   COMMUNITY_UI_CONSTANTS,
-  formatRelativeTime,
   formatTripDuration,
   getVideoThumbnailSrc,
   isVideoUrl,
 } from "@/services/community.service";
+import { formatRelativeTime, useI18n } from "@/i18n";
 import type {
   CommunityPostItem,
   TopCreatorSummary,
@@ -37,6 +37,7 @@ export function CheckinStoriesSection({
   onOpenStoryViewer: (index: number) => void;
   className?: string;
 }) {
+  const { locale, t } = useI18n();
   const storiesScrollRef = useRef<HTMLDivElement | null>(null);
 
   if (checkinHighlights.length === 0) return null;
@@ -58,7 +59,7 @@ export function CheckinStoriesSection({
             className="fa-solid fa-camera-retro text-[#10B981] mr-1.5"
             aria-hidden="true"
           />
-          Check-in Mới Nhất
+          {t("community.sidebar.checkinHeading")}
         </h3>
       </div>
 
@@ -69,7 +70,7 @@ export function CheckinStoriesSection({
             <button
               type="button"
               onClick={() => handleScrollStories(-1)}
-              aria-label="Trượt sang trái"
+              aria-label={t("community.sidebar.scrollLeftAria")}
               className="absolute left-1.5 top-1/2 -translate-y-1/2 z-20 size-7 rounded-full bg-white/95 hover:bg-white border border-[#E2E8F0] text-[#0F172A] shadow-md flex items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity cursor-pointer"
             >
               <ChevronLeft className="size-4" />
@@ -77,7 +78,7 @@ export function CheckinStoriesSection({
             <button
               type="button"
               onClick={() => handleScrollStories(1)}
-              aria-label="Trượt sang phải"
+              aria-label={t("community.sidebar.scrollRightAria")}
               className="absolute right-1.5 top-1/2 -translate-y-1/2 z-20 size-7 rounded-full bg-white/95 hover:bg-white border border-[#E2E8F0] text-[#0F172A] shadow-md flex items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity cursor-pointer"
             >
               <ChevronRight className="size-4" />
@@ -165,7 +166,7 @@ export function CheckinStoriesSection({
                   </p>
                   <div className="text-[9.5px] font-semibold text-white/85 mt-1 truncate">
                     {story.author.fullName} •{" "}
-                    {formatRelativeTime(story.createdAt)}
+                    {formatRelativeTime(story.createdAt, locale)}
                   </div>
                 </div>
               </div>
@@ -184,6 +185,7 @@ export function TopCreatorsSection({
   topCreators: TopCreatorSummary[];
   className?: string;
 }) {
+  const { t } = useI18n();
   if (topCreators.length === 0) return null;
 
   return (
@@ -196,7 +198,7 @@ export function TopCreatorsSection({
             className="fa-solid fa-award text-[#F59E0B] mr-1.5"
             aria-hidden="true"
           />
-          Tác Giả Nổi Bật
+          {t("community.sidebar.topCreatorsHeading")}
         </h3>
       </div>
 
@@ -207,7 +209,7 @@ export function TopCreatorsSection({
           const authorUsername =
             creator.author?.username ?? creator.username ?? null;
           const authorFullName =
-            creator.author?.fullName || creator.fullName || "Thành viên";
+            creator.author?.fullName || creator.fullName || t("community.memberFallback");
           const authorAvatarUrl =
             creator.author?.avatarUrl ?? creator.avatarUrl ?? null;
           const authorVerified = Boolean(
@@ -243,7 +245,7 @@ export function TopCreatorsSection({
                     {authorVerified && (
                       <i
                         className="fa-solid fa-circle-check text-[#0194F3] text-[11px] shrink-0"
-                        title="Thổ địa được xác thực"
+                        title={t("community.verifiedLocalTitle")}
                       />
                     )}
                   </div>
@@ -252,9 +254,10 @@ export function TopCreatorsSection({
                       className="fa-regular fa-newspaper"
                       aria-hidden="true"
                     />{" "}
-                    {creator.postCount} bài •{" "}
-                    <i className="fa-solid fa-route" aria-hidden="true" />{" "}
-                    {creator.publicItineraryCount} lộ trình
+                    {t("community.sidebar.creatorStats", {
+                      posts: creator.postCount,
+                      itineraries: creator.publicItineraryCount,
+                    })}
                   </div>
                 </div>
               </Link>
@@ -264,7 +267,7 @@ export function TopCreatorsSection({
                 className="bg-white hover:bg-[#F1F5F9] text-[#334155] hover:text-[#020617] border border-[#CBD5E1] font-semibold text-[11px] py-[5px] px-3 rounded-[10px] transition-colors inline-flex items-center gap-1 shrink-0"
               >
                 <i className="fa-regular fa-user" aria-hidden="true" />
-                <span>Xem kênh</span>
+                <span>{t("community.viewChannel")}</span>
               </Link>
             </div>
           );
@@ -283,6 +286,7 @@ export function CommunityRightSidebar({
   onOpenStoryViewer,
   onSelectMostClonedTab,
 }: CommunityRightSidebarProps) {
+  const { locale, t } = useI18n();
   return (
     <aside className="sidebar-sticky hidden lg:flex flex-col gap-5 lg:h-full lg:overflow-y-auto lg:overscroll-contain lg:pr-1 lg:pb-8 community-sidebar-scroll">
       {/* BLOCK 1: LỘ TRÌNH ĐƯỢC NHÂN BẢN NHIỀU NHẤT */}
@@ -293,7 +297,7 @@ export function CommunityRightSidebar({
               className="fa-solid fa-fire text-[#F97316] mr-1.5"
               aria-hidden="true"
             />
-            Lộ Trình Hot Nhất
+            {t("community.sidebar.hotItinerariesHeading")}
           </h3>
           {onSelectMostClonedTab && (
             <button
@@ -301,7 +305,7 @@ export function CommunityRightSidebar({
               onClick={onSelectMostClonedTab}
               className="text-[11px] font-bold text-[#0194F3] hover:text-[#007FE3] bg-transparent border-none p-0 flex items-center gap-1 cursor-pointer transition-colors"
             >
-              <span>Xem tất cả</span>
+              <span>{t("community.sidebar.seeAll")}</span>
               <i
                 className="fa-solid fa-chevron-right text-[9px]"
                 aria-hidden="true"
@@ -317,13 +321,14 @@ export function CommunityRightSidebar({
               itinerary?.areaName ||
               itinerary?.destination ||
               post.group?.name ||
-              "Việt Nam";
+              t("common.country");
             const durationLabel =
               formatTripDuration(
                 itinerary?.startDate,
                 itinerary?.endDate,
-                true
-              ) || "3N2Đ";
+                true,
+                locale
+              ) || t("community.sidebar.defaultDurationCompact");
 
             return (
               <div
@@ -337,7 +342,7 @@ export function CommunityRightSidebar({
                     onFocusHotPost?.(post);
                   }
                 }}
-                title="Nhấn để chuyển tới bài đăng lộ trình này trên bảng tin"
+                title={t("community.sidebar.focusHotPostTitle")}
                 className="p-3 rounded-[14px] border border-[#E2E8F0] hover:border-[#0194F3] bg-white hover:bg-[#F8FAFC] flex flex-col gap-2 transition-colors cursor-pointer group/hot"
               >
                 <div className="flex items-center justify-between text-[11px] text-[#64748B] font-bold">
@@ -364,7 +369,7 @@ export function CommunityRightSidebar({
                       className="fa-solid fa-clone text-[#94A3B8]"
                       aria-hidden="true"
                     />{" "}
-                    {post.cloneCount} lượt nhân bản
+                    {t("community.sidebar.cloneCount", { count: post.cloneCount })}
                   </span>
                   <button
                     type="button"
@@ -374,7 +379,7 @@ export function CommunityRightSidebar({
                     }}
                     className="text-[12px] font-extrabold text-[#0194F3] hover:text-[#007FE3] border-none bg-transparent cursor-pointer flex items-center gap-1 transition-colors"
                   >
-                    <span>Nhân bản</span>
+                    <span>{t("community.sidebar.clone")}</span>
                     <i
                       className="fa-solid fa-arrow-right text-[10px]"
                       aria-hidden="true"

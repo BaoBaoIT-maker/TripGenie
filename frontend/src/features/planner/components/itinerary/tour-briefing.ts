@@ -1,4 +1,5 @@
 import type { TourBriefing } from '@/types/itinerary';
+import type { AppLocale } from '@/i18n';
 
 // ponytail: client-side input caps mirror TOUR_BRIEFING_LIMITS in backend/src/modules/itineraries/dto/generate-itinerary.dto.ts; if shared monorepo package is introduced later, import from single schema.
 export const TOUR_BRIEFING_UI_CONSTANTS = {
@@ -30,22 +31,26 @@ export const DEFAULT_PRINT_SHEET_OPTIONS: PrintSheetOptions = {
   pageBreakPerDay: false,
 };
 
-export function formatVnd(amount?: number | null): string {
+export function formatVnd(amount?: number | null, locale: AppLocale = 'vi'): string {
   if (amount === undefined || amount === null || Number.isNaN(amount)) {
     return '—';
   }
   if (amount === 0) {
-    return 'Miễn phí';
+    return locale === 'en' ? 'Free' : 'Miễn phí';
   }
   return `${Math.round(amount).toLocaleString('vi-VN')}đ`;
 }
 
-export function formatDayDateLabel(startDate: string | null, dayOffset: number): string {
+export function formatDayDateLabel(
+  startDate: string | null,
+  dayOffset: number,
+  locale: AppLocale = 'vi',
+): string {
   if (!startDate) return '';
   const base = new Date(startDate);
   if (Number.isNaN(base.getTime())) return '';
   base.setDate(base.getDate() + dayOffset);
-  return base.toLocaleDateString('vi-VN', {
+  return base.toLocaleDateString(locale === 'en' ? 'en-US' : 'vi-VN', {
     weekday: 'long',
     day: '2-digit',
     month: '2-digit',
@@ -53,14 +58,19 @@ export function formatDayDateLabel(startDate: string | null, dayOffset: number):
   });
 }
 
-export function formatDateRangeVi(startDate: string | null, endDate: string | null): string {
-  if (!startDate || !endDate) return 'Linh hoạt';
+export function formatDateRangeVi(
+  startDate: string | null,
+  endDate: string | null,
+  locale: AppLocale = 'vi',
+): string {
+  if (!startDate || !endDate) return locale === 'en' ? 'Flexible' : 'Linh hoạt';
   const start = new Date(startDate);
   const end = new Date(endDate);
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
     return `${startDate} – ${endDate}`;
   }
-  return `${start.toLocaleDateString('vi-VN')} – ${end.toLocaleDateString('vi-VN')}`;
+  const intlLocale = locale === 'en' ? 'en-US' : 'vi-VN';
+  return `${start.toLocaleDateString(intlLocale)} – ${end.toLocaleDateString(intlLocale)}`;
 }
 
 /** Stable empty reference so derived draft state does not change identity every render. */

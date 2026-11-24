@@ -21,8 +21,8 @@ import { WeatherIcon } from './itinerary/WeatherIcon';
 import {
   getDestinationCover,
   DEFAULT_TRIP_DAYS,
-  DEFAULT_BUDGET_FALLBACK_TEXT,
 } from '@/features/planner/constants/itinerary.constants';
+import { useI18n } from '@/i18n';
 import type { ItineraryDetail } from '@/types/itinerary';
 import type { CommunityLinkedItinerarySummary } from '@/types/community';
 
@@ -71,6 +71,7 @@ export function TripCard({
   onClone,
 }: TripCardProps) {
   const router = useRouter();
+  const { t, locale } = useI18n();
   const item = itin as TripCardItem;
 
   const totalDays =
@@ -90,12 +91,12 @@ export function TripCard({
     ? formatVnd(item.budgetBreakdown.totalEstimated)
     : item.estimatedCost
     ? formatVnd(item.estimatedCost)
-    : DEFAULT_BUDGET_FALLBACK_TEXT;
+    : t('planner.common.actualCostFallback');
 
-  const destinationName = item.destination || item.areaName || 'Việt Nam';
+  const destinationName = item.destination || item.areaName || t('planner.common.vietnamFallback');
   const imageUrl = item.coverPhoto || getDestinationCover(destinationName);
-  const dateText = formatTripDates(item.startDate, item.endDate);
-  const weather = getItineraryWeather(destinationName, item.startDate);
+  const dateText = formatTripDates(item.startDate, item.endDate, locale);
+  const weather = getItineraryWeather(destinationName, item.startDate, locale);
   const totalActivities =
     item.days?.reduce((sum: number, d: { activities?: any[] }) => sum + (d.activities?.length || 0), 0) ||
     item.totalPlaces ||
@@ -139,7 +140,9 @@ export function TripCard({
             <button
               type="button"
               onClick={(e) => onSelect(item.id, e)}
-              aria-label={isSelected ? 'Bỏ chọn' : 'Chọn chuyến đi'}
+              aria-label={
+                isSelected ? t('planner.tripCard.deselectAria') : t('planner.tripCard.selectTripAria')
+              }
               className={`size-7 rounded-lg backdrop-blur-md flex items-center justify-center transition-all shadow-xs cursor-pointer ${
                 isSelected
                   ? 'bg-[#0194F3] text-white ring-2 ring-white'
@@ -152,7 +155,7 @@ export function TripCard({
             <span className="px-2.5 py-1 rounded-lg bg-black/40 text-white text-[11px] font-semibold shadow-xs backdrop-blur-md border border-white/20 flex items-center gap-1.5">
               <Clock className="size-3 text-white/80" />
               <span>
-                {totalDays}N{totalNights}Đ
+                {t('planner.common.durationCompact', { days: totalDays, nights: totalNights })}
               </span>
             </span>
           )}
@@ -169,7 +172,9 @@ export function TripCard({
                     : 'bg-slate-800/90 text-white'
                 }`}
               >
-                {item.viewerRole === 'EDITOR' ? 'Có quyền sửa' : 'Chỉ xem'}
+                {item.viewerRole === 'EDITOR'
+                  ? t('planner.tripCard.canEditBadge')
+                  : t('planner.roles.VIEWER')}
               </span>
             )}
 
@@ -181,7 +186,7 @@ export function TripCard({
                   setOpenDropdownId((prev) => (prev === item.id ? null : item.id));
                 }}
                 className="size-8 rounded-full bg-black/40 hover:bg-black/65 text-white backdrop-blur-md flex items-center justify-center transition-all border border-white/20 cursor-pointer active:scale-90"
-                title="Tùy chọn"
+                title={t('planner.page.optionsTitle')}
               >
                 <MoreVertical className="size-3.5" />
               </button>
@@ -196,7 +201,7 @@ export function TripCard({
                     className="flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold hover:bg-sky-50 hover:text-[#0194F3] transition-colors"
                   >
                     <Eye className="size-3.5 text-slate-400" />
-                    <span>Xem chi tiết</span>
+                    <span>{t('planner.tripCard.viewDetail')}</span>
                   </Link>
 
                   <button
@@ -208,7 +213,7 @@ export function TripCard({
                     className="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold hover:bg-sky-50 hover:text-[#0194F3] transition-colors cursor-pointer"
                   >
                     <CheckSquare className="size-3.5 text-slate-400" />
-                    <span>Chọn chuyến đi này</span>
+                    <span>{t('planner.page.selectThisTrip')}</span>
                   </button>
 
                   {(item.isOwner !== false || item.viewerRole === 'OWNER') && (
@@ -223,7 +228,7 @@ export function TripCard({
                         className="w-full text-left flex items-center gap-2.5 px-3.5 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                       >
                         <Trash2 className="size-3.5 text-rose-500" />
-                        <span>Xóa chuyến đi</span>
+                        <span>{t('planner.tripCard.delete')}</span>
                       </button>
                     </>
                   )}
@@ -271,7 +276,11 @@ export function TripCard({
 
           <div className="flex items-center gap-1.5 text-slate-600">
             <Landmark className="size-3 text-slate-400 shrink-0" />
-            <span>{totalActivities > 0 ? `${totalActivities} điểm` : 'Tự do'}</span>
+            <span>
+              {totalActivities > 0
+                ? t('planner.tripCard.stopsLabel', { count: totalActivities })
+                : t('planner.tripCard.flexibleStops')}
+            </span>
           </div>
         </div>
 
@@ -288,7 +297,7 @@ export function TripCard({
               }}
               className="h-7 px-3 rounded-lg bg-[#0194F3] hover:bg-[#007FE3] text-white text-xs font-bold inline-flex items-center justify-center shadow-2xs transition-all cursor-pointer active:scale-95"
             >
-              <span>Dùng mẫu</span>
+              <span>{t('planner.tripCard.useTemplate')}</span>
             </button>
           ) : isShared ? (
             <div className="flex items-center gap-1.5">
@@ -300,14 +309,14 @@ export function TripCard({
                         <img
                           key={m.userId}
                           src={m.avatarUrl}
-                          alt={m.fullName || `Thành viên ${idx + 1}`}
-                          title={m.fullName || `Thành viên ${idx + 1}`}
+                          alt={m.fullName || `${t('planner.common.memberFallback')} ${idx + 1}`}
+                          title={m.fullName || `${t('planner.common.memberFallback')} ${idx + 1}`}
                           className="w-5 h-5 rounded-full ring-2 ring-white object-cover shadow-2xs"
                         />
                       ) : (
                         <span
                           key={m.userId}
-                          title={m.fullName || 'Thành viên'}
+                          title={m.fullName || t('planner.common.memberFallback')}
                           className={`w-5 h-5 rounded-full ring-2 ring-white flex items-center justify-center text-[9px] font-bold shadow-2xs ${
                             m.role === 'OWNER'
                               ? 'bg-[#0194F3] text-white'
@@ -336,13 +345,15 @@ export function TripCard({
                 )}
               </div>
               <span className="text-[11px] font-medium text-slate-600">
-                {memberCount > 1 ? `${memberCount} người đi` : 'Đồng hành'}
+                {memberCount > 1
+                  ? t('planner.tripCard.travelersGoing', { count: memberCount })
+                  : t('planner.tripCard.companionLabel')}
               </span>
             </div>
           ) : (
             <span className="text-[11px] font-medium text-slate-400 flex items-center gap-1">
               <User className="size-3 text-slate-400" />
-              <span>Đi một mình</span>
+              <span>{t('planner.tripCard.soloLabel')}</span>
             </span>
           )}
         </div>

@@ -6,11 +6,15 @@ import { LandingNavbar } from "./LandingNavbar";
 import { HeroVideoPlayer } from "./HeroVideoPlayer";
 import { HeroSearchBar } from "./HeroSearchBar";
 import { LANDING_CONFIG } from "../config/landing.config";
+import { useI18n } from "@/i18n/LocaleProvider";
 
 export function HeroSection() {
-  const [currentLocationTitle, setCurrentLocationTitle] = useState<string>(
-    LANDING_CONFIG.hero.defaultLocationTitle
+  const { t } = useI18n();
+  const [customLocationTitle, setCustomLocationTitle] = useState<string | null>(
+    null
   );
+  const currentLocationTitle =
+    customLocationTitle ?? t("landing.hero.defaultLocationTitle");
 
   return (
     <header className="relative min-h-[84vh] sm:min-h-[90vh] flex flex-col justify-between overflow-hidden bg-slate-950 text-white">
@@ -27,15 +31,15 @@ export function HeroSection() {
           {/* Badge Subtitle: Kính mờ thanh lịch nằm ngay TRÊN Headline */}
           <div>
             <div className="inline-flex items-center px-3.5 sm:px-4 py-1 sm:py-1.5 rounded-full bg-white/15 hover:bg-white/20 backdrop-blur-md border border-white/25 text-white/95 text-xs sm:text-sm font-medium tracking-wide shadow-xs transition-colors">
-              {LANDING_CONFIG.hero.badgeText}
+              {t("landing.hero.badgeText")}
             </div>
           </div>
 
           {/* Headline: Ngắt 2 nhịp tự nhiên, không dấu phẩy, cân đối */}
           <h1 className="text-3xl sm:text-5xl md:text-6xl font-bold text-white tracking-tight leading-[1.18] hero-text-shadow max-w-3xl mx-auto">
-            {LANDING_CONFIG.hero.headlineLine1}
+            {t("landing.hero.headlineLine1")}
             <span className="block text-white mt-1 sm:mt-1.5">
-              {LANDING_CONFIG.hero.headlineLine2}
+              {t("landing.hero.headlineLine2")}
             </span>
           </h1>
         </div>
@@ -43,11 +47,13 @@ export function HeroSection() {
         {/* Action Block: Search Bar & Gợi ý trượt ngang gần ngay dưới Headline */}
         <div className="max-w-3xl mx-auto w-full space-y-2.5 sm:space-y-3">
           {/* Google-inspired Translucent Search Bar */}
-          <HeroSearchBar onDestinationChange={setCurrentLocationTitle} />
+          <HeroSearchBar onDestinationChange={setCustomLocationTitle} />
 
           {/* Quick Destination Chips (Trượt ngang mượt mà trên mobile, ẩn chữ "Gợi ý" để chip không bị chật) */}
           <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto sm:overflow-visible sm:flex-wrap sm:justify-center no-scrollbar py-0.5 px-0.5 touch-pan-x">
-            <span className="text-white/60 font-medium text-xs shrink-0 hidden sm:inline">Gợi ý:</span>
+            <span className="text-white/60 font-medium text-xs shrink-0 hidden sm:inline">
+              {t("landing.hero.suggestionsLabel")}
+            </span>
             {LANDING_CONFIG.hero.quickSuggestions.map((item) => (
               <Link
                 key={item.label}
@@ -77,11 +83,13 @@ export function HeroSection() {
           <strong id="heroLocTitle" className="text-slate-900">
             {currentLocationTitle}
           </strong>
-          <span className="text-[#0194F3] font-bold">28°C Nắng đẹp</span>
+          <span className="text-[#0194F3] font-bold">
+            {t("landing.hero.weatherBadge")}
+          </span>
         </div>
 
         <div className="hidden sm:flex items-center gap-2 text-slate-300 font-medium">
-          <span>Cuộn xuống xem tiếp</span>
+          <span>{t("landing.hero.scrollDown")}</span>
           <svg
             className="size-3.5"
             fill="none"

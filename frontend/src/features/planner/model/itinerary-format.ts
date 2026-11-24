@@ -1,5 +1,7 @@
 /** Shared domain constants and format helpers used by wizard, transit card, and detail timeline. */
 
+import type { AppLocale } from '@/i18n';
+
 const VND = new Intl.NumberFormat('vi-VN');
 const MINUTES_PER_DAY = 1440;
 
@@ -45,9 +47,14 @@ export function formatVnd(amount: number): string {
   return VND.format(amount) + '₫';
 }
 
-export function formatDuration(minutes: number): string {
+export function formatDuration(minutes: number, locale: AppLocale = 'vi'): string {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
+  if (locale === 'en') {
+    if (h === 0) return `${m} min`;
+    if (m === 0) return `${h} hr`;
+    return `${h}h ${m}m`;
+  }
   if (h === 0) return `${m} phút`;
   if (m === 0) return `${h} giờ`;
   return `${h} giờ ${m} phút`;
@@ -93,10 +100,41 @@ export function formatDateVi(dateStr?: string | null): string {
 }
 
 /**
- * Formats start and end dates into a readable range (e.g. "28/10/2026 – 30/10/2026" or "28/10/2026").
+ * Formats start and end dates into a readable range
+ * (e.g. "28/10/2026 – 30/10/2026" in vi or "Oct 28, 2026 – Oct 30, 2026" in en).
  */
-export function formatTripDates(start?: string | null, end?: string | null): string {
-  if (!start) return 'Chưa định ngày';
+export function formatTripDates(
+  start?: string | null,
+  end?: string | null,
+  locale: AppLocale = 'vi',
+): string {
+  if (!start) return locale === 'en' ? 'Dates TBD' : 'Chưa định ngày';
+  if (locale === 'en') {
+    const formatEnDate = (value?: string | null): string => {
+      if (!value) return '';
+      const cleanDate = value.includes('T') ? value.split('T')[0] : value.trim();
+      const parts = cleanDate.split(/[-/]/);
+      let dateObj: Date | null = null;
+      if (parts.length === 3 && parts[0].length === 4) {
+        dateObj = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      } else if (parts.length === 3 && parts[2].length === 4) {
+        dateObj = new Date(Number(parts[2]), Number(parts[1]) - 1, Number(parts[0]));
+      } else {
+        const parsed = new Date(value);
+        if (!Number.isNaN(parsed.getTime())) dateObj = parsed;
+      }
+      if (!dateObj || Number.isNaN(dateObj.getTime())) return cleanDate;
+      return dateObj.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+    };
+    const startEn = formatEnDate(start);
+    const endEn = formatEnDate(end);
+    if (!endEn || startEn === endEn) return startEn;
+    return `${startEn} – ${endEn}`;
+  }
   const startVi = formatDateVi(start);
   const endVi = formatDateVi(end);
   if (!endVi || startVi === endVi) return startVi;

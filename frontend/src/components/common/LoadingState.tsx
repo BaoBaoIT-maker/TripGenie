@@ -1,5 +1,8 @@
+"use client";
+
 import { Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useI18n } from "@/i18n/LocaleProvider";
 import { cn } from "@/lib/utils";
 
 interface LoadingStateProps {
@@ -11,10 +14,13 @@ interface LoadingStateProps {
 
 export function LoadingState({
   type = "spinner",
-  message = "Đang tải dữ liệu...",
+  message,
   count = 3,
   className,
 }: LoadingStateProps) {
+  const { t } = useI18n();
+  const resolvedMessage = message ?? t("common.loading");
+
   if (type === "cards") {
     return (
       <div
@@ -61,7 +67,7 @@ export function LoadingState({
       )}
     >
       <Loader2 className="size-8 animate-spin text-primary mb-3" />
-      <p className="text-sm font-medium text-muted-foreground">{message}</p>
+      <p className="text-sm font-medium text-muted-foreground">{resolvedMessage}</p>
     </div>
   );
 }

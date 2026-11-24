@@ -13,6 +13,12 @@ import { useSavedPlaceIds, useToggleFavorite } from "@/features/collections/hook
 import { SaveToCollectionModal } from "@/features/collections/components/SaveToCollectionModal";
 import { collectionService, DEFAULT_COLLECTION_TITLE } from "@/services/collection.service";
 import { toast } from "sonner";
+import { useI18n } from "@/i18n/LocaleProvider";
+import {
+  getPlaceCategoryLabel,
+  getPlaceCityLabel,
+  getPlacePriceRangeText,
+} from "@/i18n";
 
 interface PlaceCardProps {
   place: Place;
@@ -36,25 +42,39 @@ export const PlaceCard = memo(function PlaceCard({
   collectionName,
 }: PlaceCardProps) {
   const { user } = useAuth();
+  const { locale, t, messages } = useI18n();
+  const p = messages.place;
   const isAuthenticated = Boolean(user);
   const { data: savedIdsSet } = useSavedPlaceIds({ enabled: isAuthenticated });
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isCheckingCollections, setIsCheckingCollections] = useState(false);
+  const categoryDisplay = getPlaceCategoryLabel(place, locale);
+  const cityDisplay = getPlaceCityLabel(place, locale);
+  const priceDisplay = getPlacePriceRangeText(place.priceLevel, locale, place.priceRangeText);
 
   const toggleMutation = useToggleFavorite({
     onSaved: (data) => {
       if (data.isSaved) {
-        toast.success(`Đã lưu "${place.name}" vào ${collectionName || DEFAULT_COLLECTION_TITLE}`, {
-          action: {
-            label: "Đổi bộ sưu tập",
-            onClick: () => setIsSaveModalOpen(true),
-          },
-        });
+        toast.success(
+          t("place.savedToCollection", {
+            name: place.name,
+            collection: collectionName || DEFAULT_COLLECTION_TITLE,
+          }),
+          {
+            action: {
+              label: p.changeCollection,
+              onClick: () => setIsSaveModalOpen(true),
+            },
+          }
+        );
       } else {
         toast.info(
           collectionName
-            ? `Đã xóa "${place.name}" khỏi bộ sưu tập "${collectionName}"`
-            : `Đã bỏ lưu "${place.name}"`
+            ? t("place.removedFromCollection", {
+                name: place.name,
+                collection: collectionName,
+              })
+            : t("place.unsavedPlace", { name: place.name })
         );
       }
     },
@@ -80,7 +100,7 @@ export const PlaceCard = memo(function PlaceCard({
     e.preventDefault();
     e.stopPropagation();
     if (!isAuthenticated) {
-      toast.info("Vui lòng đăng nhập để lưu địa điểm vào bộ sưu tập");
+      toast.info(p.loginToSave);
       return;
     }
     if (toggleMutation.isPending || isCheckingCollections) return;
@@ -139,7 +159,7 @@ export const PlaceCard = memo(function PlaceCard({
           href={`/places/${place.slug}`}
           onClick={handleCardInteraction}
           className="absolute inset-0 z-0"
-          aria-label={`Xem chi tiết ${place.name}`}
+          aria-label={t("place.viewDetailsAria", { name: place.name })}
         >
           {hasValidImage ? (
             <>
@@ -163,10 +183,10 @@ export const PlaceCard = memo(function PlaceCard({
                 <i className="fa-solid fa-camera text-base" />
               </div>
               <span className="text-xs font-semibold text-slate-700">
-                Chưa có ảnh thực tế
+                {p.noRealPhoto}
               </span>
               <span className="text-[11px] text-slate-400 line-clamp-1">
-                Hãy là người đầu tiên chia sẻ
+                {p.beFirstToShare}
               </span>
             </div>
           )}
@@ -185,7 +205,7 @@ export const PlaceCard = memo(function PlaceCard({
               className="inline-flex items-center gap-1.5 rounded-lg bg-white/95 hover:bg-white border border-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-800 shadow-xs transition-colors cursor-pointer"
             >
               <i className="fa-solid fa-cloud-arrow-up text-xs text-[#0194F3]" />
-              <span>Đóng góp ảnh</span>
+              <span>{p.contributePhoto}</span>
             </button>
           </div>
         )}
@@ -197,13 +217,13 @@ export const PlaceCard = memo(function PlaceCard({
               variant="secondary"
               className="bg-black/50 text-white border border-white/20 backdrop-blur-md text-[11px] font-bold py-0.5 px-2.5 shadow-xs"
             >
-              {place.categoryLabel}
+              {categoryDisplay}
             </Badge>
 
             {place.matchScore && (
               <Badge className="bg-[#0194F3] text-white backdrop-blur-md text-[11px] font-bold py-0.5 px-2 shadow-xs gap-1.5">
                 <i className="fa-solid fa-wand-magic-sparkles text-[10px]" />
-                <span>{place.matchScore}% Phù hợp</span>
+                <span>{t("place.matchPercent", { score: place.matchScore })}</span>
               </Badge>
             )}
           </div>
@@ -222,16 +242,20 @@ export const PlaceCard = memo(function PlaceCard({
             aria-label={
               isBookmarked
                 ? currentCollectionId
-                  ? `Xóa khỏi bộ sưu tập ${collectionName || ""}`
-                  : "Bỏ lưu địa điểm"
-                : "Lưu địa điểm"
+                  ? t("place.removeFromCollectionAria", {
+                      collection: collectionName || "",
+                    })
+                  : p.unsaveAria
+                : p.saveAria
             }
             title={
               isBookmarked
                 ? currentCollectionId
-                  ? `Xóa khỏi bộ sưu tập "${collectionName || ""}"`
-                  : "Bỏ lưu địa điểm"
-                : "Lưu địa điểm"
+                  ? t("place.removeFromCollectionAria", {
+                      collection: collectionName || "",
+                    })
+                  : p.unsaveAria
+                : p.saveAria
             }
           >
             <i
@@ -249,7 +273,7 @@ export const PlaceCard = memo(function PlaceCard({
             <div className="flex items-center gap-1.5 text-white drop-shadow-sm">
               <div className="flex items-center gap-1">
                 <i className="fa-solid fa-location-dot text-[#0194F3] text-xs shrink-0 drop-shadow-xs" />
-                <span>{place.city}</span>
+                <span>{cityDisplay}</span>
               </div>
               {distanceKm !== null && distanceKm > 0 && (
                 <span className="inline-flex items-center gap-1 rounded-md bg-black/65 text-white font-semibold px-2 py-0.5 backdrop-blur-xs text-[10px] border border-white/20 shadow-2xs">
@@ -258,9 +282,9 @@ export const PlaceCard = memo(function PlaceCard({
                 </span>
               )}
             </div>
-            {place.priceRangeText ? (
+            {priceDisplay ? (
               <span className="rounded-md bg-black/60 text-white px-2 py-0.5 backdrop-blur-xs text-[11px]">
-                {place.priceRangeText}
+                {priceDisplay}
               </span>
             ) : null}
           </div>
@@ -307,7 +331,7 @@ export const PlaceCard = memo(function PlaceCard({
           ) : (
             <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
               <span className="size-1.5 rounded-full bg-emerald-500" />
-              Mới • Chưa có đánh giá
+              {p.newNoReviews}
             </span>
           )}
 
@@ -316,7 +340,7 @@ export const PlaceCard = memo(function PlaceCard({
             onClick={handleCardInteraction}
             className="font-bold text-[#0194F3] hover:underline text-xs"
           >
-            Chi tiết <span className="inline-block transition-transform duration-200 group-hover:translate-x-[3px] motion-reduce:transform-none" aria-hidden="true">→</span>
+            {p.details} <span className="inline-block transition-transform duration-200 group-hover:translate-x-[3px] motion-reduce:transform-none" aria-hidden="true">→</span>
           </Link>
         </div>
       </div>

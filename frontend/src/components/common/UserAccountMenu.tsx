@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { DEFAULT_AVATAR } from "@/config/avatars";
+import { useI18n } from "@/i18n/LocaleProvider";
 import { cn } from "@/lib/utils";
 
 function getUserInitials(fullName?: string | null): string {
@@ -31,6 +32,7 @@ export function UserAccountMenu({
   className,
 }: UserAccountMenuProps) {
   const { user, logout } = useAuth();
+  const { t } = useI18n();
 
   if (!user) return null;
 
@@ -47,7 +49,7 @@ export function UserAccountMenu({
             : "focus-visible:ring-2 focus-visible:ring-primary/40",
           className
         )}
-        aria-label="Tài khoản cá nhân"
+        aria-label={t("nav.accountMenuAria")}
       >
         <Avatar
           className={cn(
@@ -85,7 +87,7 @@ export function UserAccountMenu({
             className="group cursor-pointer rounded-lg px-3 py-2 text-sm font-semibold text-[#0194F3] hover:bg-sky-50 focus:bg-sky-50 data-[highlighted]:bg-sky-50 transition-colors flex items-center gap-2.5"
           >
             <ShieldCheck className="size-4 text-[#0194F3] transition-colors" />
-            <span>Trang quản trị</span>
+            <span>{t("nav.adminPortal")}</span>
           </DropdownMenuItem>
         )}
 
@@ -94,7 +96,7 @@ export function UserAccountMenu({
           className="group cursor-pointer rounded-lg px-3 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground transition-colors flex items-center gap-2.5"
         >
           <UserIcon className="size-4 text-muted-foreground group-hover:text-accent-foreground group-focus:text-accent-foreground group-data-[highlighted]:text-accent-foreground transition-colors" />
-          <span>Hồ sơ cá nhân</span>
+          <span>{t("nav.profile")}</span>
         </DropdownMenuItem>
 
         <DropdownMenuItem
@@ -102,7 +104,7 @@ export function UserAccountMenu({
           className="group cursor-pointer rounded-lg px-3 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground transition-colors flex items-center gap-2.5"
         >
           <LogOut className="size-4 text-muted-foreground group-hover:text-accent-foreground group-focus:text-accent-foreground group-data-[highlighted]:text-accent-foreground transition-colors" />
-          <span>Đăng xuất</span>
+          <span>{t("nav.signOut")}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

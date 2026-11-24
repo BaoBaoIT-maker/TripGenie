@@ -51,28 +51,14 @@ import { SUPER_CATEGORIES, type SuperCategory } from "@/config/categories";
 import { DEFAULT_MAP_CENTER } from "@/features/map/map-config";
 import { useGeolocation } from "@/features/map/hooks/use-geolocation";
 import { parseExploreQuery, type ExploreSort } from "@/features/map/lib/explore-query";
-
-const AI_SUGGESTIONS = [
-  "Quán cafe quanh đây trong khoảng 3km",
-  "Khách sạn view biển gần Mỹ Khê",
-  "Quán hải sản tươi sống gần Cầu Rồng",
-  "Địa điểm lãng mạn ngắm hoàng hôn bán đảo Sơn Trà",
-  "Quán ăn gần Chùa Cầu Hội An",
-];
-
-const SORT_LABELS: Record<ExploreSort, string> = {
-  rating: "Đánh giá cao nhất",
-  reviews: "Nhiều đánh giá nhất",
-  name: "Tên (A - Z)",
-};
-
-const PAGE_SIZE_LABELS: Record<string, string> = {
-  "12": "12 / trang",
-  "24": "24 / trang",
-  "48": "48 / trang",
-  all: "Tất cả",
-};
-
+import { useI18n } from "@/i18n/LocaleProvider";
+import {
+  formatNumber,
+  getPlaceCategoryLabel,
+  getPlaceCityLabel,
+  getPlaceOpenStatusText,
+  pickLocalizedName,
+} from "@/i18n";
 
 interface ExploreSearchBarProps {
   keyword: string;
@@ -81,14 +67,19 @@ interface ExploreSearchBarProps {
 }
 
 function ExploreSearchBar({ keyword, onSearch, onClear }: ExploreSearchBarProps) {
+  const { messages } = useI18n();
+  const ex = messages.explore;
+  const suggestions = Object.values(ex.suggestions);
   const [inputValue, setInputValue] = useState(keyword);
+  const [prevKeyword, setPrevKeyword] = useState(keyword);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
 
-  // Synchronize input value if parent keyword changes externally
-  useEffect(() => {
+  // Synchronize input value during render if parent keyword changes externally
+  if (keyword !== prevKeyword) {
+    setPrevKeyword(keyword);
     setInputValue(keyword);
-  }, [keyword]);
+  }
 
   // Close search suggestions when clicking outside
   useEffect(() => {
@@ -124,7 +115,7 @@ function ExploreSearchBar({ keyword, onSearch, onClear }: ExploreSearchBarProps)
             handleExecute(inputValue);
           }
         }}
-        placeholder="Tìm điểm đến, món ngon, quán cafe..."
+        placeholder={ex.searchPlaceholder}
         className="h-11 pl-9 pr-12 sm:pl-10 sm:pr-20 text-sm rounded-xl bg-slate-50 border-slate-200/80 focus:bg-white focus:border-[#0194F3] font-medium"
       />
       <div className="absolute right-1.5 sm:right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -136,7 +127,7 @@ function ExploreSearchBar({ keyword, onSearch, onClear }: ExploreSearchBarProps)
               onClear();
             }}
             className="p-1 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
-            title="Xóa tìm kiếm"
+            title={ex.clearSearchTitle}
           >
             <X className="size-3.5" />
           </button>
@@ -145,11 +136,11 @@ function ExploreSearchBar({ keyword, onSearch, onClear }: ExploreSearchBarProps)
           type="button"
           onClick={() => handleExecute(inputValue)}
           className="size-8 sm:size-auto sm:px-2.5 sm:py-1 rounded-lg bg-[#0194F3] hover:bg-sky-600 text-white text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center justify-center gap-1"
-          title="Thực hiện tìm kiếm"
-          aria-label="Thực hiện tìm kiếm"
+          title={ex.executeSearchAria}
+          aria-label={ex.executeSearchAria}
         >
           <Search className="size-3.5 sm:hidden" />
-          <span className="hidden sm:inline">Tìm</span>
+          <span className="hidden sm:inline">{ex.searchShort}</span>
         </button>
       </div>
 
@@ -159,18 +150,18 @@ function ExploreSearchBar({ keyword, onSearch, onClear }: ExploreSearchBarProps)
           <div className="flex items-center justify-between px-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">
             <span className="flex items-center gap-1.5">
               <Compass className="size-3.5 text-[#0194F3]" />
-              <span>Gợi ý tìm kiếm phổ biến</span>
+              <span>{ex.suggestionsHeading}</span>
             </span>
             <button
               type="button"
               onClick={() => setIsSearchFocused(false)}
               className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
             >
-              Đóng
+              {ex.close}
             </button>
           </div>
           <div className="space-y-1">
-            {AI_SUGGESTIONS.map((sug, idx) => (
+            {suggestions.map((sug, idx) => (
               <button
                 key={idx}
                 type="button"
@@ -207,6 +198,8 @@ function MobileMapCarousel({
   onNavigateDetail,
   onRequestDirections,
 }: MobileMapCarouselProps) {
+  const { locale, messages } = useI18n();
+  const tb = messages.explore.toolbar;
   const containerRef = useRef<HTMLDivElement>(null);
   const isProgrammaticScrollRef = useRef(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -304,7 +297,7 @@ function MobileMapCarousel({
             <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5 space-y-1">
               <div className="flex items-center justify-between gap-1">
                 <span className="text-[10px] font-bold text-[#0194F3] uppercase tracking-wider truncate">
-                  {place.categoryLabel || place.category || "Địa điểm"}
+                  {getPlaceCategoryLabel(place, locale)}
                 </span>
                 {typeof place.rating === "number" && place.rating > 0 && (
                   <span className="flex items-center gap-0.5 text-[11px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-md shrink-0">
@@ -321,7 +314,9 @@ function MobileMapCarousel({
               <div className="flex items-center justify-between gap-1 pt-0.5">
                 <p className="text-[11px] text-slate-500 truncate flex items-center gap-1">
                   <MapPin className="size-3 shrink-0 text-slate-400" />
-                  <span className="truncate">{place.address || place.city || "Việt Nam"}</span>
+                  <span className="truncate">
+                    {place.address || getPlaceCityLabel(place, locale) || "Vietnam"}
+                  </span>
                 </p>
                 <div className="flex items-center gap-1.5 shrink-0">
                   {onRequestDirections && (
@@ -332,10 +327,10 @@ function MobileMapCarousel({
                         onRequestDirections(place);
                       }}
                       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-sky-50 hover:bg-sky-100 text-[#0194F3] text-[10px] font-bold border border-sky-200 transition-colors cursor-pointer"
-                      title="Chỉ đường đến địa điểm này"
+                      title={tb.directionsTitle}
                     >
                       <Navigation className="size-2.5" />
-                      <span>Chỉ đường</span>
+                      <span>{tb.directions}</span>
                     </button>
                   )}
                   <span
@@ -345,7 +340,7 @@ function MobileMapCarousel({
                     }}
                     className="text-[10px] font-bold text-slate-600 hover:text-[#0194F3] hover:underline"
                   >
-                    Chi tiết &rarr;
+                    {tb.details} &rarr;
                   </span>
                 </div>
               </div>
@@ -360,6 +355,20 @@ function MobileMapCarousel({
 function ExploreContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { locale, t, messages } = useI18n();
+  const ex = messages.explore;
+  const sortLabels: Record<ExploreSort, string> = {
+    rating: ex.sort.rating,
+    reviews: ex.sort.reviews,
+    name: ex.sort.name,
+  };
+  const pageSizeLabels: Record<string, string> = {
+    "12": t("explore.pageSize.perPage", { count: 12 }),
+    "24": t("explore.pageSize.perPage", { count: 24 }),
+    "48": t("explore.pageSize.perPage", { count: 48 }),
+    all: ex.pageSize.all,
+  };
+  const superCategoryLabels = ex.categories as Record<string, string>;
   const parsedQuery = useMemo(() => parseExploreQuery(searchParams), [searchParams]);
 
   const initialSelectedId = searchParams.get("selected") || searchParams.get("placeId");
@@ -565,7 +574,11 @@ function ExploreContent() {
     return travelAreas.find((a) => a.id === selectedAreaId) || null;
   }, [travelAreas, selectedAreaId]);
 
+  // Keep Vietnamese name for GeoJSON province boundary matching, while displaying localized name in UI
   const selectedProvinceName = selectedAreaObj?.nameVi || selectedAreaObj?.name || null;
+  const selectedAreaDisplayName = selectedAreaObj
+    ? pickLocalizedName(selectedAreaObj, locale)
+    : null;
 
   // Find active super category config
   const activeSuperCategory: SuperCategory =
@@ -744,30 +757,25 @@ function ExploreContent() {
       slug: p.slug,
       name: p.name,
       category: p.category,
-      categoryLabel: p.categoryLabel,
+      categoryLabel: getPlaceCategoryLabel(p, locale),
       areaSlug: p.city || "vietnam",
-      areaName: p.city,
+      areaName: getPlaceCityLabel(p, locale),
       address: p.address,
       latitude: p.latitude,
       longitude: p.longitude,
       rating: p.rating > 0 ? p.rating : null,
       reviewCount: p.reviewCount,
       priceLevel: p.priceLevel ?? null,
-      isOpenNow:
-        p.openingHoursText === "Đang mở cửa"
-          ? true
-          : p.openingHoursText === "Đã đóng cửa"
-            ? false
-            : null,
+      isOpenNow: p.isOpenNow ?? null,
       primaryImage: p.coverImage || null,
       images: p.images || [],
       phone: p.phone || null,
       website: p.website || null,
-      openingHours: p.openingHoursText || null,
+      openingHours: getPlaceOpenStatusText(p.isOpenNow, locale) || null,
       tags: p.tags,
       demoSimilarityScore: p.matchScore,
     }));
-  }, [places]);
+  }, [places, locale]);
 
   // Active Geocoded Pin for map marker (retains marker when searching nearby)
   const activeGeocodedPin = useMemo(() => {
@@ -872,8 +880,11 @@ function ExploreContent() {
         setPage(1);
         toast.info(
           parsed.extractedRadiusKm
-            ? `Đang tìm "${parsed.cleanedKeyword || "địa điểm"}" quanh bạn (bán kính ${parsed.extractedRadiusKm}km)`
-            : "Đang tìm kiếm quanh vị trí hiện tại của bạn"
+            ? t("explore.gps.toastNearbyRadius", {
+                keyword: parsed.cleanedKeyword || ex.gps.fallbackPlaceWord,
+                radius: parsed.extractedRadiusKm,
+              })
+            : ex.gps.toastNearbyDefault
         );
       } else if (parsed.anchorLandmark) {
         const targetSearch = parsed.cleanedKeyword
@@ -881,14 +892,14 @@ function ExploreContent() {
           : parsed.anchorLandmark;
         setKeyword(targetSearch);
         setPage(1);
-        toast.info(`Đang tìm kiếm "${targetSearch}"`);
+        toast.info(t("explore.gps.toastSearching", { query: targetSearch }));
       } else {
         const finalKeyword = parsed.cleanedKeyword || (parsed.areaName ? "" : rawQuery.trim());
         setKeyword(finalKeyword);
         setPage(1);
       }
     },
-    [requestLocation, selectableAreas, travelAreas]
+    [requestLocation, selectableAreas, travelAreas, t, ex.gps.fallbackPlaceWord, ex.gps.toastNearbyDefault]
   );
 
   // Reset all filters
@@ -933,11 +944,14 @@ function ExploreContent() {
     setPinNearbyCenter({
       latitude: coords.latitude,
       longitude: coords.longitude,
-      label: `Khu vực (${coords.latitude.toFixed(3)}, ${coords.longitude.toFixed(3)})`,
+      label: t("explore.gps.areaLabelCoords", {
+        lat: coords.latitude.toFixed(3),
+        lng: coords.longitude.toFixed(3),
+      }),
     });
     setPage(1);
-    toast.info("Đang tìm kiếm các địa điểm trong khu vực này...");
-  }, [setPage]);
+    toast.info(ex.gps.toastSearchArea);
+  }, [setPage, t, ex.gps.toastSearchArea]);
 
   // Clear current pin and reset nearby searches
   const handleClearPin = useCallback(() => {
@@ -979,12 +993,12 @@ function ExploreContent() {
       <div className="shrink-0 pb-1.5 border-b border-slate-200/80 hidden sm:block lg:hidden">
         <div className="space-y-0.5">
           <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900">
-            Khám phá địa điểm
+            {ex.pageTitle}
           </h1>
           <p className="text-xs text-slate-500 font-medium">
-            {selectedAreaObj
-              ? `Khám phá các điểm đến hấp dẫn tại ${selectedAreaObj.nameVi || selectedAreaObj.name} được xác thực bởi cộng đồng.`
-              : "Hơn 3.100 điểm đến trên toàn quốc được xác thực bởi cộng đồng."}
+            {selectedAreaDisplayName
+              ? t("explore.subtitleArea", { area: selectedAreaDisplayName })
+              : ex.subtitleDefault}
           </p>
         </div>
       </div>
@@ -1000,19 +1014,19 @@ function ExploreContent() {
               </div>
               <div className="min-w-0">
                 <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                  Phạm vi tìm kiếm quanh đây
+                  {ex.gps.scopeLabel}
                 </div>
                 <div className="text-xs font-semibold text-slate-900 truncate">
                   {pinNearbyCenter ? (
-                    <span>Tâm điểm: <strong className="text-[#0194F3]">{pinNearbyCenter.label}</strong></span>
+                    <span>{ex.gps.centerPrefix} <strong className="text-[#0194F3]">{pinNearbyCenter.label}</strong></span>
                   ) : geocodedLocation ? (
-                    <span>Mốc địa lý: <strong className="text-[#0194F3]">{geocodedLocation.displayName}</strong></span>
+                    <span>{ex.gps.landmarkPrefix} <strong className="text-[#0194F3]">{geocodedLocation.displayName}</strong></span>
                   ) : userLocation ? (
-                    <span>Vị trí GPS của bạn (Cách bạn tối đa <strong className="text-[#0194F3]">{radiusKm}km</strong>)</span>
+                    <span>{ex.gps.gpsPrefix} <strong className="text-[#0194F3]">{radiusKm}km</strong>{ex.gps.gpsSuffix}</span>
                   ) : (
                     <span className="text-amber-600 font-medium flex items-center gap-1.5">
                       <Loader2 className="size-3 animate-spin shrink-0" />
-                      Đang lấy tọa độ GPS...
+                      {ex.gps.locating}
                     </span>
                   )}
                 </div>
@@ -1021,7 +1035,7 @@ function ExploreContent() {
 
             {/* Instant 1-tap Radius Selector */}
             <div className="flex items-center gap-1.5 shrink-0 ml-auto sm:ml-0">
-              <span className="text-[11px] font-bold text-slate-500 mr-1 hidden sm:inline">Bán kính:</span>
+              <span className="text-[11px] font-bold text-slate-500 mr-1 hidden sm:inline">{ex.gps.radiusLabel}</span>
               {MAP_RADIUS_OPTIONS.map((r) => {
                 const isSelected = radiusKm === r;
                 return (
@@ -1053,9 +1067,9 @@ function ExploreContent() {
                   setPage(1);
                 }}
                 className="ml-2 text-xs font-bold text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
-                title="Tắt chế độ tìm quanh đây"
+                title={ex.gps.cancelTitle}
               >
-                Hủy
+                {ex.gps.cancel}
               </button>
             </div>
           </div>
@@ -1087,24 +1101,24 @@ function ExploreContent() {
                 <SelectTrigger className="h-10 sm:h-11 px-3 rounded-xl bg-slate-50 border-slate-200/80 text-xs sm:text-sm font-semibold text-slate-800">
                   <div className="flex items-center gap-2 truncate">
                     <MapPin className="size-4 text-[#0194F3] shrink-0" />
-                    <SelectValue placeholder="Chọn Tỉnh / Điểm đến">
+                    <SelectValue placeholder={ex.area.placeholder}>
                       {selectedAreaId === "all"
-                        ? "Toàn quốc (Tất cả)"
-                        : selectedProvinceName || "Chọn Tỉnh / Điểm đến"}
+                        ? ex.area.all
+                        : selectedAreaDisplayName || ex.area.placeholder}
                     </SelectValue>
                   </div>
                 </SelectTrigger>
                 <SelectContent className="max-h-80">
-                  <SelectItem value="all">Toàn quốc (Tất cả)</SelectItem>
+                  <SelectItem value="all">{ex.area.all}</SelectItem>
 
                   {touristZones.length > 0 && (
                     <SelectGroup>
                       <SelectLabel className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-[#0194F3]">
-                        Điểm đến du lịch nổi bật
+                        {ex.area.zonesGroup}
                       </SelectLabel>
                       {touristZones.map((area) => (
                         <SelectItem key={area.id} value={String(area.id)}>
-                          {area.nameVi || area.name}
+                          {pickLocalizedName(area, locale)}
                         </SelectItem>
                       ))}
                     </SelectGroup>
@@ -1113,11 +1127,11 @@ function ExploreContent() {
                   {provinceAreas.length > 0 && (
                     <SelectGroup>
                       <SelectLabel className="px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                        Tỉnh / Thành phố
+                        {ex.area.provincesGroup}
                       </SelectLabel>
                       {provinceAreas.map((area) => (
                         <SelectItem key={area.id} value={String(area.id)}>
-                          {area.nameVi || area.name}
+                          {pickLocalizedName(area, locale)}
                         </SelectItem>
                       ))}
                     </SelectGroup>
@@ -1126,7 +1140,7 @@ function ExploreContent() {
               </Select>
             </div>
 
-            {/* GPS Button: Tìm quanh đây */}
+            {/* GPS Button */}
             <button
               type="button"
               onClick={handleToggleGps}
@@ -1142,16 +1156,15 @@ function ExploreContent() {
               ) : (
                 <LocateFixed className="size-3.5" />
               )}
-              <span className="inline lg:hidden xl:inline">{useGpsSearch ? "Đang tìm quanh đây" : "Tìm quanh đây"}</span>
-              <span className="hidden lg:inline xl:hidden">{useGpsSearch ? "Đang tìm" : "Quanh đây"}</span>
+              <span className="inline lg:hidden xl:inline">{useGpsSearch ? ex.gps.active : ex.gps.idle}</span>
+              <span className="hidden lg:inline xl:hidden">{useGpsSearch ? ex.gps.activeShort : ex.gps.idleShort}</span>
             </button>
           </div>
 
-          {/* Desktop-only Inline Controls: Divider + Bộ lọc + Đang mở cửa + Sắp xếp */}
+          {/* Desktop-only Inline Controls */}
           <div className="hidden lg:flex items-center gap-2 shrink-0">
             <div className="h-6 w-px bg-slate-200 mx-0.5" />
 
-            {/* Button mở Filter Sheet Modal */}
             <Button
               type="button"
               variant="outline"
@@ -1165,7 +1178,7 @@ function ExploreContent() {
               )}
             >
               <SlidersHorizontal className="size-3.5" />
-              <span>Bộ lọc</span>
+              <span>{ex.toolbar.filters}</span>
               {activeFilterCount > 0 && (
                 <span className="size-4.5 rounded-full bg-[#0194F3] text-white text-[10px] font-bold flex items-center justify-center">
                   {activeFilterCount}
@@ -1173,7 +1186,6 @@ function ExploreContent() {
               )}
             </Button>
 
-            {/* Quick Toggle: Đang mở cửa */}
             <button
               type="button"
               onClick={() => {
@@ -1188,25 +1200,23 @@ function ExploreContent() {
               )}
             >
               <Clock className="size-3.5 text-emerald-600" />
-              <span>Đang mở cửa</span>
+              <span>{ex.toolbar.openNow}</span>
             </button>
 
-            {/* Reset Filters button if any filters active */}
             {isFiltering && (
               <button
                 type="button"
                 onClick={resetFilters}
                 className="h-10 px-2 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors flex items-center gap-1 cursor-pointer"
-                title="Đặt lại tất cả bộ lọc"
+                title={ex.toolbar.resetAllTitle}
               >
                 <RotateCcw className="size-3" />
-                <span>Đặt lại</span>
+                <span>{ex.toolbar.reset}</span>
               </button>
             )}
 
-            {/* Sắp xếp theo */}
             <div className="flex items-center gap-1.5 ml-1">
-              <span className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">Sắp xếp:</span>
+              <span className="text-[11px] font-medium text-muted-foreground whitespace-nowrap">{ex.sort.label}</span>
               <Select
                 value={selectedSort}
                 onValueChange={(val) => {
@@ -1215,14 +1225,14 @@ function ExploreContent() {
                 }}
               >
                 <SelectTrigger className="h-10 w-36 rounded-xl text-xs font-semibold bg-card border-border shadow-2xs text-foreground">
-                  <SelectValue placeholder="Sắp xếp">
-                    {SORT_LABELS[selectedSort] || "Sắp xếp"}
+                  <SelectValue placeholder={ex.sort.placeholder}>
+                    {sortLabels[selectedSort] || ex.sort.placeholder}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent align="end">
-                  <SelectItem value="rating">Đánh giá cao nhất</SelectItem>
-                  <SelectItem value="reviews">Nhiều đánh giá nhất</SelectItem>
-                  <SelectItem value="name">Tên (A - Z)</SelectItem>
+                  <SelectItem value="rating">{ex.sort.rating}</SelectItem>
+                  <SelectItem value="reviews">{ex.sort.reviews}</SelectItem>
+                  <SelectItem value="name">{ex.sort.name}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1230,7 +1240,7 @@ function ExploreContent() {
         </div>
       </div>
 
-      {/* Super Categories Bar - Modern Pills */}
+      {/* Super Categories Bar */}
       <div className="shrink-0 flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
         {SUPER_CATEGORIES.map((cat) => {
           const isSelected = selectedSuperCategoryId === cat.id;
@@ -1251,26 +1261,25 @@ function ExploreContent() {
                   : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 hover:border-slate-300"
               )}
             >
-              <span>{cat.label}</span>
+              <span>{superCategoryLabels[cat.id] ?? cat.label}</span>
               <span
                 className={cn(
-                  "text-[10px] rounded-full px-1.5 py-0.2 font-extrabold",
+                  "text-[10px] rounded-full px-1.5 py-0.2 font-extrabold tabular-nums",
                   isSelected
                     ? "bg-white/20 text-white"
                     : "bg-slate-100 text-slate-500"
                 )}
               >
-                {hasLoadedCounts ? count.toLocaleString("vi-VN") : "..."}
+                {hasLoadedCounts ? formatNumber(count, locale) : "..."}
               </span>
             </button>
           );
         })}
       </div>
 
-      {/* Sub-Toolbar: Mobile only (hidden on desktop because controls are inline in search row) */}
+      {/* Sub-Toolbar: Mobile only */}
       <div className="shrink-0 flex flex-wrap items-center justify-between gap-3 pt-1 pb-2 border-b border-slate-200/70 text-xs lg:hidden">
         <div className="flex flex-wrap items-center gap-2">
-          {/* Button mở Filter Sheet Modal */}
           <Button
             type="button"
             variant="outline"
@@ -1284,7 +1293,7 @@ function ExploreContent() {
             )}
           >
             <SlidersHorizontal className="size-3.5" />
-            <span>Bộ lọc</span>
+            <span>{ex.toolbar.filters}</span>
             {activeFilterCount > 0 && (
               <span className="size-5 rounded-full bg-[#0194F3] text-white text-[10px] font-bold flex items-center justify-center ml-0.5">
                 {activeFilterCount}
@@ -1292,7 +1301,6 @@ function ExploreContent() {
             )}
           </Button>
 
-          {/* Quick Toggle: Đang mở cửa */}
           <button
             type="button"
             onClick={() => {
@@ -1307,10 +1315,9 @@ function ExploreContent() {
             )}
           >
             <Clock className="size-3.5 text-emerald-600" />
-            <span>Đang mở cửa</span>
+            <span>{ex.toolbar.openNow}</span>
           </button>
 
-          {/* Reset Filters button if any filters active */}
           {isFiltering && (
             <button
               type="button"
@@ -1318,14 +1325,13 @@ function ExploreContent() {
               className="h-9 px-2.5 rounded-xl text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors flex items-center gap-1 cursor-pointer"
             >
               <RotateCcw className="size-3" />
-              <span>Đặt lại tất cả</span>
+              <span>{ex.toolbar.resetAll}</span>
             </button>
           )}
         </div>
 
-        {/* Right: Sắp xếp theo */}
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-medium text-muted-foreground">Sắp xếp:</span>
+          <span className="text-[11px] font-medium text-muted-foreground">{ex.sort.label}</span>
           <Select
             value={selectedSort}
             onValueChange={(val) => {
@@ -1334,14 +1340,14 @@ function ExploreContent() {
             }}
           >
             <SelectTrigger className="h-9 w-40 rounded-xl text-xs font-semibold bg-card border-border shadow-2xs text-foreground">
-              <SelectValue placeholder="Sắp xếp">
-                {SORT_LABELS[selectedSort] || "Sắp xếp"}
+              <SelectValue placeholder={ex.sort.placeholder}>
+                {sortLabels[selectedSort] || ex.sort.placeholder}
               </SelectValue>
             </SelectTrigger>
             <SelectContent align="end">
-              <SelectItem value="rating">Đánh giá cao nhất</SelectItem>
-              <SelectItem value="reviews">Nhiều đánh giá nhất</SelectItem>
-              <SelectItem value="name">Tên (A - Z)</SelectItem>
+              <SelectItem value="rating">{ex.sort.rating}</SelectItem>
+              <SelectItem value="reviews">{ex.sort.reviews}</SelectItem>
+              <SelectItem value="name">{ex.sort.name}</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -1386,7 +1392,7 @@ function ExploreContent() {
                   <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs">
                     <Sparkles className="size-4 shrink-0 text-amber-600" />
                     <span>
-                      Không tìm thấy địa điểm chính xác cho <strong>&quot;{keyword}&quot;</strong>. Gợi ý các địa điểm tương tự:
+                      {ex.toolbar.fallbackPrefix} <strong>&quot;{keyword}&quot;</strong>. {ex.toolbar.fallbackSuffix}
                     </span>
                   </div>
                 )}
@@ -1395,11 +1401,11 @@ function ExploreContent() {
                   <>
                     {/* Top Bar above Split View Cards: Count & Right-aligned Page Size Dropdown */}
                     <div className="flex items-center justify-between pb-1">
-                      <span className="text-xs text-muted-foreground font-medium">
-                        Tìm thấy <strong className="text-foreground font-semibold">{totalCount.toLocaleString("vi-VN")}</strong> địa điểm
+                      <span className="text-xs text-muted-foreground font-medium tabular-nums">
+                        {ex.toolbar.foundPrefix} <strong className="text-foreground font-semibold">{formatNumber(totalCount, locale)}</strong> {ex.toolbar.foundSuffix}
                       </span>
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-medium text-muted-foreground">Hiển thị:</span>
+                        <span className="text-[11px] font-medium text-muted-foreground">{ex.pageSize.label}</span>
                         <Select
                           value={String(pageSize)}
                           onValueChange={(val) => {
@@ -1408,15 +1414,15 @@ function ExploreContent() {
                           }}
                         >
                           <SelectTrigger className="h-8.5 w-32 rounded-xl text-xs font-semibold bg-card border-border/80 shadow-2xs">
-                            <SelectValue placeholder="Số lượng">
-                              {PAGE_SIZE_LABELS[String(pageSize)] || "24 / trang"}
+                            <SelectValue placeholder={ex.pageSize.placeholder}>
+                              {pageSizeLabels[String(pageSize)] || pageSizeLabels["24"]}
                             </SelectValue>
                           </SelectTrigger>
                           <SelectContent align="end">
-                            <SelectItem value="12">12 / trang</SelectItem>
-                            <SelectItem value="24">24 / trang</SelectItem>
-                            <SelectItem value="48">48 / trang</SelectItem>
-                            <SelectItem value="all">Tất cả</SelectItem>
+                            <SelectItem value="12">{pageSizeLabels["12"]}</SelectItem>
+                            <SelectItem value="24">{pageSizeLabels["24"]}</SelectItem>
+                            <SelectItem value="48">{pageSizeLabels["48"]}</SelectItem>
+                            <SelectItem value="all">{pageSizeLabels.all}</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -1463,10 +1469,10 @@ function ExploreContent() {
                         className="flex items-center gap-1 rounded-xl border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       >
                         <ChevronLeft className="size-3.5" />
-                        <span>Trang trước</span>
+                        <span>{ex.toolbar.prevPage}</span>
                       </button>
-                      <span className="text-xs font-medium text-foreground">
-                        Trang {page} / {totalPages}
+                      <span className="text-xs font-medium text-foreground tabular-nums">
+                        {t("explore.toolbar.pageStatus", { page, total: totalPages })}
                       </span>
                       <button
                         type="button"
@@ -1480,7 +1486,7 @@ function ExploreContent() {
                         }}
                         className="flex items-center gap-1 rounded-xl border border-border px-3 py-1.5 text-xs font-semibold text-muted-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                       >
-                        <span>Trang sau</span>
+                        <span>{ex.toolbar.nextPage}</span>
                         <ChevronRight className="size-3.5" />
                       </button>
                     </div>
@@ -1489,7 +1495,7 @@ function ExploreContent() {
                   {/* Desktop List Bottom Mini-Notice */}
                   <div className="hidden lg:block pt-6 pb-4 border-t border-slate-200/70 text-center">
                     <p className="text-[11px] text-slate-400">
-                      © {new Date().getFullYear()} TripGenie · Nền tảng khám phá du lịch thông minh Việt Nam
+                      {t("explore.toolbar.desktopFooter", { year: new Date().getFullYear() })}
                     </p>
                   </div>
                 </>
@@ -1497,30 +1503,30 @@ function ExploreContent() {
                 <EmptyState
                   title={
                     pinNearbyCenter
-                      ? `Không có địa điểm nào quanh "${pinNearbyCenter.label}" trong bán kính ${radiusKm}km`
+                      ? t("explore.empty.pinTitle", { label: pinNearbyCenter.label, radius: radiusKm })
                       : geocodedLocation
-                        ? `Không có địa điểm nào quanh "${geocodedLocation.displayName}" trong bán kính ${radiusKm}km`
+                        ? t("explore.empty.pinTitle", { label: geocodedLocation.displayName, radius: radiusKm })
                         : useGpsSearch
-                          ? `Không có địa điểm nào trong bán kính ${radiusKm}km quanh vị trí của bạn`
-                          : "Không tìm thấy địa điểm phù hợp"
+                          ? t("explore.empty.gpsTitle", { radius: radiusKm })
+                          : ex.empty.defaultTitle
                   }
                   description={
                     pinNearbyCenter || geocodedLocation
-                      ? `Khu vực này hiện chưa có dữ liệu địa điểm trong bán kính ${radiusKm}km. Bạn hãy thử tăng bán kính lên (10km - 20km) hoặc xóa từ khóa tìm kiếm để khám phá thêm địa điểm.`
+                      ? t("explore.empty.pinDesc", { radius: radiusKm })
                       : useGpsSearch
-                        ? `Hiện dữ liệu chưa có điểm đến nào nằm trong bán kính ${radiusKm}km quanh tọa độ của bạn. Bạn hãy thử tăng bán kính lên (10km - 20km) hoặc tắt "Tìm quanh đây" để khám phá hơn 3.100 địa điểm khác trên toàn quốc.`
+                        ? t("explore.empty.gpsDesc", { radius: radiusKm })
                         : keyword
-                          ? `Không tìm thấy địa điểm nào khớp với "${keyword}". Hãy thử tìm kiếm với từ khóa khác hoặc điều chỉnh bộ lọc.`
-                          : "Hãy thử bỏ bớt một số tiện ích hoặc chọn 'Tất cả' để xem nhiều gợi ý hơn."
+                          ? t("explore.empty.keywordDesc", { keyword })
+                          : ex.empty.defaultDesc
                   }
                   actionLabel={
                     pinNearbyCenter || geocodedLocation
                       ? radiusKm < 20
-                        ? "Tăng bán kính lên 10km"
-                        : "Bỏ ghim vị trí"
+                        ? ex.empty.increaseRadius
+                        : ex.empty.clearPin
                       : useGpsSearch
-                        ? "Tắt tìm quanh đây (Xem toàn quốc)"
-                        : "Xóa bộ lọc tìm kiếm"
+                        ? ex.empty.disableGps
+                        : ex.empty.clearFilters
                   }
                   onAction={
                     pinNearbyCenter || geocodedLocation
@@ -1599,12 +1605,12 @@ function ExploreContent() {
               {showMobileMap ? (
                 <>
                   <List className="size-4 text-white" />
-                  <span>Xem danh sách</span>
+                  <span>{ex.toolbar.viewList}</span>
                 </>
               ) : (
                 <>
                   <MapIcon className="size-4 text-white" />
-                  <span>Xem bản đồ</span>
+                  <span>{ex.toolbar.viewMap}</span>
                 </>
               )}
             </button>
@@ -1623,16 +1629,19 @@ function ExploreContent() {
   );
 }
 
+function ExploreLoadingFallback() {
+  const { t } = useI18n();
+  return (
+    <div className="flex flex-col items-center justify-center py-24 space-y-3">
+      <Loader2 className="size-8 animate-spin text-primary" />
+      <p className="text-xs text-muted-foreground">{t("explore.loadingPage")}</p>
+    </div>
+  );
+}
+
 export default function ExplorePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex flex-col items-center justify-center py-24 space-y-3">
-          <Loader2 className="size-8 animate-spin text-primary" />
-          <p className="text-xs text-muted-foreground">Đang tải trang khám phá...</p>
-        </div>
-      }
-    >
+    <Suspense fallback={<ExploreLoadingFallback />}>
       <ExploreContent />
     </Suspense>
   );

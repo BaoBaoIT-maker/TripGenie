@@ -48,6 +48,14 @@ export interface PendingContributedPhoto {
   errorMessage?: string | null;
 }
 
+export interface PlaceAttributes {
+  descriptionEn?: string;
+  suggestedDuration?: string;
+  whyGo?: string[];
+  tips?: string[];
+  [key: string]: unknown;
+}
+
 export interface Place {
   id: string;
   slug: string;
@@ -60,8 +68,12 @@ export interface Place {
   category: PlaceCategory;
   categorySlug?: string;
   categoryLabel: string;
+  categoryName?: string;
+  categoryNameVi?: string | null;
   areaId?: number;
   areaSlug?: string;
+  areaName?: string;
+  areaNameVi?: string | null;
   address: string;
   city: string;
   latitude: number;
@@ -82,6 +94,7 @@ export interface Place {
   matchReason?: string;
   isOpenNow?: boolean | null;
   openingHoursText?: string;
+  attributes?: PlaceAttributes;
   featured?: boolean;
   distanceKm?: number;
 }

@@ -11,10 +11,10 @@ import { useAuthModalStore, type AuthModalView } from "../stores/auth-modal.stor
 import { useAuth } from "../hooks/use-auth";
 import { GoogleAuthButton } from "./GoogleAuthButton";
 import {
-  loginSchema,
-  registerSchema,
-  forgotPasswordSchema,
-  resetPasswordSchema,
+  createLoginSchema,
+  createRegisterSchema,
+  createForgotPasswordSchema,
+  createResetPasswordSchema,
   type LoginFormData,
   type RegisterFormData,
   type ForgotPasswordFormData,
@@ -22,10 +22,13 @@ import {
 } from "../schemas/auth.schema";
 import { ApiClientError } from "@/lib/api-client";
 import { resolvePostLoginRedirect } from "@/lib/safe-redirect";
+import { useI18n } from "@/i18n/LocaleProvider";
 
 export function AuthModal() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { locale, t, messages } = useI18n();
+  const a = messages.auth;
   const {
     isOpen,
     view,
@@ -102,21 +105,23 @@ export function AuthModal() {
   const [resetTicket, setResetTicket] = React.useState<string | null>(null);
   const otpInputRefs = React.useRef<(HTMLInputElement | null)[]>([]);
 
-  // Reset errors and password visibility when view changes
-  React.useEffect(() => {
+  // Reset errors and password visibility during render when view changes
+  const [prevView, setPrevView] = React.useState(view);
+  if (view !== prevView) {
+    setPrevView(view);
     setFormError(null);
     setIsUnverified(false);
     setShowPassword(false);
     setShowConfirmPassword(false);
     setEmailVerifyError(null);
     setIsEmailVerifySuccess(false);
-  }, [view]);
+  }
 
   // Handle email verification from email link
   const onConfirmVerifyEmail = async () => {
     const activeToken = verifyToken || searchParams.get("token");
     if (!activeToken) {
-      setEmailVerifyError("Không tìm thấy mã xác thực hoặc liên kết đã hết hạn.");
+      setEmailVerifyError(a.messages.verifyTokenMissing);
       return;
     }
     setEmailVerifyError(null);
@@ -132,7 +137,7 @@ export function AuthModal() {
           // ignore
         }
       }
-      toast.success("Kích hoạt tài khoản thành công! Chào mừng bạn đến với TripGenie.");
+      toast.success(a.messages.accountActivatedWelcome);
       setTimeout(() => {
         closeAuthModal();
         const target = resolvePostLoginRedirect(undefined, nextUrl, "/explore");
@@ -141,9 +146,7 @@ export function AuthModal() {
       }, 1200);
     } catch (err: unknown) {
       const message =
-        err instanceof Error
-          ? err.message
-          : "Liên kết xác thực không hợp lệ hoặc đã hết hạn (quá 30 phút). Vui lòng thử đăng ký lại.";
+        err instanceof Error ? err.message : a.messages.verifyLinkInvalid;
       setEmailVerifyError(message);
     }
   };
@@ -166,16 +169,33 @@ export function AuthModal() {
 
   // Handle post login
   const handleLoginSuccess = (role?: string) => {
-    toast.success("Đăng nhập thành công!");
+    toast.success(a.messages.loginSuccess);
     closeAuthModal();
     const target = resolvePostLoginRedirect(role, nextUrl, "/");
     router.push(target);
     router.refresh();
   };
 
+  const loginResolver = React.useMemo(
+    () => zodResolver(createLoginSchema(locale)),
+    [locale]
+  );
+  const registerResolver = React.useMemo(
+    () => zodResolver(createRegisterSchema(locale)),
+    [locale]
+  );
+  const forgotResolver = React.useMemo(
+    () => zodResolver(createForgotPasswordSchema(locale)),
+    [locale]
+  );
+  const resetResolver = React.useMemo(
+    () => zodResolver(createResetPasswordSchema(locale)),
+    [locale]
+  );
+
   // Login form
   const loginForm = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
+    resolver: loginResolver,
     defaultValues: { identifier: "", password: "", rememberMe: false },
   });
 
@@ -191,22 +211,18 @@ export function AuthModal() {
     } catch (err: unknown) {
       if (err instanceof ApiClientError && err.code === "EMAIL_NOT_VERIFIED") {
         setIsUnverified(true);
-        setFormError(
-          "Tài khoản chưa được kích hoạt qua email. Vui lòng kiểm tra hộp thư đến để nhấn vào liên kết xác thực."
-        );
+        setFormError(a.messages.unverifiedAccount);
         return;
       }
       const message =
-        err instanceof Error
-          ? err.message
-          : "Tài khoản/email hoặc mật khẩu không chính xác";
+        err instanceof Error ? err.message : a.messages.invalidCredentials;
       setFormError(message);
     }
   };
 
   // Register form
   const registerForm = useForm<RegisterFormData>({
-    resolver: zodResolver(registerSchema),
+    resolver: registerResolver,
     defaultValues: {
       email: "",
       fullName: "",
@@ -229,19 +245,17 @@ export function AuthModal() {
         email: data.email,
         retryAfter: res.retryAfter || 60,
       });
-      toast.success(
-        res.message || "Đăng ký thành công! Vui lòng kiểm tra email để kích hoạt."
-      );
+      toast.success(a.messages.registerSuccessCheckEmail);
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : "Đăng ký không thành công. Vui lòng thử lại.";
+        err instanceof Error ? err.message : a.messages.registerFailed;
       setFormError(message);
     }
   };
 
   // Forgot password form
   const forgotForm = useForm<ForgotPasswordFormData>({
-    resolver: zodResolver(forgotPasswordSchema),
+    resolver: forgotResolver,
     defaultValues: { email: emailForOtp || "" },
   });
 
@@ -249,13 +263,13 @@ export function AuthModal() {
     setFormError(null);
     try {
       const res = await forgotPassword({ email: data.email });
-      toast.success(res.message || "Mã OTP đã được gửi đến email của bạn!");
+      toast.success(a.messages.otpSent);
       setOtp(["", "", "", "", "", ""]);
       setOtpCountdown(res.retryAfter || 60);
       setView("verify-otp", { email: data.email });
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : "Không thể gửi OTP. Vui lòng thử lại sau.";
+        err instanceof Error ? err.message : a.messages.otpSendFailed;
       setFormError(message);
     }
   };
@@ -282,7 +296,7 @@ export function AuthModal() {
     e.preventDefault();
     const fullOtp = otp.join("");
     if (fullOtp.length !== 6) {
-      setFormError("Vui lòng nhập đầy đủ mã OTP 6 chữ số");
+      setFormError(a.messages.otpIncomplete);
       return;
     }
     setFormError(null);
@@ -291,25 +305,25 @@ export function AuthModal() {
         email: emailForOtp || "",
         otp: fullOtp,
       });
-      toast.success("Xác thực OTP thành công!");
+      toast.success(a.messages.otpVerified);
       setResetTicket(res.resetTicket);
       setView("reset-password");
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : "Mã OTP không chính xác hoặc đã hết hạn";
+        err instanceof Error ? err.message : a.messages.otpInvalidOrExpired;
       setFormError(message);
     }
   };
 
   // Reset password form
   const resetForm = useForm<ResetPasswordFormData>({
-    resolver: zodResolver(resetPasswordSchema),
+    resolver: resetResolver,
     defaultValues: { password: "", confirmPassword: "" },
   });
 
   const onResetSubmit = async (data: ResetPasswordFormData) => {
     if (!resetTicket) {
-      setFormError("Phiên xác thực đã hết hạn. Vui lòng gửi lại yêu cầu OTP.");
+      setFormError(a.messages.resetSessionExpired);
       setView("forgot-password");
       return;
     }
@@ -319,12 +333,12 @@ export function AuthModal() {
         resetTicket,
         password: data.password,
       });
-      toast.success("Đặt lại mật khẩu thành công! Vui lòng đăng nhập.");
+      toast.success(a.messages.resetSuccess);
       setResetTicket(null);
       setView("login");
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : "Không thể đặt lại mật khẩu. Vui lòng thử lại.";
+        err instanceof Error ? err.message : a.messages.resetFailed;
       setFormError(message);
     }
   };
@@ -334,34 +348,36 @@ export function AuthModal() {
     switch (view) {
       case "register":
         return {
-          title: "Tạo tài khoản TripGenie",
-          subtitle: "Khám phá và thiết kế chuyến đi thông minh cùng cộng đồng",
+          title: a.headers.registerTitle,
+          subtitle: a.headers.registerSubtitle,
         };
       case "forgot-password":
         return {
-          title: "Quên mật khẩu",
-          subtitle: "Nhập email đã đăng ký để nhận mã OTP khôi phục tài khoản",
+          title: a.headers.forgotTitle,
+          subtitle: a.headers.forgotSubtitle,
         };
       case "verify-otp":
         return {
-          title: "Xác thực mã OTP",
-          subtitle: `Mã xác nhận 6 số đã được gửi tới ${emailForOtp || "email của bạn"}`,
+          title: a.headers.verifyOtpTitle,
+          subtitle: t("auth.headers.verifyOtpSubtitle", {
+            email: emailForOtp || a.headers.verifyOtpEmailFallback,
+          }),
         };
       case "reset-password":
         return {
-          title: "Đặt mật khẩu mới",
-          subtitle: "Tạo mật khẩu an toàn và tiếp tục hành trình cùng TripGenie",
+          title: a.headers.resetTitle,
+          subtitle: a.headers.resetSubtitle,
         };
       case "verify-email":
         return {
-          title: "Kích hoạt tài khoản",
-          subtitle: "Xác thực quyền sở hữu email để hoàn tất kích hoạt tài khoản TripGenie",
+          title: a.headers.verifyEmailTitle,
+          subtitle: a.headers.verifyEmailSubtitle,
         };
       case "login":
       default:
         return {
-          title: "Chào mừng bạn trở lại",
-          subtitle: "Đăng nhập để đồng bộ lịch trình và tương tác cùng hội bạn",
+          title: a.headers.loginTitle,
+          subtitle: a.headers.loginSubtitle,
         };
     }
   };
@@ -400,7 +416,7 @@ export function AuthModal() {
                 TripGenie
               </span>
               <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block -mt-0.5">
-                Nền tảng du lịch thông minh
+                {t("common.brandTagline")}
               </span>
             </div>
           </div>
@@ -409,7 +425,7 @@ export function AuthModal() {
             type="button"
             onClick={closeAuthModal}
             className="size-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
-            aria-label="Đóng popup"
+            aria-label={a.closePopupAria}
           >
             <i className="fa-solid fa-xmark text-lg" />
           </button>
@@ -452,10 +468,10 @@ export function AuthModal() {
                       const emailVal = loginForm.getValues("identifier");
                       if (emailVal.includes("@")) {
                         resendVerificationEmail(emailVal)
-                          .then(() => toast.success("Đã gửi lại liên kết kích hoạt tới email!"))
+                          .then(() => toast.success(a.messages.verificationResent))
                           .catch((e: Error) => toast.error(e.message));
                       } else {
-                        toast.error("Vui lòng nhập email hợp lệ để gửi lại liên kết.");
+                        toast.error(a.messages.enterValidEmailForResend);
                       }
                     }}
                     disabled={isResendingVerificationEmail}
@@ -464,12 +480,12 @@ export function AuthModal() {
                     {isResendingVerificationEmail ? (
                       <>
                         <i className="fa-solid fa-circle-notch fa-spin text-xs" />
-                        <span>Đang gửi lại...</span>
+                        <span>{a.actions.resending}</span>
                       </>
                     ) : (
                       <>
                         <i className="fa-solid fa-paper-plane text-xs" />
-                        <span>Gửi lại email xác thực</span>
+                        <span>{a.actions.resendVerification}</span>
                       </>
                     )}
                   </button>
@@ -486,7 +502,7 @@ export function AuthModal() {
               {/* Identifier */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                  Email hoặc Tên đăng nhập
+                  {a.fields.identifierLabel}
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -495,7 +511,7 @@ export function AuthModal() {
                   <input
                     type="text"
                     {...loginForm.register("identifier")}
-                    placeholder="name@example.com hoặc username"
+                    placeholder={a.fields.identifierPlaceholder}
                     className="w-full h-11 sm:h-12 pl-10 pr-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white focus:bg-white text-base sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0194F3] focus:border-transparent transition-all"
                     autoComplete="username"
                   />
@@ -511,14 +527,14 @@ export function AuthModal() {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                    Mật khẩu
+                    {a.fields.passwordLabel}
                   </label>
                   <button
                     type="button"
                     onClick={() => setView("forgot-password")}
                     className="text-xs font-bold text-[#0194F3] hover:underline cursor-pointer"
                   >
-                    Quên mật khẩu?
+                    {a.actions.forgotPassword}
                   </button>
                 </div>
                 <div className="relative">
@@ -536,7 +552,7 @@ export function AuthModal() {
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
-                    aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    aria-label={showPassword ? a.hidePassword : a.showPassword}
                   >
                     <i
                       className={`fa-solid ${
@@ -560,7 +576,7 @@ export function AuthModal() {
                   className="size-4 rounded text-[#0194F3] focus:ring-[#0194F3] border-slate-300"
                 />
                 <span className="text-xs sm:text-sm text-slate-600 font-medium">
-                  Ghi nhớ đăng nhập trên thiết bị này
+                  {a.fields.rememberMe}
                 </span>
               </label>
 
@@ -573,10 +589,10 @@ export function AuthModal() {
                 {isLoggingIn ? (
                   <>
                     <i className="fa-solid fa-circle-notch fa-spin text-sm" />
-                    <span>Đang đăng nhập...</span>
+                    <span>{a.actions.signingIn}</span>
                   </>
                 ) : (
-                  <span>Đăng nhập</span>
+                  <span>{a.actions.signIn}</span>
                 )}
               </button>
 
@@ -586,22 +602,22 @@ export function AuthModal() {
                   <div className="w-full border-t border-slate-200" />
                 </div>
                 <span className="relative bg-white px-3 text-xs text-slate-400 font-medium uppercase tracking-wider">
-                  Hoặc
+                  {a.or}
                 </span>
               </div>
 
               {/* Google OAuth Button */}
-              <GoogleAuthButton label="Đăng nhập với Google" />
+              <GoogleAuthButton label={a.signInWithGoogle} />
 
               {/* Footer Switch */}
               <p className="text-center text-xs sm:text-sm text-slate-600 font-medium pt-2">
-                Chưa có tài khoản?{" "}
+                {a.actions.noAccountYet}{" "}
                 <button
                   type="button"
                   onClick={() => setView("register")}
                   className="font-bold text-[#0194F3] hover:underline cursor-pointer"
                 >
-                  Tạo tài khoản mới
+                  {a.actions.registerNew}
                 </button>
               </p>
             </form>
@@ -615,7 +631,7 @@ export function AuthModal() {
               {/* Full Name */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                  Họ và tên
+                  {a.fields.fullNameLabel}
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -624,7 +640,7 @@ export function AuthModal() {
                   <input
                     type="text"
                     {...registerForm.register("fullName")}
-                    placeholder="Nguyễn Văn A"
+                    placeholder={a.fields.fullNamePlaceholder}
                     className="w-full h-11 sm:h-12 pl-10 pr-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white focus:bg-white text-base sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0194F3] focus:border-transparent transition-all"
                   />
                 </div>
@@ -638,7 +654,7 @@ export function AuthModal() {
               {/* Email */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                  Địa chỉ Email
+                  {a.fields.emailLabel}
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -647,7 +663,7 @@ export function AuthModal() {
                   <input
                     type="email"
                     {...registerForm.register("email")}
-                    placeholder="name@example.com"
+                    placeholder={a.fields.emailPlaceholder}
                     className="w-full h-11 sm:h-12 pl-10 pr-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white focus:bg-white text-base sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0194F3] focus:border-transparent transition-all"
                   />
                 </div>
@@ -661,7 +677,7 @@ export function AuthModal() {
               {/* Password */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                  Mật khẩu
+                  {a.fields.passwordLabel}
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -670,13 +686,14 @@ export function AuthModal() {
                   <input
                     type={showPassword ? "text" : "password"}
                     {...registerForm.register("password")}
-                    placeholder="Tối thiểu 8 ký tự"
+                    placeholder={a.fields.passwordPlaceholder}
                     className="w-full h-11 sm:h-12 pl-10 pr-10 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white focus:bg-white text-base sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0194F3] focus:border-transparent transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                    aria-label={showPassword ? a.hidePassword : a.showPassword}
                   >
                     <i
                       className={`fa-solid ${
@@ -695,7 +712,7 @@ export function AuthModal() {
               {/* Confirm Password */}
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                  Xác nhận mật khẩu
+                  {a.fields.confirmPasswordLabel}
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -704,13 +721,14 @@ export function AuthModal() {
                   <input
                     type={showConfirmPassword ? "text" : "password"}
                     {...registerForm.register("confirmPassword")}
-                    placeholder="Nhập lại mật khẩu"
+                    placeholder={a.fields.confirmPasswordPlaceholder}
                     className="w-full h-11 sm:h-12 pl-10 pr-10 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white focus:bg-white text-base sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0194F3] focus:border-transparent transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                    aria-label={showConfirmPassword ? a.hidePassword : a.showPassword}
                   >
                     <i
                       className={`fa-solid ${
@@ -735,10 +753,10 @@ export function AuthModal() {
                 {isRegistering ? (
                   <>
                     <i className="fa-solid fa-circle-notch fa-spin text-sm" />
-                    <span>Đang đăng ký...</span>
+                    <span>{a.actions.creatingAccount}</span>
                   </>
                 ) : (
-                  <span>Tạo tài khoản miễn phí</span>
+                  <span>{a.actions.createFreeAccount}</span>
                 )}
               </button>
 
@@ -748,20 +766,20 @@ export function AuthModal() {
                   <div className="w-full border-t border-slate-200" />
                 </div>
                 <span className="relative bg-white px-3 text-xs text-slate-400 font-medium uppercase tracking-wider">
-                  Hoặc
+                  {a.or}
                 </span>
               </div>
-              <GoogleAuthButton label="Đăng ký với Google" />
+              <GoogleAuthButton label={a.signUpWithGoogle} />
 
               {/* Switch to Login */}
               <p className="text-center text-xs sm:text-sm text-slate-600 font-medium pt-2">
-                Đã có tài khoản?{" "}
+                {a.actions.alreadyHaveAccount}{" "}
                 <button
                   type="button"
                   onClick={() => setView("login")}
                   className="font-bold text-[#0194F3] hover:underline cursor-pointer"
                 >
-                  Đăng nhập ngay
+                  {a.actions.signInNow}
                 </button>
               </p>
             </form>
@@ -775,14 +793,14 @@ export function AuthModal() {
               </div>
               <div className="space-y-1.5">
                 <h3 className="text-lg font-bold text-slate-900">
-                  Kiểm tra hộp thư đến của bạn
+                  {a.messages.checkInboxTitle}
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-xs mx-auto">
-                  Chúng tôi đã gửi liên kết kích hoạt đến{" "}
+                  {a.messages.activationLinkSentTo}{" "}
                   <strong className="text-slate-900 font-semibold">
                     {pendingRegistration.email}
                   </strong>
-                  . Vui lòng bấm vào liên kết trong thư để hoàn tất.
+                  . {a.messages.activationLinkInstruction}
                 </p>
               </div>
 
@@ -791,14 +809,14 @@ export function AuthModal() {
                   type="button"
                   onClick={() => {
                     resendVerificationEmail(pendingRegistration.email)
-                      .then(() => toast.success("Đã gửi lại email kích hoạt!"))
+                      .then(() => toast.success(a.messages.activationEmailResent))
                       .catch((e: Error) => toast.error(e.message));
                   }}
                   disabled={isResendingVerificationEmail}
                   className="w-full h-11 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm transition-colors cursor-pointer inline-flex items-center justify-center gap-2"
                 >
                   <i className="fa-solid fa-rotate-right text-xs" />
-                  <span>Gửi lại email kích hoạt</span>
+                  <span>{a.actions.resendActivation}</span>
                 </button>
 
                 <button
@@ -809,7 +827,7 @@ export function AuthModal() {
                   }}
                   className="text-xs font-bold text-[#0194F3] hover:underline py-2 cursor-pointer"
                 >
-                  Quay lại đăng nhập
+                  {a.actions.backToLogin}
                 </button>
               </div>
             </div>
@@ -822,7 +840,7 @@ export function AuthModal() {
             <form onSubmit={forgotForm.handleSubmit(onForgotSubmit)} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                  Địa chỉ Email
+                  {a.fields.emailLabel}
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -831,7 +849,7 @@ export function AuthModal() {
                   <input
                     type="email"
                     {...forgotForm.register("email")}
-                    placeholder="name@example.com"
+                    placeholder={a.fields.emailPlaceholder}
                     className="w-full h-11 sm:h-12 pl-10 pr-3.5 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white focus:bg-white text-base sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0194F3] focus:border-transparent transition-all"
                   />
                 </div>
@@ -850,10 +868,10 @@ export function AuthModal() {
                 {isSubmittingForgotPassword ? (
                   <>
                     <i className="fa-solid fa-circle-notch fa-spin text-sm" />
-                    <span>Đang gửi mã OTP...</span>
+                    <span>{a.actions.sendingOtp}</span>
                   </>
                 ) : (
-                  <span>Gửi mã xác nhận OTP</span>
+                  <span>{a.actions.sendOtp}</span>
                 )}
               </button>
 
@@ -863,7 +881,7 @@ export function AuthModal() {
                 className="w-full flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-slate-600 hover:text-slate-900 pt-2 transition-colors cursor-pointer"
               >
                 <i className="fa-solid fa-arrow-left text-xs" />
-                <span>Quay lại đăng nhập</span>
+                <span>{a.actions.backToLogin}</span>
               </button>
             </form>
           )}
@@ -893,14 +911,14 @@ export function AuthModal() {
               </div>
 
               <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
-                <span>Không nhận được mã?</span>
+                <span>{a.messages.otpNotReceived}</span>
                 <button
                   type="button"
                   onClick={() => {
                     if (emailForOtp && otpCountdown <= 0) {
                       forgotPassword({ email: emailForOtp })
                         .then((res) => {
-                          toast.success("Mã OTP mới đã được gửi!");
+                          toast.success(a.messages.otpNewSent);
                           setOtpCountdown(res.retryAfter || 60);
                           setOtp(["", "", "", "", "", ""]);
                         })
@@ -912,7 +930,9 @@ export function AuthModal() {
                 >
                   <i className="fa-solid fa-rotate-right text-xs" />
                   <span>
-                    {otpCountdown > 0 ? `Gửi lại sau ${otpCountdown}s` : "Gửi lại mã"}
+                    {otpCountdown > 0
+                      ? t("auth.actions.resendAfter", { seconds: otpCountdown })
+                      : a.actions.resendCode}
                   </span>
                 </button>
               </div>
@@ -925,10 +945,10 @@ export function AuthModal() {
                 {isVerifyingResetOtp ? (
                   <>
                     <i className="fa-solid fa-circle-notch fa-spin text-sm" />
-                    <span>Đang xác thực...</span>
+                    <span>{a.actions.verifyingOtp}</span>
                   </>
                 ) : (
-                  <span>Xác nhận mã OTP</span>
+                  <span>{a.actions.verifyOtp}</span>
                 )}
               </button>
 
@@ -938,7 +958,7 @@ export function AuthModal() {
                 className="w-full flex items-center justify-center gap-2 text-xs sm:text-sm font-bold text-slate-600 hover:text-slate-900 pt-1 transition-colors cursor-pointer"
               >
                 <i className="fa-solid fa-arrow-left text-xs" />
-                <span>Nhập lại địa chỉ email</span>
+                <span>{a.actions.reenterEmail}</span>
               </button>
             </form>
           )}
@@ -950,7 +970,7 @@ export function AuthModal() {
             <form onSubmit={resetForm.handleSubmit(onResetSubmit)} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                  Mật khẩu mới
+                  {a.fields.newPasswordLabel}
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -959,13 +979,14 @@ export function AuthModal() {
                   <input
                     type={showPassword ? "text" : "password"}
                     {...resetForm.register("password")}
-                    placeholder="Tối thiểu 8 ký tự"
+                    placeholder={a.fields.passwordPlaceholder}
                     className="w-full h-11 sm:h-12 pl-10 pr-10 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white focus:bg-white text-base sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0194F3] focus:border-transparent transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                    aria-label={showPassword ? a.hidePassword : a.showPassword}
                   >
                     <i
                       className={`fa-solid ${
@@ -983,7 +1004,7 @@ export function AuthModal() {
 
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                  Xác nhận mật khẩu mới
+                  {a.fields.confirmNewPasswordLabel}
                 </label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -992,13 +1013,14 @@ export function AuthModal() {
                   <input
                     type={showConfirmPassword ? "text" : "password"}
                     {...resetForm.register("confirmPassword")}
-                    placeholder="Nhập lại mật khẩu mới"
+                    placeholder={a.fields.confirmNewPasswordPlaceholder}
                     className="w-full h-11 sm:h-12 pl-10 pr-10 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white focus:bg-white text-base sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#0194F3] focus:border-transparent transition-all"
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                    aria-label={showConfirmPassword ? a.hidePassword : a.showPassword}
                   >
                     <i
                       className={`fa-solid ${
@@ -1022,10 +1044,10 @@ export function AuthModal() {
                 {isResettingPassword ? (
                   <>
                     <i className="fa-solid fa-circle-notch fa-spin text-sm" />
-                    <span>Đang cập nhật mật khẩu...</span>
+                    <span>{a.actions.updatingPassword}</span>
                   </>
                 ) : (
-                  <span>Lưu mật khẩu mới</span>
+                  <span>{a.actions.saveNewPassword}</span>
                 )}
               </button>
             </form>
@@ -1043,10 +1065,10 @@ export function AuthModal() {
                   </div>
                   <div className="space-y-1">
                     <h3 className="text-lg font-bold text-slate-900">
-                      Kích hoạt tài khoản thành công!
+                      {a.messages.verifyEmailSuccessTitle}
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-xs mx-auto">
-                      Chào mừng bạn gia nhập TripGenie. Đang đưa bạn đến bảng khám phá địa điểm du lịch...
+                      {a.messages.verifyEmailSuccessDesc}
                     </p>
                   </div>
                 </div>
@@ -1057,7 +1079,7 @@ export function AuthModal() {
                   </div>
                   <div className="space-y-1">
                     <h3 className="text-lg font-bold text-slate-900">
-                      Không thể kích hoạt tài khoản
+                      {a.messages.verifyEmailErrorTitle}
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-xs mx-auto">
                       {emailVerifyError}
@@ -1069,14 +1091,14 @@ export function AuthModal() {
                       onClick={() => setView("register")}
                       className="h-11 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm transition-colors cursor-pointer"
                     >
-                      Đăng ký lại
+                      {a.actions.registerAgain}
                     </button>
                     <button
                       type="button"
                       onClick={() => setView("login")}
                       className="h-11 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] text-white font-bold text-xs sm:text-sm transition-colors cursor-pointer"
                     >
-                      Đăng nhập
+                      {a.actions.signIn}
                     </button>
                   </div>
                 </div>
@@ -1087,10 +1109,10 @@ export function AuthModal() {
                   </div>
                   <div className="space-y-1">
                     <h3 className="text-lg font-bold text-slate-900">
-                      Xác nhận kích hoạt tài khoản
+                      {a.messages.verifyEmailConfirmTitle}
                     </h3>
                     <p className="text-xs sm:text-sm text-slate-600 leading-relaxed max-w-xs mx-auto">
-                      Nhấn vào nút bên dưới để hoàn tất việc xác thực địa chỉ email và đăng nhập vào TripGenie.
+                      {a.messages.verifyEmailConfirmDesc}
                     </p>
                   </div>
 
@@ -1103,24 +1125,24 @@ export function AuthModal() {
                     {isVerifyingEmail ? (
                       <>
                         <i className="fa-solid fa-circle-notch fa-spin text-sm" />
-                        <span>Đang kích hoạt tài khoản...</span>
+                        <span>{a.actions.activatingAccount}</span>
                       </>
                     ) : (
                       <>
                         <i className="fa-solid fa-wand-magic-sparkles text-sm" />
-                        <span>Kích hoạt và tiếp tục</span>
+                        <span>{a.actions.activateAndContinue}</span>
                       </>
                     )}
                   </button>
 
                   <p className="text-center text-xs text-slate-500">
-                    Đã kích hoạt trước đó?{" "}
+                    {a.actions.alreadyVerified}{" "}
                     <button
                       type="button"
                       onClick={() => setView("login")}
                       className="font-bold text-[#0194F3] hover:underline cursor-pointer"
                     >
-                      Đăng nhập ngay
+                      {a.actions.signInNow}
                     </button>
                   </p>
                 </div>

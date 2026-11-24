@@ -19,17 +19,20 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { registerSchema, RegisterFormData } from '../schemas/auth.schema';
+import { createRegisterSchema, RegisterFormData } from '../schemas/auth.schema';
 import { useAuth } from '../hooks/use-auth';
 import { authService } from '@/services/auth.service';
 import { GoogleAuthButton } from './GoogleAuthButton';
 import { getSafeRedirectUrl } from '@/lib/safe-redirect';
 import { Button } from '@/components/ui/button';
+import { useI18n } from '@/i18n/LocaleProvider';
 
 export function RegisterForm() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
+  const { locale, t, messages } = useI18n();
+  const a = messages.auth;
   const nextParam = getSafeRedirectUrl(searchParams.get('next'), '/');
 
   const [showPassword, setShowPassword] = React.useState(false);
@@ -51,13 +54,18 @@ export function RegisterForm() {
     isResendingVerificationEmail,
   } = useAuth();
 
+  const resolver = React.useMemo(
+    () => zodResolver(createRegisterSchema(locale)),
+    [locale],
+  );
+
   const {
     register,
     handleSubmit,
     reset,
     formState: { errors },
   } = useForm<RegisterFormData>({
-    resolver: zodResolver(registerSchema),
+    resolver,
     defaultValues: {
       email: '',
       fullName: '',
@@ -87,7 +95,7 @@ export function RegisterForm() {
     const handleSuccess = () => {
       if (isHandled) return;
       isHandled = true;
-      toast.success('Tài khoản đã được kích hoạt thành công!');
+      toast.success(a.messages.accountActivated);
       queryClient.invalidateQueries({ queryKey: ['auth', 'me'] });
       router.push(nextParam || '/');
     };
@@ -124,7 +132,7 @@ export function RegisterForm() {
       clearInterval(pollInterval);
       channel?.close();
     };
-  }, [pendingRegistration, nextParam, router, queryClient]);
+  }, [pendingRegistration, nextParam, router, queryClient, a.messages.accountActivated]);
 
   const onSubmit = async (data: RegisterFormData) => {
     setServerError(null);
@@ -141,10 +149,10 @@ export function RegisterForm() {
         retryAfter: res.retryAfter || 60,
       });
       setCountdown(res.retryAfter || 60);
-      toast.success('Đã gửi email xác thực tài khoản!');
+      toast.success(a.messages.verificationEmailSent);
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : 'Đăng ký không thành công. Vui lòng thử lại.';
+        err instanceof Error ? err.message : a.messages.registerFailed;
       setServerError(message);
     }
   };
@@ -154,10 +162,10 @@ export function RegisterForm() {
     try {
       const res = await resendVerificationEmail(pendingRegistration.registrationId);
       setCountdown(res.retryAfter || 60);
-      toast.success(res.message || 'Đã gửi lại email xác thực!');
+      toast.success(a.messages.activationEmailResent);
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : 'Không thể gửi lại email xác thực. Vui lòng thử lại sau.';
+        err instanceof Error ? err.message : a.messages.resendFailed;
       toast.error(message);
     }
   };
@@ -186,10 +194,10 @@ export function RegisterForm() {
             <Mail className="size-8" />
           </div>
           <h2 className="text-xl font-bold font-heading text-foreground">
-            Kiểm tra email của bạn
+            {a.messages.checkEmailTitle}
           </h2>
           <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed max-w-sm">
-            Chúng tôi đã gửi đường dẫn kích hoạt tài khoản đến địa chỉ:
+            {a.messages.activationLinkSentTo}
           </p>
           <div className="px-3.5 py-1.5 rounded-xl bg-muted/60 border border-border text-foreground font-semibold text-sm">
             {maskEmail(pendingRegistration.email)}
@@ -199,11 +207,11 @@ export function RegisterForm() {
         <div className="p-4 rounded-2xl bg-muted/30 border border-border/80 space-y-2 text-xs text-muted-foreground leading-relaxed">
           <div className="flex items-center gap-1.5 font-semibold text-foreground">
             <CheckCircle2 className="size-4 text-primary" />
-            <span>Hướng dẫn xác thực:</span>
+            <span>{a.messages.activationGuideTitle}</span>
           </div>
-          <p>1. Mở hòm thư đến (hoặc thư mục Spam/Quảng cáo) của bạn.</p>
-          <p>2. Nhấn vào nút <strong>&quot;Kích hoạt tài khoản&quot;</strong> trong email từ TripGenie.</p>
-          <p>3. Xác nhận trên trang mở ra để hoàn tất đăng nhập.</p>
+          <p>{a.messages.activationGuideStep1}</p>
+          <p>{a.messages.activationGuideStep2}</p>
+          <p>{a.messages.activationGuideStep3}</p>
         </div>
 
         <div className="space-y-3 pt-1">
@@ -217,17 +225,17 @@ export function RegisterForm() {
             {isResendingVerificationEmail ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
-                <span>Đang gửi lại...</span>
+                <span>{a.actions.resending}</span>
               </>
             ) : countdown > 0 ? (
               <>
                 <RotateCw className="size-4 text-muted-foreground" />
-                <span>Gửi lại email sau ({countdown}s)</span>
+                <span>{t('auth.actions.resendEmailAfter', { seconds: countdown })}</span>
               </>
             ) : (
               <>
                 <RotateCw className="size-4" />
-                <span>Gửi lại email kích hoạt</span>
+                <span>{a.actions.resendActivation}</span>
               </>
             )}
           </Button>
@@ -239,18 +247,18 @@ export function RegisterForm() {
             className="w-full h-9 rounded-xl text-xs text-muted-foreground hover:text-foreground gap-1.5 cursor-pointer"
           >
             <ArrowLeft className="size-3.5" />
-            <span>Đăng ký với địa chỉ email khác</span>
+            <span>{a.actions.registerOtherEmail}</span>
           </Button>
         </div>
 
         <div className="border-t border-border/80 pt-4 text-center">
           <p className="text-xs text-muted-foreground">
-            Đã kích hoạt xong?{' '}
+            {a.actions.alreadyActivated}{' '}
             <Link
               href={nextParam ? `/login?next=${encodeURIComponent(nextParam)}` : '/login'}
               className="text-primary font-semibold hover:underline"
             >
-              Đăng nhập ngay
+              {a.actions.signInNow}
             </Link>
           </p>
         </div>
@@ -271,7 +279,7 @@ export function RegisterForm() {
         {/* Email Field */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-foreground tracking-wide">
-            Địa chỉ Email
+            {a.fields.emailLabel}
           </label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
@@ -280,7 +288,7 @@ export function RegisterForm() {
               type="email"
               autoCapitalize="none"
               autoComplete="email"
-              placeholder="vd: traveler@example.com"
+              placeholder={a.fields.emailPlaceholder}
               className="w-full h-10 pl-9 pr-3.5 rounded-xl border border-input bg-background/50 text-sm placeholder:text-muted-foreground/60 transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>
@@ -288,7 +296,7 @@ export function RegisterForm() {
             <p className="text-xs text-destructive mt-1">{errors.email.message}</p>
           ) : (
             <p className="text-[11px] text-muted-foreground">
-              Dùng để đăng nhập, kích hoạt tài khoản và nhận thông báo lịch trình
+              {a.fields.emailHint}
             </p>
           )}
         </div>
@@ -296,7 +304,7 @@ export function RegisterForm() {
         {/* Full Name Field */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-foreground tracking-wide">
-            Họ và tên
+            {a.fields.fullNameLabel}
           </label>
           <div className="relative">
             <User className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
@@ -304,7 +312,7 @@ export function RegisterForm() {
               {...register('fullName')}
               type="text"
               autoComplete="name"
-              placeholder="vd: Nguyễn Văn A"
+              placeholder={a.fields.fullNamePlaceholder}
               className="w-full h-10 pl-9 pr-3.5 rounded-xl border border-input bg-background/50 text-sm placeholder:text-muted-foreground/60 transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           </div>
@@ -316,7 +324,7 @@ export function RegisterForm() {
         {/* Password Field */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-foreground tracking-wide">
-            Mật khẩu
+            {a.fields.passwordLabel}
           </label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
@@ -324,14 +332,14 @@ export function RegisterForm() {
               {...register('password')}
               type={showPassword ? 'text' : 'password'}
               autoComplete="new-password"
-              placeholder="Tối thiểu 8 ký tự"
+              placeholder={a.fields.passwordPlaceholder}
               className="w-full h-10 pl-9 pr-10 rounded-xl border border-input bg-background/50 text-sm placeholder:text-muted-foreground/60 transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-1.5 top-1/2 -translate-y-1/2 size-8 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg transition-colors cursor-pointer"
-              aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              aria-label={showPassword ? a.hidePassword : a.showPassword}
             >
               {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
@@ -340,7 +348,7 @@ export function RegisterForm() {
             <p className="text-xs text-destructive mt-1">{errors.password.message}</p>
           ) : (
             <p className="text-[11px] text-muted-foreground">
-              Mật khẩu tối thiểu 8 ký tự, tối đa 72 bytes UTF-8
+              {a.fields.passwordHint}
             </p>
           )}
         </div>
@@ -348,7 +356,7 @@ export function RegisterForm() {
         {/* Confirm Password Field */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-foreground tracking-wide">
-            Xác nhận mật khẩu
+            {a.fields.confirmPasswordLabel}
           </label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
@@ -356,14 +364,14 @@ export function RegisterForm() {
               {...register('confirmPassword')}
               type={showPassword ? 'text' : 'password'}
               autoComplete="new-password"
-              placeholder="Nhập lại mật khẩu"
+              placeholder={a.fields.confirmPasswordPlaceholder}
               className="w-full h-10 pl-9 pr-10 rounded-xl border border-input bg-background/50 text-sm placeholder:text-muted-foreground/60 transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-1.5 top-1/2 -translate-y-1/2 size-8 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg transition-colors cursor-pointer"
-              aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              aria-label={showPassword ? a.hidePassword : a.showPassword}
             >
               {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
@@ -384,13 +392,13 @@ export function RegisterForm() {
             className="size-4 mt-0.5 rounded border-border text-primary focus:ring-primary cursor-pointer accent-primary"
           />
           <label htmlFor="agreeTerms" className="text-xs text-muted-foreground cursor-pointer select-none leading-relaxed">
-            Tôi đồng ý với{' '}
+            {a.fields.agreeTermsPrefix}{' '}
             <Link href="/" className="text-primary hover:underline font-medium">
-              Điều khoản dịch vụ
+              {a.fields.termsOfService}
             </Link>{' '}
-            và{' '}
+            {a.fields.and}{' '}
             <Link href="/" className="text-primary hover:underline font-medium">
-              Chính sách bảo mật
+              {a.fields.privacyPolicy}
             </Link>
           </label>
         </div>
@@ -407,10 +415,10 @@ export function RegisterForm() {
           {isRegistering ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              <span>Đang gửi thông tin đăng ký...</span>
+              <span>{a.actions.submittingRegister}</span>
             </>
           ) : (
-            <span>Tạo tài khoản</span>
+            <span>{a.actions.createAccount}</span>
           )}
         </button>
       </form>
@@ -422,22 +430,22 @@ export function RegisterForm() {
         </div>
         <div className="relative flex justify-center text-xs uppercase">
           <span className="bg-card px-3 text-muted-foreground font-medium">
-            Hoặc tiếp tục với
+            {a.orContinueWith}
           </span>
         </div>
       </div>
 
       {/* Google Auth Button */}
-      <GoogleAuthButton label="Đăng ký bằng Google" />
+      <GoogleAuthButton label={a.signUpWithGoogle} />
 
       {/* Switch to Login */}
       <p className="text-center text-xs text-muted-foreground">
-        Đã có tài khoản?{' '}
+        {a.actions.alreadyHaveAccount}{' '}
         <Link
           href={nextParam ? `/login?next=${encodeURIComponent(nextParam)}` : '/login'}
           className="text-primary font-semibold hover:underline"
         >
-          Đăng nhập
+          {a.actions.signIn}
         </Link>
       </p>
     </div>

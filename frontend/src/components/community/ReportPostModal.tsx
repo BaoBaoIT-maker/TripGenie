@@ -5,6 +5,7 @@ import { X, Loader2 } from "lucide-react";
 import { useReportCommunityPost } from "@/features/community/hooks/use-community";
 import { COMMUNITY_UI_CONSTANTS } from "@/services/community.service";
 import { CommunityModalPortal } from "./CommunityModalPortal";
+import { useI18n } from "@/i18n";
 import type { CommunityPostItem, CommunityReportType } from "@/types/community";
 
 interface ReportPostModalProps {
@@ -13,36 +14,12 @@ interface ReportPostModalProps {
   post: CommunityPostItem;
 }
 
-const REPORT_REASONS: {
-  id: CommunityReportType;
-  label: string;
-  desc: string;
-}[] = [
-  {
-    id: "SPAM",
-    label: "Spam hoặc quảng cáo trá hình",
-    desc: "Bài viết lặp lại, chèo kéo dịch vụ không liên quan trải nghiệm thật",
-  },
-  {
-    id: "FALSE_INFO",
-    label: "Thông tin sai lệch / Lừa đảo",
-    desc: "Review ảo, địa điểm hoặc bảng giá không đúng sự thật gây hiểu nhầm",
-  },
-  {
-    id: "INAPPROPRIATE",
-    label: "Ngôn từ hoặc hình ảnh phản cảm",
-    desc: "Nội dung xúc phạm, bạo lực hoặc vi phạm tiêu chuẩn cộng đồng",
-  },
-  {
-    id: "COPYRIGHT",
-    label: "Vi phạm bản quyền hình ảnh / lộ trình",
-    desc: "Sử dụng trái phép ảnh chụp, video hoặc chất xám của người khác",
-  },
-  {
-    id: "OTHER",
-    label: "Lý do khác",
-    desc: "Vấn đề khác cần Ban quản trị TripGenie kiểm tra",
-  },
+const REPORT_REASON_IDS: readonly CommunityReportType[] = [
+  "SPAM",
+  "FALSE_INFO",
+  "INAPPROPRIATE",
+  "COPYRIGHT",
+  "OTHER",
 ];
 
 const ReportReasonFieldset = memo(function ReportReasonFieldset({
@@ -52,16 +29,17 @@ const ReportReasonFieldset = memo(function ReportReasonFieldset({
   selectedType: CommunityReportType;
   onSelectType: (type: CommunityReportType) => void;
 }) {
+  const { t } = useI18n();
   return (
     <fieldset className="space-y-2">
       <legend className="text-xs font-extrabold text-[#0F172A] mb-1.5">
-        Chọn lý do báo cáo <span className="text-rose-500">*</span>
+        {t("community.report.reasonLegend")} <span className="text-rose-500">*</span>
       </legend>
-      {REPORT_REASONS.map((reason) => {
-        const checked = selectedType === reason.id;
+      {REPORT_REASON_IDS.map((reasonId) => {
+        const checked = selectedType === reasonId;
         return (
           <label
-            key={reason.id}
+            key={reasonId}
             className={`flex items-start gap-3 p-3 rounded-[14px] border cursor-pointer transition-colors ${
               checked
                 ? "border-[#0194F3] bg-[#F0F7FF]"
@@ -71,17 +49,17 @@ const ReportReasonFieldset = memo(function ReportReasonFieldset({
             <input
               type="radio"
               name="reportType"
-              value={reason.id}
+              value={reasonId}
               checked={checked}
-              onChange={() => onSelectType(reason.id)}
+              onChange={() => onSelectType(reasonId)}
               className="mt-0.5 accent-[#0194F3]"
             />
             <div className="min-w-0">
               <div className="text-xs font-extrabold text-[#0F172A]">
-                {reason.label}
+                {t(`community.report.reasons.${reasonId}.label`)}
               </div>
               <div className="text-[11px] text-[#64748B] leading-snug mt-0.5">
-                {reason.desc}
+                {t(`community.report.reasons.${reasonId}.desc`)}
               </div>
             </div>
           </label>
@@ -92,6 +70,7 @@ const ReportReasonFieldset = memo(function ReportReasonFieldset({
 });
 
 export function ReportPostModal({ open, onClose, post }: ReportPostModalProps) {
+  const { t } = useI18n();
   const [reportType, setReportType] = useState<CommunityReportType>("SPAM");
   const [description, setDescription] = useState("");
   const reportMutation = useReportCommunityPost();
@@ -136,10 +115,10 @@ export function ReportPostModal({ open, onClose, post }: ReportPostModalProps) {
               id="report-post-modal-title"
               className="text-sm font-bold text-slate-900"
             >
-              Báo cáo bài viết vi phạm
+              {t("community.report.title")}
             </h3>
             <p className="text-[11px] text-[#64748B]">
-              Giúp cộng đồng TripGenie giữ vững chất lượng review thật
+              {t("community.report.subtitle")}
             </p>
           </div>
         </div>
@@ -147,7 +126,7 @@ export function ReportPostModal({ open, onClose, post }: ReportPostModalProps) {
           type="button"
           onClick={handleClose}
           disabled={reportMutation.isPending}
-          aria-label="Đóng hộp thoại báo cáo"
+          aria-label={t("community.report.closeAria")}
           className="size-8 rounded-full bg-white border border-[#E2E8F0] hover:bg-[#F1F5F9] inline-flex items-center justify-center text-[#64748B] hover:text-[#0F172A] transition-colors cursor-pointer disabled:opacity-50"
         >
           <X className="size-4" />
@@ -160,11 +139,11 @@ export function ReportPostModal({ open, onClose, post }: ReportPostModalProps) {
         className="p-5 space-y-4 overflow-y-auto flex-1 custom-scroll"
       >
         <div className="rounded-[12px] bg-[#F8FAFC] border border-[#E2E8F0] px-3.5 py-2.5 text-xs text-[#475569]">
-          Đang báo cáo bài viết:{" "}
+          {t("community.report.reportingPrefix")}{" "}
           <strong className="text-[#0F172A] line-clamp-1">
             &ldquo;{post.title}&rdquo;
           </strong>{" "}
-          của <strong>{post.author.fullName}</strong>
+          {t("community.report.reportingBy")} <strong>{post.author.fullName}</strong>
         </div>
 
         <ReportReasonFieldset
@@ -177,7 +156,7 @@ export function ReportPostModal({ open, onClose, post }: ReportPostModalProps) {
             htmlFor="report-description"
             className="block text-xs font-extrabold text-[#0F172A]"
           >
-            Mô tả chi tiết thêm (tùy chọn)
+            {t("community.report.descriptionLabel")}
           </label>
           <textarea
             id="report-description"
@@ -185,7 +164,7 @@ export function ReportPostModal({ open, onClose, post }: ReportPostModalProps) {
             maxLength={COMMUNITY_UI_CONSTANTS.MAX_REPORT_DESCRIPTION_LENGTH}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Cung cấp thêm thông tin để Quản trị viên xử lý nhanh hơn..."
+            placeholder={t("community.report.descriptionPlaceholder")}
             className="w-full p-3 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] text-xs text-[#0F172A] placeholder:text-[#94A3B8] focus:outline-none focus:border-[#0194F3] focus:bg-white transition-colors resize-none"
           />
         </div>
@@ -197,7 +176,7 @@ export function ReportPostModal({ open, onClose, post }: ReportPostModalProps) {
             disabled={reportMutation.isPending}
             className="h-9 px-4 rounded-[10px] border border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-xs font-bold text-[#334155] transition-colors cursor-pointer disabled:opacity-50"
           >
-            Hủy
+            {t("common.cancel")}
           </button>
           <button
             type="submit"
@@ -207,7 +186,7 @@ export function ReportPostModal({ open, onClose, post }: ReportPostModalProps) {
             {reportMutation.isPending && (
               <Loader2 className="size-3.5 animate-spin" />
             )}
-            <span>Gửi báo cáo</span>
+            <span>{t("community.report.submit")}</span>
           </button>
         </div>
       </form>

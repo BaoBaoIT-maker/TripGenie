@@ -8,13 +8,16 @@ import { useRouter } from 'next/navigation';
 import { Lock, Eye, EyeOff, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
-  resetPasswordSchema,
+  createResetPasswordSchema,
   ResetPasswordFormData,
 } from '../schemas/auth.schema';
 import { useAuth } from '../hooks/use-auth';
+import { useI18n } from '@/i18n/LocaleProvider';
 
 export function ResetPasswordForm() {
   const router = useRouter();
+  const { locale, messages } = useI18n();
+  const a = messages.auth;
   const [showPassword, setShowPassword] = React.useState(false);
   const [serverError, setServerError] = React.useState<string | null>(null);
   const [resetTicket] = React.useState<string | null>(() => {
@@ -26,20 +29,24 @@ export function ResetPasswordForm() {
   const [isSuccess, setIsSuccess] = React.useState(false);
 
   const { resetPassword, isResettingPassword } = useAuth();
+  const resolver = React.useMemo(
+    () => zodResolver(createResetPasswordSchema(locale)),
+    [locale],
+  );
 
   React.useEffect(() => {
     if (typeof window !== 'undefined' && !resetTicket) {
-      toast.error('Vé xác thực đặt lại mật khẩu đã hết hạn hoặc không tồn tại.');
+      toast.error(a.messages.resetTicketMissing);
       router.push('/forgot-password');
     }
-  }, [resetTicket, router]);
+  }, [resetTicket, router, a.messages.resetTicketMissing]);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
   } = useForm<ResetPasswordFormData>({
-    resolver: zodResolver(resetPasswordSchema),
+    resolver,
     defaultValues: {
       password: '',
       confirmPassword: '',
@@ -48,7 +55,7 @@ export function ResetPasswordForm() {
 
   const onSubmit = async (data: ResetPasswordFormData) => {
     if (!resetTicket) {
-      toast.error('Vé xác thực không hợp lệ. Vui lòng thử lại.');
+      toast.error(a.messages.resetTicketInvalid);
       router.push('/forgot-password');
       return;
     }
@@ -56,13 +63,13 @@ export function ResetPasswordForm() {
     setServerError(null);
 
     try {
-      const response = await resetPassword({
+      await resetPassword({
         resetTicket,
         password: data.password,
       });
 
       setIsSuccess(true);
-      toast.success(response.message || 'Đặt lại mật khẩu thành công!');
+      toast.success(a.messages.resetSuccess);
 
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem('tripgenie:reset_ticket');
@@ -73,9 +80,7 @@ export function ResetPasswordForm() {
       }, 1200);
     } catch (err: unknown) {
       const message =
-        err instanceof Error
-          ? err.message
-          : 'Không thể đặt lại mật khẩu. Vui lòng thử lại từ đầu.';
+        err instanceof Error ? err.message : a.messages.resetFailed;
       setServerError(message);
     }
   };
@@ -83,7 +88,7 @@ export function ResetPasswordForm() {
   return (
     <div className="space-y-6">
       <p className="text-xs text-muted-foreground leading-relaxed">
-        Tạo mật khẩu mới cho tài khoản của bạn. Mật khẩu phải có tối thiểu 8 ký tự (tối đa 72 bytes) để bảo đảm an toàn.
+        {a.messages.resetDescription}
       </p>
 
       {serverError && (
@@ -96,7 +101,7 @@ export function ResetPasswordForm() {
       {isSuccess && (
         <div className="flex items-center justify-center gap-2 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold animate-in fade-in">
           <CheckCircle2 className="size-4.5" />
-          <span>Mật khẩu đã được cập nhật! Đang chuyển hướng...</span>
+          <span>{a.messages.resetUpdatedRedirecting}</span>
         </div>
       )}
 
@@ -104,7 +109,7 @@ export function ResetPasswordForm() {
         {/* New Password Field */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-foreground tracking-wide">
-            Mật khẩu mới
+            {a.fields.newPasswordLabel}
           </label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
@@ -112,14 +117,14 @@ export function ResetPasswordForm() {
               {...register('password')}
               type={showPassword ? 'text' : 'password'}
               autoComplete="new-password"
-              placeholder="Tối thiểu 8 ký tự"
+              placeholder={a.fields.passwordPlaceholder}
               className="w-full h-10 pl-9 pr-10 rounded-xl border border-input bg-background/50 text-sm placeholder:text-muted-foreground/60 transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-1.5 top-1/2 -translate-y-1/2 size-8 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg transition-colors cursor-pointer"
-              aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              aria-label={showPassword ? a.hidePassword : a.showPassword}
             >
               {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
@@ -132,7 +137,7 @@ export function ResetPasswordForm() {
         {/* Confirm Password Field */}
         <div className="space-y-1.5">
           <label className="text-xs font-semibold text-foreground tracking-wide">
-            Xác nhận mật khẩu mới
+            {a.fields.confirmNewPasswordLabel}
           </label>
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
@@ -140,14 +145,14 @@ export function ResetPasswordForm() {
               {...register('confirmPassword')}
               type={showPassword ? 'text' : 'password'}
               autoComplete="new-password"
-              placeholder="Nhập lại mật khẩu mới"
+              placeholder={a.fields.confirmNewPasswordPlaceholder}
               className="w-full h-10 pl-9 pr-10 rounded-xl border border-input bg-background/50 text-sm placeholder:text-muted-foreground/60 transition-colors focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-1.5 top-1/2 -translate-y-1/2 size-8 flex items-center justify-center text-muted-foreground hover:text-foreground rounded-lg transition-colors cursor-pointer"
-              aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+              aria-label={showPassword ? a.hidePassword : a.showPassword}
             >
               {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
@@ -168,10 +173,10 @@ export function ResetPasswordForm() {
           {isResettingPassword ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              <span>Đang lưu mật khẩu mới...</span>
+              <span>{a.actions.updatingPassword}</span>
             </>
           ) : (
-            <span>Cập nhật mật khẩu</span>
+            <span>{a.actions.updatePassword}</span>
           )}
         </button>
       </form>
@@ -182,7 +187,7 @@ export function ResetPasswordForm() {
           href="/login"
           className="text-xs text-muted-foreground hover:text-foreground hover:underline font-medium"
         >
-          Hủy bỏ và quay lại đăng nhập
+          {a.actions.cancelBackToLogin}
         </Link>
       </div>
     </div>

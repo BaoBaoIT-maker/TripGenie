@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import { BudgetLevel, Prisma, type TravelArea } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
+import { AppLocale, DEFAULT_LOCALE } from '../../../common/i18n/locale.util';
+import { t } from '../../../common/i18n/t.util';
 import {
   TransitService,
   IntercityTransitResult,
@@ -623,6 +625,7 @@ export class ItineraryPlannerService {
   async generateItinerary(
     dto: GenerateItineraryDto,
     creatorId?: string,
+    locale: AppLocale = DEFAULT_LOCALE,
   ): Promise<ItineraryDetail> {
     const startDate = new Date(dto.startDate);
     const endDate = new Date(dto.endDate);
@@ -878,6 +881,7 @@ export class ItineraryPlannerService {
             destination: dto.destinationCity,
             startDate: dto.startDate,
             totalDays,
+            locale,
           })
         : Promise.resolve(null),
     ]);
@@ -966,6 +970,7 @@ export class ItineraryPlannerService {
       lodgingName: selectedLodging?.place.name ?? null,
       places: placesContext,
       dayPools,
+      locale,
     });
 
     // 6. Validate LLM placeIds against day pools (placeId: null strictly banned) & optimize in-day route
@@ -983,7 +988,10 @@ export class ItineraryPlannerService {
 
       const dayRaw = planJson.days?.find((item) => item.dayNumber === d) || {
         dayNumber: d,
-        theme: `Khám phá ${dto.destinationCity} - Ngày ${d}`,
+        theme: t(locale, 'planner.fallback.emptyDayTheme', {
+          dest: dto.destinationCity,
+          day: d,
+        }),
         activities: [],
       };
 
@@ -2204,6 +2212,7 @@ export class ItineraryPlannerService {
   async getWeatherById(
     id: string,
     requesterId?: string,
+    locale: AppLocale = DEFAULT_LOCALE,
   ): Promise<TripWeatherResponse> {
     await this.accessService.assertCanView(id, requesterId);
 
@@ -2286,6 +2295,7 @@ export class ItineraryPlannerService {
       destination: row.destination,
       startDate: row.startDate,
       totalDays,
+      locale,
     });
   }
 

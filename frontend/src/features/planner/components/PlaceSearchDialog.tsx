@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AppModalPortal } from '@/components/common/AppModalPortal';
+import { useI18n } from '@/i18n';
 import { placeService } from '@/services/place.service';
 import type { Place } from '@/types/place';
 import { TRIP_COMPANIONS_CONFIG } from '../config/trip-companions.config';
@@ -28,26 +29,10 @@ interface PlaceSearchDialogProps {
   copilotAssist?: React.ReactNode;
 }
 
-const MODAL_META: Record<
-  PlaceSearchMode,
-  { title: string; icon: string; subtitle: (ctx: { day: number; stopName?: string }) => string }
-> = {
-  add: {
-    title: 'Tìm kiếm địa điểm thêm vào lịch trình',
-    icon: 'fa-solid fa-location-dot',
-    subtitle: ({ day }) => `Chọn địa điểm thực tế để bổ sung trực tiếp vào Ngày ${day}.`,
-  },
-  'propose-new': {
-    title: 'Đề xuất thêm điểm mới cho nhóm',
-    icon: 'fa-solid fa-check-to-slot',
-    subtitle: ({ day }) => `Tìm địa điểm để đưa vào mục Bình chọn cho Ngày ${day}.`,
-  },
-  'propose-swap': {
-    title: 'Đề xuất đổi điểm thay thế cho nhóm',
-    icon: 'fa-solid fa-right-left',
-    subtitle: ({ stopName }) =>
-      `Tìm địa điểm thay thế cho "${stopName || 'điểm dừng hiện tại'}" để mọi người cùng vote.`,
-  },
+const MODAL_ICONS: Record<PlaceSearchMode, string> = {
+  add: 'fa-solid fa-location-dot',
+  'propose-new': 'fa-solid fa-check-to-slot',
+  'propose-swap': 'fa-solid fa-right-left',
 };
 
 export function PlaceSearchDialog({
@@ -64,11 +49,12 @@ export function PlaceSearchDialog({
   isSubmittingProposal = false,
   copilotAssist,
 }: PlaceSearchDialogProps) {
+  const { t } = useI18n();
   const [query, setQuery] = useState('');
   const [places, setPlaces] = useState<Place[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSelectingId, setIsSelectingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [hasError, setHasError] = useState(false);
   const [retryNonce, setRetryNonce] = useState(0);
 
   // Proposal composer state (used only when mode !== 'add')
@@ -77,13 +63,27 @@ export function PlaceSearchDialog({
   const [notes, setNotes] = useState('');
 
   const isProposeMode = mode !== 'add';
-  const meta = MODAL_META[mode];
+  const modalIcon = MODAL_ICONS[mode];
+  const modalTitle =
+    mode === 'add'
+      ? t('planner.placeSearch.addTitle')
+      : mode === 'propose-new'
+        ? t('planner.placeSearch.proposeNewTitle')
+        : t('planner.placeSearch.proposeSwapTitle');
+  const modalSubtitle =
+    mode === 'add'
+      ? t('planner.placeSearch.addSubtitle', { day: selectedDayNumber })
+      : mode === 'propose-new'
+        ? t('planner.placeSearch.proposeNewSubtitle', { day: selectedDayNumber })
+        : t('planner.placeSearch.proposeSwapSubtitle', {
+            stopName: targetStopName || t('planner.placeSearch.currentStopFallback'),
+          });
 
   const handleClose = () => {
     if (isSubmittingProposal || isSelectingId) return;
     setQuery('');
     setPlaces([]);
-    setError(null);
+    setHasError(false);
     setChosenPlace(null);
     setProposedStartTime('');
     setNotes('');
@@ -96,7 +96,7 @@ export function PlaceSearchDialog({
     let active = true;
     const timer = setTimeout(async () => {
       setIsLoading(true);
-      setError(null);
+      setHasError(false);
       try {
         const keyword = query.trim() || destinationCity?.trim() || undefined;
         const results = await placeService.getPlaces({ keyword });
@@ -105,7 +105,7 @@ export function PlaceSearchDialog({
         }
       } catch {
         if (active) {
-          setError('Không thể tải danh sách địa điểm. Vui lòng thử lại.');
+          setHasError(true);
         }
       } finally {
         if (active) {
@@ -161,22 +161,20 @@ export function PlaceSearchDialog({
       <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between gap-3 bg-slate-50/70 shrink-0">
         <div className="flex items-start gap-2.5 min-w-0">
           <div className="size-9 rounded-xl bg-[#F0F7FF] text-[#0194F3] flex items-center justify-center shrink-0">
-            <i className={`${meta.icon} text-sm`} aria-hidden="true" />
+            <i className={`${modalIcon} text-sm`} aria-hidden="true" />
           </div>
           <div className="min-w-0">
             <h2 id="place-search-dialog-title" className="text-sm font-bold text-[#10243A]">
-              {meta.title}
+              {modalTitle}
             </h2>
-            <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
-              {meta.subtitle({ day: selectedDayNumber, stopName: targetStopName })}
-            </p>
+            <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{modalSubtitle}</p>
           </div>
         </div>
         <button
           type="button"
           onClick={handleClose}
           disabled={isSubmittingProposal || Boolean(isSelectingId)}
-          aria-label="Đóng hộp thoại tìm kiếm"
+          aria-label={t('planner.placeSearch.closeAria')}
           className="size-8 rounded-full text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50 shrink-0"
         >
           <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
@@ -195,7 +193,7 @@ export function PlaceSearchDialog({
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Tìm theo tên quán cafe, bảo tàng, nhà hàng, bãi biển..."
+              placeholder={t('planner.placeSearch.searchPlaceholder')}
               autoFocus
               spellCheck={false}
               autoComplete="off"
@@ -205,7 +203,7 @@ export function PlaceSearchDialog({
               <button
                 type="button"
                 onClick={() => setQuery('')}
-                aria-label="Xóa từ khóa"
+                aria-label={t('planner.placeSearch.clearQueryAria')}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 size-5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 flex items-center justify-center cursor-pointer"
               >
                 <i className="fa-solid fa-xmark text-[10px]" aria-hidden="true" />
@@ -215,14 +213,14 @@ export function PlaceSearchDialog({
 
           {days && days.length > 1 && mode !== 'propose-swap' && onChangeDayNumber && (
             <select
-              aria-label="Chọn ngày áp dụng"
+              aria-label={t('planner.placeSearch.daySelectAria')}
               value={selectedDayNumber}
               onChange={(e) => onChangeDayNumber(Number(e.target.value))}
               className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#0194F3]/30 focus:border-[#0194F3] shrink-0"
             >
               {days.map((d) => (
                 <option key={d.dayNumber} value={d.dayNumber}>
-                  Ngày {d.dayNumber}
+                  {t('planner.common.day', { n: d.dayNumber })}
                 </option>
               ))}
             </select>
@@ -243,34 +241,34 @@ export function PlaceSearchDialog({
           </div>
         )}
 
-        {error && !isLoading && (
+        {hasError && !isLoading && (
           <div className="flex flex-col items-center justify-center py-10 text-center space-y-2.5 text-rose-600">
             <i className="fa-solid fa-circle-exclamation text-2xl" aria-hidden="true" />
-            <p className="text-xs font-semibold">{error}</p>
+            <p className="text-xs font-semibold">{t('planner.placeSearch.loadError')}</p>
             <button
               type="button"
               onClick={() => setRetryNonce((n) => n + 1)}
               className="h-8 px-3 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer"
             >
-              Thử lại
+              {t('planner.common.retry')}
             </button>
           </div>
         )}
 
-        {!isLoading && !error && places.length === 0 && (
+        {!isLoading && !hasError && places.length === 0 && (
           <div className="flex flex-col items-center justify-center py-10 text-center text-slate-500 space-y-1.5">
             <i className="fa-solid fa-location-dot text-2xl text-slate-300" aria-hidden="true" />
             <p className="text-xs font-semibold text-slate-800">
-              Không tìm thấy địa điểm phù hợp
+              {t('planner.placeSearch.emptyTitle')}
             </p>
             <p className="text-[11px] text-slate-500 max-w-xs">
-              Hãy thử từ khóa khác (ví dụ: cafe, chợ, bảo tàng) hoặc nhờ Genie Copilot tìm giúp bên dưới.
+              {t('planner.placeSearch.emptyDesc')}
             </p>
           </div>
         )}
 
         {!isLoading &&
-          !error &&
+          !hasError &&
           places.map((place) => {
             const isSelected = isProposeMode && chosenPlace?.id === place.id;
             const isBusy = isSelectingId === place.id;
@@ -328,9 +326,9 @@ export function PlaceSearchDialog({
                   ) : isSelected ? (
                     <i className="fa-solid fa-check" aria-hidden="true" />
                   ) : isProposeMode ? (
-                    'Chọn'
+                    t('planner.common.select')
                   ) : (
-                    'Thêm'
+                    t('planner.common.add')
                   )}
                 </span>
               </button>
@@ -346,7 +344,7 @@ export function PlaceSearchDialog({
         >
           <div className="flex items-center justify-between gap-2">
             <div className="min-w-0 text-xs">
-              <span className="text-slate-500">Đề xuất đã chọn: </span>
+              <span className="text-slate-500">{t('planner.placeSearch.selectedProposal')} </span>
               <strong className="text-[#10243A] font-bold">{chosenPlace.name}</strong>
             </div>
             <button
@@ -354,7 +352,7 @@ export function PlaceSearchDialog({
               onClick={() => setChosenPlace(null)}
               className="text-[11px] font-semibold text-slate-500 hover:text-slate-800 cursor-pointer shrink-0"
             >
-              Chọn lại
+              {t('planner.placeSearch.reselect')}
             </button>
           </div>
 
@@ -362,7 +360,7 @@ export function PlaceSearchDialog({
             {mode === 'propose-new' && (
               <div>
                 <label htmlFor="proposal-start-time" className="block text-[11px] font-semibold text-slate-700 mb-1">
-                  Giờ dự kiến (tuỳ chọn)
+                  {t('planner.placeSearch.proposedTimeLabel')}
                 </label>
                 <input
                   id="proposal-start-time"
@@ -376,7 +374,7 @@ export function PlaceSearchDialog({
             <div className={mode === 'propose-new' ? 'sm:col-span-2' : 'sm:col-span-3'}>
               <div className="flex items-center justify-between mb-1">
                 <label htmlFor="proposal-notes-input" className="text-[11px] font-semibold text-slate-700">
-                  Lý do gợi ý cho đoàn (tuỳ chọn)
+                  {t('planner.placeSearch.reasonLabel')}
                 </label>
                 <span className="text-[10px] text-slate-400 tabular-nums">
                   {notes.length}/{TRIP_COMPANIONS_CONFIG.PROPOSAL_NOTES_MAX_LENGTH}
@@ -388,7 +386,7 @@ export function PlaceSearchDialog({
                 maxLength={TRIP_COMPANIONS_CONFIG.PROPOSAL_NOTES_MAX_LENGTH}
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Ví dụ: Quán này view biển thoáng, hợp đi buổi chiều..."
+                placeholder={t('planner.placeSearch.reasonPlaceholder')}
                 className="w-full h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs focus:outline-none focus:ring-2 focus:ring-[#0194F3]/30"
               />
             </div>
@@ -401,7 +399,7 @@ export function PlaceSearchDialog({
               disabled={isSubmittingProposal}
               className="h-9 px-3.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer"
             >
-              Hủy
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
@@ -413,7 +411,11 @@ export function PlaceSearchDialog({
               ) : (
                 <i className="fa-solid fa-paper-plane text-xs" aria-hidden="true" />
               )}
-              <span>{isSubmittingProposal ? 'Đang gửi...' : 'Gửi vào bình chọn nhóm'}</span>
+              <span>
+                {isSubmittingProposal
+                  ? t('planner.placeSearch.sending')
+                  : t('planner.placeSearch.submitProposal')}
+              </span>
             </button>
           </div>
         </form>

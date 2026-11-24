@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { PRESET_AVATARS, DEFAULT_AVATAR, AVATAR_PICKER_CONFIG } from '@/config/avatars';
 import { communityService } from '@/services/community.service';
+import { useI18n, type TranslationKey } from '@/i18n';
 import { useUpdateAvatar } from '../hooks/use-update-avatar';
 
 interface AvatarPickerModalProps {
@@ -31,17 +32,20 @@ const noopSubscribe = () => () => {};
  */
 function optimizeAvatarFile(
   file: File,
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
 ): Promise<{ optimizedFile: File; previewUrl: string }> {
   return new Promise((resolve, reject) => {
     if (!AVATAR_PICKER_CONFIG.ALLOWED_IMAGE_TYPES.some((type) => file.type === type)) {
-      reject(new Error('Vui lòng chọn tệp hình ảnh hợp lệ (PNG, JPG, WebP)'));
+      reject(new Error(t('profile.avatarModal.invalidType')));
       return;
     }
 
     if (file.size > AVATAR_PICKER_CONFIG.MAX_FILE_SIZE_BYTES) {
       reject(
         new Error(
-          `Kích thước ảnh tối đa là ${AVATAR_PICKER_CONFIG.MAX_FILE_SIZE_BYTES / (1024 * 1024)}MB`,
+          t('profile.avatarModal.maxSize', {
+            mb: AVATAR_PICKER_CONFIG.MAX_FILE_SIZE_BYTES / (1024 * 1024),
+          }),
         ),
       );
       return;
@@ -92,10 +96,10 @@ function optimizeAvatarFile(
           AVATAR_PICKER_CONFIG.IMAGE_QUALITY,
         );
       };
-      img.onerror = () => reject(new Error('Không thể xử lý hình ảnh này'));
+      img.onerror = () => reject(new Error(t('profile.avatarModal.processError')));
       img.src = e.target?.result as string;
     };
-    reader.onerror = () => reject(new Error('Lỗi khi đọc tệp từ thiết bị'));
+    reader.onerror = () => reject(new Error(t('profile.avatarModal.readError')));
     reader.readAsDataURL(file);
   });
 }
@@ -106,6 +110,7 @@ function AvatarPickerContent({
   currentAvatarUrl,
   userFullName,
 }: AvatarPickerModalProps) {
+  const { t } = useI18n();
   const initialUrl = currentAvatarUrl || DEFAULT_AVATAR;
   const [selectedUrl, setSelectedUrl] = React.useState<string>(initialUrl);
   const [customAvatarUrl, setCustomAvatarUrl] = React.useState<string | null>(() => {
@@ -136,7 +141,7 @@ function AvatarPickerContent({
     setErrorMessage(null);
     setIsProcessingFile(true);
     try {
-      const { optimizedFile, previewUrl } = await optimizeAvatarFile(file);
+      const { optimizedFile, previewUrl } = await optimizeAvatarFile(file, t);
       if (activeBlobUrlRef.current) {
         URL.revokeObjectURL(activeBlobUrlRef.current);
       }
@@ -146,7 +151,7 @@ function AvatarPickerContent({
       setCustomAvatarUrl(previewUrl);
       setSelectedUrl(previewUrl);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Lỗi khi tải ảnh lên';
+      const msg = err instanceof Error ? err.message : t('profile.avatarModal.uploadError');
       setErrorMessage(msg);
     } finally {
       setIsProcessingFile(false);
@@ -171,7 +176,7 @@ function AvatarPickerContent({
         const uploadResult = await communityService.uploadMedia([pendingUploadFile]);
         const uploadedUrl = uploadResult.mediaUrls?.[0];
         if (!uploadedUrl) {
-          throw new Error('Không thể tải ảnh lên máy chủ. Vui lòng thử lại.');
+          throw new Error(t('profile.avatarModal.serverUploadError'));
         }
         finalAvatarUrl = uploadedUrl;
       }
@@ -180,7 +185,7 @@ function AvatarPickerContent({
       onOpenChange(false);
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : 'Không thể cập nhật ảnh đại diện. Vui lòng thử lại.';
+        err instanceof Error ? err.message : t('profile.avatarModal.updateError');
       setErrorMessage(message);
     }
   };
@@ -194,7 +199,7 @@ function AvatarPickerContent({
       <DialogContent className="sm:max-w-[540px] p-6 rounded-3xl">
         <DialogHeader className="text-center sm:text-center pb-2">
           <DialogTitle className="text-lg font-bold font-heading text-center">
-            Chọn ảnh đại diện
+            {t('profile.avatarModal.title')}
           </DialogTitle>
         </DialogHeader>
 
@@ -242,7 +247,7 @@ function AvatarPickerContent({
                 ? 'border-primary bg-primary/5 ring-2 ring-primary ring-offset-2'
                 : 'border-border/90 hover:border-primary hover:bg-muted/50'
             }`}
-            title="Tải ảnh từ máy"
+            title={t('profile.avatarModal.uploadTooltip')}
           >
             {isProcessingFile ? (
               <Loader2 className="size-5 animate-spin text-primary" />
@@ -250,7 +255,7 @@ function AvatarPickerContent({
               <div className="relative size-full rounded-full overflow-hidden">
                 <Image
                   src={customAvatarUrl}
-                  alt="Ảnh tải lên"
+                  alt={t('profile.avatarModal.uploadAlt')}
                   fill
                   sizes="64px"
                   unoptimized={customAvatarUrl.startsWith('blob:')}
@@ -263,7 +268,7 @@ function AvatarPickerContent({
             ) : (
               <div className="flex flex-col items-center justify-center text-muted-foreground group-hover:text-primary transition-colors">
                 <Upload className="size-5 stroke-[2.2]" />
-                <span className="text-[10px] font-semibold mt-0.5">Tải lên</span>
+                <span className="text-[10px] font-semibold mt-0.5">{t('profile.avatarModal.uploadLabel')}</span>
               </div>
             )}
 
@@ -326,7 +331,7 @@ function AvatarPickerContent({
             disabled={updateAvatarMutation.isPending || isProcessingFile}
             className="rounded-xl text-xs h-9 px-4 cursor-pointer"
           >
-            Hủy
+            {t('common.cancel')}
           </Button>
           <Button
             type="button"
@@ -338,10 +343,10 @@ function AvatarPickerContent({
             {updateAvatarMutation.isPending ? (
               <>
                 <Loader2 className="size-3.5 animate-spin" />
-                <span>Đang lưu...</span>
+                <span>{t('profile.avatarModal.saving')}</span>
               </>
             ) : (
-              <span>Lưu thay đổi</span>
+              <span>{t('profile.avatarModal.saveChanges')}</span>
             )}
           </Button>
         </DialogFooter>

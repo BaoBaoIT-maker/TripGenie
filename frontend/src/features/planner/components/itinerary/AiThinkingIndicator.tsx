@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useI18n } from '@/i18n';
 
 export type SupportedLocale = 'vi' | 'en';
 
@@ -56,22 +57,25 @@ const STEP_TRANSITION_DELAYS_MS = {
  */
 export const AiThinkingIndicator = React.memo(function AiThinkingIndicator({
   context = 'copilot',
-  locale = 'vi',
+  locale,
   className = '',
   showAvatar = true,
 }: AiThinkingIndicatorProps) {
+  const { locale: activeLocale } = useI18n();
+  const resolvedLocale = locale ?? activeLocale;
   const [activeStep, setActiveStep] = useState<number>(0);
   const [isFading, setIsFading] = useState<boolean>(false);
 
-  const texts = DEFAULT_THINKING_TEXTS[context]?.[locale] || DEFAULT_THINKING_TEXTS[context].vi;
+  const texts =
+    DEFAULT_THINKING_TEXTS[context]?.[resolvedLocale] || DEFAULT_THINKING_TEXTS[context].vi;
 
   useEffect(() => {
-    setActiveStep(0);
-    setIsFading(false);
+    let innerTimer1: ReturnType<typeof setTimeout> | undefined;
+    let innerTimer2: ReturnType<typeof setTimeout> | undefined;
 
     const timer1 = setTimeout(() => {
       setIsFading(true);
-      setTimeout(() => {
+      innerTimer1 = setTimeout(() => {
         setActiveStep(1);
         setIsFading(false);
       }, 150);
@@ -79,7 +83,7 @@ export const AiThinkingIndicator = React.memo(function AiThinkingIndicator({
 
     const timer2 = setTimeout(() => {
       setIsFading(true);
-      setTimeout(() => {
+      innerTimer2 = setTimeout(() => {
         setActiveStep(2);
         setIsFading(false);
       }, 150);
@@ -88,8 +92,10 @@ export const AiThinkingIndicator = React.memo(function AiThinkingIndicator({
     return () => {
       clearTimeout(timer1);
       clearTimeout(timer2);
+      if (innerTimer1) clearTimeout(innerTimer1);
+      if (innerTimer2) clearTimeout(innerTimer2);
     };
-  }, [context, locale]);
+  }, [context, resolvedLocale]);
 
   return (
     <div

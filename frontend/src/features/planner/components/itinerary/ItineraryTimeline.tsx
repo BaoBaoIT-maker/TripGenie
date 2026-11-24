@@ -2,8 +2,13 @@
 
 import { memo, useEffect, useState } from 'react';
 import { AppModalPortal } from '@/components/common/AppModalPortal';
+import { useI18n, type AppLocale } from '@/i18n';
 import { useItineraryHoverStore } from '../../stores/itinerary-hover-store';
-import { WEATHER_THEMES, getDayWeatherAdvice } from '../../constants/climate.constants';
+import {
+  WEATHER_THEMES,
+  getDayWeatherAdvice,
+  getWeatherConditionLabel,
+} from '../../constants/climate.constants';
 import {
   TRANSIT_UI_CONFIG,
   cleanHubName,
@@ -61,85 +66,61 @@ interface Props {
   onOpenLodgingPicker?: (nightNumber: number) => void;
 }
 
+type TranslateFn = ReturnType<typeof useI18n>['t'];
+
 const TRANSIT_MODE_OPTIONS: ReadonlyArray<{
   mode: TransitMode;
-  title: string;
-  desc: string;
   iconClass: string;
 }> = [
-  {
-    mode: 'FLIGHT',
-    title: 'Máy bay',
-    desc: 'Nhanh nhất cho cự ly xa, đặt qua Google Flights & Traveloka',
-    iconClass: 'fa-solid fa-plane',
-  },
-  {
-    mode: 'TRAIN',
-    title: 'Tàu hỏa (Đường sắt)',
-    desc: 'Trải nghiệm ngắm cảnh, an toàn, đặt qua ĐSVN & VeXeRe',
-    iconClass: 'fa-solid fa-train',
-  },
-  {
-    mode: 'SLEEPER_BUS',
-    title: 'Xe khách giường nằm',
-    desc: 'Tiết kiệm chi phí, chạy ban đêm, đặt qua VeXeRe & Traveloka',
-    iconClass: 'fa-solid fa-bus',
-  },
-  {
-    mode: 'PERSONAL_CAR',
-    title: 'Ô tô cá nhân / Thuê xe',
-    desc: 'Chủ động hành trình, phù hợp đi cùng gia đình, nhóm bạn',
-    iconClass: 'fa-solid fa-car',
-  },
-  {
-    mode: 'PERSONAL_MOTORBIKE',
-    title: 'Xe máy phượt',
-    desc: 'Tự do trải nghiệm cung đường đèo ven biển, tiết kiệm tối đa',
-    iconClass: 'fa-solid fa-motorcycle',
-  },
+  { mode: 'FLIGHT', iconClass: 'fa-solid fa-plane' },
+  { mode: 'TRAIN', iconClass: 'fa-solid fa-train' },
+  { mode: 'SLEEPER_BUS', iconClass: 'fa-solid fa-bus' },
+  { mode: 'PERSONAL_CAR', iconClass: 'fa-solid fa-car' },
+  { mode: 'PERSONAL_MOTORBIKE', iconClass: 'fa-solid fa-motorcycle' },
 ];
 
-function getTransitVisualMeta(transit: IntercityTransit) {
+function getTransitVisualMeta(transit: IntercityTransit, t: TranslateFn, locale: AppLocale) {
   switch (transit.mode) {
     case 'FLIGHT':
       return {
         iconClass: 'fa-solid fa-plane',
-        label: 'Máy bay',
+        label: t('planner.transitModes.FLIGHT'),
         summary: `~${formatDuration(
           Math.max(
             TRANSIT_UI_CONFIG.FLIGHT_MIN_DURATION_MINUTES,
             transit.durationMinutes || TRANSIT_UI_CONFIG.FLIGHT_DEFAULT_DURATION_MINUTES,
           ),
+          locale,
         )}`,
       };
     case 'TRAIN':
       return {
         iconClass: 'fa-solid fa-train',
-        label: 'Tàu hỏa',
-        summary: `~${Math.round(transit.distanceKm)} km · ~${Math.max(1, Math.round(transit.durationMinutes / 60))} giờ`,
+        label: t('planner.transitModes.TRAIN'),
+        summary: `~${Math.round(transit.distanceKm)} km · ~${t('planner.timeline.hoursShort', { hours: Math.max(1, Math.round(transit.durationMinutes / 60)) })}`,
       };
     case 'SLEEPER_BUS':
       return {
         iconClass: 'fa-solid fa-bus',
-        label: 'Xe khách',
-        summary: `~${Math.round(transit.distanceKm)} km · ~${Math.max(1, Math.round(transit.durationMinutes / 60))} giờ`,
+        label: t('planner.transitModes.SLEEPER_BUS'),
+        summary: `~${Math.round(transit.distanceKm)} km · ~${t('planner.timeline.hoursShort', { hours: Math.max(1, Math.round(transit.durationMinutes / 60)) })}`,
       };
     case 'PERSONAL_CAR':
       return {
         iconClass: 'fa-solid fa-car',
-        label: 'Ô tô',
+        label: t('planner.transitModes.CAR_SHORT'),
         summary: `~${Math.round(transit.distanceKm)} km`,
       };
     case 'PERSONAL_MOTORBIKE':
       return {
         iconClass: 'fa-solid fa-motorcycle',
-        label: 'Xe máy',
+        label: t('planner.transitModes.PERSONAL_MOTORBIKE'),
         summary: `~${Math.round(transit.distanceKm)} km`,
       };
     default:
       return {
         iconClass: 'fa-solid fa-route',
-        label: 'Di chuyển liên tỉnh',
+        label: t('planner.transitModes.INTERCITY_FALLBACK'),
         summary: `~${Math.round(transit.distanceKm)} km`,
       };
   }
@@ -153,18 +134,29 @@ function numberStops(days: ItineraryDay[]) {
   }));
 }
 
-function formatDayFullDate(isoString: string | null | undefined, dayIndex: number): string {
-  if (!isoString) return `Ngày ${dayIndex + 1}`;
+function formatDayFullDate(
+  isoString: string | null | undefined,
+  dayIndex: number,
+  t: TranslateFn,
+  locale: AppLocale,
+): string {
+  if (!isoString) return t('planner.common.day', { n: dayIndex + 1 });
   try {
     const d = new Date(isoString);
     d.setDate(d.getDate() + dayIndex);
+    if (locale === 'en') {
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    }
     return `${d.getDate()} Tháng ${d.getMonth() + 1}, ${d.getFullYear()}`;
   } catch {
-    return `Ngày ${dayIndex + 1}`;
+    return t('planner.common.day', { n: dayIndex + 1 });
   }
 }
 
-function formatStopCostText(act: ItineraryActivity): {
+function formatStopCostText(
+  act: ItineraryActivity,
+  t: TranslateFn,
+): {
   desktopPrefix?: string;
   main: string;
   desktopSuffix?: string;
@@ -176,9 +168,9 @@ function formatStopCostText(act: ItineraryActivity): {
 
   if (isFree) {
     return {
-      main: 'Miễn phí',
-      desktopSuffix: ' vé',
-      title: 'Địa điểm tham quan mở cửa tự do, không thu phí vé vào cổng',
+      main: t('common.free'),
+      desktopSuffix: t('planner.timeline.freeTicketSuffix'),
+      title: t('planner.timeline.freeTicketTitle'),
     };
   }
 
@@ -187,29 +179,43 @@ function formatStopCostText(act: ItineraryActivity): {
     const hasCost = act.estimatedCost != null && act.estimatedCost > 0;
     const rangeTooltip =
       act.priceRange?.min != null && act.priceRange?.max != null && act.priceRange.max > 0
-        ? `Giá tham khảo: ${formatVnd(act.priceRange.min)} – ${formatVnd(act.priceRange.max)}`
-        : 'Chi phí ước tính một suất ăn';
+        ? t('planner.timeline.diningPriceRange', {
+            min: formatVnd(act.priceRange.min),
+            max: formatVnd(act.priceRange.max),
+          })
+        : t('planner.timeline.diningEstimateTitle');
     return hasCost
       ? {
           main: `~${formatVnd(act.estimatedCost!)}`,
-          desktopSuffix: '/người',
+          desktopSuffix: t('planner.common.perPerson'),
           title: rangeTooltip,
         }
-      : { main: 'Theo thực đơn', title: rangeTooltip };
+      : { main: t('planner.common.menuCostFallback'), title: rangeTooltip };
   }
 
   if (act.estimatedCost != null && act.estimatedCost > 0) {
     const rangeTooltip =
       act.priceRange?.min != null && act.priceRange?.max != null && act.priceRange.max > act.priceRange.min
-        ? `Giá vé niêm yết: ${formatVnd(act.priceRange.min)} – ${formatVnd(act.priceRange.max)}`
-        : 'Giá vé tham quan tiêu chuẩn';
-    return { desktopPrefix: 'Vé ', main: `~${formatVnd(act.estimatedCost)}`, title: rangeTooltip };
+        ? t('planner.timeline.ticketPriceRange', {
+            min: formatVnd(act.priceRange.min),
+            max: formatVnd(act.priceRange.max),
+          })
+        : t('planner.timeline.ticketEstimateTitle');
+    return {
+      desktopPrefix: t('planner.timeline.ticketPrefix'),
+      main: `~${formatVnd(act.estimatedCost)}`,
+      title: rangeTooltip,
+    };
   }
 
   return null;
 }
 
-function renderIntracityTransitConnector(act: ItineraryActivity) {
+function renderIntracityTransitConnector(
+  act: ItineraryActivity,
+  t: TranslateFn,
+  locale: AppLocale,
+) {
   if (act.distanceToNextKm != null && act.distanceToNextKm > 0) {
     const km = act.distanceToNextKm;
     const IC = TRANSIT_UI_CONFIG.INTRACITY;
@@ -222,13 +228,13 @@ function renderIntracityTransitConnector(act: ItineraryActivity) {
             IC.MIN_BIKE_MINUTES,
             Math.round(((km * IC.ROAD_DETOUR_FACTOR) / IC.BIKE_SPEED_KMH) * 60) + IC.BIKE_BUFFER_MINUTES,
           ));
-    const durationText = formatDuration(minutes);
+    const durationText = formatDuration(minutes, locale);
 
     if (mode === 'WALK') {
       return (
         <span className="text-[11px] text-slate-600 font-medium inline-flex items-center gap-1.5 tabular-nums">
           <i className="fa-solid fa-person-walking text-emerald-600 text-xs" aria-hidden="true" />
-          <span>~{durationText} đi bộ ({km} km)</span>
+          <span>{t('planner.timeline.connectorWalk', { duration: durationText, km })}</span>
         </span>
       );
     }
@@ -237,7 +243,7 @@ function renderIntracityTransitConnector(act: ItineraryActivity) {
       return (
         <span className="text-[11px] text-slate-600 font-medium inline-flex items-center gap-1.5 tabular-nums">
           <i className="fa-solid fa-car text-[#0194F3] text-xs" aria-hidden="true" />
-          <span>~{durationText} ô tô / taxi ({km} km)</span>
+          <span>{t('planner.timeline.connectorCar', { duration: durationText, km })}</span>
         </span>
       );
     }
@@ -245,7 +251,7 @@ function renderIntracityTransitConnector(act: ItineraryActivity) {
     return (
       <span className="text-[11px] text-slate-600 font-medium inline-flex items-center gap-1.5 tabular-nums">
         <i className="fa-solid fa-motorcycle text-slate-500 text-xs" aria-hidden="true" />
-        <span>~{durationText} xe máy ({km} km)</span>
+        <span>{t('planner.timeline.connectorBike', { duration: durationText, km })}</span>
       </span>
     );
   }
@@ -253,12 +259,12 @@ function renderIntracityTransitConnector(act: ItineraryActivity) {
   return (
     <span className="text-[11px] text-slate-400 font-medium inline-flex items-center gap-1.5">
       <i className="fa-solid fa-route text-[10px]" aria-hidden="true" />
-      <span>Di chuyển đến điểm tiếp theo</span>
+      <span>{t('planner.timeline.connectorFallback')}</span>
     </span>
   );
 }
 
-function renderTransitDeepLinks(transit: IntercityTransit) {
+function renderTransitDeepLinks(transit: IntercityTransit, t: TranslateFn) {
   return (
     <div className="flex flex-wrap items-center gap-2 pt-2">
       {transit.mode === 'FLIGHT' && (
@@ -283,7 +289,7 @@ function renderTransitDeepLinks(transit: IntercityTransit) {
               className="inline-flex items-center gap-1.5 rounded-lg border border-[#D0E7FF] bg-[#F5F9FF] hover:bg-[#F0F7FF] px-3 py-1.5 text-xs font-semibold text-[#0194F3] transition-colors"
             >
               <i className="fa-solid fa-plane text-xs" aria-hidden="true" />
-              <span>Đặt vé Traveloka</span>
+              <span>{t('planner.timeline.bookTraveloka')}</span>
               <i className="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-60" aria-hidden="true" />
             </a>
           )}
@@ -300,7 +306,7 @@ function renderTransitDeepLinks(transit: IntercityTransit) {
               className="inline-flex items-center gap-1.5 rounded-lg border border-[#D0E7FF] bg-[#F5F9FF] hover:bg-[#F0F7FF] px-3 py-1.5 text-xs font-semibold text-[#0194F3] transition-colors"
             >
               <i className="fa-solid fa-ticket text-xs" aria-hidden="true" />
-              <span>Vé tàu VeXeRe</span>
+              <span>{t('planner.timeline.bookVexereTrain')}</span>
               <i className="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-60" aria-hidden="true" />
             </a>
           )}
@@ -312,7 +318,7 @@ function renderTransitDeepLinks(transit: IntercityTransit) {
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-[#F0F7FF] px-3 py-1.5 text-xs font-semibold text-[#10243A] transition-colors"
             >
               <i className="fa-solid fa-train text-xs" aria-hidden="true" />
-              <span>Cổng ĐSVN</span>
+              <span>{t('planner.timeline.dsvnPortal')}</span>
               <i className="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-60" aria-hidden="true" />
             </a>
           )}
@@ -329,7 +335,7 @@ function renderTransitDeepLinks(transit: IntercityTransit) {
               className="inline-flex items-center gap-1.5 rounded-lg border border-[#D0E7FF] bg-[#F5F9FF] hover:bg-[#F0F7FF] px-3 py-1.5 text-xs font-semibold text-[#0194F3] transition-colors"
             >
               <i className="fa-solid fa-bus text-xs" aria-hidden="true" />
-              <span>Vé xe VeXeRe</span>
+              <span>{t('planner.timeline.bookVexereBus')}</span>
               <i className="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-60" aria-hidden="true" />
             </a>
           )}
@@ -341,7 +347,7 @@ function renderTransitDeepLinks(transit: IntercityTransit) {
               className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-[#F0F7FF] px-3 py-1.5 text-xs font-semibold text-[#10243A] transition-colors"
             >
               <i className="fa-solid fa-bus text-xs" aria-hidden="true" />
-              <span>Vé xe Traveloka</span>
+              <span>{t('planner.timeline.bookTravelokaBus')}</span>
               <i className="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-60" aria-hidden="true" />
             </a>
           )}
@@ -357,7 +363,7 @@ function renderTransitDeepLinks(transit: IntercityTransit) {
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white hover:bg-[#F0F7FF] px-3 py-1.5 text-xs font-semibold text-[#10243A] transition-colors"
           >
             <i className="fa-solid fa-map-location-dot text-xs text-[#0194F3]" aria-hidden="true" />
-            <span>Xem lộ trình Google Maps</span>
+            <span>{t('planner.timeline.viewGoogleMaps')}</span>
             <i className="fa-solid fa-arrow-up-right-from-square text-[10px] opacity-60" aria-hidden="true" />
           </a>
         )}
@@ -390,6 +396,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
   onOpenVotingTab,
   onOpenLodgingPicker,
 }: Props) {
+  const { t, locale } = useI18n();
   const numbered = numberStops(days);
   const setStoreHoveredPlaceId = useItineraryHoverStore((s) => s.setHoveredPlaceId);
   const handleHoverPlace = onHoverPlace ?? setStoreHoveredPlaceId;
@@ -422,7 +429,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
   }, [openStopMenuKey]);
 
   const targetCityName = destination || transit?.destName || '';
-  const transitVisual = transit ? getTransitVisualMeta(transit) : null;
+  const transitVisual = transit ? getTransitVisualMeta(transit, t, locale) : null;
   const isLongMotorbikeWarning =
     transit?.mode === 'PERSONAL_MOTORBIKE' &&
     transit.distanceKm > TRANSIT_UI_CONFIG.MOTORBIKE_SAFETY_LIMIT_KM;
@@ -452,13 +459,13 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
       {/* Compact Intercity Transit Strip */}
       {transit && transitVisual && (
         <section
-          aria-label="Thông tin di chuyển liên tỉnh"
+          aria-label={t('planner.timeline.intercityAria')}
           className={`rounded-2xl border bg-white overflow-hidden transition-colors ${
             isLongMotorbikeWarning ? 'border-amber-300' : 'border-slate-200'
           }`}
         >
           <div className="px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-            {/* Left: Icon & Transit Name on the same row (no wrap below icon) */}
+            {/* Left: Icon & Transit Name on the same row */}
             <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <div className="size-8 rounded-xl bg-[#F0F7FF] text-[#0194F3] flex items-center justify-center shrink-0">
                 <i className={`${transitVisual.iconClass} text-xs`} aria-hidden="true" />
@@ -474,7 +481,9 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                 <div className="text-[11px] text-slate-500 tabular-nums truncate">
                   {transitVisual.summary}
                   {' · '}
-                  Khứ hồi ~{formatVnd(transit.estimatedPriceRoundTrip)}
+                  {t('planner.timeline.roundTripSummary', {
+                    price: formatVnd(transit.estimatedPriceRoundTrip),
+                  })}
                 </div>
               </div>
             </div>
@@ -487,7 +496,11 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                 onClick={() => setIsTransitDetailsOpen((v) => !v)}
                 className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-[11px] font-semibold text-slate-700 inline-flex items-center gap-1 cursor-pointer"
               >
-                <span>{isTransitDetailsOpen ? 'Thu gọn' : 'Chi tiết chặng'}</span>
+                <span>
+                  {isTransitDetailsOpen
+                    ? t('planner.timeline.collapse')
+                    : t('planner.timeline.legDetails')}
+                </span>
                 <i
                   className={`fa-solid fa-chevron-down text-[9px] transition-transform ${
                     isTransitDetailsOpen ? 'rotate-180' : ''
@@ -511,7 +524,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                   ) : (
                     <i className="fa-solid fa-right-left text-[10px]" aria-hidden="true" />
                   )}
-                  <span>Sửa phương tiện</span>
+                  <span>{t('planner.timeline.editTransit')}</span>
                 </button>
               )}
             </div>
@@ -521,7 +534,9 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
             <div className="px-4 py-2 bg-amber-50 border-t border-amber-200 text-[11px] text-amber-800 font-medium flex items-center gap-2">
               <i className="fa-solid fa-triangle-exclamation text-amber-500 shrink-0" aria-hidden="true" />
               <span>
-                Cự ly trên {TRANSIT_UI_CONFIG.MOTORBIKE_SAFETY_LIMIT_KM} km — cân nhắc máy bay, tàu hỏa hoặc xe khách để đảm bảo sức khỏe.
+                {t('planner.timeline.motorbikeWarning', {
+                  km: TRANSIT_UI_CONFIG.MOTORBIKE_SAFETY_LIMIT_KM,
+                })}
               </span>
             </div>
           )}
@@ -529,7 +544,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
           {isTransitDetailsOpen && (
             <div className="px-4 pb-4 pt-2 border-t border-slate-100 space-y-2 bg-slate-50/40">
               <TransitRouteBreakdown transit={transit} destCity={targetCityName} />
-              {renderTransitDeepLinks(transit)}
+              {renderTransitDeepLinks(transit, t)}
             </div>
           )}
         </section>
@@ -552,17 +567,17 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
               </div>
               <div>
                 <h3 id="edit-transit-mode-title" className="text-sm font-bold text-[#10243A]">
-                  Sửa phương tiện di chuyển
+                  {t('planner.timeline.editTransitTitle')}
                 </h3>
                 <p className="text-[11px] text-slate-500">
-                  Chọn phương tiện cho chặng hành trình liên tỉnh
+                  {t('planner.timeline.editTransitSubtitle')}
                 </p>
               </div>
             </div>
             <button
               type="button"
               onClick={() => setIsEditTransitOpen(false)}
-              aria-label="Đóng hộp thoại"
+              aria-label={t('planner.common.closeDialog')}
               className="size-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
             >
               <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
@@ -588,14 +603,18 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-[#10243A]">{opt.title}</span>
+                      <span className="text-xs font-bold text-[#10243A]">
+                        {t(`planner.timeline.transitOptions.${opt.mode}.title`)}
+                      </span>
                       {isSelected && (
                         <span className="size-4 rounded-full bg-[#0194F3] text-white flex items-center justify-center">
                           <i className="fa-solid fa-check text-[9px]" aria-hidden="true" />
                         </span>
                       )}
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">{opt.desc}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                      {t(`planner.timeline.transitOptions.${opt.mode}.desc`)}
+                    </p>
                   </div>
                 </button>
               );
@@ -609,7 +628,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
               disabled={isUpdatingTransitMode}
               className="h-9 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
             >
-              Hủy
+              {t('common.cancel')}
             </button>
             <button
               type="button"
@@ -620,10 +639,10 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
               {isUpdatingTransitMode ? (
                 <>
                   <i className="fa-solid fa-circle-notch fa-spin text-xs" aria-hidden="true" />
-                  <span>Đang cập nhật...</span>
+                  <span>{t('planner.timeline.updating')}</span>
                 </>
               ) : (
-                <span>Xác nhận đổi</span>
+                <span>{t('planner.timeline.confirmChange')}</span>
               )}
             </button>
           </div>
@@ -639,17 +658,30 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
         const isCollapsed = isCollapsibleDays && Boolean(collapsedDays[day.dayNumber]);
 
         const isRainAlert = dayWeather?.condition === 'RAINY';
+        const dayWeatherLabel = dayWeather
+          ? locale === 'en' && dayWeather.labelEn
+            ? dayWeather.labelEn
+            : getWeatherConditionLabel(dayWeather.condition, locale, dayWeather.labelVi)
+          : '';
 
         return (
-          <section key={day.dayNumber} aria-label={`Lịch trình Ngày ${day.dayNumber}`} className="space-y-3">
-            {/* Day Header + Option A Weather Pill (Stacks vertically on mobile < 640px so long titles never squeeze) */}
+          <section
+            key={day.dayNumber}
+            aria-label={t('planner.timeline.dayAria', { day: day.dayNumber })}
+            className="space-y-3"
+          >
+            {/* Day Header + Option A Weather Pill */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pb-2 border-b border-slate-200/80 pt-1">
               <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 sm:flex-1">
                 {isCollapsibleDays ? (
                   <button
                     type="button"
                     aria-expanded={!isCollapsed}
-                    aria-label={`${isCollapsed ? 'Mở rộng' : 'Thu gọn'} Ngày ${day.dayNumber}`}
+                    aria-label={
+                      isCollapsed
+                        ? t('planner.timeline.expandDayAria', { day: day.dayNumber })
+                        : t('planner.timeline.collapseDayAria', { day: day.dayNumber })
+                    }
                     onClick={() => toggleDayCollapsed(day.dayNumber)}
                     className="size-11 -ml-2 sm:size-7 sm:ml-0 flex items-center justify-center shrink-0 cursor-pointer group/collapse"
                   >
@@ -678,7 +710,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                       className="text-left inline-flex items-center gap-1.5 text-sm sm:text-base font-bold text-slate-900 hover:text-[#0194F3] leading-snug cursor-pointer transition-colors max-w-full tracking-tight"
                     >
                       <span className="break-words">
-                        Ngày {day.dayNumber}
+                        {t('planner.common.day', { n: day.dayNumber })}
                         {day.theme && day.theme.trim().toLowerCase() !== `ngày ${day.dayNumber}`.toLowerCase()
                           ? `: ${day.theme}`
                           : ''}
@@ -692,14 +724,15 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                     </button>
                   ) : (
                     <h2 className="text-sm sm:text-base font-bold text-slate-900 leading-snug break-words tracking-tight">
-                      Ngày {day.dayNumber}
+                      {t('planner.common.day', { n: day.dayNumber })}
                       {day.theme && day.theme.trim().toLowerCase() !== `ngày ${day.dayNumber}`.toLowerCase()
                         ? `: ${day.theme}`
                         : ''}
                     </h2>
                   )}
                   <p className="text-xs text-slate-500 tabular-nums font-medium">
-                    {formatDayFullDate(startDate, dIdx)} · {day.activities.length} điểm dừng
+                    {formatDayFullDate(startDate, dIdx, t, locale)} ·{' '}
+                    {t('planner.common.stopsCount', { count: day.activities.length })}
                   </p>
                 </div>
               </div>
@@ -715,7 +748,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                     )
                   }
                   className="self-start sm:self-auto max-w-full inline-flex items-center gap-1.5 px-2.5 min-h-[40px] sm:min-h-[32px] py-1.5 rounded-xl bg-white hover:bg-slate-50 border border-slate-200/90 text-xs text-slate-700 transition-colors cursor-pointer shrink-0 tabular-nums"
-                  title="Nhấn để xem gợi ý thời tiết ngày này"
+                  title={t('planner.timeline.weatherPillTitle')}
                 >
                   <WeatherIcon
                     condition={dayWeather.condition}
@@ -730,10 +763,12 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                     ·
                   </span>
                   <span className={isRainAlert ? 'text-sky-700 font-semibold' : 'text-slate-600'}>
-                    {dayWeather.labelVi}
+                    {dayWeatherLabel}
                   </span>
                   {dayWeather.source === 'SEASONAL_AVERAGE' && (
-                    <span className="text-[11px] text-slate-500">(Theo mùa)</span>
+                    <span className="text-[11px] text-slate-500">
+                      {t('planner.timeline.seasonalTag')}
+                    </span>
                   )}
                   <i
                     className={`fa-solid ${
@@ -746,7 +781,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
             </div>
 
             {isWeatherGuidanceOpen && dayWeather && weatherTheme && (() => {
-              const dayAdvice = getDayWeatherAdvice(dayWeather);
+              const dayAdvice = getDayWeatherAdvice(dayWeather, locale);
               return (
                 <div
                   className={`rounded-2xl p-3.5 text-xs border space-y-2.5 transition-all ${
@@ -768,7 +803,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                         className="w-4.5 h-4.5 object-contain shrink-0"
                       />
                       <span className="font-bold text-slate-900">
-                        {dayWeather.labelVi}
+                        {dayWeatherLabel}
                       </span>
                       <span className="text-slate-400">·</span>
                       <span className="font-semibold text-slate-700">
@@ -786,7 +821,11 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                           }`}
                         >
                           <i className="fa-solid fa-cloud-showers-heavy text-[10px]" aria-hidden="true" />
-                          <span>Mưa {dayWeather.precipitationProbabilityMax}%</span>
+                          <span>
+                            {t('planner.timeline.rainProb', {
+                              pct: dayWeather.precipitationProbabilityMax,
+                            })}
+                          </span>
                         </span>
                       )}
 
@@ -806,7 +845,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                       {dayWeather.source === 'SEASONAL_AVERAGE' && (
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-white/90 text-slate-500 border border-slate-200/80">
                           <i className="fa-regular fa-calendar text-[10px]" aria-hidden="true" />
-                          <span>Khí hậu mùa</span>
+                          <span>{t('planner.timeline.seasonalClimateBadge')}</span>
                         </span>
                       )}
                     </div>
@@ -838,7 +877,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                 onClick={() => toggleDayCollapsed(day.dayNumber)}
                 className="w-full py-2.5 rounded-xl border border-slate-200/80 bg-white text-xs font-semibold text-slate-600 hover:text-[#0194F3] hover:border-[#0194F3]/30 transition-colors cursor-pointer"
               >
-                Đang thu gọn {day.activities.length} điểm dừng · Bấm để mở lại
+                {t('planner.timeline.collapsedSummary', { count: day.activities.length })}
               </button>
             ) : (
               <>
@@ -848,10 +887,10 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                       <i className="fa-regular fa-calendar-plus text-base" aria-hidden="true" />
                     </div>
                     <h3 className="text-sm font-semibold text-slate-900">
-                      Ngày {day.dayNumber} chưa có điểm dừng
+                      {t('planner.timeline.emptyDayTitle', { day: day.dayNumber })}
                     </h3>
                     <p className="text-xs text-slate-500 max-w-xs mx-auto">
-                      Chọn địa điểm tham quan hoặc quán ăn phù hợp cho ngày này.
+                      {t('planner.timeline.emptyDayDesc')}
                     </p>
                     {(Boolean(onAddPlace) || Boolean(isMemberOrOwner && onProposeNewForDay)) && (
                       <div className="pt-1 flex flex-wrap items-center justify-center gap-2">
@@ -862,7 +901,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                             className="min-h-[40px] px-4 rounded-xl bg-[#0194F3] hover:bg-[#007FE3] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                           >
                             <i className="fa-solid fa-plus" aria-hidden="true" />
-                            <span>Thêm địa điểm vào Ngày {day.dayNumber}</span>
+                            <span>{t('planner.timeline.addPlaceToDay', { day: day.dayNumber })}</span>
                           </button>
                         )}
                         {!onAddPlace && isMemberOrOwner && onProposeNewForDay && (
@@ -872,7 +911,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                             className="min-h-[40px] px-4 rounded-xl bg-[#0194F3] hover:bg-[#007FE3] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                           >
                             <i className="fa-solid fa-check-to-slot" aria-hidden="true" />
-                            <span>Đề xuất địa điểm cho Ngày {day.dayNumber}</span>
+                            <span>{t('planner.timeline.proposePlaceForDay', { day: day.dayNumber })}</span>
                           </button>
                         )}
                       </div>
@@ -886,7 +925,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                       const isLastMultiStop = day.activities.length > 1 && isLast;
                       const imageUrl = act.thumbnailUrl || act.imageUrl || null;
                       const isSelected = act.placeId === selectedPlaceId;
-                      const costInfo = formatStopCostText(act);
+                      const costInfo = formatStopCostText(act, t);
                       const stopVotesCount = act.id ? (pendingProposalCountByStop?.[act.id] ?? 0) : 0;
                       const isMoving = Boolean(act.id && movingStopId === act.id);
                       const stopKey = act.id || `${day.dayNumber}-${act.placeId}-${idx}`;
@@ -910,7 +949,6 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
 
                       return (
                         <div key={stopKey} className="transition-all duration-200">
-                          {/* Stop Card Matched to Demo v2.3 */}
                           <article
                             id={`itinerary-activity-${act.placeId}`}
                             onClick={() => onSelectPlace?.(act.placeId)}
@@ -927,7 +965,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                                 : undefined
                             }
                           >
-                            {/* Top Row: Thumbnail (72px / 84px) + Time/Category/Cost + Title + Facts */}
+                            {/* Top Row */}
                             <div className="flex items-start gap-3 sm:gap-3.5">
                               <div className="relative size-[72px] sm:size-[84px] rounded-xl overflow-hidden bg-slate-100 shrink-0 flex items-center justify-center">
                                 {imageUrl ? (
@@ -966,7 +1004,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                                       ·
                                     </span>
                                     <span className="text-slate-500 truncate">
-                                      {act.categoryName || 'Tham quan'}
+                                      {act.categoryName || t('planner.common.sightseeingFallback')}
                                     </span>
                                   </div>
 
@@ -1006,7 +1044,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                                       )}
                                     </span>
                                   ) : (
-                                    <span className="text-slate-500">Chưa có đánh giá</span>
+                                    <span className="text-slate-500">{t('planner.timeline.noRating')}</span>
                                   )}
 
                                   {act.address && (
@@ -1047,10 +1085,11 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                                           aria-hidden="true"
                                         />
                                         <span>
-                                          {act.openingStatus.label ||
-                                            (act.openingStatus.state === 'OPEN'
-                                              ? 'Đang mở cửa'
-                                              : 'Ngoài giờ mở cửa')}
+                                          {locale === 'vi' && act.openingStatus.label
+                                            ? act.openingStatus.label
+                                            : act.openingStatus.state === 'OPEN'
+                                              ? t('planner.timeline.openNow')
+                                              : t('planner.timeline.closedNow')}
                                         </span>
                                       </span>
                                     </>
@@ -1059,7 +1098,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                               </div>
                             </div>
 
-                            {/* Lower Content + Bottom Action Bar (sm:pl-[98px] aligns under Info column on Desktop, Full-Width on Mobile) */}
+                            {/* Lower Content + Bottom Action Bar */}
                             {(act.notes || hasBottomActionBar) && (
                               <div className="sm:pl-[98px] space-y-2">
                                 {act.notes && (
@@ -1085,7 +1124,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                                               className="fa-regular fa-pen-to-square text-[11px]"
                                               aria-hidden="true"
                                             />
-                                            <span>Sửa giờ</span>
+                                            <span>{t('planner.timeline.editTime')}</span>
                                           </button>
                                         )}
 
@@ -1093,14 +1132,14 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                                           <button
                                             type="button"
                                             onClick={() => onSwapPlace(act.placeId, act)}
-                                            title="Đổi điểm tham quan hoặc quán ăn khác"
+                                            title={t('planner.timeline.swapStopTitle')}
                                             className="min-h-[44px] sm:min-h-[34px] px-3 sm:px-2.5 rounded-xl sm:rounded-lg text-xs font-semibold text-slate-700 hover:bg-[#F0F7FF] hover:text-[#0194F3] inline-flex items-center gap-1.5 transition-colors cursor-pointer bg-slate-50/70 sm:bg-transparent whitespace-nowrap"
                                           >
                                             <i
                                               className="fa-solid fa-right-left text-[11px]"
                                               aria-hidden="true"
                                             />
-                                            <span>Đổi điểm</span>
+                                            <span>{t('planner.timeline.swapStop')}</span>
                                           </button>
                                         )}
 
@@ -1114,7 +1153,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                                               className="fa-solid fa-check-to-slot text-[11px]"
                                               aria-hidden="true"
                                             />
-                                            <span>Mở vote</span>
+                                            <span>{t('planner.timeline.openVote')}</span>
                                           </button>
                                         )}
 
@@ -1124,7 +1163,9 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                                               type="button"
                                               aria-expanded={menuOpen}
                                               aria-haspopup="menu"
-                                              aria-label={`Thêm tùy chọn cho ${act.placeName}`}
+                                              aria-label={t('planner.timeline.moreStopOptions', {
+                                                name: act.placeName,
+                                              })}
                                               onClick={() =>
                                                 setOpenStopMenuKey((curr) =>
                                                   curr === stopKey ? null : stopKey,
@@ -1158,7 +1199,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                                                       className="fa-solid fa-check-to-slot text-[11px]"
                                                       aria-hidden="true"
                                                     />
-                                                    <span>Mở bình chọn nhóm</span>
+                                                    <span>{t('planner.timeline.openGroupVote')}</span>
                                                   </button>
                                                 )}
 
@@ -1177,7 +1218,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                                                       className="fa-solid fa-arrow-up text-[11px] text-slate-400"
                                                       aria-hidden="true"
                                                     />
-                                                    <span>Đưa lên trước</span>
+                                                    <span>{t('planner.timeline.moveUp')}</span>
                                                   </button>
                                                 )}
 
@@ -1196,7 +1237,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                                                       className="fa-solid fa-arrow-down text-[11px] text-slate-400"
                                                       aria-hidden="true"
                                                     />
-                                                    <span>Đẩy xuống sau</span>
+                                                    <span>{t('planner.timeline.moveDown')}</span>
                                                   </button>
                                                 )}
 
@@ -1204,7 +1245,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                                                   <button
                                                     type="button"
                                                     role="menuitem"
-                                                    title="Xóa điểm này khỏi lịch trình"
+                                                    title={t('planner.timeline.deleteStopTitle')}
                                                     onClick={() => {
                                                       setOpenStopMenuKey(null);
                                                       onDeletePlace(act.placeId, act);
@@ -1215,7 +1256,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                                                       className="fa-regular fa-trash-can text-[11px]"
                                                       aria-hidden="true"
                                                     />
-                                                    <span>Xóa điểm dừng</span>
+                                                    <span>{t('planner.timeline.deleteStop')}</span>
                                                   </button>
                                                 )}
                                               </div>
@@ -1235,7 +1276,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                                             className="fa-solid fa-right-left text-[11px]"
                                             aria-hidden="true"
                                           />
-                                          <span>Đề xuất đổi điểm</span>
+                                          <span>{t('planner.timeline.proposeSwap')}</span>
                                         </button>
                                       )
                                     )}
@@ -1261,11 +1302,17 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                                       aria-hidden="true"
                                     />
                                     <span className="min-w-0">
-                                      Đang có <strong className="text-slate-900">{stopVotesCount} đề xuất thay thế</strong> cần ý kiến nhóm
+                                      {t('planner.timeline.pendingVotesPrefix')}{' '}
+                                      <strong className="text-slate-900">
+                                        {t('planner.timeline.pendingVotesCount', {
+                                          count: stopVotesCount,
+                                        })}
+                                      </strong>{' '}
+                                      {t('planner.timeline.pendingVotesSuffix')}
                                     </span>
                                   </span>
                                   <span className="font-semibold text-[#0194F3] inline-flex items-center gap-1 shrink-0 whitespace-nowrap ml-auto">
-                                    <span>Bình chọn</span>
+                                    <span>{t('planner.timeline.voteCta')}</span>
                                     <i className="fa-solid fa-chevron-right text-[10px]" aria-hidden="true" />
                                   </span>
                                 </button>
@@ -1277,7 +1324,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                           {!isLast && (
                             <div className="flex items-center gap-2.5 pl-9 py-1">
                               <span className="w-px h-4 bg-slate-300 shrink-0" aria-hidden="true" />
-                              {renderIntracityTransitConnector(act)}
+                              {renderIntracityTransitConnector(act, t, locale)}
                             </div>
                           )}
                         </div>
@@ -1286,7 +1333,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                   </div>
                 )}
 
-                {/* Per-Day Action Buttons (Direct Add vs Propose for Voting when day already has stops) */}
+                {/* Per-Day Action Buttons */}
                 {day.activities.length > 0 &&
                   (Boolean(onAddPlace) || Boolean(isMemberOrOwner && onProposeNewForDay)) && (
                   <div
@@ -1303,7 +1350,7 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                         className="w-full min-h-[42px] rounded-2xl border border-dashed border-slate-300 bg-white/70 hover:bg-[#F0F7FF]/50 hover:border-[#0194F3]/60 text-slate-600 hover:text-[#0194F3] text-xs font-semibold flex items-center justify-center gap-2 cursor-pointer transition-colors"
                       >
                         <i className="fa-solid fa-plus text-[11px]" aria-hidden="true" />
-                        <span>Thêm địa điểm vào Ngày {day.dayNumber}</span>
+                        <span>{t('planner.timeline.addPlaceToDay', { day: day.dayNumber })}</span>
                       </button>
                     )}
 
@@ -1320,8 +1367,8 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                         <i className="fa-solid fa-check-to-slot text-[11px] text-[#0194F3]" aria-hidden="true" />
                         <span>
                           {onAddPlace
-                            ? 'Đề xuất để nhóm vote'
-                            : `Đề xuất địa điểm vào Ngày ${day.dayNumber} để nhóm bình chọn`}
+                            ? t('planner.timeline.proposeToGroup')
+                            : t('planner.timeline.proposeForDayFull', { day: day.dayNumber })}
                         </span>
                       </button>
                     )}

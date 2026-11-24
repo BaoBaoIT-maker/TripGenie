@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient, skipToken } from '@tanstack/react-query';
+import { useI18n } from '@/i18n';
 import { itineraryService, ApiError } from '@/services/itinerary-planner.service';
 import { COPILOT_TOOL_NAMES, swapStopsOptimistically } from '@/features/planner/utils/itinerary-schedule.util';
 import { NON_RETRYABLE_HTTP_STATUS } from '@/features/planner/constants/itinerary.constants';
@@ -441,6 +442,7 @@ export function usePrefetchLodgingSuggestions(
 /** Update lodging for a night range and re-optimize affected day routes. */
 export function useUpdateLodging(itineraryId: string) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const detailKey = itineraryKeys.detail(itineraryId);
 
   return useMutation({
@@ -477,7 +479,7 @@ export function useUpdateLodging(itineraryId: string) {
                 name:
                   dto.optimisticLodging?.name ??
                   prevLodging?.name ??
-                  'Đang cập nhật chỗ ở...',
+                  t('planner.lodging.updatingNameFallback'),
                 address:
                   dto.optimisticLodging?.address ??
                   prevLodging?.address ??

@@ -44,6 +44,7 @@ import {
 } from "@/features/community/hooks/use-community";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { COMMUNITY_UI_CONSTANTS } from "@/services/community.service";
+import { useI18n } from "@/i18n";
 import type {
   CommunityFeedResponse,
   CommunityPostItem,
@@ -64,6 +65,7 @@ export function CommunityClientShell({
   initialSidebarDiscovery = null,
   initialFeedFirstPage = null,
 }: CommunityClientShellProps) {
+  const { t } = useI18n();
   const { user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
@@ -173,13 +175,13 @@ export function CommunityClientShell({
 
   useEffect(() => {
     if (deepPostId && !isValidPostId) {
-      toast.error("Đường dẫn bài viết không hợp lệ");
+      toast.error(t("community.toasts.invalidPostLink"));
       handleCloseDeepLinkModal();
     } else if (isDeepPostError) {
-      toast.error("Bài viết không còn tồn tại hoặc đã bị xóa");
+      toast.error(t("community.toasts.postNotFound"));
       handleCloseDeepLinkModal();
     }
-  }, [deepPostId, isValidPostId, isDeepPostError, handleCloseDeepLinkModal]);
+  }, [deepPostId, isValidPostId, isDeepPostError, handleCloseDeepLinkModal, t]);
 
   // Click outside to close search suggestions dropdown
   useEffect(() => {
@@ -298,7 +300,7 @@ export function CommunityClientShell({
 
   const handleOpenComposer = (focusItinerary = false) => {
     if (!user) {
-      toast.error("Vui lòng đăng nhập để đăng bài chia sẻ lên cộng đồng");
+      toast.error(t("community.toasts.loginToPost"));
       return;
     }
     setComposeInitialFiles([]);
@@ -309,7 +311,7 @@ export function CommunityClientShell({
   const handlePickFiles = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user) {
-      toast.error("Vui lòng đăng nhập để đăng bài chia sẻ lên cộng đồng");
+      toast.error(t("community.toasts.loginToPost"));
       return;
     }
     fileInputRef.current?.click();
@@ -318,7 +320,7 @@ export function CommunityClientShell({
   const handlePickMedia = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!user) {
-      toast.error("Vui lòng đăng nhập để đăng bài chia sẻ lên cộng đồng");
+      toast.error(t("community.toasts.loginToPost"));
       return;
     }
     mediaInputRef.current?.click();
@@ -439,7 +441,7 @@ export function CommunityClientShell({
                     href={`/community/profile/${encodeURIComponent(
                       currentUser.username || currentUser.id
                     )}`}
-                    title="Xem trang cá nhân của bạn"
+                    title={t("community.viewProfileTitle")}
                     className="shrink-0"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -456,7 +458,7 @@ export function CommunityClientShell({
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop&crop=face"
-                    alt="Khách"
+                    alt={t("community.guestAlt")}
                     className="w-10 h-10 rounded-full object-cover shrink-0 border border-[#E2E8F0]"
                   />
                 )}
@@ -474,7 +476,7 @@ export function CommunityClientShell({
                   className="flex-1 min-w-0 h-10 px-3.5 sm:px-4 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 hover:border-slate-300 flex items-center justify-between cursor-pointer transition-colors"
                 >
                   <span className="text-[13px] text-slate-500 truncate select-none">
-                    Chia sẻ kinh nghiệm, ảnh hoặc lộ trình chuyến đi của bạn...
+                    {t("community.quickComposer.placeholder")}
                   </span>
                   <i className="fa-regular fa-face-smile text-slate-400 text-base ml-2.5 shrink-0" />
                 </div>
@@ -488,10 +490,10 @@ export function CommunityClientShell({
                     type="button"
                     onClick={handlePickFiles}
                     className="inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-transparent hover:bg-slate-100 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
-                    title="Đính kèm tệp"
+                    title={t("community.quickComposer.attachFileTitle")}
                   >
                     <i className="fa-solid fa-folder text-slate-700 text-[13px]" />
-                    <span className="hidden sm:inline">Tệp</span>
+                    <span className="hidden sm:inline">{t("community.quickComposer.file")}</span>
                   </button>
 
                   {/* Nút Ảnh / Video */}
@@ -499,10 +501,13 @@ export function CommunityClientShell({
                     type="button"
                     onClick={handlePickMedia}
                     className="inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-transparent hover:bg-slate-100 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
-                    title="Đính kèm ảnh hoặc video"
+                    title={t("community.quickComposer.attachMediaTitle")}
                   >
                     <i className="fa-solid fa-image text-slate-700 text-[13px]" />
-                    <span>Ảnh<span className="hidden sm:inline"> / Video</span></span>
+                    <span>
+                      {t("community.quickComposer.photo")}
+                      <span className="hidden sm:inline">{t("community.quickComposer.videoSuffix")}</span>
+                    </span>
                   </button>
 
                   {/* Nút Lịch trình */}
@@ -510,10 +515,10 @@ export function CommunityClientShell({
                     type="button"
                     onClick={() => handleOpenComposer(true)}
                     className="inline-flex items-center gap-1.5 px-2 sm:px-3 py-1.5 rounded-lg bg-transparent hover:bg-slate-100 text-xs font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer shrink-0"
-                    title="Đính kèm lịch trình chuyến đi"
+                    title={t("community.quickComposer.attachItineraryTitle")}
                   >
                     <i className="fa-solid fa-route text-slate-700 text-[13px]" />
-                    <span>Lịch trình</span>
+                    <span>{t("community.quickComposer.itinerary")}</span>
                   </button>
                 </div>
 
@@ -524,7 +529,7 @@ export function CommunityClientShell({
                   className="bg-slate-900 hover:bg-slate-800 text-white rounded-xl px-3 sm:px-4 py-1.5 sm:py-2 text-xs font-bold inline-flex items-center gap-1.5 transition-all shadow-xs active:scale-[0.98] cursor-pointer shrink-0"
                 >
                   <i className="fa-solid fa-pen-to-square text-[11px]" aria-hidden="true" />
-                  <span>Đăng bài</span>
+                  <span>{t("community.quickComposer.publish")}</span>
                 </button>
               </div>
             </div>
@@ -550,7 +555,7 @@ export function CommunityClientShell({
                   }`}
                 >
                   <i className="fa-regular fa-clock" />
-                  <span>Mới nhất</span>
+                  <span>{t("community.sort.latest")}</span>
                 </button>
 
                 <button
@@ -567,7 +572,7 @@ export function CommunityClientShell({
                       sort === "TRENDING" ? "text-white" : "text-[#F97316]"
                     }`}
                   />
-                  <span>Thịnh hành</span>
+                  <span>{t("community.sort.trending")}</span>
                 </button>
 
                 <button
@@ -580,7 +585,7 @@ export function CommunityClientShell({
                   }`}
                 >
                   <i className="fa-regular fa-clone" />
-                  <span>Được nhân bản nhiều</span>
+                  <span>{t("community.sort.mostCloned")}</span>
                   <span
                     className={`w-1.5 h-1.5 rounded-full ${
                       sort === "MOST_CLONED" ? "bg-white" : "bg-[#0194F3]"
@@ -620,8 +625,8 @@ export function CommunityClientShell({
                       setIsSearchDropdownOpen(false);
                     }
                   }}
-                  placeholder="Tìm bài viết, #hashtag..."
-                  aria-label="Tìm bài viết, hashtag, tác giả hoặc điểm đến"
+                  placeholder={t("community.search.placeholder")}
+                  aria-label={t("community.search.aria")}
                   autoComplete="off"
                   className="w-full h-9 pl-[34px] pr-7 rounded-[10px] bg-[#F8FAFC] border border-[#E2E8F0] focus:border-[#0194F3] text-[12px] text-[#1E293B] placeholder:text-[#94A3B8] outline-none transition-colors"
                 />
@@ -633,7 +638,7 @@ export function CommunityClientShell({
                       setAppliedSearch("");
                       setIsSearchDropdownOpen(false);
                     }}
-                    aria-label="Xóa từ khóa tìm kiếm"
+                    aria-label={t("community.search.clearAria")}
                     className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 inline-flex items-center justify-center rounded-full text-[#94A3B8] hover:text-[#0F172A] hover:bg-[#E2E8F0] transition-colors cursor-pointer"
                   >
                     <X className="size-3" />
@@ -646,7 +651,7 @@ export function CommunityClientShell({
                     {suggestedSearchTags.length > 0 && (
                       <div className="space-y-1">
                         <div className="px-2 py-0.5 text-[10px] font-bold text-[#64748B] uppercase tracking-wider">
-                          Hashtag đề xuất
+                          {t("community.search.suggestedTags")}
                         </div>
                         <div className="flex flex-wrap gap-1.5 px-1">
                           {suggestedSearchTags.map((tag) => (
@@ -667,7 +672,7 @@ export function CommunityClientShell({
                     {suggestedDestinations.length > 0 && (
                       <div className="space-y-1 pt-1 border-t border-[#F1F5F9]">
                         <div className="px-2 py-0.5 text-[10px] font-bold text-[#64748B] uppercase tracking-wider">
-                          Điểm đến phổ biến
+                          {t("community.search.popularDestinations")}
                         </div>
                         <div className="space-y-0.5 px-1">
                           {suggestedDestinations.map((dest) => (
@@ -699,7 +704,7 @@ export function CommunityClientShell({
               <div className="flex items-center justify-between gap-2 px-4 py-2.5 rounded-2xl bg-[#F0F7FF] border border-[#BAE0FD] text-[12px]">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-semibold text-[#475569]">
-                    Đang lọc theo:
+                    {t("community.search.filteringBy")}
                   </span>
                   {activeGroupObj && (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white border border-[#BAE0FD] font-bold text-[#0194F3]">
@@ -709,7 +714,7 @@ export function CommunityClientShell({
                         type="button"
                         onClick={() => setSelectedGroupId("")}
                         className="hover:text-[#0F172A] cursor-pointer ml-0.5"
-                        aria-label="Bỏ lọc nhóm"
+                        aria-label={t("community.search.clearGroupAria")}
                       >
                         <X className="size-3" />
                       </button>
@@ -722,7 +727,7 @@ export function CommunityClientShell({
                         type="button"
                         onClick={() => setSelectedTag("")}
                         className="hover:text-[#0F172A] cursor-pointer ml-0.5"
-                        aria-label="Bỏ lọc thẻ"
+                        aria-label={t("community.search.clearTagAria")}
                       >
                         <X className="size-3" />
                       </button>
@@ -734,7 +739,7 @@ export function CommunityClientShell({
                   onClick={handleClearFilters}
                   className="text-[11px] font-bold text-[#0194F3] hover:underline shrink-0 cursor-pointer"
                 >
-                  Xem tất cả
+                  {t("community.search.viewAll")}
                 </button>
               </div>
             )}
@@ -746,11 +751,11 @@ export function CommunityClientShell({
                   <div className="flex items-center gap-2 text-xs font-bold text-[#0F172A]">
                     <Users className="size-4 text-[#0194F3]" />
                     <span>
-                      Kênh sáng tạo phù hợp ({matchedCreators.length})
+                      {t("community.search.matchedCreatorsTitle", { count: matchedCreators.length })}
                     </span>
                   </div>
                   <span className="text-[11px] text-[#64748B]">
-                    Nhấn để xem trang cá nhân & lịch trình công khai
+                    {t("community.search.matchedCreatorsHint")}
                   </span>
                 </div>
 
@@ -788,19 +793,19 @@ export function CommunityClientShell({
                                 creator.isVerified) && (
                                 <CheckCircle2
                                   className="size-3.5 text-[#0194F3] shrink-0"
-                                  aria-label="Thổ địa xác thực"
+                                  aria-label={t("community.verifiedLocalTitle")}
                                 />
                               )}
                             </div>
                             <p className="text-[11px] text-[#64748B] truncate">
                               {creator.username ? `@${creator.username} • ` : ""}
-                              {creator.postCount} bài đăng
+                              {t("community.search.postCount", { count: creator.postCount })}
                             </p>
                           </div>
                         </div>
 
                         <span className="px-2.5 py-1 rounded-lg bg-white border border-[#E2E8F0] text-[#0F172A] text-[11px] font-bold shrink-0">
-                          Xem kênh
+                          {t("community.viewChannel")}
                         </span>
                       </Link>
                     );
@@ -827,11 +832,10 @@ export function CommunityClientShell({
               ) : isError ? (
                 <div className="rounded-[20px] border border-[#E2E8F0] bg-white p-10 text-center space-y-3 shadow-[0_2px_6px_rgba(0,0,0,0.02)]">
                   <p className="text-sm font-bold text-[#0F172A]">
-                    Không thể tải bảng tin cộng đồng
+                    {t("community.feed.loadErrorTitle")}
                   </p>
                   <p className="text-xs text-[#64748B] max-w-md mx-auto">
-                    Đã xảy ra sự cố kết nối khi tải danh sách bài viết. Vui lòng
-                    thử lại.
+                    {t("community.feed.loadErrorDesc")}
                   </p>
                   <Button
                     variant="outline"
@@ -840,7 +844,7 @@ export function CommunityClientShell({
                     className="h-10 px-4 rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
                   >
                     <RefreshCw className="size-3.5" />
-                    <span>Thử lại</span>
+                    <span>{t("common.retry")}</span>
                   </Button>
                 </div>
               ) : allPosts.length === 0 ? (
@@ -848,13 +852,13 @@ export function CommunityClientShell({
                   <Compass className="size-10 mx-auto text-[#94A3B8]" />
                   <p className="text-base font-bold text-[#0F172A]">
                     {hasActiveFilter
-                      ? "Không tìm thấy bài viết nào khớp với bộ lọc"
-                      : "Chưa có bài chia sẻ nào phù hợp"}
+                      ? t("community.feed.emptyFilterTitle")
+                      : t("community.feed.emptyDefaultTitle")}
                   </p>
                   <p className="text-xs text-[#64748B] max-w-md mx-auto">
                     {hasActiveFilter
-                      ? "Hãy thử tìm với từ khóa khác, chọn nhóm cộng đồng khác hoặc xóa bộ lọc hiện tại."
-                      : "Hãy là người đầu tiên đăng tải hình ảnh, video trải nghiệm và lịch trình chuyến đi của bạn để truyền cảm hứng cho cộng đồng TripGenie!"}
+                      ? t("community.feed.emptyFilterDesc")
+                      : t("community.feed.emptyDefaultDesc")}
                   </p>
                   <div className="flex items-center justify-center gap-2.5 pt-1">
                     {hasActiveFilter && (
@@ -864,7 +868,7 @@ export function CommunityClientShell({
                         className="h-10 px-4 rounded-xl text-xs font-semibold gap-1.5 cursor-pointer"
                       >
                         <X className="size-3.5" />
-                        <span>Xóa bộ lọc</span>
+                        <span>{t("community.feed.clearFilters")}</span>
                       </Button>
                     )}
                     <button
@@ -873,7 +877,7 @@ export function CommunityClientShell({
                       className="h-10 px-5 rounded-xl bg-[#0194F3] hover:bg-[#007FE3] text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
                     >
                       <Plus className="size-4" />
-                      <span>Đăng bài mới</span>
+                      <span>{t("community.feed.newPost")}</span>
                     </button>
                   </div>
                 </div>
@@ -902,8 +906,8 @@ export function CommunityClientShell({
                         className="h-10 px-6 rounded-xl bg-white hover:bg-[#F1F5F9] border border-[#CBD5E1] text-[#334155] text-xs font-bold cursor-pointer transition-colors disabled:opacity-50"
                       >
                         {isFetchingNextPage
-                          ? "Đang tải thêm..."
-                          : "Xem thêm bài viết"}
+                          ? t("community.feed.loadingMore")
+                          : t("community.feed.loadMore")}
                       </button>
                     </div>
                   )}

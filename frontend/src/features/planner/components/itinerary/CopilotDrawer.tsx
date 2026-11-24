@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { TripGenieMark } from '@/components/common/TripGenieMark';
+import { useI18n } from '@/i18n';
 import { placeService } from '@/services/place.service';
 import { CopilotProposal, ItineraryDay } from '@/types/itinerary';
 import { AiThinkingIndicator } from './AiThinkingIndicator';
@@ -184,6 +185,7 @@ function CopilotRecommendationCard({
   onLocatePlaceOnMap,
   onSendAction,
 }: CopilotRecommendationCardProps) {
+  const { t } = useI18n();
   const isAddOpen =
     activeActionMenu?.msgIndex === msgIndex &&
     activeActionMenu?.recIndex === recIdx &&
@@ -323,17 +325,17 @@ function CopilotRecommendationCard({
               })
             }
             className="h-8 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors shadow-2xs flex items-center gap-1.5 cursor-pointer shrink-0"
-            title="Xem vị trí trên bản đồ"
+            title={t('planner.copilot.recMapTitle')}
           >
             <i className="fa-solid fa-location-dot text-[10px] text-[#0194F3]" aria-hidden="true" />
-            <span>Bản đồ</span>
+            <span>{t('planner.copilot.recMapBtn')}</span>
           </button>
         ) : (
           <div />
         )}
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* [+ Thêm] Button - Refined TripGenie Style */}
+          {/* [+ Thêm] Button */}
           <button
             type="button"
             disabled={isPending}
@@ -345,10 +347,10 @@ function CopilotRecommendationCard({
                 ? 'bg-[#0194F3] text-white border border-[#0194F3] ring-2 ring-sky-200'
                 : 'bg-sky-50 hover:bg-sky-100/90 border border-sky-200/90 text-sky-800'
             }`}
-            title="Thêm địa điểm này vào lịch trình"
+            title={t('planner.copilot.recAddTitle')}
           >
             <i className={`fa-solid fa-plus text-[10px] ${isAddOpen ? 'text-white' : 'text-[#0194F3]'}`} aria-hidden="true" />
-            <span>Thêm</span>
+            <span>{t('planner.copilot.recAddBtn')}</span>
           </button>
 
           {/* [⇄ Đổi] Button */}
@@ -363,10 +365,10 @@ function CopilotRecommendationCard({
                 ? 'bg-sky-50 border-[#0194F3] text-sky-950 ring-2 ring-sky-200'
                 : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700 hover:text-slate-900'
             }`}
-            title="Đổi một địa điểm có sẵn thành điểm này"
+            title={t('planner.copilot.recSwapTitle')}
           >
             <i className="fa-solid fa-right-left text-[10px] text-slate-400" aria-hidden="true" />
-            <span>Đổi</span>
+            <span>{t('planner.copilot.recSwapBtn')}</span>
           </button>
         </div>
       </div>
@@ -377,12 +379,12 @@ function CopilotRecommendationCard({
           <div className="flex items-center justify-between text-xs">
             <span className="font-semibold text-slate-900 flex items-center gap-1.5">
               <i className="fa-regular fa-calendar-plus text-xs text-[#0194F3]" aria-hidden="true" />
-              <span>Chọn ngày thêm vào lịch trình:</span>
+              <span>{t('planner.copilot.recChooseDay')}</span>
             </span>
             <button
               type="button"
               onClick={() => onToggleActionMenu(null)}
-              aria-label="Đóng chọn ngày"
+              aria-label={t('planner.copilot.recCloseDayAria')}
               className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
             >
               <i className="fa-solid fa-xmark text-xs" aria-hidden="true" />
@@ -397,13 +399,15 @@ function CopilotRecommendationCard({
                   type="button"
                   disabled={isPending}
                   onClick={() => {
-                    onSendAction(`Thêm ${rec.name} vào Ngày ${d.dayNumber}`);
+                    onSendAction(
+                      t('planner.copilot.promptAddDay', { place: rec.name, day: d.dayNumber })
+                    );
                     onToggleActionMenu(null);
                   }}
                   className="px-3 py-1.5 rounded-lg bg-white hover:bg-[#F0F7FF] hover:border-[#0194F3]/50 border border-slate-200 text-slate-700 hover:text-[#0194F3] font-medium text-xs transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
                 >
                   <i className="fa-regular fa-calendar text-[10px] text-[#0194F3]" aria-hidden="true" />
-                  <span>Ngày {d.dayNumber}</span>
+                  <span>{t('planner.common.day', { n: d.dayNumber })}</span>
                 </button>
               ))
             ) : (
@@ -411,13 +415,13 @@ function CopilotRecommendationCard({
                 type="button"
                 disabled={isPending}
                 onClick={() => {
-                  onSendAction(`Thêm ${rec.name} vào Ngày 1`);
+                  onSendAction(t('planner.copilot.promptAddDay', { place: rec.name, day: 1 }));
                   onToggleActionMenu(null);
                 }}
                 className="px-3 py-1.5 rounded-lg bg-white hover:bg-[#F0F7FF] hover:border-[#0194F3]/50 border border-slate-200 text-slate-700 hover:text-[#0194F3] font-medium text-xs transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
               >
                 <i className="fa-regular fa-calendar text-[10px] text-[#0194F3]" aria-hidden="true" />
-                <span>Ngày 1</span>
+                <span>{t('planner.common.day', { n: 1 })}</span>
               </button>
             )}
 
@@ -425,13 +429,13 @@ function CopilotRecommendationCard({
               type="button"
               disabled={isPending}
               onClick={() => {
-                onSendAction(`Thêm ${rec.name} vào ngày phù hợp trong lịch trình`);
+                onSendAction(t('planner.copilot.promptAddAuto', { place: rec.name }));
                 onToggleActionMenu(null);
               }}
               className="px-3 py-1.5 rounded-lg bg-[#F0F7FF] hover:bg-sky-100 border border-[#D0E7FF] text-[#0068B8] font-semibold text-xs transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
             >
               <i className="fa-solid fa-wand-magic-sparkles text-[10px] text-[#0194F3]" aria-hidden="true" />
-              <span>Tự động chọn ngày</span>
+              <span>{t('planner.copilot.recAutoDay')}</span>
             </button>
           </div>
         </div>
@@ -443,12 +447,12 @@ function CopilotRecommendationCard({
           <div className="flex items-center justify-between text-xs">
             <span className="font-semibold text-slate-900 flex items-center gap-1.5">
               <i className="fa-solid fa-right-left text-xs text-[#0194F3]" aria-hidden="true" />
-              <span>Chọn điểm bạn muốn thay thế:</span>
+              <span>{t('planner.copilot.recChooseReplace')}</span>
             </span>
             <button
               type="button"
               onClick={() => onToggleActionMenu(null)}
-              aria-label="Đóng chọn điểm thay thế"
+              aria-label={t('planner.copilot.recCloseReplaceAria')}
               className="text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
             >
               <i className="fa-solid fa-xmark text-xs" aria-hidden="true" />
@@ -463,14 +467,19 @@ function CopilotRecommendationCard({
                   type="button"
                   disabled={isPending}
                   onClick={() => {
-                    onSendAction(`Đổi ${act.placeName} thành ${rec.name}`);
+                    onSendAction(
+                      t('planner.copilot.promptSwapSpecific', {
+                        oldPlace: act.placeName,
+                        newPlace: rec.name,
+                      })
+                    );
                     onToggleActionMenu(null);
                   }}
                   className="w-full text-left p-2 rounded-xl bg-white hover:bg-[#F0F7FF] hover:border-[#0194F3]/40 border border-slate-200 transition-colors flex items-center justify-between text-xs group cursor-pointer"
                 >
                   <div className="min-w-0 pr-2">
                     <span className="text-[10px] text-[#0194F3] font-semibold block">
-                      Ngày {act.dayNumber}
+                      {t('planner.common.day', { n: act.dayNumber })}
                       {act.startTime ? ` • ${act.startTime}` : ''}
                       {act.categoryName ? ` • ${act.categoryName}` : ''}
                     </span>
@@ -479,7 +488,7 @@ function CopilotRecommendationCard({
                     </span>
                   </div>
                   <span className="text-xs font-medium text-[#0194F3] bg-sky-50 group-hover:bg-[#0194F3] group-hover:text-white px-2 py-0.5 rounded-md border border-sky-200/80 shrink-0 transition-colors">
-                    Thay điểm này
+                    {t('planner.copilot.recReplaceThis')}
                   </span>
                 </button>
               ))}
@@ -490,13 +499,13 @@ function CopilotRecommendationCard({
             type="button"
             disabled={isPending}
             onClick={() => {
-              onSendAction(`Đổi một địa điểm tương đương trong lịch trình thành ${rec.name}`);
+              onSendAction(t('planner.copilot.promptSwapAuto', { newPlace: rec.name }));
               onToggleActionMenu(null);
             }}
             className="w-full text-center py-2 px-3 rounded-xl bg-slate-50 hover:bg-[#F0F7FF] hover:text-[#0194F3] text-slate-700 font-medium text-xs transition-colors cursor-pointer border border-slate-200 hover:border-[#0194F3]/30 flex items-center justify-center gap-1.5"
           >
             <i className="fa-solid fa-wand-magic-sparkles text-xs text-[#0194F3]" aria-hidden="true" />
-            <span>Nhờ AI tự chọn điểm phù hợp để đổi</span>
+            <span>{t('planner.copilot.recAutoReplace')}</span>
           </button>
         </div>
       )}
@@ -526,7 +535,6 @@ interface CopilotDrawerProps {
 export default function CopilotDrawer({
   isOpen,
   onClose,
-  destination,
   days,
   messages,
   isPending,
@@ -541,6 +549,7 @@ export default function CopilotDrawer({
   onLocatePlaceOnMap,
   canEdit = true,
 }: CopilotDrawerProps) {
+  const { t } = useI18n();
   const [inputValue, setInputValue] = useState('');
   const [activeActionMenu, setActiveActionMenu] = useState<{
     msgIndex: number;
@@ -633,10 +642,10 @@ export default function CopilotDrawer({
           </div>
           <div>
             <h3 className="text-sm font-bold text-[#10243A] leading-tight">
-              Genie Copilot
+              {t('planner.copilot.title')}
             </h3>
             <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Trợ lý tối ưu lịch trình thực tế
+              {t('planner.copilot.subtitleDefault')}
             </p>
           </div>
         </div>
@@ -646,9 +655,9 @@ export default function CopilotDrawer({
             <button
               type="button"
               onClick={onResetSession}
-              aria-label="Làm mới phiên trò chuyện"
+              aria-label={t('planner.copilot.resetSessionTitle')}
               className="size-8 rounded-full text-slate-400 hover:text-[#0194F3] hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
-              title="Làm mới phiên trò chuyện"
+              title={t('planner.copilot.resetSessionTitle')}
             >
               <i className="fa-solid fa-rotate-left text-xs" aria-hidden="true" />
             </button>
@@ -657,9 +666,9 @@ export default function CopilotDrawer({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Đóng khung chat"
+            aria-label={t('planner.copilot.closeTitle')}
             className="size-8 rounded-full text-slate-400 hover:text-slate-800 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
-            title="Đóng khung chat"
+            title={t('planner.copilot.closeTitle')}
           >
             <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
           </button>
@@ -722,28 +731,27 @@ export default function CopilotDrawer({
                 {/* Micro Subtitle / Sender Label */}
                 <div className={`px-2 flex items-center gap-1 text-[10px] text-slate-400 ${isUser ? 'justify-end' : 'justify-start pl-9'}`}>
                   {isUser ? (
-                    <span>Bạn</span>
+                    <span>{t('planner.common.you')}</span>
                   ) : (
                     <>
                       <i className="fa-solid fa-compass text-[9px] text-[#0194F3]" aria-hidden="true" />
-                      <span>Genie Copilot</span>
+                      <span>{t('planner.copilot.title')}</span>
                     </>
                   )}
                 </div>
 
                 {/* =====================================================================
                     GENERATIVE UI: INTERACTIVE PLACE RECOMMENDATION CARDS
-                    With Visual Thumbnail, 1-Click Map Locate, [+ Thêm], and [⇄ Đổi]
                     ===================================================================== */}
                 {recommendations.length > 0 && (
                   <div className="ml-9 p-3 bg-white border border-slate-200/90 rounded-2xl shadow-xs space-y-2.5 animate-in fade-in duration-200">
                     <div className="flex items-center justify-between text-xs font-semibold text-slate-700 px-0.5">
                       <span className="flex items-center gap-1.5 text-slate-900">
                         <i className="fa-solid fa-location-dot text-xs text-[#0194F3]" aria-hidden="true" />
-                        <span>Gợi ý địa điểm:</span>
+                        <span>{t('planner.copilot.recHeading')}</span>
                       </span>
                       <span className="text-[11px] text-slate-400 font-medium tabular-nums">
-                        {recommendations.length} địa điểm
+                        {t('planner.copilot.recCount', { count: recommendations.length })}
                       </span>
                     </div>
 
@@ -769,7 +777,6 @@ export default function CopilotDrawer({
 
                 {/* =====================================================================
                     SMART PROPOSAL DIFF CARD (Before -> After Comparison)
-                    Clean editorial system style (No AI slop gradients)
                     ===================================================================== */}
                 {msg.proposal && (
                   <div className="ml-9 p-3.5 sm:p-4 rounded-2xl bg-white border border-sky-200/90 text-slate-800 space-y-3 shadow-xs animate-in zoom-in-95 duration-200">
@@ -779,7 +786,7 @@ export default function CopilotDrawer({
                         <span>{msg.proposal.title}</span>
                       </div>
                       <span className="px-2 py-0.5 rounded-full bg-[#F0F7FF] text-[#0194F3] border border-[#D0E7FF] text-[10px] font-semibold">
-                        Chờ xác nhận
+                        {t('planner.copilot.pendingConfirmBadge')}
                       </span>
                     </div>
 
@@ -799,11 +806,11 @@ export default function CopilotDrawer({
                             }
                           }}
                           className="bg-slate-50/80 p-2.5 rounded-xl border border-rose-200/70 flex items-start justify-between gap-2 cursor-pointer hover:bg-rose-50/50 transition-colors group"
-                          title="Bấm để xem địa điểm cũ trên bản đồ"
+                          title={t('planner.copilot.clickOldPlaceTitle')}
                         >
                           <div className="min-w-0">
                             <span className="text-[10px] font-bold text-rose-600 block uppercase tracking-wider">
-                              Địa điểm hiện tại
+                              {t('planner.copilot.currentPlaceLabel')}
                             </span>
                             <span className="text-xs font-semibold text-slate-700 line-through decoration-rose-400 group-hover:text-rose-900">
                               {msg.proposal.fromPlaceName}
@@ -811,7 +818,7 @@ export default function CopilotDrawer({
                           </div>
                           <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 text-[10px] font-semibold shrink-0 flex items-center gap-1">
                             <i className="fa-solid fa-location-dot text-[9px] text-rose-500" aria-hidden="true" />
-                            Cũ
+                            {t('planner.copilot.oldBadge')}
                           </span>
                         </div>
 
@@ -827,7 +834,7 @@ export default function CopilotDrawer({
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-[10px] font-semibold text-[#0194F3] uppercase tracking-wider flex items-center gap-1">
                               <i className="fa-solid fa-right-left text-[10px] text-[#0194F3]" aria-hidden="true" />
-                              Đề xuất đổi sang
+                              {t('planner.copilot.proposedSwapLabel')}
                             </span>
                             {msg.proposal.toPlaceRating && (
                               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 font-semibold text-[11px] border border-amber-200/70 tabular-nums">
@@ -868,16 +875,21 @@ export default function CopilotDrawer({
                               className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-white hover:bg-sky-50 text-slate-700 hover:text-sky-950 text-xs font-medium border border-slate-200/90 transition-colors cursor-pointer shadow-2xs"
                             >
                               <i className="fa-solid fa-location-dot text-[10px] text-[#0194F3]" aria-hidden="true" />
-                              <span>Xem địa điểm này trên bản đồ</span>
+                              <span>{t('planner.copilot.locateOnMap')}</span>
                             </button>
                           )}
                         </div>
                       </div>
                     ) : msg.proposal.swapDays ? (
                       <div className="bg-white p-3 rounded-xl border border-sky-200 text-xs text-sky-900 font-semibold flex items-center justify-between shadow-2xs">
-                        <span className="text-slate-600 font-medium">Hoán đổi lịch trình:</span>
+                        <span className="text-slate-600 font-medium">
+                          {t('planner.copilot.swapDaysLabel')}
+                        </span>
                         <span className="px-2.5 py-1 rounded-lg bg-[#F0F7FF] text-[#0194F3] border border-[#D0E7FF] font-semibold tabular-nums">
-                          Ngày {msg.proposal.swapDays.dayA} ⇄ Ngày {msg.proposal.swapDays.dayB}
+                          {t('planner.copilot.swapDaysValue', {
+                            dayA: msg.proposal.swapDays.dayA,
+                            dayB: msg.proposal.swapDays.dayB,
+                          })}
                         </span>
                       </div>
                     ) : (
@@ -899,12 +911,12 @@ export default function CopilotDrawer({
                             {applyingProposalId === msg.proposal.id ? (
                               <>
                                 <i className="fa-solid fa-circle-notch fa-spin text-xs" aria-hidden="true" />
-                                <span>Đang cập nhật lịch trình...</span>
+                                <span>{t('planner.copilot.applying')}</span>
                               </>
                             ) : (
                               <>
                                 <i className="fa-solid fa-check text-xs" aria-hidden="true" />
-                                <span>Áp dụng vào lịch trình</span>
+                                <span>{t('planner.copilot.applyToItinerary')}</span>
                               </>
                             )}
                           </button>
@@ -915,20 +927,18 @@ export default function CopilotDrawer({
                             onClick={() => onRejectProposal(i)}
                             className="px-3 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-medium text-xs transition-colors cursor-pointer min-h-[40px]"
                           >
-                            Bỏ qua
+                            {t('planner.copilot.skip')}
                           </button>
                         </div>
                       ) : (
                         <div className="flex items-center justify-between gap-2 pt-1 text-[11px] text-slate-600 bg-white border border-slate-200 rounded-xl px-3 py-2">
-                          <span>
-                            Bạn đang ở quyền xem. Hãy tạo đề xuất trong tab <strong>Bình chọn</strong> để cả nhóm cùng góp ý.
-                          </span>
+                          <span>{t('planner.copilot.viewerProposalHint')}</span>
                           <button
                             type="button"
                             onClick={() => onRejectProposal(i)}
                             className="shrink-0 text-slate-500 hover:text-slate-700 font-semibold cursor-pointer"
                           >
-                            Ẩn
+                            {t('planner.copilot.hide')}
                           </button>
                         </div>
                       )
@@ -937,14 +947,14 @@ export default function CopilotDrawer({
                     {msg.proposalStatus === 'APPLIED' && (
                       <div className="flex items-center gap-1.5 text-[11px] text-emerald-800 font-semibold bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-200">
                         <i className="fa-solid fa-check text-xs text-emerald-600" aria-hidden="true" />
-                        <span>Đã áp dụng và cập nhật vào lịch trình</span>
+                        <span>{t('planner.copilot.appliedBanner')}</span>
                       </div>
                     )}
 
                     {msg.proposalStatus === 'REJECTED' && (
                       <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium bg-slate-100 px-3 py-2 rounded-xl">
                         <i className="fa-solid fa-xmark text-xs" aria-hidden="true" />
-                        <span>Đã bỏ qua đề xuất (Giữ nguyên lịch trình)</span>
+                        <span>{t('planner.copilot.rejectedBanner')}</span>
                       </div>
                     )}
                   </div>
@@ -959,7 +969,9 @@ export default function CopilotDrawer({
                       className="w-full inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
                     >
                       <i className="fa-solid fa-plane-departure text-xs" aria-hidden="true" />
-                      <span>Mở tạo lịch trình {msg.action.destination}</span>
+                      <span>
+                        {t('planner.copilot.openWizardForDest', { dest: msg.action.destination })}
+                      </span>
                     </button>
                   </div>
                 )}
@@ -983,38 +995,38 @@ export default function CopilotDrawer({
         <button
           type="button"
           disabled={isPending}
-          onClick={() => handleSend('Đổi điểm trưa Ngày 1 sang quán ăn đặc sản')}
+          onClick={() => handleSend(t('planner.copilot.chipSwapLunchPrompt'))}
           className="whitespace-nowrap px-3 py-1.5 bg-slate-50 hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#0194F3]/30 border border-slate-200/80 text-slate-700 text-xs font-medium rounded-full transition-colors cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 shrink-0"
         >
           <i className="fa-solid fa-utensils text-[10px] text-amber-500" aria-hidden="true" />
-          <span>Đổi trưa sang đặc sản</span>
+          <span>{t('planner.copilot.chipSwapLunchLabel')}</span>
         </button>
         <button
           type="button"
           disabled={isPending}
-          onClick={() => handleSend('Gợi ý cho tôi quán cafe đẹp ngắm cảnh gần đây')}
+          onClick={() => handleSend(t('planner.copilot.chipCafePrompt'))}
           className="whitespace-nowrap px-3 py-1.5 bg-slate-50 hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#0194F3]/30 border border-slate-200/80 text-slate-700 text-xs font-medium rounded-full transition-colors cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 shrink-0"
         >
           <i className="fa-solid fa-mug-hot text-[10px] text-[#0194F3]" aria-hidden="true" />
-          <span>Gợi ý cafe đẹp</span>
+          <span>{t('planner.copilot.chipCafeLabel')}</span>
         </button>
         <button
           type="button"
           disabled={isPending}
-          onClick={() => handleSend('Hoán đổi lịch trình Ngày 1 và Ngày 2 cho nhau')}
+          onClick={() => handleSend(t('planner.copilot.chipSwapDaysPrompt'))}
           className="whitespace-nowrap px-3 py-1.5 bg-slate-50 hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#0194F3]/30 border border-slate-200/80 text-slate-700 text-xs font-medium rounded-full transition-colors cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 shrink-0"
         >
           <i className="fa-regular fa-calendar text-[10px] text-[#0194F3]" aria-hidden="true" />
-          <span>Đổi Ngày 1 &amp; Ngày 2</span>
+          <span>{t('planner.copilot.chipSwapDaysLabel')}</span>
         </button>
         <button
           type="button"
           disabled={isPending}
-          onClick={() => handleSend('Tôi muốn đổi chuyến đi sang Phú Quốc')}
+          onClick={() => handleSend(t('planner.copilot.chipChangeDestPrompt'))}
           className="whitespace-nowrap px-3 py-1.5 bg-slate-50 hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#0194F3]/30 border border-slate-200/80 text-slate-700 text-xs font-medium rounded-full transition-colors cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50 shrink-0"
         >
           <i className="fa-solid fa-compass text-[10px] text-emerald-600" aria-hidden="true" />
-          <span>Đổi sang Phú Quốc</span>
+          <span>{t('planner.copilot.chipChangeDestLabel')}</span>
         </button>
       </div>
 
@@ -1030,7 +1042,11 @@ export default function CopilotDrawer({
             value={inputValue}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder={isPending ? 'Genie đang suy nghĩ & xử lý...' : 'Nhắn cho Genie Copilot (Shift+Enter để xuống dòng)...'}
+            placeholder={
+              isPending
+                ? t('planner.copilot.inputPendingPlaceholder')
+                : t('planner.copilot.inputPlaceholder')
+            }
             className="flex-1 bg-transparent resize-none max-h-32 py-1.5 text-xs sm:text-[13px] text-slate-800 placeholder-slate-400 focus:outline-none disabled:opacity-50 leading-relaxed font-sans"
           />
 
@@ -1038,9 +1054,9 @@ export default function CopilotDrawer({
             type="button"
             disabled={isPending || !inputValue.trim()}
             onClick={() => handleSend()}
-            aria-label="Gửi tin nhắn"
+            aria-label={t('planner.copilot.sendAria')}
             className="size-9 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] disabled:opacity-30 disabled:bg-slate-300 text-white flex items-center justify-center transition-all cursor-pointer shrink-0 shadow-xs disabled:cursor-not-allowed active:scale-95"
-            title="Gửi tin nhắn"
+            title={t('planner.copilot.sendAria')}
           >
             {isPending ? (
               <i className="fa-solid fa-circle-notch fa-spin text-sm" aria-hidden="true" />
@@ -1050,10 +1066,10 @@ export default function CopilotDrawer({
           </button>
         </div>
         <div className="flex items-center justify-between text-[10px] text-slate-400 px-1 mt-1.5">
-          <span>Nhấn Enter để gửi • Shift + Enter xuống dòng</span>
+          <span>{t('planner.copilot.inputShortcutHint')}</span>
           <span className="flex items-center gap-1">
             <i className="fa-solid fa-wand-magic-sparkles text-[9px] text-[#0194F3]" aria-hidden="true" />
-            <span>Genie AI đồng hành</span>
+            <span>{t('planner.copilot.brandFooter')}</span>
           </span>
         </div>
       </div>

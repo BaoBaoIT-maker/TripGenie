@@ -3,13 +3,13 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useI18n } from '@/i18n';
 import { API_BASE_URL } from '@/lib/api-client';
 import type {
   GroupProposalItem,
   GroupProposalsListResponse,
   ProposalResolveAction,
 } from '@/types/itinerary';
-import { TRIP_COMPANIONS_CONFIG } from '../config/trip-companions.config';
 import { itineraryKeys } from './use-itinerary-planner';
 import { PROPOSALS_QUERY_KEYS } from './use-trip-proposals';
 
@@ -66,6 +66,11 @@ export function useItineraryLiveEvents(
   enabled = true,
 ) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
   const eventSourceRef = useRef<EventSource | null>(null);
 
   useEffect(() => {
@@ -89,6 +94,7 @@ export function useItineraryLiveEvents(
         const isSelf = Boolean(
           currentUserId && liveEvent.actor?.userId === currentUserId,
         );
+        const translate = tRef.current;
 
         switch (liveEvent.type) {
           case 'PROPOSAL_VOTED': {
@@ -117,9 +123,9 @@ export function useItineraryLiveEvents(
 
             if (!isSelf) {
               toast.info(
-                TRIP_COMPANIONS_CONFIG.LIVE_NOTIFICATIONS.PROPOSAL_VOTED(
-                  liveEvent.actor.fullName,
-                ),
+                translate('planner.proposals.live.voted', {
+                  name: liveEvent.actor.fullName || translate('planner.common.aMemberFallback'),
+                }),
               );
             }
             break;
@@ -143,9 +149,9 @@ export function useItineraryLiveEvents(
 
             if (!isSelf) {
               toast.info(
-                TRIP_COMPANIONS_CONFIG.LIVE_NOTIFICATIONS.PROPOSAL_CREATED(
-                  liveEvent.actor.fullName,
-                ),
+                translate('planner.proposals.live.created', {
+                  name: liveEvent.actor.fullName || translate('planner.common.aMemberFallback'),
+                }),
               );
             }
             break;
@@ -173,11 +179,12 @@ export function useItineraryLiveEvents(
             }
 
             if (!isSelf) {
+              const actorName =
+                liveEvent.actor.fullName || translate('planner.common.leaderFallback');
               toast.info(
-                TRIP_COMPANIONS_CONFIG.LIVE_NOTIFICATIONS.PROPOSAL_RESOLVED(
-                  action === 'APPROVE',
-                  liveEvent.actor.fullName,
-                ),
+                action === 'APPROVE'
+                  ? translate('planner.proposals.live.approved', { name: actorName })
+                  : translate('planner.proposals.live.rejected', { name: actorName }),
               );
             }
             break;
@@ -198,9 +205,9 @@ export function useItineraryLiveEvents(
 
             if (!isSelf) {
               toast.info(
-                TRIP_COMPANIONS_CONFIG.LIVE_NOTIFICATIONS.PROPOSAL_WITHDRAWN(
-                  liveEvent.actor.fullName,
-                ),
+                translate('planner.proposals.live.withdrawn', {
+                  name: liveEvent.actor.fullName || translate('planner.common.aMemberFallback'),
+                }),
               );
             }
             break;
@@ -212,9 +219,9 @@ export function useItineraryLiveEvents(
 
             if (!isSelf) {
               toast.info(
-                TRIP_COMPANIONS_CONFIG.LIVE_NOTIFICATIONS.STOPS_REORDERED(
-                  liveEvent.actor.fullName,
-                ),
+                translate('planner.proposals.live.reordered', {
+                  name: liveEvent.actor.fullName || translate('planner.common.aMemberFallback'),
+                }),
               );
             }
             break;

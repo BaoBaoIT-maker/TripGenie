@@ -26,6 +26,13 @@ import { useSavedPlaceIds, useToggleFavorite } from "@/features/collections/hook
 import { SaveToCollectionModal } from "@/features/collections/components/SaveToCollectionModal";
 import { DEFAULT_COLLECTION_TITLE } from "@/services/collection.service";
 import { AddPlaceToItineraryModal } from "@/features/planner/components/AddPlaceToItineraryModal";
+import { useI18n } from "@/i18n/LocaleProvider";
+import {
+  getPlaceCityLabel,
+  getPlaceDescription,
+  getPlaceOpenStatusText,
+  getPlacePriceRangeText,
+} from "@/i18n";
 
 export interface PlaceDetailClientProps {
   params: Promise<{ slug: string }>;
@@ -33,6 +40,9 @@ export interface PlaceDetailClientProps {
 
 export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
   const router = useRouter();
+  const { locale, t, messages } = useI18n();
+  const p = messages.place;
+  const pd = messages.place.detail;
   const resolvedParams = use(params);
 
   const initialSlug = resolvedParams?.slug || "";
@@ -56,14 +66,20 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
     onSaved: (data) => {
       if (!place) return;
       if (data.isSaved) {
-        toast.success(`Đã lưu "${place.name}" vào ${DEFAULT_COLLECTION_TITLE}`, {
-          action: {
-            label: "Đổi bộ sưu tập",
-            onClick: () => setIsSaveModalOpen(true),
-          },
-        });
+        toast.success(
+          t("place.savedToCollection", {
+            name: place.name,
+            collection: DEFAULT_COLLECTION_TITLE,
+          }),
+          {
+            action: {
+              label: p.changeCollection,
+              onClick: () => setIsSaveModalOpen(true),
+            },
+          }
+        );
       } else {
-        toast.info(`Đã bỏ lưu "${place.name}"`);
+        toast.info(t("place.unsavedPlace", { name: place.name }));
       }
     },
   });
@@ -119,9 +135,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
       } catch (err) {
         if (!isCancelled) {
           setErrorMessage(
-            err instanceof Error
-              ? err.message
-              : "Không thể tải thông tin địa điểm vào lúc này. Vui lòng thử lại sau."
+            err instanceof Error ? err.message : pd.loadErrorFallback
           );
         }
       } finally {
@@ -136,7 +150,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
     return () => {
       isCancelled = true;
     };
-  }, [initialSlug, reloadNonce]);
+  }, [initialSlug, reloadNonce, pd.loadErrorFallback]);
 
   if (loading) {
     return <PlaceDetailSkeleton />;
@@ -146,7 +160,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
     return (
       <div className="max-w-[1280px] mx-auto w-full px-4 py-16 sm:px-6 lg:px-8">
         <ErrorState
-          title="Không thể tải địa điểm"
+          title={pd.loadErrorTitle}
           message={errorMessage}
           onRetry={() => setReloadNonce((n) => n + 1)}
         />
@@ -158,9 +172,9 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
     return (
       <div className="max-w-[1280px] mx-auto w-full px-4 py-16 sm:px-6 lg:px-8">
         <EmptyState
-          title="Không tìm thấy địa điểm"
-          description="Địa điểm bạn đang tìm kiếm không tồn tại hoặc đã được cập nhật."
-          actionLabel="Trở về trang Khám phá"
+          title={pd.notFoundTitle}
+          description={pd.notFoundDesc}
+          actionLabel={pd.backToExplore}
           onAction={() => router.push("/explore")}
         />
       </div>
@@ -168,6 +182,9 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
   }
 
   const isSaved = isAuthenticated ? (savedIdsSet?.has(place.id) ?? false) : false;
+  const openStatusDisplay = getPlaceOpenStatusText(place.isOpenNow, locale);
+  const priceDisplay = getPlacePriceRangeText(place.priceLevel, locale, place.priceRangeText);
+  const cityDisplay = getPlaceCityLabel(place, locale);
   const galleryImages =
     place.images.length > 0
       ? place.images
@@ -185,7 +202,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
 
   const toggleSave = () => {
     if (!isAuthenticated) {
-      toast.info("Vui lòng đăng nhập để lưu địa điểm vào bộ sưu tập");
+      toast.info(p.loginToSave);
       router.push(`/login?next=${encodeURIComponent(`/places/${initialSlug}`)}`);
       return;
     }
@@ -195,7 +212,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
 
   const handleOpenSaveCollectionModal = () => {
     if (!isAuthenticated) {
-      toast.info("Vui lòng đăng nhập để lưu địa điểm vào bộ sưu tập");
+      toast.info(p.loginToSave);
       router.push(`/login?next=${encodeURIComponent(`/places/${initialSlug}`)}`);
       return;
     }
@@ -204,7 +221,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
 
   const handleOpenAddToItineraryModal = () => {
     if (!isAuthenticated) {
-      toast.info("Vui lòng đăng nhập để thêm địa điểm vào lịch trình");
+      toast.info(p.loginToAddItinerary);
       router.push(`/login?next=${encodeURIComponent(`/places/${initialSlug}`)}`);
       return;
     }
@@ -212,11 +229,11 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
   };
 
   const hasPracticalDetails = Boolean(
-    place.priceRangeText ||
-      place.openingHoursText ||
+    priceDisplay ||
+      openStatusDisplay ||
       place.phone ||
       place.website ||
-      place.city ||
+      cityDisplay ||
       place.tags.length > 0
   );
 
@@ -230,16 +247,16 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
           className="inline-flex items-center gap-1.5 font-semibold text-[#10243A] hover:text-[#0194F3] transition-colors cursor-pointer"
         >
           <i className="fa-solid fa-arrow-left text-xs" aria-hidden="true" />
-          <span>Quay lại</span>
+          <span>{pd.back}</span>
         </button>
 
         <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs">
           <Link href="/" className="hover:text-[#10243A] transition-colors">
-            Trang chủ
+            {pd.home}
           </Link>
           <span className="text-slate-300">/</span>
           <Link href="/explore" className="hover:text-[#10243A] transition-colors">
-            Khám phá
+            {pd.explore}
           </Link>
           <span className="text-slate-300">/</span>
           <span className="font-semibold text-[#10243A] truncate max-w-[220px]">
@@ -285,13 +302,13 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                   setIsContributePhotoOpen(true);
                 }}
                 className="absolute bottom-3.5 right-3.5 z-10 inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/95 hover:bg-white backdrop-blur-md shadow-md text-xs font-bold text-[#10243A] border border-slate-200/80 transition-all hover:border-[#0194F3]/40 cursor-pointer"
-                title="Đóng góp ảnh thực tế cho địa điểm này"
+                title={p.contributePhotoTooltip}
               >
                 <i
                   className="fa-solid fa-camera text-[#0194F3]"
                   aria-hidden="true"
                 />
-                <span>Đóng góp ảnh</span>
+                <span>{p.contributePhoto}</span>
               </button>
             </>
           ) : (
@@ -300,10 +317,10 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                 <i className="fa-solid fa-camera text-xl" aria-hidden="true" />
               </div>
               <h2 className="text-base font-bold text-[#10243A]">
-                Chưa có ảnh thực tế cho {place.name}
+                {t("place.detail.noPhotoHeading", { name: place.name })}
               </h2>
               <p className="text-xs text-slate-500 mt-1 max-w-sm">
-                Hình ảnh thực tế sẽ sớm được cập nhật từ cộng đồng du lịch TripGenie.
+                {pd.noPhotoDesc}
               </p>
               <Button
                 type="button"
@@ -316,7 +333,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                   className="fa-solid fa-camera text-xs text-[#0194F3]"
                   aria-hidden="true"
                 />
-                <span>Đóng góp ảnh ngay</span>
+                <span>{p.contributePhotoNow}</span>
               </Button>
             </div>
           )}
@@ -368,10 +385,16 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                               className="fa-regular fa-images text-sm"
                               aria-hidden="true"
                             />
-                            <span>+{extraPhotosCount} ảnh</span>
+                            <span>
+                              {t("place.detail.morePhotosBadge", {
+                                count: extraPhotosCount,
+                              })}
+                            </span>
                           </div>
                           <span className="text-[11px] font-semibold text-white/90">
-                            Xem tất cả {galleryImages.length} ảnh thực tế
+                            {t("place.detail.viewAllPhotos", {
+                              count: galleryImages.length,
+                            })}
                           </span>
                         </div>
                       )}
@@ -381,14 +404,14 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                       type="button"
                       onClick={() => setIsContributePhotoOpen(true)}
                       className="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 p-3 text-center hover:bg-[#F0F7FF] transition-colors cursor-pointer group w-full h-full"
-                      title="Nhấn để đóng góp thêm ảnh"
+                      title={p.addPhotoTooltip}
                     >
                       <i
                         className="fa-solid fa-camera text-lg text-slate-400 mb-1.5 group-hover:text-[#0194F3] transition-colors"
                         aria-hidden="true"
                       />
                       <span className="text-xs text-slate-600 group-hover:text-[#0194F3] font-semibold">
-                        + Thêm ảnh
+                        {p.addPhotoShort}
                       </span>
                     </button>
                   )}
@@ -416,7 +439,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
             </h1>
 
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-600">
-              {place.openingHoursText && (
+              {openStatusDisplay && (
                 <>
                   <span
                     className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border font-semibold ${
@@ -432,7 +455,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                           : "bg-emerald-600"
                       }`}
                     />
-                    <span>{place.openingHoursText}</span>
+                    <span>{openStatusDisplay}</span>
                   </span>
                   <span className="text-slate-300">•</span>
                 </>
@@ -452,7 +475,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
               <Link
                 href={splitMapHref}
                 className="inline-flex items-center gap-1.5 text-slate-700 hover:text-[#0194F3] font-medium transition-colors cursor-pointer"
-                title="Xem trên bản đồ"
+                title={pd.viewOnMapTitle}
               >
                 <i
                   className="fa-solid fa-location-dot text-slate-400 text-xs shrink-0"
@@ -483,14 +506,14 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                 }`}
                 aria-hidden="true"
               />
-              <span>{isSaved ? "Đã lưu" : "Yêu thích"}</span>
+              <span>{isSaved ? pd.saved : pd.favorite}</span>
             </button>
 
             <button
               type="button"
               onClick={() => {
                 navigator.clipboard?.writeText(window.location.href);
-                toast.success("Đã sao chép liên kết địa điểm!");
+                toast.success(pd.linkCopied);
               }}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200/90 bg-white hover:bg-[#F8FAFC] text-xs font-semibold text-[#10243A] transition-colors cursor-pointer"
             >
@@ -498,7 +521,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                 className="fa-solid fa-share-nodes text-slate-600"
                 aria-hidden="true"
               />
-              <span>Chia sẻ</span>
+              <span>{pd.share}</span>
             </button>
           </div>
         </div>
@@ -511,10 +534,10 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
           {/* Description Card */}
           <div className="rounded-2xl border border-slate-200/85 bg-white p-6 space-y-3 shadow-2xs">
             <h2 className="text-lg font-extrabold text-[#10243A] tracking-tight">
-              Giới thiệu địa điểm
+              {pd.aboutHeading}
             </h2>
             <p className="text-sm text-slate-700 font-medium leading-relaxed whitespace-pre-line">
-              {place.description}
+              {getPlaceDescription(place, locale)}
             </p>
           </div>
 
@@ -522,11 +545,11 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
           {hasPracticalDetails && (
             <div className="rounded-2xl border border-slate-200/85 bg-white p-6 space-y-4 shadow-2xs">
               <h2 className="text-lg font-extrabold text-[#10243A] tracking-tight">
-                Thông tin thực tế
+                {pd.practicalHeading}
               </h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-xs">
-                {place.priceRangeText && (
+                {priceDisplay && (
                   <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200/80 flex items-start gap-3">
                     <div className="size-8 rounded-lg bg-white border border-slate-200/80 text-[#10243A] flex items-center justify-center shrink-0">
                       <i
@@ -536,16 +559,16 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                     </div>
                     <div>
                       <div className="text-slate-500 font-medium">
-                        Mức giá tham khảo
+                        {pd.priceLabel}
                       </div>
                       <div className="text-sm font-bold text-[#10243A] mt-0.5 tabular-nums">
-                        {place.priceRangeText}
+                        {priceDisplay}
                       </div>
                     </div>
                   </div>
                 )}
 
-                {place.openingHoursText && (
+                {openStatusDisplay && (
                   <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200/80 flex items-start gap-3">
                     <div className="size-8 rounded-lg bg-white border border-slate-200/80 text-[#10243A] flex items-center justify-center shrink-0">
                       <i
@@ -555,10 +578,10 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                     </div>
                     <div>
                       <div className="text-slate-500 font-medium">
-                        Trạng thái hoạt động
+                        {pd.statusLabel}
                       </div>
                       <div className="text-sm font-bold text-[#10243A] mt-0.5 tabular-nums">
-                        {place.openingHoursText}
+                        {openStatusDisplay}
                       </div>
                     </div>
                   </div>
@@ -574,7 +597,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                     </div>
                     <div>
                       <div className="text-slate-500 font-medium">
-                        Số điện thoại
+                        {pd.phoneLabel}
                       </div>
                       <div className="text-sm font-bold text-[#10243A] mt-0.5 tabular-nums">
                         {place.phone}
@@ -592,7 +615,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                       />
                     </div>
                     <div className="min-w-0">
-                      <div className="text-slate-500 font-medium">Website</div>
+                      <div className="text-slate-500 font-medium">{pd.websiteLabel}</div>
                       <a
                         href={place.website}
                         target="_blank"
@@ -604,7 +627,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                     </div>
                   </div>
                 ) : (
-                  place.city && (
+                  cityDisplay && (
                     <div className="p-3.5 rounded-xl bg-[#F8FAFC] border border-slate-200/80 flex items-start gap-3">
                       <div className="size-8 rounded-lg bg-white border border-slate-200/80 text-[#10243A] flex items-center justify-center shrink-0">
                         <i
@@ -613,9 +636,9 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                         />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-slate-500 font-medium">Khu vực</div>
+                        <div className="text-slate-500 font-medium">{pd.areaLabel}</div>
                         <div className="text-sm font-bold text-[#10243A] mt-0.5 truncate">
-                          {place.city}
+                          {cityDisplay}
                         </div>
                       </div>
                     </div>
@@ -626,7 +649,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
               {place.tags.length > 0 && (
                 <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center gap-2">
                   <span className="text-xs font-semibold text-slate-500 mr-1">
-                    Chủ đề:
+                    {pd.topicsLabel}
                   </span>
                   {place.tags.map((tag) => (
                     <span
@@ -653,7 +676,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                 className="w-full h-11 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] active:scale-[0.98] text-white font-bold text-xs sm:text-sm shadow-[0_2px_8px_rgba(1,148,243,0.3)] transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 <i className="fa-regular fa-calendar-plus" aria-hidden="true" />
-                <span>Thêm vào lịch trình</span>
+                <span>{pd.addToItinerary}</span>
               </button>
 
               <button
@@ -665,7 +688,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                   className="fa-regular fa-bookmark text-slate-600"
                   aria-hidden="true"
                 />
-                <span>Lưu vào bộ sưu tập</span>
+                <span>{pd.saveToCollection}</span>
               </button>
             </div>
 
@@ -679,7 +702,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                     className="fa-solid fa-route text-slate-600"
                     aria-hidden="true"
                   />
-                  <span>Khoảng cách & Chỉ đường</span>
+                  <span>{pd.distanceHeading}</span>
                 </span>
                 {userLocation && directDistanceKm !== null ? (
                   <span className="tabular-nums text-[11px] font-bold text-[#10243A] bg-white px-2 py-0.5 rounded-md border border-slate-200">
@@ -692,7 +715,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                     disabled={locating}
                     className="text-[11px] font-semibold text-[#0194F3] hover:underline cursor-pointer"
                   >
-                    {locating ? "Đang định vị..." : "Bật vị trí"}
+                    {locating ? pd.locating : pd.enableLocation}
                   </button>
                 )}
               </div>
@@ -700,13 +723,13 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
               {userLocation && directDistanceKm !== null ? (
                 <div className="space-y-1.5 text-xs">
                   <div className="flex items-center justify-between text-slate-600">
-                    <span>Đường chim bay:</span>
+                    <span>{pd.straightDistance}</span>
                     <strong className="tabular-nums text-[#10243A] font-bold">
                       ~{routingService.formatDistanceKm(directDistanceKm)}
                     </strong>
                   </div>
                   <div className="flex items-center justify-between text-slate-600">
-                    <span>Ước tính di chuyển:</span>
+                    <span>{pd.estimatedTravel}</span>
                     <strong className="tabular-nums text-emerald-700 font-bold">
                       ~
                       {routingService.formatDurationMinutes(
@@ -720,7 +743,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                 </div>
               ) : (
                 <p className="text-[11px] text-slate-500 leading-relaxed">
-                  Bật quyền vị trí trên trình duyệt để xem khoảng cách từ bạn đến đây và ước tính thời gian di chuyển.
+                  {pd.locationPermissionHint}
                 </p>
               )}
 
@@ -730,7 +753,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#0194F3]/40 px-3 py-2 text-xs font-semibold text-[#10243A] transition-colors"
                 >
                   <i className="fa-regular fa-map text-xs" aria-hidden="true" />
-                  <span>Trên bản đồ</span>
+                  <span>{pd.onMap}</span>
                 </Link>
 
                 <a
@@ -750,7 +773,7 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
                   rel="noopener noreferrer"
                   className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#0194F3]/40 px-3 py-2 text-xs font-semibold text-[#10243A] transition-colors"
                 >
-                  <span>Google Maps</span>
+                  <span>{pd.googleMaps}</span>
                   <i
                     className="fa-solid fa-arrow-up-right-from-square text-[10px]"
                     aria-hidden="true"
@@ -762,12 +785,12 @@ export default function PlaceDetailClient({ params }: PlaceDetailClientProps) {
         </aside>
       </section>
 
-      {/* 6. Related Places Section ("Địa điểm gợi ý" + "Xem thêm" filtered by Area & Category) */}
+      {/* 6. Related Places Section */}
       {relatedPlaces.length > 0 && (
         <section className="pt-6 border-t border-slate-200/80">
           <SectionHeader
-            title="Địa điểm gợi ý"
-            viewAllLabel="Xem thêm"
+            title={pd.relatedHeading}
+            viewAllLabel={pd.seeMore}
             viewAllHref={seeMoreHref}
           />
 

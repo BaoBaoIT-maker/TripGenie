@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search, X } from "lucide-react";
+import { useI18n } from "@/i18n/LocaleProvider";
 
 interface HeroSearchBarProps {
   onDestinationChange?: (locationName: string) => void;
@@ -10,6 +11,7 @@ interface HeroSearchBarProps {
 
 export function HeroSearchBar({ onDestinationChange }: HeroSearchBarProps) {
   const router = useRouter();
+  const { t } = useI18n();
   const [query, setQuery] = useState("");
 
   const executeSearch = (searchQuery: string) => {
@@ -46,9 +48,9 @@ export function HeroSearchBar({ onDestinationChange }: HeroSearchBarProps) {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Tìm điểm đến, món ngon, quán cafe..."
+          placeholder={t("landing.hero.searchPlaceholder")}
           className="flex-1 min-w-0 bg-transparent py-2 sm:py-3 text-sm sm:text-base font-semibold text-slate-900 placeholder:text-slate-500/90 focus:outline-hidden"
-          aria-label="Tìm kiếm điểm đến du lịch"
+          aria-label={t("landing.hero.searchAria")}
         />
 
         {/* Clear Button (appears when query is non-empty) */}
@@ -57,7 +59,7 @@ export function HeroSearchBar({ onDestinationChange }: HeroSearchBarProps) {
             type="button"
             onClick={() => setQuery("")}
             className="p-1 sm:p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 transition-colors cursor-pointer shrink-0"
-            aria-label="Xóa tìm kiếm"
+            aria-label={t("landing.hero.clearSearchAria")}
           >
             <X className="size-4" />
           </button>
@@ -67,10 +69,10 @@ export function HeroSearchBar({ onDestinationChange }: HeroSearchBarProps) {
         <button
           type="submit"
           className="size-10 sm:h-11 sm:w-auto sm:px-6 rounded-full bg-[#0194F3] hover:bg-[#0073D1] text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-blue-500/25 hover:shadow-blue-500/40 shrink-0 cursor-pointer"
-          title="Khám phá ngay"
+          title={t("landing.hero.exploreNow")}
         >
           <Search className="size-4.5 sm:size-4" />
-          <span className="hidden sm:inline">Khám phá</span>
+          <span className="hidden sm:inline">{t("landing.hero.exploreShort")}</span>
         </button>
       </form>
     </div>

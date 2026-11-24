@@ -112,7 +112,8 @@ export function formatRelativeTime(isoDate: string): string {
 export function formatTripDuration(
   startDate?: string | null,
   endDate?: string | null,
-  compact = false
+  compact = false,
+  locale: "vi" | "en" = "vi"
 ): string | null {
   if (!startDate || !endDate) return null;
   const start = new Date(startDate);
@@ -123,6 +124,16 @@ export function formatTripDuration(
     Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1
   );
   const nights = Math.max(0, diffDays - 1);
+  if (locale === "en") {
+    if (compact) {
+      return nights > 0 ? `${diffDays}D${nights}N` : `${diffDays}D`;
+    }
+    const dayWord = diffDays === 1 ? "Day" : "Days";
+    const nightWord = nights === 1 ? "Night" : "Nights";
+    return nights > 0
+      ? `${diffDays} ${dayWord} ${nights} ${nightWord}`
+      : `${diffDays} ${dayWord}`;
+  }
   if (compact) {
     return nights > 0 ? `${diffDays}N${nights}Đ` : `${diffDays} Ngày`;
   }

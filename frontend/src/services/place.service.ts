@@ -166,6 +166,7 @@ export interface BackendPlaceItem {
       }
   >;
   tags?: string[];
+  attributes?: Record<string, unknown> | null;
   category?: {
     id?: number;
     name?: string;
@@ -265,12 +266,16 @@ export function mapBackendPlaceToPlace(dto: BackendPlaceItem): Place {
     tagline: dto.description
       ? dto.description.slice(0, 110) + (dto.description.length > 110 ? "..." : "")
       : undefined,
-    description: dto.description || `Địa điểm ${dto.name} tọa lạc tại ${dto.address || city}.`,
+    description: dto.description?.trim() || "",
     category: catMapping.category,
     categorySlug: dto.category?.slug || undefined,
     categoryLabel: dto.category?.nameVi || dto.category?.name || catMapping.label,
+    categoryName: dto.category?.name || undefined,
+    categoryNameVi: dto.category?.nameVi ?? null,
     areaId: typeof dto.area?.id === "number" ? dto.area.id : undefined,
     areaSlug: dto.area?.slug || undefined,
+    areaName: dto.area?.name || undefined,
+    areaNameVi: dto.area?.nameVi ?? null,
     address: dto.address || city,
     city,
     latitude: Number(dto.latitude) || 16.0544,
@@ -293,6 +298,10 @@ export function mapBackendPlaceToPlace(dto: BackendPlaceItem): Place {
       : undefined,
     isOpenNow: dto.isOpenNow ?? null,
     openingHoursText,
+    attributes:
+      dto.attributes && typeof dto.attributes === "object"
+        ? dto.attributes
+        : undefined,
     featured: realRating >= 4.5 || Boolean(dto.imageCount && dto.imageCount > 0),
     distanceKm:
       typeof dto.distanceMeters === "number" && dto.distanceMeters >= 0

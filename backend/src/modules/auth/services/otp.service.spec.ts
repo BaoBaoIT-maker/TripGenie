@@ -72,9 +72,25 @@ describe('OtpService', () => {
         'user@example.com',
         expect.any(String),
         'email-verification',
+        'vi',
       );
       expect(result.expiresIn).toBe(600);
       expect(result.retryAfter).toBe(60);
+    });
+
+    it('forwards requested locale (en) to MailService when provided', async () => {
+      await otpService.generateAndSendOtp(
+        'user@example.com',
+        'password-reset',
+        'en',
+      );
+
+      expect(mockMailService.sendOtpEmail).toHaveBeenCalledWith(
+        'user@example.com',
+        expect.any(String),
+        'password-reset',
+        'en',
+      );
     });
 
     it('nên rollback challenge và ném ServiceUnavailableException nếu SMTP lỗi', async () => {

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { AppModalPortal } from '@/components/common/AppModalPortal';
+import { useI18n } from '@/i18n';
 import { useActivityAlternatives } from '../../hooks/use-itinerary-planner';
 import { ModalCopilotAssist } from './ModalCopilotAssist';
 import type { ItineraryActivity, AlternativePlaceItem } from '@/types/itinerary';
@@ -29,6 +30,7 @@ export default function PlaceAlternativesModal({
   isMemberOrOwner = false,
   onProposeAlternative,
 }: Props) {
+  const { t } = useI18n();
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const destinationId = activity?.id || activity?.placeId || null;
@@ -78,10 +80,11 @@ export default function PlaceAlternativesModal({
               </div>
               <div className="min-w-0">
                 <h3 id="place-alternatives-title" className="text-sm font-bold text-slate-900 leading-tight">
-                  Đổi địa điểm tương đương
+                  {t('planner.alternatives.title')}
                 </h3>
                 <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                  Thay thế cho: <span className="font-semibold text-slate-700">{activity.placeName}</span>
+                  {t('planner.alternatives.replacing')}{' '}
+                  <span className="font-semibold text-slate-700">{activity.placeName}</span>
                 </p>
               </div>
             </div>
@@ -90,7 +93,7 @@ export default function PlaceAlternativesModal({
               type="button"
               onClick={onClose}
               disabled={busyId !== null}
-              aria-label="Đóng hộp thoại"
+              aria-label={t('planner.common.closeDialog')}
               className="size-8 rounded-full text-slate-400 hover:bg-slate-200/70 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
             >
               <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
@@ -102,14 +105,14 @@ export default function PlaceAlternativesModal({
             {isLoading && (
               <div className="py-12 flex flex-col items-center justify-center gap-2.5 text-slate-500">
                 <i className="fa-solid fa-circle-notch fa-spin text-xl text-[#0194F3]" aria-hidden="true" />
-                <p className="text-xs font-medium">Đang tìm các địa điểm tương đương trong khu vực...</p>
+                <p className="text-xs font-medium">{t('planner.alternatives.loading')}</p>
               </div>
             )}
 
             {!isLoading && error && (
               <div className="py-8 text-center text-slate-500 space-y-2">
                 <i className="fa-solid fa-circle-exclamation text-xl text-rose-500" aria-hidden="true" />
-                <p className="text-xs font-medium">Không thể tải gợi ý thay thế. Vui lòng thử lại.</p>
+                <p className="text-xs font-medium">{t('planner.alternatives.error')}</p>
               </div>
             )}
 
@@ -117,10 +120,10 @@ export default function PlaceAlternativesModal({
               <div className="py-8 text-center text-slate-500 space-y-2">
                 <i className="fa-solid fa-utensils text-2xl text-slate-300" aria-hidden="true" />
                 <p className="text-xs font-semibold text-slate-700">
-                  Chưa tìm thấy quán tương đương cùng loại trong phạm vi lân cận.
+                  {t('planner.alternatives.emptyTitle')}
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  Bạn có thể nhờ Genie Copilot tìm kiếm quán theo yêu cầu riêng bên dưới.
+                  {t('planner.alternatives.emptyDesc')}
                 </p>
               </div>
             )}
@@ -193,7 +196,7 @@ export default function PlaceAlternativesModal({
                         ) : (
                           <i className="fa-solid fa-check text-[11px]" aria-hidden="true" />
                         )}
-                        <span>Đổi ngay</span>
+                        <span>{t('planner.alternatives.swapNow')}</span>
                       </button>
                     )}
 
@@ -213,7 +216,11 @@ export default function PlaceAlternativesModal({
                         ) : (
                           <i className="fa-solid fa-check-to-slot text-[11px]" aria-hidden="true" />
                         )}
-                        <span>{canEdit ? 'Mở vote' : 'Đề xuất đổi'}</span>
+                        <span>
+                          {canEdit
+                            ? t('planner.alternatives.openVote')
+                            : t('planner.alternatives.proposeSwap')}
+                        </span>
                       </button>
                     )}
                   </div>

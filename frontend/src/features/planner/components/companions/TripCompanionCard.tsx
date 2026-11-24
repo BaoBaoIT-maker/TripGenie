@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useI18n, type MessageKey } from '@/i18n';
 import { useTripCompanions } from '../../hooks/use-trip-companions';
 import { TRIP_COMPANIONS_CONFIG } from '../../config/trip-companions.config';
 import { InviteTripCompanionDialog } from './InviteTripCompanionDialog';
@@ -20,6 +21,7 @@ export function TripCompanionCard({
   currentUserId,
   isMemberOrOwner,
 }: TripCompanionCardProps) {
+  const { t } = useI18n();
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
 
@@ -41,7 +43,7 @@ export function TripCompanionCard({
               <i className="fa-solid fa-users text-xs" aria-hidden="true" />
             </div>
             <h3 className="text-sm font-semibold text-slate-900 tabular-nums">
-              Bạn đồng hành ({members.length})
+              {t('planner.companions.cardTitle', { count: members.length })}
             </h3>
           </div>
 
@@ -50,7 +52,7 @@ export function TripCompanionCard({
             onClick={() => setIsPanelOpen(true)}
             className="text-xs font-bold text-[#0194F3] hover:underline cursor-pointer"
           >
-            Quản lý
+            {t('planner.common.manage')}
           </button>
         </div>
 
@@ -66,7 +68,7 @@ export function TripCompanionCard({
               {previewMembers.map((member) => (
                 <div
                   key={member.userId}
-                  title={`${member.fullName} (${TRIP_COMPANIONS_CONFIG.ROLES[member.role]})`}
+                  title={`${member.fullName} (${t(`planner.roles.${member.role}` as MessageKey)})`}
                   className="relative"
                 >
                   <Avatar className="size-10 border-2 border-white ring-1 ring-slate-200 shrink-0">
@@ -77,7 +79,7 @@ export function TripCompanionCard({
                   </Avatar>
                   {member.role === 'OWNER' && (
                     <div
-                      title={TRIP_COMPANIONS_CONFIG.ROLES.OWNER}
+                      title={t('planner.roles.OWNER')}
                       className="absolute -top-1 -right-1 size-4 rounded-full bg-amber-500 text-white flex items-center justify-center shadow-xs"
                     >
                       <i className="fa-solid fa-crown text-[8px]" aria-hidden="true" />
@@ -100,8 +102,8 @@ export function TripCompanionCard({
                 <button
                   type="button"
                   onClick={() => setIsInviteDialogOpen(true)}
-                  title="Mời bạn đồng hành"
-                  aria-label="Mời bạn đồng hành"
+                  title={t('planner.companions.inviteTooltip')}
+                  aria-label={t('planner.companions.inviteTooltip')}
                   className="size-10 rounded-full border-2 border-dashed border-slate-300 hover:border-[#0194F3] hover:text-[#0194F3] text-slate-400 flex items-center justify-center transition-colors cursor-pointer ml-4 shrink-0"
                 >
                   <i className="fa-solid fa-plus text-xs" aria-hidden="true" />
@@ -114,8 +116,8 @@ export function TripCompanionCard({
         {/* Description */}
         <p className="text-xs text-slate-500 leading-relaxed">
           {canManageMembers
-            ? 'Mời bạn bè tham gia chuyến đi để cùng xem lịch trình, đóng góp ý kiến và bình chọn điểm dừng.'
-            : 'Cùng các thành viên thảo luận và bình chọn điểm đến cho chuyến đi.'}
+            ? t('planner.companions.descCanManage')
+            : t('planner.companions.descMember')}
         </p>
 
         {/* Action Button */}
@@ -126,7 +128,7 @@ export function TripCompanionCard({
             className="w-full h-10 rounded-xl bg-[#0194F3] hover:bg-[#007AD0] text-white text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
           >
             <i className="fa-solid fa-user-plus text-xs" aria-hidden="true" />
-            <span>Mời bạn cùng đi</span>
+            <span>{t('planner.companions.inviteButton')}</span>
           </button>
         ) : (
           <button
@@ -135,7 +137,7 @@ export function TripCompanionCard({
             className="w-full h-10 rounded-xl border border-slate-200 bg-white hover:bg-[#F0F7FF] text-[#10243A] hover:text-[#0194F3] text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
           >
             <i className="fa-solid fa-users text-xs text-[#0194F3]" aria-hidden="true" />
-            <span>Xem danh sách thành viên</span>
+            <span>{t('planner.companions.viewMembersButton')}</span>
           </button>
         )}
       </div>

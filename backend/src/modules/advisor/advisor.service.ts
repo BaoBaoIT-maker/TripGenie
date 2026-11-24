@@ -15,12 +15,13 @@ import {
   GeminiContent,
   GeminiPart,
 } from '../../common/utils/gemini-contents.util';
+import { AppLocale, DEFAULT_LOCALE } from '../../common/i18n/locale.util';
 import { CopilotAgentService } from '../itineraries/copilot/copilot-agent.service';
 import { AdvisorToolsService } from './advisor-tools.service';
 import {
   ADVISOR_CONSTANTS,
-  ADVISOR_FALLBACK_MESSAGES,
   ADVISOR_FUNCTION_DECLARATIONS,
+  getAdvisorFallbackMessages,
   getAdvisorSystemPrompt,
   getFormattedCurrentTemporalContext,
 } from './advisor.constants';
@@ -81,8 +82,10 @@ export class AdvisorService {
   async chat(
     dto: AdvisorChatDto,
     userId?: string,
+    locale: AppLocale = DEFAULT_LOCALE,
   ): Promise<AdvisorChatResponse> {
     const cleanMessage = dto.message.trim();
+    const fallbackMessages = getAdvisorFallbackMessages(locale);
     const session = await this.resolveSession(
       cleanMessage,
       userId,
@@ -93,7 +96,7 @@ export class AdvisorService {
       this.logger.warn('GEMINI_API_KEY is missing in AdvisorService.');
       return {
         sessionId: session.id,
-        reply: ADVISOR_FALLBACK_MESSAGES.MISSING_API_KEY,
+        reply: fallbackMessages.MISSING_API_KEY,
         places: [],
       };
     }
@@ -108,7 +111,7 @@ export class AdvisorService {
 
     const isInitialTurn = historyRows.length === 0 && !session.summary;
     const cachedHit = isInitialTurn
-      ? this.getCachedInitialAnswer(cleanMessage)
+      ? this.getCachedInitialAnswer(cleanMessage, locale)
       : undefined;
 
     let finalReply = '';
@@ -126,11 +129,15 @@ export class AdvisorService {
       places = cachedHit.places;
     } else {
       // 2. Build temporal-anchored System Prompt (with long-term session.summary) & conversation contents
-      const { currentDate, dayOfWeek } = getFormattedCurrentTemporalContext();
+      const { currentDate, dayOfWeek } = getFormattedCurrentTemporalContext(
+        new Date(),
+        locale,
+      );
       const systemInstruction = getAdvisorSystemPrompt(
         currentDate,
         dayOfWeek,
         session.summary,
+        locale,
       );
       const contents: GeminiContent[] = this.buildGeminiContents(
         historyRows,
@@ -244,11 +251,11 @@ export class AdvisorService {
             synthesisParts
               .map((part) => part.text || '')
               .join('\n')
-              .trim() || ADVISOR_FALLBACK_MESSAGES.CIRCUIT_BREAKER_TRIGGERED;
+              .trim() || fallbackMessages.CIRCUIT_BREAKER_TRIGGERED;
         }
 
         if (!finalReply) {
-          finalReply = ADVISOR_FALLBACK_MESSAGES.CIRCUIT_BREAKER_TRIGGERED;
+          finalReply = fallbackMessages.CIRCUIT_BREAKER_TRIGGERED;
         }
       } catch (error) {
         hadNetworkError = true;
@@ -257,13 +264,13 @@ export class AdvisorService {
           `Advisor Gemini API Error: ${err.message}`,
           err.stack,
         );
-        finalReply = ADVISOR_FALLBACK_MESSAGES.NETWORK_ERROR;
+        finalReply = fallbackMessages.NETWORK_ERROR;
       }
 
       places = Array.from(collectedPlacesMap.values());
 
       if (isInitialTurn && !hadNetworkError && finalReply) {
-        this.setCachedInitialAnswer(cleanMessage, {
+        this.setCachedInitialAnswer(cleanMessage, locale, {
           reply: finalReply,
           places,
           expiresAt: Date.now() + ADVISOR_CONSTANTS.LRU_CACHE_TTL_MS,
@@ -507,17 +514,18 @@ export class AdvisorService {
     });
   }
 
-  private normalizeCacheKey(message: string): string {
-    return message
+  private normalizeCacheKey(message: string, locale: AppLocale): string {
+    return `${locale}:${message
       .toLowerCase()
       .replace(/[?!.,;:\s]+/g, ' ')
-      .trim();
+      .trim()}`;
   }
 
   private getCachedInitialAnswer(
     message: string,
+    locale: AppLocale,
   ): CachedAdvisorAnswer | undefined {
-    const key = this.normalizeCacheKey(message);
+    const key = this.normalizeCacheKey(message, locale);
     const entry = this.initialQueryCache.get(key);
     if (!entry) return undefined;
 
@@ -534,9 +542,10 @@ export class AdvisorService {
 
   private setCachedInitialAnswer(
     message: string,
+    locale: AppLocale,
     value: CachedAdvisorAnswer,
   ): void {
-    const key = this.normalizeCacheKey(message);
+    const key = this.normalizeCacheKey(message, locale);
     if (this.initialQueryCache.has(key)) {
       this.initialQueryCache.delete(key);
     } else if (

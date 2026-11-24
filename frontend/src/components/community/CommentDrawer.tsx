@@ -12,10 +12,8 @@ import {
   useCreatePostComment,
   useDeletePostComment,
 } from "@/features/community/hooks/use-community";
-import {
-  COMMUNITY_UI_CONSTANTS,
-  formatRelativeTime,
-} from "@/services/community.service";
+import { COMMUNITY_UI_CONSTANTS } from "@/services/community.service";
+import { formatRelativeTime, useI18n } from "@/i18n";
 import type { CommunityCommentItem } from "@/types/community";
 import { toast } from "sonner";
 
@@ -30,6 +28,7 @@ interface ReplyTargetState {
 }
 
 export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
+  const { locale, t } = useI18n();
   const { user } = useAuth();
   const [content, setContent] = useState("");
   const [replyTarget, setReplyTarget] = useState<ReplyTargetState | null>(null);
@@ -74,7 +73,7 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
 
   const handleSelectReply = (targetCommentId: string, targetAuthorName: string) => {
     if (!user) {
-      toast.error("Vui lòng đăng nhập để trả lời bình luận");
+      toast.error(t("community.toasts.loginToReply"));
       return;
     }
     setReplyTarget({
@@ -149,13 +148,13 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
               </Link>
               {cmt.userId === postOwnerId && (
                 <span className="px-1.5 py-0.5 rounded-full bg-secondary text-secondary-foreground text-[11px] font-semibold">
-                  Tác giả
+                  {t("community.comments.authorBadge")}
                 </span>
               )}
               {isReply && cmt.replyToName && (
                 <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
                   <CornerDownRight className="size-3 text-primary shrink-0" />
-                  <span>trả lời</span>
+                  <span>{t("community.comments.replyingWord")}</span>
                   <span className="font-semibold text-primary">
                     @{cmt.replyToName}
                   </span>
@@ -164,8 +163,8 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
               <span className="text-[11px] text-muted-foreground shrink-0">
                 •{" "}
                 {cmt.isOptimistic
-                  ? "Đang gửi..."
-                  : formatRelativeTime(cmt.createdAt)}
+                  ? t("community.comments.sending")
+                  : formatRelativeTime(cmt.createdAt, locale)}
               </span>
             </div>
 
@@ -174,8 +173,8 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
                 type="button"
                 onClick={() => setDeletingCommentId(cmt.id)}
                 disabled={deleteCommentMutation.isPending}
-                aria-label="Xóa bình luận"
-                title="Xóa bình luận"
+                aria-label={t("community.comments.deleteTitle")}
+                title={t("community.comments.deleteTitle")}
                 className="min-h-[34px] min-w-[34px] inline-flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-muted transition-colors cursor-pointer shrink-0"
               >
                 <Trash2 className="size-3.5" />
@@ -196,7 +195,7 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
                 }
                 className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground hover:text-primary transition-colors cursor-pointer py-0.5"
               >
-                <span>Trả lời</span>
+                <span>{t("community.comments.reply")}</span>
               </button>
             </div>
           )}
@@ -217,7 +216,7 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
         <div className="py-4 text-center space-y-1">
           <MessageSquare className="size-5 mx-auto text-muted-foreground/60" />
           <p className="text-xs text-muted-foreground">
-            Chưa có bình luận nào. Hãy là người đầu tiên đặt câu hỏi hoặc chia sẻ cảm nhận!
+            {t("community.comments.emptyInline")}
           </p>
         </div>
       ) : (
@@ -245,7 +244,7 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
             <div className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-secondary/50 border border-primary/25 text-xs">
               <div className="flex items-center gap-1.5 min-w-0">
                 <CornerDownRight className="size-3.5 text-primary shrink-0" />
-                <span className="text-muted-foreground">Đang trả lời</span>
+                <span className="text-muted-foreground">{t("community.comments.replyingTo")}</span>
                 <span className="font-bold text-primary truncate">
                   @{replyTarget.replyToName}
                 </span>
@@ -253,11 +252,11 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
               <button
                 type="button"
                 onClick={() => setReplyTarget(null)}
-                aria-label="Hủy trả lời bình luận"
+                aria-label={t("community.comments.cancelReplyAria")}
                 className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0"
               >
                 <X className="size-3" />
-                <span>Hủy</span>
+                <span>{t("common.cancel")}</span>
               </button>
             </div>
           )}
@@ -270,11 +269,11 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
               onChange={(e) => setContent(e.target.value)}
               placeholder={
                 replyTarget
-                  ? `Viết câu trả lời cho @${replyTarget.replyToName}...`
-                  : "Viết bình luận hỏi kinh nghiệm hoặc chia sẻ cảm nghĩ..."
+                  ? t("community.comments.replyPlaceholder", { name: replyTarget.replyToName })
+                  : t("community.comments.defaultPlaceholder")
               }
               maxLength={COMMUNITY_UI_CONSTANTS.MAX_COMMENT_LENGTH}
-              aria-label="Nội dung bình luận"
+              aria-label={t("community.comments.inputAria")}
               className="flex-1 h-11 px-3.5 rounded-xl border border-border bg-background text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
             <Button
@@ -284,19 +283,19 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
               className="h-11 px-4 rounded-xl text-xs font-semibold gap-1.5 shrink-0 cursor-pointer"
             >
               <Send className="size-3.5" />
-              <span>Gửi</span>
+              <span>{t("community.comments.send")}</span>
             </Button>
           </form>
         </div>
       ) : (
         <div className="flex items-center justify-between p-2.5 rounded-xl bg-muted/40 border border-border/60 text-xs text-muted-foreground">
-          <span>Đăng nhập để bình luận và trao đổi kinh nghiệm cùng tác giả.</span>
+          <span>{t("community.comments.guestPrompt")}</span>
           <button
             type="button"
             onClick={() => useAuthModalStore.getState().openAuthModal("login")}
             className="font-semibold text-primary hover:underline shrink-0 ml-2 cursor-pointer"
           >
-            Đăng nhập
+            {t("nav.signIn")}
           </button>
         </div>
       )}
@@ -327,13 +326,13 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
                   id="drawer-confirm-delete-comment-title"
                   className="text-base font-bold text-foreground"
                 >
-                  Xác nhận xóa bình luận?
+                  {t("community.comments.deleteConfirmTitle")}
                 </h4>
                 <p
                   id="drawer-confirm-delete-comment-desc"
                   className="text-xs sm:text-sm text-muted-foreground leading-relaxed"
                 >
-                  Bạn có chắc chắn muốn xóa bình luận này không? Hành động này không thể hoàn tác.
+                  {t("community.comments.deleteConfirmDesc")}
                 </p>
               </div>
             </div>
@@ -346,7 +345,7 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
                 onClick={() => setDeletingCommentId(null)}
                 className="h-9 px-4 rounded-xl text-xs font-medium cursor-pointer"
               >
-                Hủy
+                {t("common.cancel")}
               </Button>
               <Button
                 type="button"
@@ -369,7 +368,7 @@ export function CommentDrawer({ postId, postOwnerId }: CommentDrawerProps) {
                 {deleteCommentMutation.isPending && (
                   <Loader2 className="size-3.5 animate-spin" />
                 )}
-                <span>Xóa bình luận</span>
+                <span>{t("community.comments.deleteTitle")}</span>
               </Button>
             </div>
           </div>

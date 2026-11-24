@@ -6,10 +6,13 @@ import Link from 'next/link';
 import { Loader2, AlertCircle, ArrowLeft, RotateCw, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/use-auth';
+import { useI18n } from '@/i18n/LocaleProvider';
 
 export function VerifyOtpForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t, messages } = useI18n();
+  const a = messages.auth;
   const email = searchParams.get('email') || '';
 
   const [otp, setOtp] = React.useState(['', '', '', '', '', '']);
@@ -101,7 +104,7 @@ export function VerifyOtpForm() {
       });
 
       setIsSuccess(true);
-      toast.success('Xác thực OTP thành công!');
+      toast.success(a.messages.otpVerified);
 
       // Store reset ticket securely in sessionStorage for next step
       if (typeof window !== 'undefined') {
@@ -113,7 +116,7 @@ export function VerifyOtpForm() {
       }, 800);
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : 'Mã OTP không chính xác hoặc đã hết hạn';
+        err instanceof Error ? err.message : a.messages.otpInvalidOrExpired;
       setServerError(message);
     }
   };
@@ -125,13 +128,13 @@ export function VerifyOtpForm() {
     try {
       const result = await forgotPassword({ email });
 
-      toast.success(result.message || 'Mã OTP mới đã được gửi tới email!');
+      toast.success(a.messages.otpNewSent);
       setCountdown(result.retryAfter || 60);
       setOtp(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     } catch (err: unknown) {
       const message =
-        err instanceof Error ? err.message : 'Không thể gửi lại mã OTP. Vui lòng thử lại sau.';
+        err instanceof Error ? err.message : a.messages.otpSendFailed;
       setServerError(message);
     }
   };
@@ -140,14 +143,14 @@ export function VerifyOtpForm() {
     return (
       <div className="space-y-4 text-center">
         <p className="text-sm text-destructive">
-          Không tìm thấy thông tin email cần xác thực.
+          {a.messages.otpMissingEmail}
         </p>
         <Link
           href="/login"
           className="inline-flex items-center gap-1.5 text-xs text-primary font-semibold hover:underline"
         >
           <ArrowLeft className="size-3.5" />
-          <span>Quay lại trang đăng nhập</span>
+          <span>{a.actions.backToLoginPage}</span>
         </Link>
       </div>
     );
@@ -157,7 +160,7 @@ export function VerifyOtpForm() {
     <div className="space-y-6">
       {/* Email badge preview */}
       <div className="rounded-2xl bg-muted/50 border border-border/80 p-3.5 text-center space-y-1">
-        <span className="text-xs text-muted-foreground">Mã OTP đã được gửi đến:</span>
+        <span className="text-xs text-muted-foreground">{a.messages.otpSentTo}</span>
         <div className="font-semibold text-sm text-foreground break-all">{email}</div>
       </div>
 
@@ -171,7 +174,7 @@ export function VerifyOtpForm() {
       {isSuccess && (
         <div className="flex items-center justify-center gap-2 p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-sm font-semibold animate-in fade-in">
           <CheckCircle2 className="size-4.5" />
-          <span>Xác thực thành công! Đang chuyển hướng...</span>
+          <span>{a.messages.otpVerifiedRedirecting}</span>
         </div>
       )}
 
@@ -210,10 +213,10 @@ export function VerifyOtpForm() {
           {isSubmitting ? (
             <>
               <Loader2 className="size-4 animate-spin" />
-              <span>Đang kiểm tra mã...</span>
+              <span>{a.actions.checkingCode}</span>
             </>
           ) : (
-            <span>Xác nhận mã OTP</span>
+            <span>{a.actions.verifyOtp}</span>
           )}
         </button>
       </form>
@@ -222,9 +225,7 @@ export function VerifyOtpForm() {
       <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-muted-foreground border-t border-border/60">
         <div>
           {countdown > 0 ? (
-            <span>
-              Gửi lại mã sau <strong className="text-foreground">{countdown}s</strong>
-            </span>
+            <span>{t('auth.actions.resendAfter', { seconds: countdown })}</span>
           ) : (
             <button
               type="button"
@@ -233,7 +234,7 @@ export function VerifyOtpForm() {
               className="inline-flex items-center gap-1 text-primary font-semibold hover:underline cursor-pointer disabled:opacity-50"
             >
               <RotateCw className={`size-3 ${isSubmittingForgotPassword ? 'animate-spin' : ''}`} />
-              <span>Gửi lại mã OTP</span>
+              <span>{a.actions.resendOtp}</span>
             </button>
           )}
         </div>
@@ -242,7 +243,7 @@ export function VerifyOtpForm() {
           href="/forgot-password"
           className="hover:text-foreground hover:underline transition-colors font-medium"
         >
-          Đổi địa chỉ email khác
+          {a.actions.changeEmail}
         </Link>
       </div>
     </div>

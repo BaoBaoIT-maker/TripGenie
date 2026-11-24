@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TripGenie — Demo HUD Pill Xác Minh & Đăng Xuất (Honkai: Star Rail Pattern)</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background-color: #F5F9FF;
+      color: #10243A;
+      -webkit-font-smoothing: antialiased;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-[#F5F9FF] text-[#10243A] flex flex-col">
+
+  <!-- TOP DEMO SWITCHER BAR -->
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 px-4 py-2.5">
+    <div class="max-w-5xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2">
+        <div class="size-7 rounded-lg bg-[#0194F3] text-white flex items-center justify-center font-black text-xs">
+          TG
+        </div>
+        <span class="font-extrabold text-[#10243A] text-xs sm:text-sm tracking-tight">
+          Demo In-Modal HUD Pill (0 KB Ảnh • Không Trang Trắng • Chuẩn Honkai: Star Rail)
+        </span>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-1.5 text-xs">
+        <button
+          type="button"
+          onclick="triggerGoogleVerify()"
+          class="px-3.5 py-1.5 rounded-xl font-bold bg-[#0194F3] hover:bg-[#0084DE] text-white transition-colors cursor-pointer inline-flex items-center gap-1.5"
+        >
+          <i class="fa-brands fa-google text-[11px]"></i>
+          <span>1. Bấm thử "Đăng nhập với Google"</span>
+        </button>
+
+        <button
+          type="button"
+          onclick="triggerLogoutHud()"
+          class="px-3.5 py-1.5 rounded-xl font-semibold bg-[#F8FAFC] text-[#10243A] border border-slate-200 hover:bg-[#F0F7FF] hover:text-[#0194F3] transition-colors cursor-pointer inline-flex items-center gap-1.5"
+        >
+          <i class="fa-solid fa-right-from-bracket text-[11px]"></i>
+          <span>2. Bấm thử "Đang đăng xuất..."</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- BACKGROUND PAGE CONTEXT (STAYS INTACT — NEVER WIPED TO A BLANK WHITE PAGE) -->
+  <main class="flex-1 relative flex items-center justify-center p-4">
+    <!-- AuthModal Mockup in the middle of the page -->
+    <div id="auth-modal-card" class="w-full max-w-md rounded-2xl bg-white border border-slate-200/90 shadow-xl p-6 space-y-4">
+      <div class="space-y-1">
+        <h1 class="text-xl font-extrabold text-[#10243A] tracking-tight">
+          Đăng nhập TripGenie
+        </h1>
+        <p class="text-xs text-slate-500">
+          Trang hiện tại giữ nguyên 100% phía sau — không chuyển sang trang trắng.
+        </p>
+      </div>
+
+      <div class="space-y-3">
+        <input
+          type="text"
+          disabled
+          value="hoangminh@tripgenie.vn"
+          class="w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-600 font-medium"
+        />
+        <input
+          type="password"
+          disabled
+          value="••••••••••••"
+          class="w-full h-11 px-3.5 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-600 font-medium"
+        />
+        <button
+          type="button"
+          class="w-full h-11 rounded-xl bg-[#0194F3] text-white font-bold text-xs shadow-sm"
+        >
+          Đăng nhập
+        </button>
+      </div>
+
+      <div class="relative my-2 text-center">
+        <div class="absolute inset-0 flex items-center">
+          <div class="w-full border-t border-slate-200"></div>
+        </div>
+        <span class="relative bg-white px-3 text-[11px] text-slate-400 font-semibold uppercase tracking-wider">
+          Hoặc
+        </span>
+      </div>
+
+      <button
+        type="button"
+        onclick="triggerGoogleVerify()"
+        class="w-full h-11 flex items-center justify-center gap-2.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-[#10243A] text-xs font-bold transition-colors cursor-pointer"
+      >
+        <i class="fa-brands fa-google text-[#0194F3] text-sm"></i>
+        <span>Đăng nhập với Google (Mở Popup + HUD Pill)</span>
+      </button>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- HONKAI: STAR RAIL COMPACT HUD PILL OVERLAY (1:1 WITH AuthHudPill)   -->
+    <!-- =================================================================== -->
+    <div
+      id="hud-overlay"
+      class="hidden fixed inset-0 z-50 bg-[#10243A]/35 backdrop-blur-[2px] flex items-center justify-center p-4"
+    >
+      <div
+        role="status"
+        aria-live="polite"
+        class="inline-flex items-center gap-3 px-5 py-3.5 rounded-2xl bg-[#10243A]/95 text-white border border-white/15 shadow-2xl backdrop-blur-md select-none"
+      >
+        <i
+          id="hud-icon"
+          class="fa-solid fa-circle-notch fa-spin text-[#0194F3] text-sm shrink-0"
+          aria-hidden="true"
+        ></i>
+        <span id="hud-label" class="text-xs sm:text-sm font-bold tracking-tight whitespace-nowrap">
+          Đang xác minh...
+        </span>
+        <button
+          type="button"
+          id="hud-cancel"
+          onclick="hideHud()"
+          class="ml-1 pl-2.5 border-l border-white/15 text-[11px] font-semibold text-slate-300 hover:text-white transition-colors cursor-pointer"
+        >
+          Hủy
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Toast -->
+  <div
+    id="demo-toast"
+    class="hidden fixed bottom-5 right-5 z-50 bg-[#10243A] text-white text-xs font-semibold px-4 py-3 rounded-xl shadow-xl border border-slate-700 flex items-center gap-2.5"
+  >
+    <i class="fa-solid fa-circle-check text-[#0194F3]"></i>
+    <span id="demo-toast-msg">Thông báo</span>
+  </div>
+
+  <script>
+    function showToast(msg) {
+      const t = document.getElementById('demo-toast');
+      document.getElementById('demo-toast-msg').textContent = msg;
+      t.classList.remove('hidden');
+      clearTimeout(window.__t);
+      window.__t = setTimeout(() => t.classList.add('hidden'), 2600);
+    }
+
+    function hideHud() {
+      clearTimeout(window.__hudTimer);
+      document.getElementById('hud-overlay').classList.add('hidden');
+    }
+
+    function triggerGoogleVerify() {
+      clearTimeout(window.__hudTimer);
+      const overlay = document.getElementById('hud-overlay');
+      const label = document.getElementById('hud-label');
+      const cancel = document.getElementById('hud-cancel');
+
+      label.textContent = 'Đang xác minh...';
+      cancel.classList.remove('hidden');
+      overlay.classList.remove('hidden');
+
+      window.__hudTimer = setTimeout(() => {
+        overlay.classList.add('hidden');
+        showToast('Chào mừng trở lại, Hoàng Minh! (Đã đăng nhập ngay tại chỗ, 0 lần reload trang)');
+      }, 1100);
+    }
+
+    function triggerLogoutHud() {
+      clearTimeout(window.__hudTimer);
+      const overlay = document.getElementById('hud-overlay');
+      const label = document.getElementById('hud-label');
+      const cancel = document.getElementById('hud-cancel');
+
+      label.textContent = 'Đang đăng xuất...';
+      cancel.classList.add('hidden');
+      overlay.classList.remove('hidden');
+
+      window.__hudTimer = setTimeout(() => {
+        overlay.classList.add('hidden');
+        showToast('Đã đăng xuất tài khoản & chuyển thẳng về Trang chủ (/)');
+      }, 650);
+    }
+  </script>
+</body>
+</html>

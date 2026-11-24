@@ -7,6 +7,7 @@ import {
   useUploadCommunityMedia,
 } from "@/features/community/hooks/use-community";
 import { CommunityModalPortal } from "./CommunityModalPortal";
+import { useI18n } from "@/i18n";
 
 interface CreateGroupModalProps {
   open: boolean;
@@ -14,6 +15,7 @@ interface CreateGroupModalProps {
 }
 
 export function CreateGroupModal({ open, onClose }: CreateGroupModalProps) {
+  const { t } = useI18n();
   const [name, setName] = useState("");
   const [subtitle, setSubtitle] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
@@ -76,17 +78,17 @@ export function CreateGroupModal({ open, onClose }: CreateGroupModalProps) {
               id="create-group-modal-title"
               className="text-sm font-bold text-slate-900"
             >
-              Tạo Nhóm Cộng Đồng Mới
+              {t("community.createGroup.title")}
             </h3>
             <p className="text-[11px] text-[#64748B]">
-              Dành cho Quản trị viên (Admin) tạo chủ đề & điểm đến
+              {t("community.createGroup.subtitle")}
             </p>
           </div>
         </div>
         <button
           type="button"
           onClick={handleClose}
-          aria-label="Đóng hộp thoại"
+          aria-label={t("community.createGroup.closeAria")}
           className="size-8 rounded-full bg-white border border-[#E2E8F0] hover:bg-[#F1F5F9] inline-flex items-center justify-center text-[#64748B] hover:text-[#0F172A] transition-colors cursor-pointer"
         >
           <X className="size-4" />
@@ -99,7 +101,7 @@ export function CreateGroupModal({ open, onClose }: CreateGroupModalProps) {
             htmlFor="group-name-input"
             className="block text-xs font-extrabold text-[#0F172A]"
           >
-            Tên nhóm chủ đề <span className="text-rose-500">*</span>
+            {t("community.createGroup.nameLabel")} <span className="text-rose-500">*</span>
           </label>
           <input
             id="group-name-input"
@@ -108,7 +110,7 @@ export function CreateGroupModal({ open, onClose }: CreateGroupModalProps) {
             maxLength={120}
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="VD: Săn Mây & Núi Rừng"
+            placeholder={t("community.createGroup.namePlaceholder")}
             className="w-full h-10 px-3.5 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] text-xs text-[#0F172A] focus:outline-none focus:border-[#0194F3] focus:bg-white transition-colors"
           />
         </div>
@@ -118,7 +120,7 @@ export function CreateGroupModal({ open, onClose }: CreateGroupModalProps) {
             htmlFor="group-subtitle-input"
             className="block text-xs font-extrabold text-[#0F172A]"
           >
-            Điểm đến tiêu biểu / Mô tả ngắn
+            {t("community.createGroup.subtitleLabel")}
           </label>
           <input
             id="group-subtitle-input"
@@ -126,7 +128,7 @@ export function CreateGroupModal({ open, onClose }: CreateGroupModalProps) {
             maxLength={255}
             value={subtitle}
             onChange={(e) => setSubtitle(e.target.value)}
-            placeholder="VD: Đà Lạt, Tà Xùa, Hà Giang"
+            placeholder={t("community.createGroup.subtitlePlaceholder")}
             className="w-full h-10 px-3.5 rounded-[12px] border border-[#E2E8F0] bg-[#F8FAFC] text-xs text-[#0F172A] focus:outline-none focus:border-[#0194F3] focus:bg-white transition-colors"
           />
         </div>
@@ -136,7 +138,7 @@ export function CreateGroupModal({ open, onClose }: CreateGroupModalProps) {
             htmlFor="group-cover-input"
             className="block text-xs font-extrabold text-[#0F172A]"
           >
-            Ảnh đại diện nhóm (URL hoặc Tải lên)
+            {t("community.createGroup.coverLabel")}
           </label>
           <div className="flex items-center gap-2">
             <input
@@ -153,7 +155,7 @@ export function CreateGroupModal({ open, onClose }: CreateGroupModalProps) {
               ) : (
                 <Upload className="size-3.5 text-[#0194F3]" />
               )}
-              <span>Tải ảnh</span>
+              <span>{t("community.createGroup.uploadPhoto")}</span>
               <input
                 type="file"
                 accept="image/jpeg,image/png,image/webp"
@@ -171,7 +173,7 @@ export function CreateGroupModal({ open, onClose }: CreateGroupModalProps) {
             disabled={createGroupMutation.isPending}
             className="h-9 px-4 rounded-[10px] border border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-xs font-bold text-[#334155] transition-colors cursor-pointer disabled:opacity-50"
           >
-            Hủy
+            {t("common.cancel")}
           </button>
           <button
             type="submit"
@@ -181,7 +183,7 @@ export function CreateGroupModal({ open, onClose }: CreateGroupModalProps) {
             {createGroupMutation.isPending && (
               <Loader2 className="size-3.5 animate-spin" />
             )}
-            <span>Tạo nhóm</span>
+            <span>{t("community.createGroup.submit")}</span>
           </button>
         </div>
       </form>

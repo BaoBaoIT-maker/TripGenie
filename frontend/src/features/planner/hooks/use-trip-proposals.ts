@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useI18n } from '@/i18n';
 import { ApiError } from '@/services/itinerary-planner.service';
 import { tripProposalService } from '@/services/trip-companion.service';
 import type {
@@ -14,8 +15,6 @@ import type {
 import { TRIP_COMPANIONS_CONFIG } from '../config/trip-companions.config';
 import { NON_RETRYABLE_HTTP_STATUS } from '../constants/itinerary.constants';
 import { itineraryKeys } from './use-itinerary-planner';
-
-const { PROPOSAL_MESSAGES } = TRIP_COMPANIONS_CONFIG;
 
 export const PROPOSALS_QUERY_KEYS = {
   list: (itineraryId: string) => ['itineraries', itineraryId, 'proposals'] as const,
@@ -65,6 +64,7 @@ export function useTripProposals(itineraryId: string, enabled = true) {
 
 export function useCreateGroupProposal(itineraryId: string) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const listKey = PROPOSALS_QUERY_KEYS.list(itineraryId);
 
   return useMutation({
@@ -75,10 +75,10 @@ export function useCreateGroupProposal(itineraryId: string) {
         proposals: [created, ...(prev?.proposals.filter((p) => p.id !== created.id) ?? [])],
       }));
       queryClient.invalidateQueries({ queryKey: listKey });
-      toast.success(PROPOSAL_MESSAGES.CREATE_SUCCESS);
+      toast.success(t('planner.proposals.toasts.createSuccess'));
     },
     onError: (err: Error) => {
-      toast.error(err.message || PROPOSAL_MESSAGES.CREATE_ERROR);
+      toast.error(err.message || t('planner.proposals.toasts.createError'));
     },
   });
 }
@@ -92,6 +92,7 @@ export function useToggleProposalVote(
   currentUser?: GroupProposalParticipant | null,
 ) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const listKey = PROPOSALS_QUERY_KEYS.list(itineraryId);
 
   return useMutation({
@@ -114,7 +115,7 @@ export function useToggleProposalVote(
       if (context?.previousData) {
         queryClient.setQueryData(listKey, context.previousData);
       }
-      toast.error(err.message || PROPOSAL_MESSAGES.VOTE_ERROR);
+      toast.error(err.message || t('planner.proposals.toasts.voteError'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: listKey });
@@ -124,6 +125,7 @@ export function useToggleProposalVote(
 
 export function useResolveGroupProposal(itineraryId: string) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const listKey = PROPOSALS_QUERY_KEYS.list(itineraryId);
 
   return useMutation({
@@ -165,18 +167,19 @@ export function useResolveGroupProposal(itineraryId: string) {
 
       toast.success(
         variables.action === 'APPROVE'
-          ? PROPOSAL_MESSAGES.APPROVE_SUCCESS
-          : PROPOSAL_MESSAGES.REJECT_SUCCESS,
+          ? t('planner.proposals.toasts.approveSuccess')
+          : t('planner.proposals.toasts.rejectSuccess'),
       );
     },
     onError: (err: Error) => {
-      toast.error(err.message || PROPOSAL_MESSAGES.RESOLVE_ERROR);
+      toast.error(err.message || t('planner.proposals.toasts.resolveError'));
     },
   });
 }
 
 export function useWithdrawGroupProposal(itineraryId: string) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
   const listKey = PROPOSALS_QUERY_KEYS.list(itineraryId);
 
   return useMutation({
@@ -198,10 +201,10 @@ export function useWithdrawGroupProposal(itineraryId: string) {
       if (context?.previousData) {
         queryClient.setQueryData(listKey, context.previousData);
       }
-      toast.error(err.message || PROPOSAL_MESSAGES.WITHDRAW_ERROR);
+      toast.error(err.message || t('planner.proposals.toasts.withdrawError'));
     },
     onSuccess: () => {
-      toast.success(PROPOSAL_MESSAGES.WITHDRAW_SUCCESS);
+      toast.success(t('planner.proposals.toasts.withdrawSuccess'));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: listKey });

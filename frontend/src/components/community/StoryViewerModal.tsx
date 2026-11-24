@@ -10,9 +10,9 @@ import {
 } from "@/features/community/hooks/use-community";
 import {
   COMMUNITY_UI_CONSTANTS,
-  formatRelativeTime,
   isVideoUrl,
 } from "@/services/community.service";
+import { formatRelativeTime, useI18n } from "@/i18n";
 import type { CommunityPostItem } from "@/types/community";
 
 interface StoryViewerModalProps {
@@ -30,6 +30,7 @@ export function StoryViewerModal({
   onClose,
   onPreviewItinerary,
 }: StoryViewerModalProps) {
+  const { locale, t } = useI18n();
   const { user } = useAuth();
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isPaused, setIsPaused] = useState(false);
@@ -130,14 +131,16 @@ export function StoryViewerModal({
     currentStory.mediaUrls?.[0] || currentStory.itinerary?.coverPhoto || "";
   const isVideo = isVideoUrl(mediaUrl);
   const groupOrContextLabel =
-    currentStory.group?.name || COMMUNITY_UI_CONSTANTS.DEFAULT_GROUP_DISPLAY_NAME;
+    currentStory.group && !currentStory.group.isDefault
+      ? currentStory.group.name
+      : t("community.defaultGroupName");
   const profileHref = `/community/profile/${encodeURIComponent(
     currentStory.author.username || currentStory.author.id
   )}`;
 
   const handleToggleLike = () => {
     if (!user) {
-      toast.error("Vui lòng đăng nhập để thả tim khoảnh khắc này");
+      toast.error(t("community.toasts.loginToLikeStory"));
       return;
     }
     toggleLikeMutation.mutate(currentStory.id);
@@ -148,7 +151,7 @@ export function StoryViewerModal({
     const content = replyText.trim();
     if (!content) return;
     if (!user) {
-      toast.error("Vui lòng đăng nhập để gửi phản hồi");
+      toast.error(t("community.toasts.loginToSendReply"));
       return;
     }
     await createCommentMutation.mutateAsync({
@@ -156,14 +159,14 @@ export function StoryViewerModal({
       content,
     });
     setReplyText("");
-    toast.success("Đã gửi bình luận phản hồi vào bài viết!");
+    toast.success(t("community.toasts.storyReplied"));
   };
 
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`Khoảnh khắc check-in của ${currentStory.author.fullName}`}
+      aria-label={t("community.story.dialogAria", { name: currentStory.author.fullName })}
       className="fixed inset-0 z-[100] bg-[#0F172A]/75 flex items-center justify-center p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
@@ -223,7 +226,7 @@ export function StoryViewerModal({
                 {currentStory.author.isVerified && (
                   <i
                     className="fa-solid fa-circle-check text-[#38BDF8] text-xs"
-                    title="Thổ địa được xác thực"
+                    title={t("community.verifiedLocalTitle")}
                   />
                 )}
               </div>
@@ -236,7 +239,7 @@ export function StoryViewerModal({
                   {groupOrContextLabel}
                 </span>
                 <span>•</span>
-                <span>{formatRelativeTime(currentStory.createdAt)}</span>
+                <span>{formatRelativeTime(currentStory.createdAt, locale)}</span>
               </div>
             </div>
           </Link>
@@ -244,7 +247,7 @@ export function StoryViewerModal({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Đóng khoảnh khắc check-in"
+            aria-label={t("community.story.closeAria")}
             className="size-8 rounded-full bg-black/40 hover:bg-black/65 border-none text-white flex items-center justify-center cursor-pointer transition-colors"
           >
             <i className="fa-solid fa-xmark text-sm" aria-hidden="true" />
@@ -259,7 +262,7 @@ export function StoryViewerModal({
               setCurrentIndex((prev) => prev - 1);
               setProgress(0);
             }}
-            aria-label="Khoảnh khắc trước"
+            aria-label={t("community.story.prevAria")}
             className="absolute left-2 top-1/2 -translate-y-1/2 z-20 size-8 rounded-full bg-black/35 hover:bg-black/60 text-white flex items-center justify-center cursor-pointer transition-colors"
           >
             <i className="fa-solid fa-chevron-left text-xs" aria-hidden="true" />
@@ -272,7 +275,7 @@ export function StoryViewerModal({
               setCurrentIndex((prev) => prev + 1);
               setProgress(0);
             }}
-            aria-label="Khoảnh khắc tiếp theo"
+            aria-label={t("community.story.nextAria")}
             className="absolute right-2 top-1/2 -translate-y-1/2 z-20 size-8 rounded-full bg-black/35 hover:bg-black/60 text-white flex items-center justify-center cursor-pointer transition-colors"
           >
             <i className="fa-solid fa-chevron-right text-xs" aria-hidden="true" />
@@ -335,7 +338,7 @@ export function StoryViewerModal({
                 </div>
                 <div className="min-w-0">
                   <div className="text-[9px] opacity-80 uppercase font-bold">
-                    Lộ trình liên quan
+                    {t("community.story.relatedItinerary")}
                   </div>
                   <div className="text-[11px] font-extrabold truncate">
                     {currentStory.itinerary.title}
@@ -350,7 +353,7 @@ export function StoryViewerModal({
                 }}
                 className="bg-[#0194F3] hover:bg-[#007FE3] text-white border-none rounded-full px-2.5 py-1 text-[10px] font-extrabold cursor-pointer shrink-0 transition-colors"
               >
-                Xem ngay
+                {t("community.story.viewNow")}
               </button>
             </div>
           )}
@@ -365,8 +368,8 @@ export function StoryViewerModal({
                 type="text"
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
-                placeholder="Gửi bình luận phản hồi..."
-                aria-label="Gửi bình luận phản hồi khoảnh khắc"
+                placeholder={t("community.story.replyPlaceholder")}
+                aria-label={t("community.story.replyAria")}
                 className="w-full bg-white/20 border border-white/25 rounded-full py-2 px-3.5 text-[11px] text-white placeholder:text-white/75 outline-none focus:border-[#38BDF8] focus:bg-white/25 transition-colors"
               />
             </div>
@@ -374,9 +377,9 @@ export function StoryViewerModal({
               type="button"
               onClick={handleToggleLike}
               aria-label={
-                currentStory.isLiked ? "Bỏ thích khoảnh khắc" : "Thả tim khoảnh khắc"
+                currentStory.isLiked ? t("community.story.unlikeAria") : t("community.story.likeAria")
               }
-              title={`${currentStory.likeCount} lượt thích`}
+              title={t("community.post.likesCount", { count: currentStory.likeCount })}
               className="size-9 rounded-full bg-white/20 hover:bg-white/30 border-none text-white flex items-center justify-center cursor-pointer transition-transform active:scale-90 shrink-0"
             >
               <i

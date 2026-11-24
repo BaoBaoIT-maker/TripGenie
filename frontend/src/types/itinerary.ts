@@ -345,6 +345,7 @@ export interface DayWeather {
   isForecast: boolean;
   condition: WeatherCondition;
   labelVi: string;
+  labelEn?: string;
   tempMinC: number;
   tempMaxC: number;
   tempAvgC: number;

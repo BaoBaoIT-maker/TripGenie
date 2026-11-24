@@ -1,5 +1,8 @@
+"use client";
+
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/i18n/LocaleProvider";
 import { cn } from "@/lib/utils";
 
 interface ErrorStateProps {
@@ -10,11 +13,15 @@ interface ErrorStateProps {
 }
 
 export function ErrorState({
-  title = "Đã xảy ra lỗi",
-  message = "Không thể tải dữ liệu vào lúc này. Vui lòng kiểm tra kết nối mạng hoặc thử lại sau.",
+  title,
+  message,
   onRetry,
   className,
 }: ErrorStateProps) {
+  const { t } = useI18n();
+  const resolvedTitle = title ?? t("common.errorTitle");
+  const resolvedMessage = message ?? t("common.errorMessage");
+
   return (
     <div
       className={cn(
@@ -26,10 +33,10 @@ export function ErrorState({
         <AlertTriangle className="size-7 stroke-[1.75]" />
       </div>
       <h3 className="text-lg font-semibold text-foreground tracking-tight">
-        {title}
+        {resolvedTitle}
       </h3>
       <p className="mt-1.5 max-w-md text-sm text-muted-foreground leading-relaxed">
-        {message}
+        {resolvedMessage}
       </p>
 
       {onRetry && (
@@ -39,7 +46,7 @@ export function ErrorState({
           className="mt-6 gap-2 border-destructive/30 hover:bg-destructive/10 text-destructive"
         >
           <RefreshCw className="size-4" />
-          Thử lại
+          {t("common.retry")}
         </Button>
       )}
     </div>

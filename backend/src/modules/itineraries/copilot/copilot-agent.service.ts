@@ -16,6 +16,8 @@ import {
   GeminiPart,
 } from '../../../common/utils/gemini-contents.util';
 import { formatTimeOfDay } from '../../../common/utils/time-of-day.util';
+import { AppLocale, DEFAULT_LOCALE } from '../../../common/i18n/locale.util';
+import { t } from '../../../common/i18n/t.util';
 import { ItineraryPlannerService } from '../services/itinerary-planner.service';
 import { ItineraryAccessService } from '../services/itinerary-access.service';
 import { TransitService } from '../services/transit.service';
@@ -42,30 +44,42 @@ type CopilotToolHandler = (
   itineraryId: string,
   args: Record<string, unknown>,
   dryRun: boolean,
+  locale?: AppLocale,
 ) => Promise<CopilotToolExecutionResult>;
 
 const PROPOSAL_TITLE_BUILDERS: Record<
   CopilotToolName,
-  (data?: Record<string, unknown>) => string
+  (locale: AppLocale, data?: Record<string, unknown>) => string
 > = {
-  [COPILOT_TOOL_NAMES.SWAP_ACTIVITY]: (data) =>
+  [COPILOT_TOOL_NAMES.SWAP_ACTIVITY]: (locale, data) =>
     data?.dayNumber
-      ? `Đề xuất đổi địa điểm Ngày ${data.dayNumber}`
-      : 'Đề xuất đổi địa điểm',
-  [COPILOT_TOOL_NAMES.SWAP_DAYS]: (data) =>
+      ? t(locale, 'copilot.proposals.swapActivityDay', {
+          day: String(data.dayNumber),
+        })
+      : t(locale, 'copilot.proposals.swapActivity'),
+  [COPILOT_TOOL_NAMES.SWAP_DAYS]: (locale, data) =>
     data?.dayA && data?.dayB
-      ? `Đề xuất hoán đổi Ngày ${data.dayA} và Ngày ${data.dayB}`
-      : 'Đề xuất hoán đổi ngày',
-  [COPILOT_TOOL_NAMES.ADD_ACTIVITY]: (data) =>
+      ? t(locale, 'copilot.proposals.swapDaysRange', {
+          dayA: String(data.dayA),
+          dayB: String(data.dayB),
+        })
+      : t(locale, 'copilot.proposals.swapDays'),
+  [COPILOT_TOOL_NAMES.ADD_ACTIVITY]: (locale, data) =>
     data?.dayNumber
-      ? `Đề xuất thêm điểm Ngày ${data.dayNumber}`
-      : 'Đề xuất thêm địa điểm',
-  [COPILOT_TOOL_NAMES.REMOVE_ACTIVITY]: (data) =>
+      ? t(locale, 'copilot.proposals.addActivityDay', {
+          day: String(data.dayNumber),
+        })
+      : t(locale, 'copilot.proposals.addActivity'),
+  [COPILOT_TOOL_NAMES.REMOVE_ACTIVITY]: (locale, data) =>
     data?.dayNumber
-      ? `Đề xuất xóa điểm Ngày ${data.dayNumber}`
-      : 'Đề xuất xóa địa điểm',
-  [COPILOT_TOOL_NAMES.MOVE_ACTIVITY]: () => 'Đề xuất chuyển ngày hoạt động',
-  [COPILOT_TOOL_NAMES.CHANGE_DESTINATION]: () => 'Đề xuất đổi điểm đến',
+      ? t(locale, 'copilot.proposals.removeActivityDay', {
+          day: String(data.dayNumber),
+        })
+      : t(locale, 'copilot.proposals.removeActivity'),
+  [COPILOT_TOOL_NAMES.MOVE_ACTIVITY]: (locale) =>
+    t(locale, 'copilot.proposals.moveActivity'),
+  [COPILOT_TOOL_NAMES.CHANGE_DESTINATION]: (locale) =>
+    t(locale, 'copilot.proposals.changeDestination'),
 };
 
 @Injectable()
@@ -104,12 +118,20 @@ export class CopilotAgentService {
 
     // Strategy/Dispatcher map: Open/Closed Principle (OCP) without switch/if-else chains
     this.toolHandlers = {
-      [COPILOT_TOOL_NAMES.CHANGE_DESTINATION]: async (_itineraryId, args) => {
-        const dest = String(args.newDestination || 'điểm đến mới');
+      [COPILOT_TOOL_NAMES.CHANGE_DESTINATION]: async (
+        _itineraryId,
+        args,
+        _dryRun,
+        locale = DEFAULT_LOCALE,
+      ) => {
+        const dest = String(
+          args.newDestination ||
+            t(locale, 'copilot.changeDestinationFallback'),
+        );
         return {
           toolName: COPILOT_TOOL_NAMES.CHANGE_DESTINATION,
           success: false,
-          message: `Đổi sang ${dest} cần khởi tạo một lịch trình mới để tính toán lại điểm đến, thời gian và phương tiện di chuyển phù hợp. Bạn hãy bấm vào nút bên dưới để tạo lịch trình ${dest} mới nhé!`,
+          message: t(locale, 'copilot.changeDestinationMessage', { dest }),
           data: {
             action: {
               type: 'CREATE_NEW_TRIP',
@@ -193,6 +215,7 @@ export class CopilotAgentService {
     userId?: string,
     sessionId?: string,
     autoApply: boolean = false,
+    locale: AppLocale = DEFAULT_LOCALE,
   ): Promise<CopilotChatResponse> {
     const cleanMessage = userMessage.trim();
     const itinerary = await this.prisma.itinerary.findFirst({
@@ -262,6 +285,7 @@ export class CopilotAgentService {
           destination: itinerary.destination,
           startDate: itinerary.startDate,
           totalDays: Math.max(spanDays, maxDay, 1),
+          locale,
         })
       : Promise.resolve(null);
 
@@ -309,6 +333,7 @@ export class CopilotAgentService {
       availablePlaces: destinationPlaces,
       sessionSummary: session.summary,
       weatherGuidance: weatherSummary?.guidance,
+      locale,
     });
     const contents: GeminiContent[] = buildAlternatingGeminiContents(
       historyRows,
@@ -366,6 +391,7 @@ export class CopilotAgentService {
           toolName,
           toolArgs,
           shouldDryRun,
+          locale,
         );
         appliedTool = {
           name: toolName,
@@ -382,7 +408,7 @@ export class CopilotAgentService {
           proposal = {
             id: `prop-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
             toolName,
-            title: this.getProposalTitle(toolName, toolResult.data),
+            title: this.getProposalTitle(toolName, toolResult.data, locale),
             description: toolResult.message,
             dayNumber: toolResult.data?.dayNumber as number | undefined,
             fromPlaceId: toolResult.data?.oldPlaceId as string | undefined,
@@ -440,8 +466,8 @@ export class CopilotAgentService {
                         oldPlaceName: proposal?.fromPlaceName,
                         proposedPlaceName: proposal?.toPlaceName,
                         instruction: shouldDryRun
-                          ? `Đây mới là ĐỀ XUẤT (chưa áp dụng vào lịch trình). BẮT BUỘC nêu chính xác tên địa điểm đề xuất trong resultMessage ("${proposal?.toPlaceName || ''}"), tuyệt đối không tự gọi tên quán khác, và mời người dùng bấm nút [Áp dụng vào lịch trình] bên dưới.`
-                          : 'Đã thực thi thay đổi thành công. Hãy phản hồi ngắn gọn, thân thiện và nhiệt tình cho người dùng.',
+                          ? `This is a PROPOSAL only (not yet applied to the itinerary). You MUST mention the exact proposed place name from resultMessage ("${proposal?.toPlaceName || ''}"), never invent another place name, and invite the user to click the Apply button below. Follow the OUTPUT LANGUAGE & TONE rule (${locale === 'en' ? 'English' : 'Vietnamese'}).`
+                          : `The itinerary update succeeded. Respond concisely, warmly, and naturally following the OUTPUT LANGUAGE & TONE rule (${locale === 'en' ? 'English' : 'Vietnamese'}).`,
                       },
                     },
                   },
@@ -474,14 +500,12 @@ export class CopilotAgentService {
             .filter((p) => p.text)
             .map((p) => p.text)
             .join('\n')
-            .trim() ||
-          'Genie đã ghi nhận yêu cầu của bạn. Bạn có muốn điều chỉnh thêm hoạt động nào nữa không?';
+            .trim() || t(locale, 'copilot.fallbackDirectReply');
       }
     } catch (err) {
       const e = err as Error;
       this.logger.error(`Gemini Copilot Error: ${e.message}`, e.stack);
-      agentReply =
-        'Genie hiện đang bận tối ưu hóa dữ liệu. Bạn hãy thử lại câu hỏi hoặc dùng nút ✨ Đổi điểm trực tiếp trên thẻ nhé!';
+      agentReply = t(locale, 'copilot.fallbackError');
     }
 
     // 5. Atomically persist USER message, AGENT response, and session messageCount
@@ -793,9 +817,10 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
   private getProposalTitle(
     toolName: string,
     data?: Record<string, unknown>,
+    locale: AppLocale = DEFAULT_LOCALE,
   ): string {
     const builder = PROPOSAL_TITLE_BUILDERS[toolName as CopilotToolName];
-    return builder ? builder(data) : 'Đề xuất thay đổi lịch trình';
+    return builder ? builder(locale, data) : t(locale, 'copilot.proposals.default');
   }
 
   private async executeTool(
@@ -803,16 +828,17 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
     toolName: string,
     args: Record<string, unknown>,
     dryRun: boolean = false,
+    locale: AppLocale = DEFAULT_LOCALE,
   ): Promise<CopilotToolExecutionResult> {
     const handler = this.toolHandlers[toolName as CopilotToolName];
     if (!handler) {
       return {
         toolName,
         success: false,
-        message: `Công cụ ${toolName} không được hỗ trợ.`,
+        message: t(locale, 'copilot.unsupportedTool', { toolName }),
       };
     }
-    return handler(itineraryId, args, dryRun);
+    return handler(itineraryId, args, dryRun, locale);
   }
 
   private async resolveSession(
@@ -869,64 +895,75 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
     }>;
     sessionSummary?: string | null;
     weatherGuidance?: string;
+    locale?: AppLocale;
   }): string {
+    const locale = itinerary.locale ?? DEFAULT_LOCALE;
+    const isEn = locale === 'en';
     const dayGroups: Record<number, string[]> = {};
     for (const d of itinerary.destinations) {
       if (!dayGroups[d.dayNumber]) dayGroups[d.dayNumber] = [];
       const timeStr = formatTimeOfDay(d.startTime);
-      const cat = d.place.category?.nameVi || d.place.category?.name || '';
+      const cat = isEn
+        ? d.place.category?.name || d.place.category?.nameVi || ''
+        : d.place.category?.nameVi || d.place.category?.name || '';
       dayGroups[d.dayNumber].push(
         `${timeStr ? `[${timeStr}] ` : ''}${d.place.name}${cat ? ` (${cat})` : ''} - ${d.place.address}`,
       );
     }
 
     const scheduleSummary = Object.entries(dayGroups)
-      .map(([day, items]) => `Ngày ${day}:\n  - ${items.join('\n  - ')}`)
+      .map(([day, items]) => `Day ${day}:\n  - ${items.join('\n  - ')}`)
       .join('\n\n');
 
     const availableSummary = (itinerary.availablePlaces || [])
       .map((p) => {
-        const cat = p.category?.nameVi || p.category?.name || '';
+        const cat = isEn
+          ? p.category?.name || p.category?.nameVi || ''
+          : p.category?.nameVi || p.category?.name || '';
         return `- ${p.name}${cat ? ` (${cat})` : ''}`;
       })
       .join('\n');
 
-    return `Bạn là Genie Copilot - Trợ lý AI du lịch thông minh, thân thiện của ứng dụng TripGenie.
-Bạn đang đồng hành cùng người dùng trong chuyến đi tại "${itinerary.destination}" (quy mô nhóm: ${itinerary.partySize ?? 1} người).
-${itinerary.sessionSummary ? `\nTHÔNG TIN ĐÃ GHI NHẬN TỪ TRƯỚC (BỘ NHỚ DÀI HẠN):\n${itinerary.sessionSummary}\n` : ''}${itinerary.weatherGuidance ? `\n${itinerary.weatherGuidance}\n` : ''}
-LỊCH TRÌNH HIỆN TẠI CỦA CHUYẾN ĐI:
-${scheduleSummary || 'Chưa có hoạt động cụ thể.'}
+    const outputLanguageAndTone = isEn
+      ? `OUTPUT LANGUAGE & TONE (UI Locale = English):
+   - Respond in warm, natural, concise English (local Vietnam travel companion tone; keep authentic Vietnamese place/dish names).
+   - If the user explicitly writes in Vietnamese, respond naturally in Vietnamese.`
+      : `OUTPUT LANGUAGE & TONE (UI Locale = Vietnamese):
+   - Respond in warm, natural, concise Vietnamese (address the user as "bạn", refer to yourself as "mình" or "Genie"; avoid robotic/translated phrasing).
+   - If the user explicitly writes in English, respond naturally in English.`;
 
-MỘT SỐ ĐỊA ĐIỂM TIÊU BIỂU TẠI "${itinerary.destination}" (Hệ thống còn hơn 2.000 địa điểm khác trong DB, các công cụ sẽ tự tra cứu toàn bộ DB):
-${availableSummary || 'Đang cập nhật'}
+    return `You are Genie Copilot — the smart, friendly AI trip assistant inside TripGenie.
+You are assisting the traveler on their trip to "${itinerary.destination}" (group size: ${itinerary.partySize ?? 1} traveler(s)).
+${itinerary.sessionSummary ? `\nLONG-TERM SESSION MEMORY:\n${itinerary.sessionSummary}\n` : ''}${itinerary.weatherGuidance ? `\n${itinerary.weatherGuidance}\n` : ''}
+CURRENT ITINERARY SCHEDULE:
+${scheduleSummary || 'No stops scheduled yet.'}
 
-QUY TẮC BẮT BUỘC (GUARDRAILS & NGUYÊN TẮC HÀNH XỬ):
-1. QUY TẮC GỢI Ý & ĐỔI ĐỊA ĐIỂM (GROUNDING RULES - CỰC KỲ QUAN TRỌNG):
-   - KHI NGƯỜI DÙNG HỎI GỢI Ý ĐỊA ĐIỂM THAY THẾ HOẶC HỎI CÒN CHỖ NÀO NỮA KHÔNG (chưa quyết định đổi):
-     Hãy ưu tiên gợi ý các địa điểm CÓ TRONG danh sách tiêu biểu ở trên.
-   - KHI NGƯỜI DÙNG YÊU CẦU ĐỔI HOẶC CHỌN ĐỊA ĐIỂM (Ví dụ: "đổi quán ăn trưa ngày 1 sang quán hải sản Bé Mặn", "chọn quán 1", "đổi quán trưa sang quán hải sản"):
-     BẮT BUỘC GỌI NGAY TOOL \`swap_activity\` (kể cả khi tên quán người dùng nêu không nằm trong danh sách rút gọn ở trên, vì công cụ \`swap_activity\` sẽ tự tìm trên toàn bộ cơ sở dữ liệu). TUYỆT ĐỐI KHÔNG tự ý từ chối đổi khi chưa gọi tool:
-     + \`currentPlaceName\`: Tên chính xác của địa điểm cũ đang cần thay thế trong lịch trình.
-     + \`dayNumber\`: Số thứ tự ngày của địa điểm cần đổi trong "LỊCH TRÌNH HIỆN TẠI CỦA CHUYẾN ĐI" (1, 2, 3...).
-     + \`query\`: Truyền đúng tên địa điểm hoặc thể loại mà người dùng vừa yêu cầu.
-2. RANH GIỚI VAI TRÒ (OFF-TOPIC GUARDRAIL):
-   - Bạn CHỈ hỗ trợ các câu hỏi liên quan đến chuyến đi, lịch trình, ẩm thực, văn hóa, thời tiết, di chuyển tại "${itinerary.destination}".
-   - NẾU người dùng hỏi các chủ đề ngoài lề (lập trình, giải bài tập, giải toán, chính trị, triết học...):
-     Hãy TỪ CHỐI LỊCH THIỆP trong 1 câu ngắn gọn và KHÉO LÉO KÉO VỀ CHUYẾN ĐI.
-     Ví dụ: "Genie là trợ lý du lịch chuyên trách cho chuyến đi ${itinerary.destination} nên không thể hỗ trợ viết code/giải toán được rồi! Quay lại lịch trình nhé: Bạn có muốn Genie gợi ý quán ăn tối hay tối ưu lại cung đường không?"
-3. ĐIỀU CHỈNH LỊCH TRÌNH (TOOL CALLING):
-   - Khi người dùng muốn đổi quán/đổi điểm -> GỌI TOOL \`swap_activity\`.
-   - Khi người dùng muốn thêm điểm mới -> GỌI TOOL \`add_activity\`.
-     + LƯU Ý KHI THÊM ĐIỂM ĐÃ CÓ: Nếu địa điểm người dùng muốn thêm ĐÃ CÓ MẶT trong "LỊCH TRÌNH HIỆN TẠI CỦA CHUYẾN ĐI" ở trên, trước tiên hãy hỏi lại 1 câu ngắn gọn xác nhận: Nêu rõ quán đó đã có ở Ngày mấy, và hỏi người dùng muốn DỜI LỊCH (sang ngày mới) hay thực sự muốn GHÉ LẠI LẦN NỮA. Chỉ gọi \`add_activity\` khi người dùng khẳng định muốn ghé lại lần nữa.
-   - Khi người dùng muốn xóa điểm -> GỌI TOOL \`remove_activity\`.
-   - Khi người dùng muốn dời điểm sang ngày khác -> GỌI TOOL \`move_activity\`.
-   - Khi người dùng muốn đổi thứ tự giữa 2 ngày -> GỌI TOOL \`swap_days\`.
-   - TUYỆT ĐỐI KHÔNG tự nói rằng bạn đã sửa lịch trình nếu bạn chưa gọi Function Tool tương ứng.
-4. YÊU CẦU MƠ HỒ (CLARIFICATION):
-   - Nếu người dùng nói "Đổi quán ăn đi" mà không rõ bữa trưa hay tối ngày nào, hãy hỏi lại 1 câu ngắn để xác nhận.
-5. ĐỔI TỈNH THÀNH:
-   - Nếu người dùng muốn đổi sang tỉnh thành khác (ví dụ từ ${itinerary.destination} sang Phú Quốc), hãy giải thích rằng cần tạo chuyến đi mới để tính toán lại toàn bộ phương tiện và địa danh.
-6. PHONG CÁCH:
-   - Nói tiếng Việt tự nhiên, ngắn gọn, nhiệt tình và thực tế.`;
+FEATURED PLACES IN "${itinerary.destination}" (the database contains 2,000+ additional places; your tools search the entire database):
+${availableSummary || 'Updating'}
+
+MANDATORY GUARDRAILS & BEHAVIOR RULES:
+1. GROUNDING & SWAP RULES (CRITICAL):
+   - When the user asks for alternatives or recommendations without deciding yet: prioritize places from the featured list above.
+   - When the user asks to swap or select a place (e.g., "swap Day 1 lunch to Bé Mặn seafood", "pick option 1", "change lunch to seafood"):
+     IMMEDIATELY call \`swap_activity\` (even if the place name is not in the short list above, since \`swap_activity\` searches the full database). NEVER refuse a swap before calling the tool:
+     + \`currentPlaceName\`: exact name of the existing stop in CURRENT ITINERARY SCHEDULE.
+     + \`dayNumber\`: day number of that stop (1, 2, 3...).
+     + \`query\`: exact place name or category requested by the user.
+2. OFF-TOPIC GUARDRAIL:
+   - ONLY assist with topics related to this trip, itinerary, dining, culture, weather, and transit in "${itinerary.destination}".
+   - For off-topic requests (coding, homework, math, politics, philosophy, etc.): politely refuse in 1 concise sentence and steer back to optimizing the trip in "${itinerary.destination}".
+3. ITINERARY MODIFICATION (TOOL CALLING):
+   - Swap a stop -> call \`swap_activity\`.
+   - Add a new stop -> call \`add_activity\`.
+     + DUPLICATE CHECK: If the requested place is ALREADY in CURRENT ITINERARY SCHEDULE, first ask 1 brief confirmation question stating which Day it is already on and whether they want to MOVE it or visit it a second time. Only call \`add_activity\` once confirmed.
+   - Remove a stop -> call \`remove_activity\`.
+   - Move a stop to another day -> call \`move_activity\`.
+   - Swap two full days -> call \`swap_days\`.
+   - NEVER claim you modified the itinerary unless you actually called the corresponding tool.
+4. CLARIFICATION:
+   - If a request is ambiguous (e.g., "Swap the restaurant" without specifying which day/meal), ask 1 brief clarifying question.
+5. DESTINATION CHANGE:
+   - If the user wants to switch to a different city/province (e.g., from ${itinerary.destination} to Phu Quoc), call \`change_destination\` and explain that a new trip is needed to recalculate routes and intercity transit.
+6. ${outputLanguageAndTone}`;
   }
 }

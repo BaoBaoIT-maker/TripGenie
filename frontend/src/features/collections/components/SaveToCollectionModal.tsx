@@ -20,6 +20,7 @@ import {
   useToggleFavorite,
 } from "@/features/collections/hooks/use-collections";
 import { DEFAULT_COLLECTION_TITLE } from "@/services/collection.service";
+import { useI18n } from "@/i18n";
 import { Heart, Folder, Check, Plus, Loader2, Camera, Lock, Globe } from "lucide-react";
 
 export interface SaveablePlace {
@@ -41,6 +42,7 @@ export function SaveToCollectionModal({
   isOpen,
   onClose,
 }: SaveToCollectionModalProps) {
+  const { t } = useI18n();
   const { data: collections = [], isLoading: isCollectionsLoading } = useCollections();
   const { data: containingSet, isLoading: isContainingLoading } =
     useCollectionsContainingPlace(place?.id, { enabled: isOpen && Boolean(place?.id) });
@@ -100,9 +102,9 @@ export function SaveToCollectionModal({
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md p-6 space-y-5">
         <DialogHeader className="space-y-1">
-          <DialogTitle className="font-heading text-xl">Lưu vào bộ sưu tập</DialogTitle>
+          <DialogTitle className="font-heading text-xl">{t("collections.saveModalTitle")}</DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground">
-            Chọn một hoặc nhiều bộ sưu tập để lưu địa điểm này.
+            {t("collections.saveModalDescription")}
           </DialogDescription>
         </DialogHeader>
 
@@ -125,7 +127,7 @@ export function SaveToCollectionModal({
           </div>
           <div className="min-w-0 flex-1">
             <h4 className="text-xs font-bold text-foreground truncate">{place.name}</h4>
-            <p className="text-[11px] text-muted-foreground truncate">{place.address || "Việt Nam"}</p>
+            <p className="text-[11px] text-muted-foreground truncate">{place.address || t("common.country")}</p>
           </div>
         </div>
 
@@ -139,13 +141,14 @@ export function SaveToCollectionModal({
             </div>
           ) : collections.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-4">
-              Chưa có bộ sưu tập nào.
+              {t("collections.noCollections")}
             </p>
           ) : (
             collections.map((col) => {
               const isChecked = containingSet?.has(col.id) ?? false;
               const isBusy = togglingId === col.id;
               const isFav = col.title === DEFAULT_COLLECTION_TITLE;
+              const displayTitle = isFav ? t("collections.defaultTitle") : col.title;
 
               return (
                 <button
@@ -170,7 +173,7 @@ export function SaveToCollectionModal({
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5">
                         <span className="text-xs font-semibold text-foreground truncate">
-                          {col.title}
+                          {displayTitle}
                         </span>
                         {col.isPublic ? (
                           <Globe className="size-2.5 text-muted-foreground" />
@@ -179,7 +182,7 @@ export function SaveToCollectionModal({
                         )}
                       </div>
                       <span className="text-[10px] text-muted-foreground">
-                        {col._count?.places ?? 0} địa điểm
+                        {t("collections.placeCount", { count: col._count?.places ?? 0 })}
                       </span>
                     </div>
                   </div>
@@ -208,19 +211,19 @@ export function SaveToCollectionModal({
             className="w-full min-h-[44px] rounded-xl text-xs font-semibold gap-2 border border-dashed border-border/80 text-muted-foreground hover:text-foreground hover:bg-muted/40 cursor-pointer"
           >
             <Plus className="size-4" />
-            <span>Tạo bộ sưu tập mới</span>
+            <span>{t("collections.createModalTitle")}</span>
           </Button>
         ) : (
           <form onSubmit={handleCreateAndAdd} className="space-y-3 p-3 rounded-2xl bg-muted/30 border border-border">
             <div className="space-y-1">
               <label htmlFor="inlineNewColTitle" className="text-[11px] font-semibold text-foreground">
-                Tên bộ sưu tập
+                {t("collections.titleLabel")}
               </label>
               <Input
                 id="inlineNewColTitle"
                 autoFocus
                 required
-                placeholder="VD: Quán cafe sống ảo"
+                placeholder={t("collections.inlineTitlePlaceholder")}
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 maxLength={80}
@@ -236,7 +239,7 @@ export function SaveToCollectionModal({
                 className="size-4 rounded border-border text-primary focus:ring-primary cursor-pointer"
               />
               <label htmlFor="inlinePublic" className="text-[11px] text-muted-foreground cursor-pointer">
-                Công khai bộ sưu tập này
+                {t("collections.publicCheckboxShort")}
               </label>
             </div>
             <div className="flex justify-end gap-2 pt-1">
@@ -250,7 +253,7 @@ export function SaveToCollectionModal({
                 }}
                 className="min-h-[40px] text-xs cursor-pointer"
               >
-                Hủy
+                {t("common.cancel")}
               </Button>
               <Button
                 type="submit"
@@ -261,7 +264,7 @@ export function SaveToCollectionModal({
                 {(createMutation.isPending || addPlaceMutation.isPending) && (
                   <Loader2 className="size-3 animate-spin" />
                 )}
-                <span>Tạo & Lưu</span>
+                <span>{t("collections.createAndSave")}</span>
               </Button>
             </div>
           </form>

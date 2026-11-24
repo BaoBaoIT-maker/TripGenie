@@ -72,10 +72,38 @@ describe('Itinerary partySize scaling, LLM weather prompt, and weather retrieval
       ],
     });
 
-    expect(prompt).toContain('4 người');
+    expect(prompt).toContain('4 traveler(s)');
     expect(prompt).toContain('THỜI TIẾT TỪNG NGÀY TẠI ĐIỂM ĐẾN');
     expect(prompt).toContain('ƯU TIÊN điểm trong nhà');
     expect(prompt).toContain('Xu hướng khí hậu mùa, không phải dự báo');
+    expect(prompt).toContain('OUTPUT LANGUAGE & TONE (Vietnamese)');
+
+    const promptEn = (gemini as any).buildPrompt({
+      originCity: 'Ho Chi Minh City',
+      destCity: 'Da Nang',
+      destLat: 16.0544,
+      destLng: 108.2022,
+      totalDays: 2,
+      partySize: 4,
+      budgetLevel: 'MEDIUM',
+      pace: 'BALANCED',
+      travelStyles: ['CULTURE', 'FOOD'],
+      dietaryRestrictions: [],
+      preferredCategories: [],
+      dailyWeather,
+      locale: 'en',
+      places: [
+        {
+          id: 'p-1',
+          name: 'Cham Museum',
+          cat: 'Museum',
+          rating: 4.7,
+          tags: [],
+        },
+      ],
+    });
+    expect(promptEn).toContain('DAILY WEATHER AT DESTINATION:');
+    expect(promptEn).toContain('OUTPUT LANGUAGE & TONE (English)');
   });
 
   it('updatePartySize updates budget deterministically without calling LLM, blocks non-owner, and keeps partySize independent of memberCount', async () => {
@@ -336,6 +364,7 @@ describe('Itinerary partySize scaling, LLM weather prompt, and weather retrieval
       destination: 'Đà Lạt',
       startDate: row.startDate,
       totalDays: 3,
+      locale: 'vi',
     });
   });
 
@@ -361,8 +390,8 @@ describe('Itinerary partySize scaling, LLM weather prompt, and weather retrieval
       travelStyles: ['FOOD'],
       places: samplePlaces,
     });
-    expect(packedPrompt).toContain('Khám phá nhiều (7–8 điểm/ngày)');
-    expect(packedPrompt).toContain('MẬT ĐỘ HOẠT ĐỘNG (PACKED)');
+    expect(packedPrompt).toContain('Pace: PACKED (7-8 stops/day)');
+    expect(packedPrompt).toContain('ACTIVITY DENSITY (PACKED)');
 
     const relaxedPlan = (gemini as any).buildFallbackPlan({
       destCity: 'Đà Nẵng',

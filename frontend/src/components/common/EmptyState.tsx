@@ -1,6 +1,9 @@
+"use client";
+
 import { ReactNode } from "react";
 import { Compass, LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/i18n/LocaleProvider";
 import { cn } from "@/lib/utils";
 
 interface EmptyStateProps {
@@ -14,14 +17,18 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({
-  title = "Không tìm thấy dữ liệu",
-  description = "Chưa có địa điểm hoặc mục nào trong danh sách này. Hãy thử thay đổi bộ lọc hoặc tìm kiếm lại.",
+  title,
+  description,
   icon: Icon = Compass,
   actionLabel,
   onAction,
   actionNode,
   className,
 }: EmptyStateProps) {
+  const { t } = useI18n();
+  const resolvedTitle = title ?? t("common.emptyTitle");
+  const resolvedDescription = description ?? t("common.emptyDescription");
+
   return (
     <div
       className={cn(
@@ -33,10 +40,10 @@ export function EmptyState({
         <Icon className="size-7 stroke-[1.75]" />
       </div>
       <h3 className="text-lg font-semibold text-foreground tracking-tight">
-        {title}
+        {resolvedTitle}
       </h3>
       <p className="mt-1.5 max-w-md text-sm text-muted-foreground leading-relaxed">
-        {description}
+        {resolvedDescription}
       </p>
 
       {actionLabel && onAction && (

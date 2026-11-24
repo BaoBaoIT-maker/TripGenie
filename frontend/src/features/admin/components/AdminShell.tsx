@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { AuthTransitionScreen } from "@/features/auth/components/AuthTransitionScreen";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { DEFAULT_AVATAR } from "@/config/avatars";
 import { ADMIN_SIDEBAR_NAV } from "../admin.constants";
@@ -16,30 +16,35 @@ const emptySubscribe = () => () => {};
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "";
   const router = useRouter();
-  const { user, isLoading, logout } = useAuth();
+  const { user, isLoading, isLoggingOut, logout } = useAuth();
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const mounted = useSyncExternalStore(emptySubscribe, () => true, () => false);
 
-  const isAuthorizedAdmin = mounted && !isLoading && user?.role === "ADMIN";
+  const isAuthorizedAdmin =
+    mounted && !isLoading && !isSigningOut && !isLoggingOut && user?.role === "ADMIN";
   const { data: stats } = useAdminDashboardStats({ enabled: isAuthorizedAdmin });
   useAdminLiveEvents(isAuthorizedAdmin);
 
   useEffect(() => {
     if (!mounted || isLoading) return;
+    if (isSigningOut || isLoggingOut) {
+      router.replace("/");
+      return;
+    }
     if (!user) {
-      router.replace("/login");
+      router.replace("/?auth=login");
     } else if (user.role !== "ADMIN") {
       router.replace("/");
     }
-  }, [mounted, isLoading, user, router]);
+  }, [mounted, isLoading, isSigningOut, isLoggingOut, user, router]);
 
   if (!isAuthorizedAdmin) {
     return (
-      <div className="h-screen w-screen bg-[#F5F9FF] flex items-center justify-center">
-        <div className="flex items-center gap-2.5 px-5 py-3.5 rounded-2xl bg-white border border-slate-200/80 shadow-xs text-xs font-bold text-[#10243A]">
-          <Loader2 className="size-4 animate-spin text-[#0194F3]" />
-          <span>Đang xác thực quyền Quản trị viên...</span>
-        </div>
-      </div>
+      <AuthTransitionScreen
+        title={
+          isSigningOut || isLoggingOut ? "Đang đăng xuất..." : "Đang xác minh..."
+        }
+      />
     );
   }
 
@@ -199,7 +204,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
           <button
             type="button"
-            onClick={() => logout()}
+            onClick={() => {
+              setIsSigningOut(true);
+              void logout();
+            }}
             className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl border border-rose-200/80 bg-rose-50/70 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-colors cursor-pointer"
           >
             <i className="fa-solid fa-right-from-bracket" aria-hidden="true" />

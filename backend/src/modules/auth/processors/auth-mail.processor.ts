@@ -3,10 +3,12 @@ import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { MailService } from '../services/mail.service';
 import { AUTH_CONSTANTS } from '@/common/constants/auth.constants';
+import { AppLocale, DEFAULT_LOCALE } from '@/common/i18n/locale.util';
 
 export interface SendVerificationMailJobData {
   email: string;
   verificationUrl: string;
+  locale?: AppLocale;
 }
 
 @Processor(AUTH_CONSTANTS.MAIL_QUEUE)
@@ -24,6 +26,7 @@ export class AuthMailProcessor extends WorkerHost {
     const sent = await this.mailService.sendVerificationLinkEmail(
       job.data.email,
       job.data.verificationUrl,
+      job.data.locale ?? DEFAULT_LOCALE,
     );
 
     if (!sent) {

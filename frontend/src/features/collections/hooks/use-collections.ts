@@ -1,11 +1,11 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   collectionService,
-  CollectionSummary,
   CollectionDetail,
   CreateCollectionPayload,
   UpdateCollectionPayload,
 } from '@/services/collection.service';
+import { useI18n } from '@/i18n';
 import { toast } from 'sonner';
 
 export const COLLECTION_KEYS = {
@@ -54,6 +54,7 @@ export function useToggleFavorite(options?: {
   onSaved?: (data: { isSaved: boolean; collectionId: string; placeId: string }) => void;
 }) {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
 
   return useMutation({
     mutationFn: ({
@@ -122,7 +123,7 @@ export function useToggleFavorite(options?: {
       toast.error(
         err instanceof Error
           ? err.message
-          : 'Không thể cập nhật mục đã lưu. Vui lòng thử lại.',
+          : t('collections.toasts.toggleError'),
       );
     },
 
@@ -132,8 +133,8 @@ export function useToggleFavorite(options?: {
       } else {
         toast.success(
           data.isSaved
-            ? 'Đã lưu địa điểm vào bộ sưu tập'
-            : 'Đã xóa địa điểm khỏi bộ sưu tập',
+            ? t('collections.toasts.saved')
+            : t('collections.toasts.removed'),
         );
       }
     },
@@ -161,6 +162,7 @@ export function useToggleFavorite(options?: {
  */
 export function useAddPlaceToCollection() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
 
   return useMutation({
     mutationFn: ({
@@ -176,8 +178,8 @@ export function useAddPlaceToCollection() {
     onSuccess: (_data, variables) => {
       toast.success(
         variables.collectionName
-          ? `Đã thêm địa điểm vào "${variables.collectionName}"!`
-          : 'Đã thêm địa điểm vào bộ sưu tập!',
+          ? t('collections.toasts.addedNamed', { name: variables.collectionName })
+          : t('collections.toasts.added'),
       );
       queryClient.invalidateQueries({
         queryKey: COLLECTION_KEYS.detail(variables.collectionId),
@@ -194,7 +196,7 @@ export function useAddPlaceToCollection() {
     },
     onError: (err: unknown) => {
       toast.error(
-        err instanceof Error ? err.message : 'Không thể thêm địa điểm',
+        err instanceof Error ? err.message : t('collections.toasts.addError'),
       );
     },
   });
@@ -228,17 +230,18 @@ export function useCollectionDetail(id: string) {
  */
 export function useCreateCollection() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
 
   return useMutation({
     mutationFn: (payload: CreateCollectionPayload) =>
       collectionService.createCollection(payload),
     onSuccess: () => {
-      toast.success('Đã tạo bộ sưu tập mới');
+      toast.success(t('collections.toasts.created'));
       queryClient.invalidateQueries({ queryKey: COLLECTION_KEYS.list() });
     },
     onError: (err: unknown) => {
       toast.error(
-        err instanceof Error ? err.message : 'Tạo bộ sưu tập thất bại',
+        err instanceof Error ? err.message : t('collections.toasts.createError'),
       );
     },
   });
@@ -249,6 +252,7 @@ export function useCreateCollection() {
  */
 export function useUpdateCollection() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
 
   return useMutation({
     mutationFn: ({
@@ -259,12 +263,12 @@ export function useUpdateCollection() {
       payload: UpdateCollectionPayload;
     }) => collectionService.updateCollection(id, payload),
     onSuccess: (updated) => {
-      toast.success('Đã cập nhật bộ sưu tập');
+      toast.success(t('collections.toasts.updated'));
       queryClient.invalidateQueries({ queryKey: COLLECTION_KEYS.list() });
       queryClient.invalidateQueries({ queryKey: COLLECTION_KEYS.detail(updated.id) });
     },
     onError: (err: unknown) => {
-      toast.error(err instanceof Error ? err.message : 'Cập nhật thất bại');
+      toast.error(err instanceof Error ? err.message : t('collections.toasts.updateError'));
     },
   });
 }
@@ -274,16 +278,17 @@ export function useUpdateCollection() {
  */
 export function useDeleteCollection() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
 
   return useMutation({
     mutationFn: (id: string) => collectionService.deleteCollection(id),
     onSuccess: () => {
-      toast.success('Đã xóa bộ sưu tập');
+      toast.success(t('collections.toasts.deleted'));
       queryClient.invalidateQueries({ queryKey: COLLECTION_KEYS.all });
     },
     onError: (err: unknown) => {
       toast.error(
-        err instanceof Error ? err.message : 'Xóa bộ sưu tập thất bại',
+        err instanceof Error ? err.message : t('collections.toasts.deleteError'),
       );
     },
   });

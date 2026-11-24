@@ -13,8 +13,10 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { PlaceCard } from "@/components/place/PlaceCard";
 import { mapBackendPlaceToPlace } from "@/services/place.service";
+import { DEFAULT_COLLECTION_TITLE } from "@/services/collection.service";
 import { useCollectionDetail } from "@/features/collections/hooks/use-collections";
 import { useAuth } from "@/features/auth/hooks/use-auth";
+import { useI18n } from "@/i18n";
 import { toast } from "sonner";
 
 interface Props {
@@ -23,6 +25,7 @@ interface Props {
 
 export default function PublicCollectionDetailPage({ params }: Props) {
   const { id } = use(params);
+  const { t } = useI18n();
   const { user } = useAuth();
   const {
     data: collection,
@@ -32,15 +35,19 @@ export default function PublicCollectionDetailPage({ params }: Props) {
   } = useCollectionDetail(id);
 
   const isOwner = Boolean(user && collection && user.id === collection.userId);
+  const displayTitle =
+    collection?.title === DEFAULT_COLLECTION_TITLE
+      ? t("collections.defaultTitle")
+      : collection?.title ?? "";
 
   const handleShare = () => {
     if (typeof window === "undefined") return;
     const url = window.location.href;
     if (navigator.clipboard) {
       navigator.clipboard.writeText(url);
-      toast.success("Đã sao chép liên kết bộ sưu tập công khai!");
+      toast.success(t("collections.toasts.publicLinkCopied"));
     } else {
-      toast.info(`Liên kết: ${url}`);
+      toast.info(t("collections.toasts.linkFallback", { url }));
     }
   };
 
@@ -71,13 +78,13 @@ export default function PublicCollectionDetailPage({ params }: Props) {
         <div className="max-w-md mx-auto space-y-2">
           <h1 className="text-2xl font-bold font-heading text-foreground">
             {isForbidden
-              ? "Bộ sưu tập này đang ở chế độ riêng tư"
-              : "Không tìm thấy bộ sưu tập"}
+              ? t("collections.privateTitle")
+              : t("collections.notFoundTitle")}
           </h1>
           <p className="text-sm text-muted-foreground">
             {isForbidden
-              ? "Người tạo đã đặt bộ sưu tập này ở chế độ riêng tư. Bạn cần đăng nhập đúng tài khoản sở hữu để xem."
-              : "Đường dẫn không tồn tại hoặc bộ sưu tập đã bị xóa."}
+              ? t("collections.privateDescription")
+              : t("collections.notFoundDescription")}
           </p>
         </div>
         <div className="flex items-center justify-center gap-3 pt-2">
@@ -89,7 +96,7 @@ export default function PublicCollectionDetailPage({ params }: Props) {
             })}
           >
             <ArrowLeft className="size-3.5" />
-            <span>Bộ sưu tập của tôi</span>
+            <span>{t("collections.myCollections")}</span>
           </Link>
           <Link
             href="/places"
@@ -98,7 +105,7 @@ export default function PublicCollectionDetailPage({ params }: Props) {
             })}
           >
             <Compass className="size-3.5" />
-            <span>Khám phá địa điểm</span>
+            <span>{t("collections.explorePlaces")}</span>
           </Link>
         </div>
       </div>
@@ -114,7 +121,7 @@ export default function PublicCollectionDetailPage({ params }: Props) {
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="size-3.5" />
-          <span>Tất cả bộ sưu tập</span>
+          <span>{t("collections.allCollections")}</span>
         </Link>
       </div>
 
@@ -132,22 +139,22 @@ export default function PublicCollectionDetailPage({ params }: Props) {
               {collection.isPublic ? (
                 <>
                   <Globe className="size-3" />
-                  <span>Bộ sưu tập công khai</span>
+                  <span>{t("collections.publicCollectionBadge")}</span>
                 </>
               ) : (
                 <>
                   <Lock className="size-3" />
-                  <span>Bộ sưu tập riêng tư</span>
+                  <span>{t("collections.privateCollectionBadge")}</span>
                 </>
               )}
             </span>
             <span className="text-xs text-muted-foreground">
-              • {collection._count?.places ?? 0} địa điểm
+              • {t("collections.placeCount", { count: collection._count?.places ?? 0 })}
             </span>
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-bold font-heading text-foreground tracking-tight">
-            {collection.title}
+            {displayTitle}
           </h1>
 
           {collection.description && (
@@ -165,7 +172,7 @@ export default function PublicCollectionDetailPage({ params }: Props) {
               className="min-h-[44px] px-4 rounded-xl text-xs font-semibold gap-2 border-primary/30 text-primary hover:bg-primary/10 cursor-pointer"
             >
               <Share2 className="size-4" />
-              <span>Chia sẻ bộ sưu tập</span>
+              <span>{t("collections.shareCollection")}</span>
             </Button>
           </div>
         )}
@@ -175,7 +182,7 @@ export default function PublicCollectionDetailPage({ params }: Props) {
       {collection.places && collection.places.length > 0 ? (
         <div className="space-y-4">
           <h2 className="text-lg font-bold font-heading text-foreground">
-            Danh sách địa điểm ({collection.places.length})
+            {t("collections.placesHeading", { count: collection.places.length })}
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {collection.places.map((item) => {
@@ -185,7 +192,7 @@ export default function PublicCollectionDetailPage({ params }: Props) {
                   key={place.id}
                   place={place}
                   currentCollectionId={isOwner ? collection.id : undefined}
-                  collectionName={isOwner ? collection.title : undefined}
+                  collectionName={isOwner ? displayTitle : undefined}
                 />
               );
             })}
@@ -198,10 +205,10 @@ export default function PublicCollectionDetailPage({ params }: Props) {
           </div>
           <div className="space-y-1">
             <h3 className="text-base font-semibold text-foreground">
-              Chưa có địa điểm nào trong bộ sưu tập này
+              {t("collections.emptyTitle")}
             </h3>
             <p className="text-xs text-muted-foreground">
-              Bộ sưu tập hiện tại chưa được người tạo thêm địa điểm nào.
+              {t("collections.emptyPublicHint")}
             </p>
           </div>
           <Link
@@ -211,7 +218,7 @@ export default function PublicCollectionDetailPage({ params }: Props) {
               className: "rounded-xl text-xs font-semibold inline-flex items-center",
             })}
           >
-            Khám phá các điểm đến khác
+            {t("collections.exploreOthers")}
           </Link>
         </div>
       )}

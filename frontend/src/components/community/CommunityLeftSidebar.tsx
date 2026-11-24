@@ -1,6 +1,7 @@
 "use client";
 
 import type { CommunityGroupSummary } from "@/types/community";
+import { useI18n } from "@/i18n";
 
 interface CommunityLeftSidebarProps {
   groups: CommunityGroupSummary[];
@@ -24,6 +25,7 @@ export function MobileTopicGroupsStrip({
 }: Omit<CommunityLeftSidebarProps, "onOpenCreatePostWithItinerary"> & {
   className?: string;
 }) {
+  const { t } = useI18n();
   const topicGroups = groups.filter((g) => !g.isDefault);
   const displayGroups = topicGroups.length > 0 ? topicGroups : groups;
 
@@ -46,7 +48,7 @@ export function MobileTopicGroupsStrip({
         }`}
       >
         <i className="fa-solid fa-layer-group text-[11px]" aria-hidden="true" />
-        <span>Tất cả chủ đề</span>
+        <span>{t("community.sidebar.allTopics")}</span>
       </button>
 
       {displayGroups.map((group) => {
@@ -94,7 +96,7 @@ export function MobileTopicGroupsStrip({
           onClick={onOpenCreateGroup}
           className="h-8 px-3 rounded-[10px] border border-dashed border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-[11px] font-bold text-[#475569] shrink-0 cursor-pointer"
         >
-          + Tạo nhóm
+          {t("community.sidebar.createGroupShort")}
         </button>
       )}
     </div>
@@ -109,6 +111,7 @@ export function CommunityLeftSidebar({
   isAdmin = false,
   onOpenCreateGroup,
 }: CommunityLeftSidebarProps) {
+  const { t } = useI18n();
   const topicGroups = groups.filter((g) => !g.isDefault);
   const displayGroups = topicGroups.length > 0 ? topicGroups : groups;
 
@@ -122,7 +125,7 @@ export function CommunityLeftSidebar({
               className="fa-solid fa-layer-group mr-1.5 text-[#0194F3]"
               aria-hidden="true"
             />
-            Chủ Đề &amp; Điểm Đến
+            {t("community.sidebar.topicsHeading")}
           </h3>
 
           <div className="flex items-center gap-2">
@@ -130,10 +133,10 @@ export function CommunityLeftSidebar({
               <button
                 type="button"
                 onClick={onOpenCreateGroup}
-                title="Quản trị viên tạo nhóm cộng đồng mới"
+                title={t("community.sidebar.createGroupTooltip")}
                 className="text-[11px] font-bold text-[#64748B] hover:text-[#0F172A] bg-slate-100 hover:bg-slate-200 px-2 py-0.5 rounded-md transition-colors cursor-pointer"
               >
-                + Tạo nhóm
+                {t("community.sidebar.createGroupShort")}
               </button>
             )}
             <button
@@ -145,7 +148,7 @@ export function CommunityLeftSidebar({
                   : "text-[#0194F3] hover:text-[#007FE3]"
               }`}
             >
-              Tất cả
+              {t("community.sidebar.all")}
             </button>
           </div>
         </div>
@@ -161,7 +164,7 @@ export function CommunityLeftSidebar({
                 onClick={() =>
                   onSelectGroup(isSelected ? "" : group.slug)
                 }
-                title={`Khám phá nhóm ${group.name}`}
+                title={t("community.sidebar.exploreGroupTitle", { name: group.name })}
                 className={`w-full flex items-center justify-between py-2 px-2.5 rounded-[14px] border transition-all cursor-pointer text-left group/cat ${
                   isSelected
                     ? "bg-[#F0F7FF] border-[#BAE0FD]"
@@ -219,12 +222,12 @@ export function CommunityLeftSidebar({
             onOpenCreatePostWithItinerary();
           }
         }}
-        title="Nhấp để tạo bài viết chia sẻ chuyến đi"
+        title={t("community.sidebar.shareBannerTitle")}
         className="rounded-[20px] border border-[#E2E8F0] hover:border-[#CBD5E1] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] cursor-pointer flex flex-col gap-2.5 transition-all group/banner"
       >
         <div>
           <div className="inline-flex items-center gap-1.5 text-[#0194F3] group-hover/banner:text-[#007FE3] text-[13px] font-extrabold uppercase tracking-[0.04em] transition-colors">
-            <span>Chia sẻ ngay</span>
+            <span>{t("community.sidebar.shareNow")}</span>
             <i
               className="fa-solid fa-arrow-right text-[11px] transition-transform duration-200 group-hover/banner:translate-x-[3px]"
               aria-hidden="true"
@@ -237,7 +240,7 @@ export function CommunityLeftSidebar({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/images/community/camper-van-banner.png"
-            alt="Chia sẻ lộ trình chuyến đi cùng cộng đồng TripGenie"
+            alt={t("community.sidebar.shareBannerAlt")}
             loading="lazy"
             className="w-full h-auto block transition-transform duration-300 group-hover/banner:scale-[1.03]"
           />
@@ -247,9 +250,9 @@ export function CommunityLeftSidebar({
       {/* MINI FOOTER */}
       <div className="px-2 text-[11px] text-[#94A3B8] leading-[1.6]">
         <p>
-          © 2026 TripGenie Vietnam.
+          {t("community.sidebar.miniFooterLine1")}
           <br />
-          Review thật • Lộ trình có thể nhân bản.
+          {t("community.sidebar.miniFooterLine2")}
         </p>
       </div>
     </aside>

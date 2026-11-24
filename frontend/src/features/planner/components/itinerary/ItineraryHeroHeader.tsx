@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useI18n } from '@/i18n';
 import { formatTripDates } from '../../model/itinerary-format';
 import {
   PARTY_SIZE_BOUNDS,
   type WorkspaceTabKey,
 } from '../../constants/itinerary.constants';
-import { TRIP_COMPANIONS_CONFIG } from '../../config/trip-companions.config';
 import type { ItineraryDetail, ItineraryMemberSummary } from '@/types/itinerary';
 
 export interface ItineraryHeroHeaderProps {
@@ -61,6 +61,7 @@ export function ItineraryHeroHeader({
   isCloning = false,
   isUpdatingMeta = false,
 }: ItineraryHeroHeaderProps) {
+  const { t, locale } = useI18n();
   const [isOverflowOpen, setIsOverflowOpen] = useState(false);
 
   const partySize = Math.max(
@@ -78,7 +79,9 @@ export function ItineraryHeroHeader({
   };
 
   const formattedCompactBudget = data.budgetBreakdown
-    ? `~${(data.budgetBreakdown.totalEstimated / 1_000_000).toFixed(1).replace(/\.0$/, '')}tr`
+    ? t('planner.hero.compactMillion', {
+        value: (data.budgetBreakdown.totalEstimated / 1_000_000).toFixed(1).replace(/\.0$/, ''),
+      })
     : null;
 
   return (
@@ -100,7 +103,7 @@ export function ItineraryHeroHeader({
             className="h-9 px-3.5 rounded-xl bg-white/90 hover:bg-white text-[#10243A] text-xs font-bold inline-flex items-center gap-1.5 backdrop-blur-md shadow-xs transition-colors cursor-pointer"
           >
             <i className="fa-solid fa-arrow-left text-xs" aria-hidden="true" />
-            <span>Quay lại</span>
+            <span>{t('planner.common.back')}</span>
           </button>
 
           {canEdit && (
@@ -110,7 +113,7 @@ export function ItineraryHeroHeader({
               className="h-9 px-3.5 rounded-xl bg-slate-950/55 hover:bg-slate-950/75 text-white border border-white/25 text-xs font-bold inline-flex items-center gap-1.5 backdrop-blur-md transition-colors cursor-pointer"
             >
               <i className="fa-solid fa-camera text-xs" aria-hidden="true" />
-              <span>Đổi ảnh bìa</span>
+              <span>{t('planner.hero.changeCover')}</span>
             </button>
           )}
         </div>
@@ -129,7 +132,7 @@ export function ItineraryHeroHeader({
               )}
               {data.viewerRole && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 text-[11px] font-semibold">
-                  {TRIP_COMPANIONS_CONFIG.ROLES[data.viewerRole]}
+                  {t(`planner.roles.${data.viewerRole}`)}
                 </span>
               )}
             </div>
@@ -150,8 +153,8 @@ export function ItineraryHeroHeader({
             <button
               type="button"
               onClick={onShare}
-              title="Chia sẻ lịch trình"
-              aria-label="Chia sẻ lịch trình"
+              title={t('planner.hero.shareTitle')}
+              aria-label={t('planner.hero.shareTitle')}
               className="size-9 rounded-xl border border-slate-200 bg-white hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#D0E7FF] text-[#10243A] flex items-center justify-center transition-colors cursor-pointer shrink-0"
             >
               <i className="fa-solid fa-share text-xs" aria-hidden="true" />
@@ -163,7 +166,7 @@ export function ItineraryHeroHeader({
               className="flex-1 sm:flex-initial h-9 px-2 sm:px-3.5 rounded-xl border border-slate-200 bg-white hover:bg-[#F0F7FF] hover:text-[#0194F3] hover:border-[#D0E7FF] text-xs font-bold text-[#10243A] inline-flex items-center justify-center gap-1.5 transition-colors cursor-pointer min-w-0"
             >
               <i className="fa-solid fa-print text-xs shrink-0" aria-hidden="true" />
-              <span>In</span>
+              <span>{t('planner.hero.print')}</span>
             </button>
 
             <button
@@ -177,14 +180,16 @@ export function ItineraryHeroHeader({
               ) : (
                 <i className="fa-regular fa-clone text-xs shrink-0" aria-hidden="true" />
               )}
-              <span className="truncate">{isCloning ? 'Đang chép...' : 'Sao chép'}</span>
+              <span className="truncate">
+                {isCloning ? t('planner.hero.cloning') : t('planner.hero.clone')}
+              </span>
             </button>
 
             {(canEdit || isMemberOrOwner || isOwner) && (
               <div className="relative shrink-0">
                 <button
                   type="button"
-                  aria-label="Tùy chọn thêm"
+                  aria-label={t('planner.hero.moreOptions')}
                   aria-expanded={isOverflowOpen}
                   onClick={() => setIsOverflowOpen((v) => !v)}
                   className="size-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-600 flex items-center justify-center transition-colors cursor-pointer shrink-0"
@@ -210,7 +215,7 @@ export function ItineraryHeroHeader({
                           className="w-full px-3.5 py-2 text-left font-semibold text-[#10243A] hover:bg-[#F0F7FF] hover:text-[#0194F3] flex items-center gap-2 cursor-pointer"
                         >
                           <i className="fa-solid fa-pen-to-square w-3.5 text-center" aria-hidden="true" />
-                          <span>Chỉnh sửa tên, ngày &amp; mô tả</span>
+                          <span>{t('planner.hero.editMeta')}</span>
                         </button>
                       )}
                       {isMemberOrOwner && (
@@ -223,7 +228,7 @@ export function ItineraryHeroHeader({
                           className="w-full px-3.5 py-2 text-left font-semibold text-[#10243A] hover:bg-[#F0F7FF] hover:text-[#0194F3] flex items-center gap-2 cursor-pointer"
                         >
                           <i className="fa-solid fa-users w-3.5 text-center" aria-hidden="true" />
-                          <span>Quản lý bạn đồng hành</span>
+                          <span>{t('planner.hero.manageCompanions')}</span>
                         </button>
                       )}
                       {isOwner && (
@@ -236,7 +241,7 @@ export function ItineraryHeroHeader({
                           className="w-full px-3.5 py-2 text-left font-semibold text-rose-600 hover:bg-rose-50 flex items-center gap-2 cursor-pointer"
                         >
                           <i className="fa-regular fa-trash-can w-3.5 text-center" aria-hidden="true" />
-                          <span>Xóa chuyến đi</span>
+                          <span>{t('planner.hero.deleteTrip')}</span>
                         </button>
                       )}
                     </div>
@@ -255,26 +260,26 @@ export function ItineraryHeroHeader({
               <button
                 type="button"
                 onClick={onOpenEditMetaModal}
-                title="Bấm để chỉnh sửa ngày chuyến đi"
+                title={t('planner.hero.editDatesTitle')}
                 className="flex-1 sm:flex-initial inline-flex items-center justify-between sm:justify-start gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 hover:bg-[#F0F7FF] hover:border-[#0194F3]/40 hover:text-[#0194F3] border border-slate-200/80 font-semibold text-slate-700 tabular-nums transition-colors cursor-pointer group text-left min-w-0"
               >
                 <div className="inline-flex items-center gap-1.5 min-w-0 truncate">
                   <i className="fa-regular fa-calendar text-[#0194F3] shrink-0" aria-hidden="true" />
-                  <span className="truncate">{formatTripDates(data.startDate, data.endDate)}</span>
+                  <span className="truncate">{formatTripDates(data.startDate, data.endDate, locale)}</span>
                 </div>
                 <i className="fa-solid fa-pen text-[9px] text-slate-400 group-hover:text-[#0194F3] transition-colors ml-0.5 shrink-0" aria-hidden="true" />
               </button>
             ) : (
               <span className="flex-1 sm:flex-initial inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 font-semibold text-slate-700 tabular-nums min-w-0">
                 <i className="fa-regular fa-calendar text-[#0194F3] shrink-0" aria-hidden="true" />
-                <span className="truncate">{formatTripDates(data.startDate, data.endDate)}</span>
+                <span className="truncate">{formatTripDates(data.startDate, data.endDate, locale)}</span>
               </span>
             )}
 
             <span className="shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 font-semibold text-slate-700 tabular-nums">
               <i className="fa-regular fa-clock text-[#0194F3]" aria-hidden="true" />
               <span>
-                {totalDays}N{totalNights}Đ
+                {t('planner.common.durationCompact', { days: totalDays, nights: totalNights })}
               </span>
             </span>
           </div>
@@ -286,7 +291,7 @@ export function ItineraryHeroHeader({
               <div className="inline-flex items-center justify-between gap-1 rounded-xl border border-slate-200 bg-slate-50 px-1.5 py-0.5 shrink-0">
                 <button
                   type="button"
-                  aria-label="Giảm số người dự kiến"
+                  aria-label={t('planner.hero.decreasePartySize')}
                   disabled={isUpdatingMeta || partySize <= PARTY_SIZE_BOUNDS.MIN}
                   onClick={() => handleStepPartySize(-1)}
                   className="size-7 rounded-lg bg-white hover:bg-[#F0F7FF] text-slate-700 hover:text-[#0194F3] flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40"
@@ -295,11 +300,11 @@ export function ItineraryHeroHeader({
                 </button>
                 <span className="px-1.5 text-xs font-bold text-[#10243A] tabular-nums inline-flex items-center gap-1">
                   <i className="fa-solid fa-user-group text-[11px] text-[#0194F3]" aria-hidden="true" />
-                  <span>{partySize} người</span>
+                  <span>{t('planner.common.peopleCount', { count: partySize })}</span>
                 </span>
                 <button
                   type="button"
-                  aria-label="Tăng số người dự kiến"
+                  aria-label={t('planner.hero.increasePartySize')}
                   disabled={isUpdatingMeta || partySize >= PARTY_SIZE_BOUNDS.MAX}
                   onClick={() => handleStepPartySize(1)}
                   className="size-7 rounded-lg bg-white hover:bg-[#F0F7FF] text-slate-700 hover:text-[#0194F3] flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40"
@@ -310,7 +315,7 @@ export function ItineraryHeroHeader({
             ) : (
               <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200/80 font-medium tabular-nums shrink-0">
                 <i className="fa-solid fa-user-group text-[#0194F3]" aria-hidden="true" />
-                <span>{partySize} người</span>
+                <span>{t('planner.common.peopleCount', { count: partySize })}</span>
               </span>
             )}
 
@@ -320,12 +325,12 @@ export function ItineraryHeroHeader({
                 type="button"
                 onClick={onOpenCompanionsModal}
                 className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 py-1 rounded-xl bg-slate-50/60 sm:bg-transparent hover:bg-[#F5F9FF] border border-slate-200/60 sm:border-transparent hover:border-[#D0E7FF] transition-colors cursor-pointer shrink-0"
-                title="Quản lý thành viên chuyến đi"
+                title={t('planner.hero.manageMembersTitle')}
               >
                 <div className="flex items-center -space-x-2">
                   {members.slice(0, 4).map((m) => (
                     <Avatar key={m.userId} className="size-6 sm:size-7 border-2 border-white ring-1 ring-slate-200">
-                      <AvatarImage src={m.avatarUrl || undefined} alt={m.fullName || 'Thành viên'} />
+                      <AvatarImage src={m.avatarUrl || undefined} alt={m.fullName || t('planner.common.memberFallback')} />
                       <AvatarFallback className="text-[9px] sm:text-[10px] font-bold bg-[#10243A] text-white">
                         {(m.fullName || 'TV').slice(0, 2).toUpperCase()}
                       </AvatarFallback>
@@ -338,7 +343,7 @@ export function ItineraryHeroHeader({
                   )}
                 </div>
                 <span className="text-xs font-semibold text-[#0194F3] tabular-nums whitespace-nowrap">
-                  {memberCount} thành viên
+                  {t('planner.common.membersCount', { count: memberCount })}
                 </span>
               </button>
             )}
@@ -351,8 +356,7 @@ export function ItineraryHeroHeader({
             <div className="flex items-center gap-2 text-[#10243A]">
               <i className="fa-solid fa-users-gear text-[#0194F3] shrink-0" aria-hidden="true" />
               <span className="tabular-nums">
-                Đoàn đã có <strong>{memberCount} thành viên</strong> tham gia, trong khi dự toán chi phí đang tính cho{' '}
-                <strong>{partySize} người</strong>.
+                {t('planner.hero.syncBannerText', { members: memberCount, partySize })}
               </span>
             </div>
             <button
@@ -361,7 +365,7 @@ export function ItineraryHeroHeader({
               onClick={() => onUpdatePartySize(Math.min(PARTY_SIZE_BOUNDS.MAX, memberCount))}
               className="h-8 px-3 rounded-lg bg-[#0194F3] hover:bg-[#007AD0] text-white font-bold text-[11px] transition-colors cursor-pointer disabled:opacity-50"
             >
-              Đồng bộ sang {Math.min(PARTY_SIZE_BOUNDS.MAX, memberCount)} người
+              {t('planner.hero.syncBannerCta', { count: Math.min(PARTY_SIZE_BOUNDS.MAX, memberCount) })}
             </button>
           </div>
         )}
@@ -370,7 +374,7 @@ export function ItineraryHeroHeader({
       {/* Workspace Sub-tabs attached to bottom edge */}
       <nav
         role="tablist"
-        aria-label="Không gian làm việc lịch trình"
+        aria-label={t('planner.hero.workspaceAria')}
         className="px-4 sm:px-6 border-t border-slate-100 flex items-center gap-1 overflow-x-auto no-scrollbar bg-slate-50/40"
       >
         <button
@@ -385,7 +389,7 @@ export function ItineraryHeroHeader({
           }`}
         >
           <i className="fa-solid fa-route text-xs" aria-hidden="true" />
-          <span>Lịch trình</span>
+          <span>{t('planner.hero.tabItinerary')}</span>
         </button>
 
         <button
@@ -400,7 +404,7 @@ export function ItineraryHeroHeader({
           }`}
         >
           <i className="fa-solid fa-wallet text-xs" aria-hidden="true" />
-          <span>Chi phí</span>
+          <span>{t('planner.hero.tabBudget')}</span>
           {formattedCompactBudget && (
             <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold tabular-nums">
               {formattedCompactBudget}
@@ -421,7 +425,7 @@ export function ItineraryHeroHeader({
             }`}
           >
             <i className="fa-solid fa-check-to-slot text-xs" aria-hidden="true" />
-            <span>Bình chọn</span>
+            <span>{t('planner.hero.tabVoting')}</span>
             {pendingProposalsCount > 0 && (
               <span className="px-1.5 py-0.5 rounded-full bg-[#0194F3] text-white text-[10px] font-bold tabular-nums">
                 {pendingProposalsCount}
@@ -443,7 +447,7 @@ export function ItineraryHeroHeader({
             }`}
           >
             <i className="fa-solid fa-users text-xs" aria-hidden="true" />
-            <span>Đoàn &amp; Hướng dẫn</span>
+            <span>{t('planner.hero.tabGroup')}</span>
           </button>
         )}
       </nav>

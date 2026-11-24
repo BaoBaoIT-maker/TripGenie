@@ -8,6 +8,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 import * as crypto from 'crypto';
+import { AppLocale, DEFAULT_LOCALE } from '../../../common/i18n/locale.util';
 import { MailService } from './mail.service';
 
 export type OtpPurpose = 'email-verification' | 'password-reset';
@@ -71,6 +72,7 @@ export class OtpService {
   async generateAndSendOtp(
     email: string,
     purpose: OtpPurpose,
+    locale: AppLocale = DEFAULT_LOCALE,
   ): Promise<OtpChallengeResult> {
     const normalizedEmail = email.toLowerCase().trim();
     const cooldownKey = this.getCooldownKey(purpose, normalizedEmail);
@@ -152,6 +154,7 @@ export class OtpService {
       normalizedEmail,
       rawOtp,
       purpose,
+      locale,
     );
     if (!emailSent) {
       // Clean up challenge so user isn't stuck with unreachable code

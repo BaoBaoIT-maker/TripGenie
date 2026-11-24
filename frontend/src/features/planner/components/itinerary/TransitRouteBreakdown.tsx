@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { useI18n, type AppLocale } from '@/i18n';
 import type { IntercityTransit, TransitMode } from '@/types/itinerary';
 import {
   TRANSIT_UI_CONFIG,
@@ -11,9 +12,15 @@ import {
 
 export { cleanHubName };
 
+type TranslateFn = ReturnType<typeof useI18n>['t'];
+
 interface DirectModeTheme {
   icon: ReactNode;
-  title: string;
+  titleKey:
+    | 'planner.transitBreakdown.flightTitle'
+    | 'planner.transitBreakdown.busTitle'
+    | 'planner.transitBreakdown.trainTitle'
+    | 'planner.transitBreakdown.carTitle';
   buildFallbackSteps: (ctx: {
     transit: IntercityTransit;
     cleanOrigin: string;
@@ -21,14 +28,16 @@ interface DirectModeTheme {
     durHours: number;
     durMinutes: number;
     priceOneWay: number;
+    t: TranslateFn;
+    locale: AppLocale;
   }) => string[];
 }
 
 const DIRECT_MODE_THEMES: Record<Exclude<TransitMode, 'PERSONAL_MOTORBIKE'>, DirectModeTheme> = {
   FLIGHT: {
     icon: <i className="fa-solid fa-plane text-[#0194F3] text-sm shrink-0" aria-hidden="true" />,
-    title: 'Chặng bay & xe trung chuyển',
-    buildFallbackSteps: ({ transit, cleanOrigin, cleanDest, durMinutes, priceOneWay }) => {
+    titleKey: 'planner.transitBreakdown.flightTitle',
+    buildFallbackSteps: ({ transit, cleanOrigin, cleanDest, durMinutes, priceOneWay, t, locale }) => {
       const transferKm =
         transit.destHub?.distanceKm || TRANSIT_UI_CONFIG.DEFAULT_AIRPORT_TRANSFER_KM;
       const transferMins = Math.max(
@@ -36,32 +45,68 @@ const DIRECT_MODE_THEMES: Record<Exclude<TransitMode, 'PERSONAL_MOTORBIKE'>, Dir
         Math.round(transferKm * TRANSIT_UI_CONFIG.LOCAL_TRANSFER_MINS_PER_KM),
       );
       return [
-        `Chặng bay: ${cleanHubName(transit.originHub?.name || cleanOrigin)} → ${cleanHubName(transit.destHub?.name || cleanDest)} (~${formatDuration(durMinutes)}, ~${formatVnd(priceOneWay)}/vé)`,
-        `Xe trung chuyển: Taxi / Buýt sân bay về trung tâm ${cleanDest} (~${transferKm} km, ~${transferMins} phút)`,
+        t('planner.transitBreakdown.flightStepMain', {
+          origin: cleanHubName(transit.originHub?.name || cleanOrigin),
+          dest: cleanHubName(transit.destHub?.name || cleanDest),
+          duration: formatDuration(durMinutes, locale),
+          price: formatVnd(priceOneWay),
+        }),
+        t('planner.transitBreakdown.flightStepTransfer', {
+          dest: cleanDest,
+          km: transferKm,
+          mins: transferMins,
+        }),
       ];
     },
   },
   SLEEPER_BUS: {
     icon: <i className="fa-solid fa-bus text-amber-600 text-sm shrink-0" aria-hidden="true" />,
-    title: 'Chặng xe khách liên tỉnh',
-    buildFallbackSteps: ({ transit, cleanOrigin, cleanDest, durHours, priceOneWay }) => [
-      `Chặng xe: ${cleanHubName(transit.originHub?.name || `Bến xe ${cleanOrigin}`)} → ${cleanHubName(transit.destHub?.name || `Bến xe ${cleanDest}`)} (~${durHours} tiếng, ~${formatVnd(priceOneWay)}/vé)`,
-      `Xe trung chuyển: Nhà xe hoặc Taxi đưa đón về trung tâm ${cleanDest}`,
+    titleKey: 'planner.transitBreakdown.busTitle',
+    buildFallbackSteps: ({ transit, cleanOrigin, cleanDest, durHours, priceOneWay, t }) => [
+      t('planner.transitBreakdown.busStepMain', {
+        origin: cleanHubName(
+          transit.originHub?.name ||
+            t('planner.transitBreakdown.busOriginFallback', { city: cleanOrigin }),
+        ),
+        dest: cleanHubName(
+          transit.destHub?.name ||
+            t('planner.transitBreakdown.busDestFallback', { city: cleanDest }),
+        ),
+        hours: durHours,
+        price: formatVnd(priceOneWay),
+      }),
+      t('planner.transitBreakdown.busStepTransfer', { dest: cleanDest }),
     ],
   },
   TRAIN: {
     icon: <i className="fa-solid fa-train text-[#0194F3] text-sm shrink-0" aria-hidden="true" />,
-    title: 'Tuyến tàu hỏa & ga đến',
-    buildFallbackSteps: ({ transit, cleanOrigin, cleanDest, durHours, priceOneWay }) => [
-      `Tuyến tàu: ${cleanHubName(transit.originHub?.name || `Ga ${cleanOrigin}`)} → ${cleanHubName(transit.destHub?.name || `Ga ${cleanDest}`)} (~${durHours} tiếng, ~${formatVnd(priceOneWay)}/vé)`,
-      `Xe trung chuyển: Taxi / Xe ôm công nghệ từ ga về trung tâm ${cleanDest}`,
+    titleKey: 'planner.transitBreakdown.trainTitle',
+    buildFallbackSteps: ({ transit, cleanOrigin, cleanDest, durHours, priceOneWay, t }) => [
+      t('planner.transitBreakdown.trainStepMain', {
+        origin: cleanHubName(
+          transit.originHub?.name ||
+            t('planner.transitBreakdown.trainOriginFallback', { city: cleanOrigin }),
+        ),
+        dest: cleanHubName(
+          transit.destHub?.name ||
+            t('planner.transitBreakdown.trainDestFallback', { city: cleanDest }),
+        ),
+        hours: durHours,
+        price: formatVnd(priceOneWay),
+      }),
+      t('planner.transitBreakdown.trainStepTransfer', { dest: cleanDest }),
     ],
   },
   PERSONAL_CAR: {
     icon: <i className="fa-solid fa-car text-[#0194F3] text-sm shrink-0" aria-hidden="true" />,
-    title: 'Lộ trình ô tô tự lái',
-    buildFallbackSteps: ({ cleanOrigin, cleanDest, durHours, transit }) => [
-      `Lộ trình cao tốc / quốc lộ: ${cleanOrigin} → trung tâm ${cleanDest} (~${transit.distanceKm} km, ~${durHours} tiếng)`,
+    titleKey: 'planner.transitBreakdown.carTitle',
+    buildFallbackSteps: ({ cleanOrigin, cleanDest, durHours, transit, t }) => [
+      t('planner.transitBreakdown.carStepMain', {
+        origin: cleanOrigin,
+        dest: cleanDest,
+        km: transit.distanceKm,
+        hours: durHours,
+      }),
     ],
   },
 };
@@ -77,6 +122,7 @@ export default function TransitRouteBreakdown({
   originCity,
   destCity,
 }: Props) {
+  const { t, locale } = useI18n();
   const cleanOrigin = originCity || transit.originName;
   const cleanDest = destCity || transit.destName;
   const distKm = transit.distanceKm ?? 0;
@@ -93,7 +139,7 @@ export default function TransitRouteBreakdown({
         <div className="flex items-center justify-between font-bold text-[#10243A] flex-wrap gap-2">
           <span className="flex items-center gap-1.5">
             <i className="fa-solid fa-route text-[#0194F3] text-sm shrink-0" aria-hidden="true" />
-            <span>Lộ trình nối chặng liên tỉnh</span>
+            <span>{t('planner.transitBreakdown.connectingTitle')}</span>
           </span>
           {transit.transferLeg && (
             <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#E1EFFF] text-[#0194F3] inline-flex items-center gap-1.5 border border-[#D0E7FF]">
@@ -102,7 +148,11 @@ export default function TransitRouteBreakdown({
               ) : (
                 <i className="fa-solid fa-bus text-[11px] shrink-0" aria-hidden="true" />
               )}
-              <span>{isFerry ? 'Tàu cao tốc' : 'Xe trung chuyển'}</span>
+              <span>
+                {isFerry
+                  ? t('planner.transitBreakdown.ferryBadge')
+                  : t('planner.transitBreakdown.shuttleBadge')}
+              </span>
             </span>
           )}
         </div>
@@ -142,7 +192,8 @@ export default function TransitRouteBreakdown({
           <div className="rounded-lg bg-white/90 border border-[#D0E7FF] p-2.5 text-xs text-slate-700 flex items-start gap-2 shadow-2xs">
             <i className="fa-solid fa-circle-info text-[#0194F3] text-sm shrink-0 mt-0.5" aria-hidden="true" />
             <span>
-              <strong className="text-[#10243A]">Lưu ý:</strong> {cleanHubName(transit.details.notes)}
+              <strong className="text-[#10243A]">{t('planner.transitBreakdown.noteLabel')}</strong>{' '}
+              {cleanHubName(transit.details.notes)}
             </span>
           </div>
         )}
@@ -178,12 +229,17 @@ export default function TransitRouteBreakdown({
               <i className="fa-solid fa-car text-[#0194F3] text-sm shrink-0" aria-hidden="true" />
             )}
             <span className={isOverLimit ? 'text-amber-950 font-bold' : 'text-[#10243A] font-bold'}>
-              {isOverLimit ? 'Lưu ý cự ly phượt đường bộ' : `Lộ trình phượt đường bộ (${cleanOrigin} → ${cleanDest})`}
+              {isOverLimit
+                ? t('planner.transitBreakdown.motorbikeWarningTitle')
+                : t('planner.transitBreakdown.motorbikeRouteTitle', {
+                    origin: cleanOrigin,
+                    dest: cleanDest,
+                  })}
             </span>
           </div>
           {distKm > 0 && (
             <span className={`text-xs font-semibold ${isOverLimit ? 'text-amber-800' : 'text-slate-600'}`}>
-              ~{distKm} km • ~{durHours} tiếng
+              {t('planner.transitBreakdown.distanceHours', { km: distKm, hours: durHours })}
             </span>
           )}
         </div>
@@ -191,7 +247,7 @@ export default function TransitRouteBreakdown({
         {isOverLimit ? (
           <div className="space-y-1.5 text-xs">
             <p className="text-amber-900 leading-relaxed font-medium">
-              Cự ly ~{distKm} km mất hơn {durHours} tiếng lái xe liên tục. Bạn nên cân nhắc lựa chọn <strong>Xe khách giường nằm</strong> hoặc <strong>Máy bay</strong> để đảm bảo an toàn và sức khỏe.
+              {t('planner.transitBreakdown.motorbikeWarningBody', { km: distKm, hours: durHours })}
             </p>
           </div>
         ) : (
@@ -199,8 +255,16 @@ export default function TransitRouteBreakdown({
             {(routeSteps.length > 0
               ? routeSteps
               : [
-                  `Cung đường: ${cleanOrigin} → ${cleanDest} (~${distKm} km, ~${durHours} tiếng)`,
-                  `Nhiên liệu ước tính: ~${formatVnd(priceOneWay)} (~${fuelLiters} lít xăng)`,
+                  t('planner.transitBreakdown.motorbikeStepRoute', {
+                    origin: cleanOrigin,
+                    dest: cleanDest,
+                    km: distKm,
+                    hours: durHours,
+                  }),
+                  t('planner.transitBreakdown.motorbikeStepFuel', {
+                    price: formatVnd(priceOneWay),
+                    liters: fuelLiters,
+                  }),
                 ]
             ).map((step, idx) => (
               <div key={idx} className="flex items-start gap-2">
@@ -230,7 +294,10 @@ export default function TransitRouteBreakdown({
               aria-hidden="true"
             />
             <span>
-              <strong className="font-bold">Khuyến nghị:</strong> {transit.details.notes}
+              <strong className="font-bold">
+                {t('planner.transitBreakdown.recommendationLabel')}
+              </strong>{' '}
+              {transit.details.notes}
             </span>
           </div>
         )}
@@ -250,6 +317,8 @@ export default function TransitRouteBreakdown({
           durHours,
           durMinutes,
           priceOneWay,
+          t,
+          locale,
         });
 
   return (
@@ -257,12 +326,12 @@ export default function TransitRouteBreakdown({
       <div className="flex items-center justify-between font-semibold text-slate-900">
         <div className="flex items-center gap-1.5">
           {theme.icon}
-          <span className="font-semibold text-slate-900">{theme.title}</span>
+          <span className="font-semibold text-slate-900">{t(theme.titleKey)}</span>
         </div>
         <div className="text-xs font-semibold text-slate-600">
           {distKm > 0 && `~${distKm} km`}
           {distKm > 0 && durMinutes > 0 && ' • '}
-          {durMinutes > 0 && `~${formatDuration(durMinutes)}`}
+          {durMinutes > 0 && `~${formatDuration(durMinutes, locale)}`}
         </div>
       </div>
 
@@ -281,7 +350,8 @@ export default function TransitRouteBreakdown({
         <div className="rounded-lg bg-white/90 border border-[#D0E7FF] p-2.5 text-xs text-slate-700 flex items-start gap-2 shadow-2xs">
           <i className="fa-solid fa-circle-info text-[#0194F3] text-sm shrink-0 mt-0.5" aria-hidden="true" />
           <span>
-            <strong className="text-[#10243A]">Lưu ý:</strong> {cleanHubName(transit.details.notes)}
+            <strong className="text-[#10243A]">{t('planner.transitBreakdown.noteLabel')}</strong>{' '}
+            {cleanHubName(transit.details.notes)}
           </span>
         </div>
       )}

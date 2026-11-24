@@ -1,3 +1,6 @@
+import { AppLocale, DEFAULT_LOCALE } from '../../common/i18n/locale.util';
+import { t } from '../../common/i18n/t.util';
+
 export enum WeatherSource {
   FORECAST = 'FORECAST',
   SEASONAL_AVERAGE = 'SEASONAL_AVERAGE',
@@ -33,40 +36,48 @@ export const WEATHER_THRESHOLDS = {
 export interface WmoWeatherDescriptor {
   condition: WeatherCondition;
   labelVi: string;
+  labelEn: string;
 }
 
 /**
  * WMO Weather Interpretation Codes (WW) used by Open-Meteo daily.weather_code.
  */
 export const WMO_WEATHER_MAP: Record<number, WmoWeatherDescriptor> = {
-  0: { condition: WeatherCondition.SUNNY, labelVi: 'Trời quang nắng đẹp' },
-  1: { condition: WeatherCondition.SUNNY, labelVi: 'Ít mây, nắng ráo' },
-  2: { condition: WeatherCondition.MILD, labelVi: 'Có mây rải rác' },
-  3: { condition: WeatherCondition.MILD, labelVi: 'Nhiều mây, dịu mát' },
-  45: { condition: WeatherCondition.MILD, labelVi: 'Có sương mù nhẹ' },
-  48: { condition: WeatherCondition.COLD, labelVi: 'Sương mù ẩm lạnh' },
-  51: { condition: WeatherCondition.RAINY, labelVi: 'Mưa phùn nhẹ' },
-  53: { condition: WeatherCondition.RAINY, labelVi: 'Mưa phùn vừa' },
-  55: { condition: WeatherCondition.RAINY, labelVi: 'Mưa phùn dày' },
-  56: { condition: WeatherCondition.COLD, labelVi: 'Mưa phùn lạnh' },
-  57: { condition: WeatherCondition.COLD, labelVi: 'Mưa phùn giá rét' },
-  61: { condition: WeatherCondition.RAINY, labelVi: 'Mưa nhỏ rải rác' },
-  63: { condition: WeatherCondition.RAINY, labelVi: 'Mưa vừa' },
-  65: { condition: WeatherCondition.RAINY, labelVi: 'Mưa to' },
-  66: { condition: WeatherCondition.RAINY, labelVi: 'Mưa lạnh nhẹ' },
-  67: { condition: WeatherCondition.RAINY, labelVi: 'Mưa lạnh nặng hạt' },
-  71: { condition: WeatherCondition.COLD, labelVi: 'Tuyết nhẹ / Rét đậm' },
-  73: { condition: WeatherCondition.COLD, labelVi: 'Tuyết vừa / Rét đậm' },
-  75: { condition: WeatherCondition.COLD, labelVi: 'Tuyết dày / Rét buốt' },
-  77: { condition: WeatherCondition.COLD, labelVi: 'Mưa tuyết / Rét' },
-  80: { condition: WeatherCondition.RAINY, labelVi: 'Mưa rào nhẹ' },
-  81: { condition: WeatherCondition.RAINY, labelVi: 'Mưa rào vừa' },
-  82: { condition: WeatherCondition.RAINY, labelVi: 'Mưa rào rất to' },
-  85: { condition: WeatherCondition.COLD, labelVi: 'Mưa tuyết rải rác' },
-  86: { condition: WeatherCondition.COLD, labelVi: 'Mưa tuyết dày' },
-  95: { condition: WeatherCondition.RAINY, labelVi: 'Dông sét' },
-  96: { condition: WeatherCondition.RAINY, labelVi: 'Mưa dông kèm mưa đá nhẹ' },
-  99: { condition: WeatherCondition.RAINY, labelVi: 'Mưa dông mạnh' },
+  0: { condition: WeatherCondition.SUNNY, labelVi: 'Trời quang nắng đẹp', labelEn: 'Clear & sunny' },
+  1: { condition: WeatherCondition.SUNNY, labelVi: 'Ít mây, nắng ráo', labelEn: 'Mostly clear' },
+  2: { condition: WeatherCondition.MILD, labelVi: 'Có mây rải rác', labelEn: 'Partly cloudy' },
+  3: { condition: WeatherCondition.MILD, labelVi: 'Nhiều mây, dịu mát', labelEn: 'Overcast & mild' },
+  45: { condition: WeatherCondition.MILD, labelVi: 'Có sương mù nhẹ', labelEn: 'Light fog' },
+  48: { condition: WeatherCondition.COLD, labelVi: 'Sương mù ẩm lạnh', labelEn: 'Cold mist' },
+  51: { condition: WeatherCondition.RAINY, labelVi: 'Mưa phùn nhẹ', labelEn: 'Light drizzle' },
+  53: { condition: WeatherCondition.RAINY, labelVi: 'Mưa phùn vừa', labelEn: 'Moderate drizzle' },
+  55: { condition: WeatherCondition.RAINY, labelVi: 'Mưa phùn dày', labelEn: 'Dense drizzle' },
+  56: { condition: WeatherCondition.COLD, labelVi: 'Mưa phùn lạnh', labelEn: 'Freezing drizzle' },
+  57: { condition: WeatherCondition.COLD, labelVi: 'Mưa phùn giá rét', labelEn: 'Heavy freezing drizzle' },
+  61: { condition: WeatherCondition.RAINY, labelVi: 'Mưa nhỏ rải rác', labelEn: 'Light rain' },
+  63: { condition: WeatherCondition.RAINY, labelVi: 'Mưa vừa', labelEn: 'Moderate rain' },
+  65: { condition: WeatherCondition.RAINY, labelVi: 'Mưa to', labelEn: 'Heavy rain' },
+  66: { condition: WeatherCondition.RAINY, labelVi: 'Mưa lạnh nhẹ', labelEn: 'Light freezing rain' },
+  67: { condition: WeatherCondition.RAINY, labelVi: 'Mưa lạnh nặng hạt', labelEn: 'Heavy freezing rain' },
+  71: { condition: WeatherCondition.COLD, labelVi: 'Tuyết nhẹ / Rét đậm', labelEn: 'Light snow / Very cold' },
+  73: { condition: WeatherCondition.COLD, labelVi: 'Tuyết vừa / Rét đậm', labelEn: 'Moderate snow / Very cold' },
+  75: { condition: WeatherCondition.COLD, labelVi: 'Tuyết dày / Rét buốt', labelEn: 'Heavy snow / Freezing' },
+  77: { condition: WeatherCondition.COLD, labelVi: 'Mưa tuyết / Rét', labelEn: 'Snow grains / Cold' },
+  80: { condition: WeatherCondition.RAINY, labelVi: 'Mưa rào nhẹ', labelEn: 'Light rain showers' },
+  81: { condition: WeatherCondition.RAINY, labelVi: 'Mưa rào vừa', labelEn: 'Moderate rain showers' },
+  82: { condition: WeatherCondition.RAINY, labelVi: 'Mưa rào rất to', labelEn: 'Heavy rain showers' },
+  85: { condition: WeatherCondition.COLD, labelVi: 'Mưa tuyết rải rác', labelEn: 'Light snow showers' },
+  86: { condition: WeatherCondition.COLD, labelVi: 'Mưa tuyết dày', labelEn: 'Heavy snow showers' },
+  95: { condition: WeatherCondition.RAINY, labelVi: 'Dông sét', labelEn: 'Thunderstorm' },
+  96: { condition: WeatherCondition.RAINY, labelVi: 'Mưa dông kèm mưa đá nhẹ', labelEn: 'Thunderstorm with light hail' },
+  99: { condition: WeatherCondition.RAINY, labelVi: 'Mưa dông mạnh', labelEn: 'Severe thunderstorm' },
+};
+
+export const CONDITION_FALLBACK_LABEL_EN: Record<WeatherCondition, string> = {
+  [WeatherCondition.SUNNY]: 'Sunny & pleasant',
+  [WeatherCondition.MILD]: 'Mild & pleasant',
+  [WeatherCondition.RAINY]: 'Rain showers expected',
+  [WeatherCondition.COLD]: 'Cool & chilly',
 };
 
 export function resolveWmoWeather(
@@ -76,14 +87,22 @@ export function resolveWmoWeather(
   const mapped =
     code != null && WMO_WEATHER_MAP[code]
       ? WMO_WEATHER_MAP[code]
-      : { condition: WeatherCondition.MILD, labelVi: 'Thời tiết ôn hòa' };
+      : {
+          condition: WeatherCondition.MILD,
+          labelVi: 'Thời tiết ôn hòa',
+          labelEn: 'Mild weather',
+        };
 
   if (
     tempAvgC != null &&
     tempAvgC <= WEATHER_THRESHOLDS.COLD_TEMP_C &&
     mapped.condition !== WeatherCondition.RAINY
   ) {
-    return { condition: WeatherCondition.COLD, labelVi: mapped.labelVi };
+    return {
+      condition: WeatherCondition.COLD,
+      labelVi: mapped.labelVi,
+      labelEn: mapped.labelEn,
+    };
   }
   return mapped;
 }
@@ -95,6 +114,7 @@ export interface DayWeather {
   isForecast: boolean;
   condition: WeatherCondition;
   labelVi: string;
+  labelEn?: string;
   tempMinC: number;
   tempMaxC: number;
   tempAvgC: number;
@@ -115,22 +135,28 @@ export interface TripWeatherResponse {
 
 /**
  * Pure guidance formatter shared between GeminiPlannerService and CopilotAgentService.
- * Uses centralized WEATHER_THRESHOLDS so prompt rules stay consistent and testable.
+ * Uses centralized WEATHER_THRESHOLDS + backend i18n dictionary so prompt rules stay consistent and testable.
  */
-export function buildWeatherGuidance(days: DayWeather[] | undefined): string {
+export function buildWeatherGuidance(
+  days: DayWeather[] | undefined,
+  locale: AppLocale = DEFAULT_LOCALE,
+): string {
   if (!days || days.length === 0) return '';
 
   const lines = days.map((d) => {
-    const sourceTag =
+    const source =
       d.source === WeatherSource.FORECAST
-        ? 'Dự báo'
-        : 'Xu hướng khí hậu mùa, không phải dự báo';
+        ? t(locale, 'weather.sourceForecast')
+        : t(locale, 'weather.sourceSeasonal');
     const datePart = d.date ? ` (${d.date})` : '';
     const rainPart =
       d.precipitationProbabilityMax != null
-        ? `, xác suất mưa ${d.precipitationProbabilityMax}%`
+        ? t(locale, 'weather.rainPart', { prob: d.precipitationProbabilityMax })
         : '';
-    const uvPart = d.uvIndexMax != null ? `, UV tối đa ${d.uvIndexMax}` : '';
+    const uvPart =
+      d.uvIndexMax != null
+        ? t(locale, 'weather.uvPart', { uv: d.uvIndexMax })
+        : '';
 
     const hints: string[] = [];
     const isHighRain =
@@ -138,39 +164,51 @@ export function buildWeatherGuidance(days: DayWeather[] | undefined): string {
         WEATHER_THRESHOLDS.RAIN_PROB_HIGH ||
       d.condition === WeatherCondition.RAINY;
     if (isHighRain) {
-      hints.push(
-        'ƯU TIÊN điểm trong nhà/có mái che (bảo tàng, café, workshop, ẩm thực, TTTM), hạn chế ngoài trời kéo dài và gợi ý phương án dự phòng trong notes',
-      );
+      hints.push(t(locale, 'weather.hintRain'));
     }
 
     const isHotOrHighUv =
       d.tempMaxC >= WEATHER_THRESHOLDS.HEAT_TEMP_C ||
       (d.uvIndexMax ?? 0) >= WEATHER_THRESHOLDS.UV_HIGH;
     if (isHotOrHighUv) {
-      hints.push(
-        'Nắng gắt/UV cao: đẩy điểm ngoài trời lên sáng sớm (07:30-10:30) hoặc chiều muộn/tối (>=16:00); khung 11:30-15:00 ưu tiên ăn trưa, nghỉ ngơi, nơi có điều hòa',
-      );
+      hints.push(t(locale, 'weather.hintHeat'));
     }
 
     if (
       d.tempAvgC <= WEATHER_THRESHOLDS.COLD_TEMP_C ||
       d.condition === WeatherCondition.COLD
     ) {
-      hints.push(
-        'Trời lạnh: ưu tiên đồ ăn nóng, quán ấm cúng, nhắc giữ ấm khi đi sáng sớm/tối',
-      );
+      hints.push(t(locale, 'weather.hintCold'));
     }
 
-    const hintText = hints.length > 0 ? ` => ${hints.join('; ')}` : '';
-    return `- Ngày ${d.dayNumber}${datePart} [${sourceTag}]: ${d.labelVi}, ${d.tempMinC}-${d.tempMaxC}°C${rainPart}${uvPart}${hintText}`;
+    const hintPart = hints.length > 0 ? ` => ${hints.join('; ')}` : '';
+    const label =
+      locale === 'en'
+        ? d.labelEn || CONDITION_FALLBACK_LABEL_EN[d.condition] || d.labelVi
+        : d.labelVi;
+
+    return t(locale, 'weather.dayLine', {
+      day: d.dayNumber,
+      datePart,
+      source,
+      label,
+      min: d.tempMinC,
+      max: d.tempMaxC,
+      rainPart,
+      uvPart,
+      hintPart,
+    });
   });
 
   const hasSeasonalOnly = days.every(
     (d) => d.source === WeatherSource.SEASONAL_AVERAGE,
   );
   const seasonalNote = hasSeasonalOnly
-    ? '\nLưu ý: Dữ liệu trên là trung bình khí hậu theo mùa (ngoài cửa sổ dự báo), chỉ dùng để gợi ý khung giờ và trang phục, không khẳng định chắc chắn thời tiết từng giờ.'
+    ? t(locale, 'weather.seasonalNote')
     : '';
 
-  return `THỜI TIẾT TỪNG NGÀY TẠI ĐIỂM ĐẾN:\n${lines.join('\n')}${seasonalNote}`;
+  return t(locale, 'weather.guidanceHeading', {
+    lines: lines.join('\n'),
+    seasonalNote,
+  });
 }

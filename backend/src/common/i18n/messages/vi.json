@@ -1,0 +1,76 @@
+{
+  "mail": {
+    "common": {
+      "greeting": "Xin chào,",
+      "footer": "Đây là email tự động từ hệ thống TripGenie, vui lòng không phản hồi thư này."
+    },
+    "otp": {
+      "resetSubject": "[TripGenie] Mã OTP đặt lại mật khẩu: {otp}",
+      "verifySubject": "[TripGenie] Mã OTP xác thực tài khoản: {otp}",
+      "resetTitle": "Đặt Lại Mật Khẩu TripGenie",
+      "verifyTitle": "Mã Xác Thực TripGenie",
+      "resetMessage": "Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản của bạn tại <strong>TripGenie</strong>.",
+      "verifyMessage": "Cảm ơn bạn đã đăng ký tài khoản tại <strong>TripGenie</strong> — Nền tảng Lập kế hoạch Du lịch Thông minh.",
+      "expiry": "Mã OTP có hiệu lực trong vòng <strong>10 phút</strong>.",
+      "resetNote": "Nếu bạn không yêu cầu đặt lại mật khẩu, vui lòng bỏ qua email này hoặc liên hệ hỗ trợ để bảo mật tài khoản.",
+      "verifyNote": "Vui lòng không chia sẻ mã này với bất kỳ ai để đảm bảo an toàn cho tài khoản của bạn."
+    },
+    "verification": {
+      "subject": "[TripGenie] Kích hoạt tài khoản của bạn",
+      "heading": "Xác Thực Tài Khoản TripGenie",
+      "intro": "Cảm ơn bạn đã đăng ký tài khoản tại <strong>TripGenie</strong> — Nền tảng Lập kế hoạch Du lịch Thông minh.",
+      "instruction": "Vui lòng nhấn vào nút bên dưới để xác thực địa chỉ email và kích hoạt tài khoản của bạn:",
+      "cta": "Xác Thực Tài Khoản",
+      "expiry": "Đường link xác thực này có hiệu lực trong vòng <strong>30 phút</strong>.",
+      "fallbackLink": "Nếu nút trên không bấm được, bạn có thể copy liên kết này vào trình duyệt:"
+    }
+  },
+  "advisor": {
+    "fallback": {
+      "networkError": "Hệ thống AI Advisor đang gặp gián đoạn kết nối tạm thời. Bạn vui lòng thử lại sau giây lát nhé!",
+      "circuitBreaker": "Mình đã tổng hợp các thông tin phù hợp nhất từ dữ liệu hiện có. Bạn có cần mình làm rõ thêm chi tiết nào không?",
+      "missingApiKey": "Dịch vụ AI hiện chưa được cấu hình khóa kết nối. Vui lòng kiểm tra cấu hình hệ thống."
+    }
+  },
+  "copilot": {
+    "proposals": {
+      "swapActivityDay": "Đề xuất đổi địa điểm Ngày {day}",
+      "swapActivity": "Đề xuất đổi địa điểm",
+      "swapDaysRange": "Đề xuất hoán đổi Ngày {dayA} và Ngày {dayB}",
+      "swapDays": "Đề xuất hoán đổi ngày",
+      "addActivityDay": "Đề xuất thêm điểm Ngày {day}",
+      "addActivity": "Đề xuất thêm địa điểm",
+      "removeActivityDay": "Đề xuất xóa điểm Ngày {day}",
+      "removeActivity": "Đề xuất xóa địa điểm",
+      "moveActivity": "Đề xuất chuyển ngày hoạt động",
+      "changeDestination": "Đề xuất đổi điểm đến",
+      "default": "Đề xuất thay đổi lịch trình"
+    },
+    "changeDestinationFallback": "điểm đến mới",
+    "changeDestinationMessage": "Đổi sang {dest} cần khởi tạo một lịch trình mới để tính toán lại điểm đến, thời gian và phương tiện di chuyển phù hợp. Bạn hãy bấm vào nút bên dưới để tạo lịch trình {dest} mới nhé!",
+    "unsupportedTool": "Công cụ {toolName} không được hỗ trợ.",
+    "fallbackDirectReply": "Genie đã ghi nhận yêu cầu của bạn. Bạn có muốn điều chỉnh thêm hoạt động nào nữa không?",
+    "fallbackError": "Genie hiện đang bận tối ưu hóa dữ liệu. Bạn hãy thử lại câu hỏi hoặc dùng nút ✨ Đổi điểm trực tiếp trên thẻ nhé!"
+  },
+  "planner": {
+    "fallback": {
+      "title": "Hành trình khám phá {dest} {days} ngày",
+      "description": "Lịch trình được tối ưu hóa theo các địa điểm nổi bật tại {dest}.",
+      "dayTheme": "Khám phá các điểm nổi bật {dest} - Ngày {day}",
+      "emptyDayTheme": "Khám phá {dest} - Ngày {day}",
+      "activityNote": "Tham quan và trải nghiệm {placeName}"
+    }
+  },
+  "weather": {
+    "sourceForecast": "Dự báo",
+    "sourceSeasonal": "Xu hướng khí hậu mùa, không phải dự báo",
+    "dayLine": "- Ngày {day}{datePart} [{source}]: {label}, {min}-{max}°C{rainPart}{uvPart}{hintPart}",
+    "rainPart": ", xác suất mưa {prob}%",
+    "uvPart": ", UV tối đa {uv}",
+    "hintRain": "ƯU TIÊN điểm trong nhà/có mái che (bảo tàng, café, workshop, ẩm thực, TTTM), hạn chế ngoài trời kéo dài và gợi ý phương án dự phòng trong notes",
+    "hintHeat": "Nắng gắt/UV cao: đẩy điểm ngoài trời lên sáng sớm (07:30-10:30) hoặc chiều muộn/tối (>=16:00); khung 11:30-15:00 ưu tiên ăn trưa, nghỉ ngơi, nơi có điều hòa",
+    "hintCold": "Trời lạnh: ưu tiên đồ ăn nóng, quán ấm cúng, nhắc giữ ấm khi đi sáng sớm/tối",
+    "seasonalNote": "\nLưu ý: Dữ liệu trên là trung bình khí hậu theo mùa (ngoài cửa sổ dự báo), chỉ dùng để gợi ý khung giờ và trang phục, không khẳng định chắc chắn thời tiết từng giờ.",
+    "guidanceHeading": "THỜI TIẾT TỪNG NGÀY TẠI ĐIỂM ĐẾN:\n{lines}{seasonalNote}"
+  }
+}

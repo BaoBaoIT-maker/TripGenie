@@ -26,6 +26,8 @@ import {
 } from './dto';
 import { JwtAuthGuard } from '@/common/guards/jwt-auth.guard';
 import { CurrentUser } from '@/common/decorators/current-user.decorator';
+import { RequestLocale } from '@/common/decorators/request-locale.decorator';
+import { AppLocale } from '@/common/i18n/locale.util';
 import { AuthenticatedUser } from '@/common/types';
 import { UserResponse } from './interfaces/auth.interface';
 import { RateLimit } from '../../common/decorators/rate-limit.decorator';
@@ -68,8 +70,11 @@ export class AuthController {
 
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  async register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  async register(
+    @Body() dto: RegisterDto,
+    @RequestLocale() locale: AppLocale = 'vi',
+  ) {
+    return this.authService.register(dto, locale);
   }
 
   @Post('verify-email')
@@ -85,8 +90,11 @@ export class AuthController {
 
   @Post('resend-verification-email')
   @HttpCode(HttpStatus.OK)
-  async resendVerificationEmail(@Body() dto: ResendVerificationEmailDto) {
-    return this.authService.resendVerificationEmail(dto.registrationId);
+  async resendVerificationEmail(
+    @Body() dto: ResendVerificationEmailDto,
+    @RequestLocale() locale: AppLocale = 'vi',
+  ) {
+    return this.authService.resendVerificationEmail(dto.registrationId, locale);
   }
 
   @Get('registration-status/:registrationId')
@@ -117,8 +125,11 @@ export class AuthController {
 
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
-  async forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.forgotPassword(dto);
+  async forgotPassword(
+    @Body() dto: ForgotPasswordDto,
+    @RequestLocale() locale: AppLocale = 'vi',
+  ) {
+    return this.authService.forgotPassword(dto, locale);
   }
 
   @Post('verify-reset-otp')

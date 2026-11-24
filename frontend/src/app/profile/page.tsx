@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense, useMemo } from "react";
+import { useState, Suspense, useMemo } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -23,42 +23,44 @@ import {
 import { BudgetLevel } from "@/services/user-preference.service";
 import { DEFAULT_AVATAR } from "@/config/avatars";
 import { AvatarPickerModal } from "@/features/auth/components/AvatarPickerModal";
+import { useI18n } from "@/i18n";
 
-const DEFAULT_TRAVEL_STYLES = [
-  { id: "CULTURE", label: "Văn hóa & Di sản" },
-  { id: "FOOD", label: "Ẩm thực địa phương" },
-  { id: "CHILL", label: "Nghỉ dưỡng & Cafe" },
-  { id: "NATURE", label: "Thiên nhiên non nước" },
-  { id: "ADVENTURE", label: "Khám phá & Trải nghiệm" },
-  { id: "CHECKIN", label: "Chụp ảnh check-in" },
-  { id: "HEALING", label: "Chữa lành tâm hồn" },
-  { id: "BUDGET", label: "Du lịch tiết kiệm" },
-];
+const DEFAULT_TRAVEL_STYLE_IDS = [
+  "CULTURE",
+  "FOOD",
+  "CHILL",
+  "NATURE",
+  "ADVENTURE",
+  "CHECKIN",
+  "HEALING",
+  "BUDGET",
+] as const;
 
-const DEFAULT_PREFERRED_CATEGORIES = [
-  { id: "am-thuc", label: "Quán ăn & Ẩm thực" },
-  { id: "cafe", label: "Quán cafe & Trà" },
-  { id: "diem-tham-quan", label: "Điểm tham quan" },
-  { id: "lich-su", label: "Di tích lịch sử" },
-  { id: "mua-sam", label: "Chợ & Mua sắm" },
-  { id: "giai-tri", label: "Khu vui chơi giải trí" },
-];
+const DEFAULT_PREFERRED_CATEGORY_IDS = [
+  "am-thuc",
+  "cafe",
+  "diem-tham-quan",
+  "lich-su",
+  "mua-sam",
+  "giai-tri",
+] as const;
 
-const DEFAULT_DIETARY_RESTRICTIONS = [
-  { id: "VEGETARIAN", label: "Ăn chay" },
-  { id: "HALAL", label: "Halal" },
-  { id: "NO_SEAFOOD", label: "Không ăn hải sản" },
-  { id: "NO_SPICY", label: "Không ăn cay" },
-];
+const DEFAULT_DIETARY_RESTRICTION_IDS = [
+  "VEGETARIAN",
+  "HALAL",
+  "NO_SEAFOOD",
+  "NO_SPICY",
+] as const;
 
-const BUDGET_LEVELS: { id: BudgetLevel; label: string; desc: string }[] = [
-  { id: "LOW", label: "Tiết kiệm", desc: "Homestay, ăn đường phố, xe máy" },
-  { id: "MEDIUM", label: "Vừa phải", desc: "Khách sạn 3*, nhà hàng vừa, taxi/xe máy" },
-  { id: "HIGH", label: "Thoải mái", desc: "Resort 4*, trải nghiệm ẩm thực tinh hoa" },
-  { id: "LUXURY", label: "Sang trọng", desc: "Nghỉ dưỡng 5* cao cấp, tour riêng tư" },
+const BUDGET_LEVEL_IDS: readonly BudgetLevel[] = [
+  "LOW",
+  "MEDIUM",
+  "HIGH",
+  "LUXURY",
 ];
 
 function ProfileContent() {
+  const { t } = useI18n();
   const { user, isLoading: isAuthLoading } = useAuth();
   const searchParams = useSearchParams();
   const tabParam = searchParams.get("tab");
@@ -78,11 +80,12 @@ function ProfileContent() {
   const [activeTab, setActiveTab] = useState<"account" | "preferences">(() => {
     return tabParam === "preferences" ? "preferences" : "account";
   });
-
-  useEffect(() => {
+  const [prevTabParam, setPrevTabParam] = useState(tabParam);
+  if (tabParam !== prevTabParam) {
+    setPrevTabParam(tabParam);
     if (tabParam === "preferences") setActiveTab("preferences");
     else if (tabParam === "account") setActiveTab("account");
-  }, [tabParam]);
+  }
 
   // Real Preferences from backend
   const { data: userPref, isLoading: isPrefLoading } = useUserPreferences({
@@ -96,19 +99,19 @@ function ProfileContent() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedDietary, setSelectedDietary] = useState<string[]>([]);
 
+  const [syncedUserPref, setSyncedUserPref] = useState(userPref);
+  if (userPref && userPref !== syncedUserPref) {
+    setSyncedUserPref(userPref);
+    setSelectedBudget(userPref.budgetLevel || "MEDIUM");
+    setSelectedStyles(userPref.travelStyle || []);
+    setSelectedCategories(userPref.preferredCategories || []);
+    setSelectedDietary(userPref.dietaryRestrictions || []);
+  }
+
   // Input state for custom user-defined preferences
   const [customStyleInput, setCustomStyleInput] = useState("");
   const [customCategoryInput, setCustomCategoryInput] = useState("");
   const [customDietaryInput, setCustomDietaryInput] = useState("");
-
-  useEffect(() => {
-    if (userPref) {
-      setSelectedBudget(userPref.budgetLevel || "MEDIUM");
-      setSelectedStyles(userPref.travelStyle || []);
-      setSelectedCategories(userPref.preferredCategories || []);
-      setSelectedDietary(userPref.dietaryRestrictions || []);
-    }
-  }, [userPref]);
 
   const toggleStyle = (value: string) => {
     setSelectedStyles((prev) =>
@@ -163,9 +166,9 @@ function ProfileContent() {
         preferredCategories: selectedCategories,
         dietaryRestrictions: selectedDietary,
       });
-      toast.success("Đã lưu sở thích du lịch AI thành công");
+      toast.success(t("profile.preferences.saveSuccess"));
     } catch {
-      toast.error("Không thể lưu sở thích. Vui lòng thử lại sau.");
+      toast.error(t("profile.preferences.saveError"));
     }
   };
 
@@ -175,16 +178,16 @@ function ProfileContent() {
         <div className="rounded-3xl border border-border bg-card p-10 space-y-4 shadow-xs">
           <i className="fa-regular fa-circle-user text-5xl text-primary mx-auto block text-center" aria-hidden="true" />
           <h1 className="text-2xl font-bold font-heading text-foreground">
-            Vui lòng đăng nhập để xem Hồ sơ cá nhân
+            {t("profile.guestTitle")}
           </h1>
           <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
-            Đăng nhập để quản lý tài khoản và cá nhân hóa sở thích du lịch cùng TripGenie AI.
+            {t("profile.guestDescription")}
           </p>
           <div className="pt-2">
             <Link href="/login">
               <Button className="rounded-xl font-semibold gap-2 px-6">
                 <LogIn className="size-4" />
-                <span>Đăng nhập ngay</span>
+                <span>{t("profile.signInNow")}</span>
               </Button>
             </Link>
           </div>
@@ -194,9 +197,9 @@ function ProfileContent() {
   }
 
   // Set of predefined IDs for badge recognition
-  const predefinedStyleIds = new Set(DEFAULT_TRAVEL_STYLES.map((s) => s.id));
-  const predefinedCategoryIds = new Set(DEFAULT_PREFERRED_CATEGORIES.map((c) => c.id));
-  const predefinedDietaryIds = new Set(DEFAULT_DIETARY_RESTRICTIONS.map((d) => d.id));
+  const predefinedStyleIds = new Set<string>(DEFAULT_TRAVEL_STYLE_IDS);
+  const predefinedCategoryIds = new Set<string>(DEFAULT_PREFERRED_CATEGORY_IDS);
+  const predefinedDietaryIds = new Set<string>(DEFAULT_DIETARY_RESTRICTION_IDS);
 
   return (
     <div className="max-w-[1200px] mx-auto w-full px-4 py-8 sm:px-6 lg:px-8 space-y-8 pb-16">
@@ -206,13 +209,13 @@ function ProfileContent() {
           type="button"
           onClick={() => setIsAvatarModalOpen(true)}
           className="group relative shrink-0 rounded-full transition-transform hover:scale-105 active:scale-95 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-          title="Nhấn để đổi ảnh đại diện"
-          aria-label="Đổi ảnh đại diện"
+          title={t("profile.changeAvatarTooltip")}
+          aria-label={t("profile.changeAvatarAria")}
         >
           <Avatar className="size-20 sm:size-24 border-2 border-primary/20 shadow-sm group-hover:border-primary transition-colors">
             <AvatarImage
               src={user?.avatarUrl || DEFAULT_AVATAR}
-              alt={user?.fullName || "Avatar Người dùng"}
+              alt={user?.fullName || t("profile.avatarAlt")}
             />
             <AvatarFallback className="text-xl font-bold bg-primary text-primary-foreground">
               {userInitials}
@@ -223,12 +226,12 @@ function ProfileContent() {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2.5 flex-wrap">
             <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-foreground tracking-tight truncate">
-              {user?.fullName || "Khách du lịch TripGenie"}
+              {user?.fullName || t("profile.fallbackName")}
             </h1>
             {Boolean(user?.isVerifiedCreator || user?.role === "ADMIN") && (
               <span
-                title={user?.role === "ADMIN" ? "Quản trị viên hệ thống" : "Thổ địa được xác thực bởi TripGenie"}
-                aria-label="Xác thực TripGenie"
+                title={user?.role === "ADMIN" ? t("profile.adminBadgeTitle") : t("profile.verifiedCreatorTitle")}
+                aria-label={t("profile.verifiedAria")}
                 className="text-brand-blue text-[20px] inline-flex items-center shrink-0"
               >
                 <i className="fa-solid fa-circle-check" aria-hidden="true" />
@@ -255,7 +258,7 @@ function ProfileContent() {
           }`}
         >
           <i className="fa-regular fa-id-badge text-base" aria-hidden="true" />
-          <span>Tài khoản & Bảo mật</span>
+          <span>{t("profile.tabs.account")}</span>
         </button>
 
         <button
@@ -268,7 +271,7 @@ function ProfileContent() {
           }`}
         >
           <i className="fa-solid fa-sliders text-sm" aria-hidden="true" />
-          <span>Sở thích du lịch</span>
+          <span>{t("profile.tabs.preferences")}</span>
         </button>
       </div>
 
@@ -282,26 +285,26 @@ function ProfileContent() {
         <div className="rounded-3xl border border-border bg-card p-6 sm:p-8 space-y-8 shadow-xs max-w-4xl">
           <div className="space-y-1 border-b border-border pb-4">
             <h2 className="text-xl font-bold font-heading text-foreground">
-              Sở thích du lịch
+              {t("profile.preferences.title")}
             </h2>
             <p className="text-xs text-muted-foreground">
-              Tùy chỉnh ngân sách, phong cách và thói quen ăn uống để TripGenie đề xuất điểm đến và lịch trình phù hợp với gu của riêng bạn.
+              {t("profile.preferences.subtitle")}
             </p>
           </div>
 
           {/* 1. Budget Level Selection */}
           <div className="space-y-3">
             <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              1. Mức ngân sách ưu tiên
+              {t("profile.preferences.budgetHeading")}
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-              {BUDGET_LEVELS.map((lvl) => {
-                const isSelected = selectedBudget === lvl.id;
+              {BUDGET_LEVEL_IDS.map((budgetId) => {
+                const isSelected = selectedBudget === budgetId;
                 return (
                   <button
-                    key={lvl.id}
+                    key={budgetId}
                     type="button"
-                    onClick={() => setSelectedBudget(lvl.id)}
+                    onClick={() => setSelectedBudget(budgetId)}
                     className={`text-left p-3.5 rounded-2xl border transition-all cursor-pointer min-h-[44px] ${
                       isSelected
                         ? "border-primary bg-primary/10 shadow-xs ring-1 ring-primary"
@@ -309,11 +312,11 @@ function ProfileContent() {
                     }`}
                   >
                     <div className="flex items-center justify-between font-semibold text-xs text-foreground">
-                      <span>{lvl.label}</span>
+                      <span>{t(`profile.preferences.budgets.${budgetId}.label`)}</span>
                       {isSelected && <Check className="size-3.5 text-primary" />}
                     </div>
                     <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2">
-                      {lvl.desc}
+                      {t(`profile.preferences.budgets.${budgetId}.desc`)}
                     </p>
                   </button>
                 );
@@ -325,29 +328,29 @@ function ProfileContent() {
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                2. Phong cách du lịch yêu thích
+                {t("profile.preferences.stylesHeading")}
               </label>
               <span className="text-[11px] text-muted-foreground">
-                Chọn gợi ý hoặc tự nhập phong cách của riêng bạn
+                {t("profile.preferences.stylesHint")}
               </span>
             </div>
 
             {/* Quick Suggestion Chips */}
             <div className="flex flex-wrap gap-2">
-              {DEFAULT_TRAVEL_STYLES.map((style) => {
-                const isSelected = selectedStyles.includes(style.id);
+              {DEFAULT_TRAVEL_STYLE_IDS.map((styleId) => {
+                const isSelected = selectedStyles.includes(styleId);
                 return (
                   <button
-                    key={style.id}
+                    key={styleId}
                     type="button"
-                    onClick={() => toggleStyle(style.id)}
+                    onClick={() => toggleStyle(styleId)}
                     className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer min-h-[40px] ${
                       isSelected
                         ? "bg-primary text-primary-foreground shadow-xs"
                         : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                   >
-                    <span>{style.label}</span>
+                    <span>{t(`profile.preferences.travelStyles.${styleId}`)}</span>
                   </button>
                 );
               })}
@@ -365,8 +368,8 @@ function ProfileContent() {
                       type="button"
                       onClick={() => toggleStyle(customStyle)}
                       className="hover:bg-white/20 rounded-full p-0.5 cursor-pointer transition-colors"
-                      title="Xóa sở thích này"
-                      aria-label={`Xóa ${customStyle}`}
+                      title={t("profile.preferences.removeStyleTitle")}
+                      aria-label={t("profile.preferences.removeAria", { item: customStyle })}
                     >
                       <X className="size-3" />
                     </button>
@@ -378,7 +381,7 @@ function ProfileContent() {
             <div className="flex items-center gap-2 max-w-md pt-1">
               <Input
                 type="text"
-                placeholder="Thêm phong cách khác (ví dụ: Chụp ảnh săn mây, Trekking...)"
+                placeholder={t("profile.preferences.customStylePlaceholder")}
                 value={customStyleInput}
                 onChange={(e) => setCustomStyleInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -399,7 +402,7 @@ function ProfileContent() {
                 className="rounded-xl h-10 px-3.5 text-xs font-semibold shrink-0 cursor-pointer gap-1"
               >
                 <Plus className="size-3.5" />
-                <span>Thêm</span>
+                <span>{t("profile.preferences.addButton")}</span>
               </Button>
             </div>
           </div>
@@ -408,28 +411,28 @@ function ProfileContent() {
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                3. Thể loại địa điểm quan tâm
+                {t("profile.preferences.categoriesHeading")}
               </label>
               <span className="text-[11px] text-muted-foreground">
-                Chọn gợi ý hoặc tự nhập loại địa điểm mong muốn
+                {t("profile.preferences.categoriesHint")}
               </span>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {DEFAULT_PREFERRED_CATEGORIES.map((cat) => {
-                const isSelected = selectedCategories.includes(cat.id);
+              {DEFAULT_PREFERRED_CATEGORY_IDS.map((catId) => {
+                const isSelected = selectedCategories.includes(catId);
                 return (
                   <button
-                    key={cat.id}
+                    key={catId}
                     type="button"
-                    onClick={() => toggleCategory(cat.id)}
+                    onClick={() => toggleCategory(catId)}
                     className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer min-h-[40px] ${
                       isSelected
                         ? "bg-primary text-primary-foreground shadow-xs"
                         : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                   >
-                    <span>{cat.label}</span>
+                    <span>{t(`profile.preferences.categories.${catId}`)}</span>
                   </button>
                 );
               })}
@@ -447,8 +450,8 @@ function ProfileContent() {
                       type="button"
                       onClick={() => toggleCategory(customCat)}
                       className="hover:bg-white/20 rounded-full p-0.5 cursor-pointer transition-colors"
-                      title="Xóa thể loại này"
-                      aria-label={`Xóa ${customCat}`}
+                      title={t("profile.preferences.removeCategoryTitle")}
+                      aria-label={t("profile.preferences.removeAria", { item: customCat })}
                     >
                       <X className="size-3" />
                     </button>
@@ -460,7 +463,7 @@ function ProfileContent() {
             <div className="flex items-center gap-2 max-w-md pt-1">
               <Input
                 type="text"
-                placeholder="Thêm thể loại khác (ví dụ: Chợ đêm, Làng nghề...)"
+                placeholder={t("profile.preferences.customCategoryPlaceholder")}
                 value={customCategoryInput}
                 onChange={(e) => setCustomCategoryInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -481,7 +484,7 @@ function ProfileContent() {
                 className="rounded-xl h-10 px-3.5 text-xs font-semibold shrink-0 cursor-pointer gap-1"
               >
                 <Plus className="size-3.5" />
-                <span>Thêm</span>
+                <span>{t("profile.preferences.addButton")}</span>
               </Button>
             </div>
           </div>
@@ -490,28 +493,28 @@ function ProfileContent() {
           <div className="space-y-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
               <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                4. Chế độ ăn uống & Kiêng cữ
+                {t("profile.preferences.dietaryHeading")}
               </label>
               <span className="text-[11px] text-muted-foreground">
-                Chọn gợi ý hoặc tự nhập dị ứng, kiêng cữ riêng
+                {t("profile.preferences.dietaryHint")}
               </span>
             </div>
 
             <div className="flex flex-wrap gap-2">
-              {DEFAULT_DIETARY_RESTRICTIONS.map((diet) => {
-                const isSelected = selectedDietary.includes(diet.id);
+              {DEFAULT_DIETARY_RESTRICTION_IDS.map((dietId) => {
+                const isSelected = selectedDietary.includes(dietId);
                 return (
                   <button
-                    key={diet.id}
+                    key={dietId}
                     type="button"
-                    onClick={() => toggleDietary(diet.id)}
+                    onClick={() => toggleDietary(dietId)}
                     className={`rounded-xl px-3.5 py-2 text-xs font-semibold transition-all cursor-pointer min-h-[40px] ${
                       isSelected
                         ? "bg-primary text-primary-foreground shadow-xs"
                         : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
                     }`}
                   >
-                    <span>{diet.label}</span>
+                    <span>{t(`profile.preferences.dietary.${dietId}`)}</span>
                   </button>
                 );
               })}
@@ -529,8 +532,8 @@ function ProfileContent() {
                       type="button"
                       onClick={() => toggleDietary(customDiet)}
                       className="hover:bg-white/20 rounded-full p-0.5 cursor-pointer transition-colors"
-                      title="Xóa kiêng cữ này"
-                      aria-label={`Xóa ${customDiet}`}
+                      title={t("profile.preferences.removeDietaryTitle")}
+                      aria-label={t("profile.preferences.removeAria", { item: customDiet })}
                     >
                       <X className="size-3" />
                     </button>
@@ -542,7 +545,7 @@ function ProfileContent() {
             <div className="flex items-center gap-2 max-w-md pt-1">
               <Input
                 type="text"
-                placeholder="Thêm dị ứng/kiêng cữ khác (ví dụ: Dị ứng đậu phộng, Ăn nhạt...)"
+                placeholder={t("profile.preferences.customDietaryPlaceholder")}
                 value={customDietaryInput}
                 onChange={(e) => setCustomDietaryInput(e.target.value)}
                 onKeyDown={(e) => {
@@ -563,7 +566,7 @@ function ProfileContent() {
                 className="rounded-xl h-10 px-3.5 text-xs font-semibold shrink-0 cursor-pointer gap-1"
               >
                 <Plus className="size-3.5" />
-                <span>Thêm</span>
+                <span>{t("profile.preferences.addButton")}</span>
               </Button>
             </div>
           </div>
@@ -571,7 +574,7 @@ function ProfileContent() {
           {/* Save Button */}
           <div className="pt-4 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground">
-              {isPrefLoading ? "Đang tải hồ sơ..." : "Thay đổi sẽ áp dụng ngay cho các lịch trình AI tạo mới."}
+              {isPrefLoading ? t("profile.preferences.loadingProfile") : t("profile.preferences.applyHint")}
             </p>
             <Button
               onClick={handleSavePreferences}
@@ -579,7 +582,7 @@ function ProfileContent() {
               className="rounded-xl font-semibold text-xs h-10 px-6 gap-2 cursor-pointer self-start sm:self-auto shadow-xs"
             >
               {updatePrefMutation.isPending && <Loader2 className="size-4 animate-spin" />}
-              <span>Lưu sở thích du lịch</span>
+              <span>{t("profile.preferences.saveButton")}</span>
             </Button>
           </div>
         </div>

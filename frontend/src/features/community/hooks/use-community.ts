@@ -28,6 +28,7 @@ import type {
 } from "@/types/community";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { ApiClientError } from "@/lib/api-client";
+import { useI18n, type TranslationKey } from "@/i18n";
 import { COMMUNITY_CONFIG } from "../config/community.config";
 
 export const COMMUNITY_QUERY_KEYS = {
@@ -77,7 +78,8 @@ function removePostFromFeedPages(
 
 function scheduleModerationOutcomeCheck(
   queryClient: QueryClient,
-  postId: string
+  postId: string,
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string
 ): void {
   setTimeout(async () => {
     try {
@@ -91,17 +93,17 @@ function scheduleModerationOutcomeCheck(
       );
 
       if (latest.moderationStatus === "APPROVED") {
-        toast.success(COMMUNITY_CONFIG.MESSAGES.MODERATION_APPROVED);
+        toast.success(t("community.toasts.moderationApproved"));
       } else if (latest.moderationStatus === "FLAGGED") {
         toast.warning(
           latest.moderationNote ||
-            COMMUNITY_CONFIG.MESSAGES.MODERATION_FLAGGED_FALLBACK
+            t("community.toasts.moderationFlagged")
         );
       } else if (latest.moderationStatus === "REJECTED") {
         toast.error(
-          `${COMMUNITY_CONFIG.MESSAGES.MODERATION_REJECTED_PREFIX}: ${
+          `${t("community.toasts.moderationRejectedPrefix")}: ${
             latest.moderationNote ||
-            COMMUNITY_CONFIG.MESSAGES.MODERATION_REJECTED_FALLBACK
+            t("community.toasts.moderationRejectedFallback")
           }`
         );
       }
@@ -111,7 +113,7 @@ function scheduleModerationOutcomeCheck(
           { queryKey: ["community", "feed"] },
           (old) => removePostFromFeedPages(old, postId)
         );
-        toast.error(COMMUNITY_CONFIG.MESSAGES.POST_NOT_FOUND_OR_DELETED);
+        toast.error(t("community.toasts.postNotFound"));
       }
     } finally {
       queryClient.invalidateQueries({ queryKey: COMMUNITY_QUERY_KEYS.all });
@@ -238,6 +240,7 @@ export function useCreatorProfile(
 export function useUpdateProfileMutation() {
   const queryClient = useQueryClient();
   const { refetchUser } = useAuth();
+  const { t } = useI18n();
 
   return useMutation({
     mutationFn: (data: { fullName?: string; bio?: string; avatarUrl?: string }) =>
@@ -245,25 +248,27 @@ export function useUpdateProfileMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: COMMUNITY_QUERY_KEYS.all });
       refetchUser();
-      toast.success("Cập nhật thông tin hồ sơ thành công!");
+      toast.success(t("community.toasts.profileUpdated"));
     },
     onError: (err: Error) => {
-      toast.error(err.message || "Cập nhật hồ sơ thất bại");
+      toast.error(err.message || t("community.toasts.profileUpdateFailed"));
     },
   });
 }
 
 export function useUploadCommunityMedia() {
+  const { t } = useI18n();
   return useMutation({
     mutationFn: (files: File[]) => communityService.uploadMedia(files),
     onError: (err: Error) => {
-      toast.error(err.message || "Tải lên ảnh/video thất bại");
+      toast.error(err.message || t("community.toasts.uploadFailed"));
     },
   });
 }
 
 export function useCreateCommunityPost() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
 
   return useMutation({
     mutationFn: (payload: CreateCommunityPostPayload) =>
@@ -302,23 +307,24 @@ export function useCreateCommunityPost() {
       );
 
       if (newPost.moderationStatus === "PENDING") {
-        toast.info(COMMUNITY_CONFIG.MESSAGES.POST_CREATED_PENDING, {
+        toast.info(t("community.toasts.postCreatedPending"), {
           duration: COMMUNITY_CONFIG.INFO_TOAST_DURATION_MS,
         });
-        scheduleModerationOutcomeCheck(queryClient, newPost.id);
+        scheduleModerationOutcomeCheck(queryClient, newPost.id, t);
       } else {
-        toast.success(COMMUNITY_CONFIG.MESSAGES.POST_CREATED_SUCCESS);
+        toast.success(t("community.toasts.postCreatedSuccess"));
         queryClient.invalidateQueries({ queryKey: COMMUNITY_QUERY_KEYS.all });
       }
     },
     onError: (err: Error) => {
-      toast.error(err.message || COMMUNITY_CONFIG.MESSAGES.ERROR_CREATE_POST);
+      toast.error(err.message || t("community.toasts.postCreateError"));
     },
   });
 }
 
 export function useUpdateCommunityPost() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
 
   return useMutation({
     mutationFn: ({
@@ -339,23 +345,24 @@ export function useUpdateCommunityPost() {
               : {
                   ...post,
                   moderationStatus: "PENDING" as const,
-                  moderationNote: COMMUNITY_CONFIG.MESSAGES.AI_REVIEWING_NOTE,
+                  moderationNote: t("community.toasts.aiReviewingNote"),
                 }
           )
       );
-      toast.info(COMMUNITY_CONFIG.MESSAGES.POST_UPDATED_PENDING, {
+      toast.info(t("community.toasts.postUpdatedPending"), {
         duration: COMMUNITY_CONFIG.INFO_TOAST_DURATION_MS,
       });
-      scheduleModerationOutcomeCheck(queryClient, postId);
+      scheduleModerationOutcomeCheck(queryClient, postId, t);
     },
     onError: (err: Error) => {
-      toast.error(err.message || COMMUNITY_CONFIG.MESSAGES.ERROR_UPDATE_POST);
+      toast.error(err.message || t("community.toasts.postUpdateError"));
     },
   });
 }
 
 export function useDeleteCommunityPost() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
 
   return useMutation({
     mutationFn: (postId: string) => communityService.deletePost(postId),
@@ -373,7 +380,7 @@ export function useDeleteCommunityPost() {
       return { previousFeeds };
     },
     onSuccess: () => {
-      toast.success("Bài viết đã được xóa vĩnh viễn.");
+      toast.success(t("community.toasts.postDeleted"));
       queryClient.invalidateQueries({ queryKey: COMMUNITY_QUERY_KEYS.all });
     },
     onError: (err: Error, _postId, context) => {
@@ -381,28 +388,30 @@ export function useDeleteCommunityPost() {
       context?.previousFeeds?.forEach(([queryKey, data]) => {
         queryClient.setQueryData(queryKey, data);
       });
-      toast.error(err.message || "Không thể xóa bài viết");
+      toast.error(err.message || t("community.toasts.postDeleteError"));
     },
   });
 }
 
 export function useCreateCommunityGroup() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
 
   return useMutation({
     mutationFn: (payload: CreateCommunityGroupPayload) =>
       communityService.createGroup(payload),
     onSuccess: (res) => {
-      toast.success(res.message || "Đã tạo nhóm cộng đồng mới!");
+      toast.success(res.message || t("community.toasts.groupCreated"));
       queryClient.invalidateQueries({ queryKey: COMMUNITY_QUERY_KEYS.all });
     },
     onError: (err: Error) => {
-      toast.error(err.message || "Không thể tạo nhóm cộng đồng");
+      toast.error(err.message || t("community.toasts.groupCreateError"));
     },
   });
 }
 
 export function useReportCommunityPost() {
+  const { t } = useI18n();
   return useMutation({
     mutationFn: ({
       postId,
@@ -413,11 +422,11 @@ export function useReportCommunityPost() {
     }) => communityService.reportPost(postId, payload),
     onSuccess: (res) => {
       toast.success(
-        res.message || "Đã gửi báo cáo bài viết để Ban quản trị xem xét"
+        res.message || t("community.toasts.reportSent")
       );
     },
     onError: (err: Error) => {
-      toast.error(err.message || "Không thể gửi báo cáo bài viết");
+      toast.error(err.message || t("community.toasts.reportError"));
     },
   });
 }
@@ -427,6 +436,7 @@ export function useReportCommunityPost() {
  */
 export function useTogglePostLike() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
 
   return useMutation({
     mutationFn: (postId: string) => communityService.toggleLike(postId),
@@ -537,7 +547,7 @@ export function useTogglePostLike() {
           context.previousSidebar
         );
       }
-      toast.error(err.message || "Vui lòng đăng nhập để thả tim bài viết");
+      toast.error(err.message || t("community.toasts.loginToLike"));
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["community"] });
@@ -551,6 +561,7 @@ export function useTogglePostLike() {
 export function useCreatePostComment() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { t } = useI18n();
 
   return useMutation({
     mutationFn: ({
@@ -588,7 +599,7 @@ export function useCreatePostComment() {
         author: {
           id: user?.id || "me",
           username: user?.username || null,
-          fullName: user?.fullName || "Bạn",
+          fullName: user?.fullName || t("community.youFallback"),
           avatarUrl: user?.avatarUrl || null,
           bio: null,
           isVerified: Boolean(user?.role === "ADMIN"),
@@ -623,7 +634,7 @@ export function useCreatePostComment() {
           queryClient.setQueryData(queryKey, data);
         });
       }
-      toast.error(err.message || "Không thể gửi bình luận");
+      toast.error(err.message || t("community.toasts.commentCreateError"));
     },
     onSettled: (_data, _err, variables) => {
       queryClient.invalidateQueries({
@@ -636,6 +647,7 @@ export function useCreatePostComment() {
 
 export function useDeletePostComment() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
 
   return useMutation({
     mutationFn: ({
@@ -645,31 +657,32 @@ export function useDeletePostComment() {
       postId: string;
     }) => communityService.deleteComment(commentId),
     onSuccess: (_res, vars) => {
-      toast.success("Đã xóa bình luận");
+      toast.success(t("community.toasts.commentDeleted"));
       queryClient.invalidateQueries({
         queryKey: COMMUNITY_QUERY_KEYS.comments(vars.postId),
       });
       queryClient.invalidateQueries({ queryKey: ["community", "feed"] });
     },
     onError: (err: Error) => {
-      toast.error(err.message || "Không thể xóa bình luận");
+      toast.error(err.message || t("community.toasts.commentDeleteError"));
     },
   });
 }
 
 export function useCloneCommunityItinerary() {
   const queryClient = useQueryClient();
+  const { t } = useI18n();
 
   return useMutation({
     mutationFn: (itineraryId: string) =>
       itineraryService.cloneItinerary(itineraryId),
     onSuccess: () => {
-      toast.success("Đã nhân bản lịch trình về tài khoản của bạn!");
+      toast.success(t("community.toasts.itineraryCloned"));
       queryClient.invalidateQueries({ queryKey: COMMUNITY_QUERY_KEYS.all });
       queryClient.invalidateQueries({ queryKey: ["planners"] });
     },
     onError: (err: Error) => {
-      toast.error(err.message || "Không thể nhân bản lịch trình");
+      toast.error(err.message || t("community.toasts.itineraryCloneError"));
     },
   });
 }

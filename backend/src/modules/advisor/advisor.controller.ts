@@ -11,6 +11,8 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequestLocale } from '../../common/decorators/request-locale.decorator';
+import { AppLocale } from '../../common/i18n/locale.util';
 import { RateLimit } from '../../common/decorators/rate-limit.decorator';
 import { RateLimitTier } from '../../config/rate-limit.config';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
@@ -30,8 +32,12 @@ export class AdvisorController {
   @RateLimit({ tier: RateLimitTier.AI_CHAT })
   @Post('chat')
   @HttpCode(HttpStatus.OK)
-  async chat(@Body() dto: AdvisorChatDto, @CurrentUser('id') userId: string) {
-    return this.advisorService.chat(dto, userId);
+  async chat(
+    @Body() dto: AdvisorChatDto,
+    @CurrentUser('id') userId: string,
+    @RequestLocale() locale: AppLocale,
+  ) {
+    return this.advisorService.chat(dto, userId, locale);
   }
 
   /**

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useI18n } from '@/i18n';
 import { formatVnd, isDiningActivity } from '../../model/itinerary-format';
 import { BUDGET_BUFFER_RATIO, PARTY_SIZE_BOUNDS } from '../../constants/itinerary.constants';
 import type { BudgetBreakdown, ItineraryActivity, ItineraryDay } from '@/types/itinerary';
@@ -40,6 +41,7 @@ export default function BudgetBreakdownCard({
   onUpdatePartySize,
   onJumpToStop,
 }: Props) {
+  const { t } = useI18n();
   const [expandedRow, setExpandedRow] = useState<'food' | 'tickets' | null>(null);
 
   const nights = Math.max(1, totalDays - 1);
@@ -72,41 +74,43 @@ export default function BudgetBreakdownCard({
     {
       id: 'transit',
       iconClass: 'fa-solid fa-plane',
-      title: `Vé ${transitModeName?.toLowerCase() || 'di chuyển'} khứ hồi`,
+      title: t('planner.budget.transitRowTitle', {
+        mode: transitModeName?.toLowerCase() || t('planner.budget.transitFallbackName'),
+      }),
       subtitle:
         partySize > 1
-          ? `Ước tính cho ${partySize} hành khách theo chặng liên tỉnh`
-          : 'Cước phí vé khứ hồi theo tuyến đường và thời điểm dự kiến',
+          ? t('planner.budget.transitSubGroup', { count: partySize })
+          : t('planner.budget.transitSubSolo'),
       amount: breakdown.transitRoundTrip,
     },
     {
       id: 'hotel',
       iconClass: 'fa-solid fa-bed',
-      title: `Lưu trú khách sạn (${nights} đêm · ${roomsNeeded} phòng)`,
-      subtitle: 'Phân bổ theo số lượng phòng đôi và hạng sao ngân sách',
+      title: t('planner.budget.hotelRowTitle', { nights, rooms: roomsNeeded }),
+      subtitle: t('planner.budget.hotelRowSub'),
       amount: breakdown.accommodation,
     },
     {
       id: 'food',
       iconClass: 'fa-solid fa-utensils',
-      title: `Ẩm thực & Đặc sản (${totalDays} ngày)`,
-      subtitle: 'Theo khoảng giá tham khảo các quán ăn và cafe trong lịch trình',
+      title: t('planner.budget.foodRowTitle', { days: totalDays }),
+      subtitle: t('planner.budget.foodRowSub'),
       amount: breakdown.food,
       stops: foodStops,
     },
     {
       id: 'tickets',
       iconClass: 'fa-solid fa-ticket',
-      title: 'Vé tham quan & Trải nghiệm',
-      subtitle: 'Tổng giá vé niêm yết tại các điểm có thu phí (điểm miễn phí tính 0đ)',
+      title: t('planner.budget.ticketsRowTitle'),
+      subtitle: t('planner.budget.ticketsRowSub'),
       amount: breakdown.tickets,
       stops: ticketStops,
     },
     {
       id: 'local',
       iconClass: 'fa-solid fa-car',
-      title: `Di chuyển nội thành (${totalDays} ngày)`,
-      subtitle: 'Thuê xe hoặc gọi xe nội đô di chuyển giữa các điểm dừng',
+      title: t('planner.budget.localRowTitle', { days: totalDays }),
+      subtitle: t('planner.budget.localRowSub'),
       amount: breakdown.localTransit,
     },
   ];
@@ -123,31 +127,37 @@ export default function BudgetBreakdownCard({
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
       {/* Left: Clean Monochrome Ledger */}
       <section
-        aria-label="Bảng kê chi phí chi tiết"
+        aria-label={t('planner.budget.ledgerAria')}
         className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 overflow-hidden"
       >
         <div className="p-5 sm:p-6 border-b border-slate-100 flex flex-wrap items-start justify-between gap-4">
           <div className="space-y-1">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
-              Tổng dự toán {partySize > 1 ? `cho ${partySize} người` : 'toàn chuyến đi'}
+              {partySize > 1
+                ? t('planner.budget.totalHeaderGroup', { count: partySize })
+                : t('planner.budget.totalHeaderTrip')}
             </span>
             <div className="text-2xl sm:text-3xl font-bold text-slate-900 tabular-nums tracking-tight">
               ~{formatVnd(breakdown.totalEstimated)}
             </div>
             <p className="text-xs text-slate-500 tabular-nums">
-              Bình quân ~<strong className="text-slate-900 font-semibold">{formatVnd(perPerson)}</strong>/người
+              {t('planner.budget.avgPrefix')}
+              <strong className="text-slate-900 font-semibold">{formatVnd(perPerson)}</strong>
+              {t('planner.common.perPerson')}
               {' · '}
-              {roomsNeeded} phòng lưu trú
+              {t('planner.budget.roomsLabel', { count: roomsNeeded })}
             </p>
           </div>
 
           {isOwner && onUpdatePartySize ? (
             <div className="flex flex-col items-end gap-1">
-              <span className="text-[11px] font-semibold text-slate-500">Quy mô tính giá</span>
+              <span className="text-[11px] font-semibold text-slate-500">
+                {t('planner.budget.pricingScaleLabel')}
+              </span>
               <div className="inline-flex items-center rounded-xl border border-slate-200 bg-slate-50 p-0.5">
                 <button
                   type="button"
-                  aria-label="Giảm số người"
+                  aria-label={t('planner.budget.decreaseGroupAria')}
                   disabled={isUpdatingPartySize || partySize <= PARTY_SIZE_BOUNDS.MIN}
                   onClick={() => handleStepPartySize(-1)}
                   className="size-8 rounded-lg bg-white hover:bg-[#F0F7FF] text-[#10243A] hover:text-[#0194F3] flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40"
@@ -155,11 +165,11 @@ export default function BudgetBreakdownCard({
                   <i className="fa-solid fa-minus text-[10px]" aria-hidden="true" />
                 </button>
                 <span className="px-3 text-xs font-bold text-[#10243A] tabular-nums min-w-[64px] text-center">
-                  {partySize} người
+                  {t('planner.common.peopleCount', { count: partySize })}
                 </span>
                 <button
                   type="button"
-                  aria-label="Tăng số người"
+                  aria-label={t('planner.budget.increaseGroupAria')}
                   disabled={isUpdatingPartySize || partySize >= PARTY_SIZE_BOUNDS.MAX}
                   onClick={() => handleStepPartySize(1)}
                   className="size-8 rounded-lg bg-white hover:bg-[#F0F7FF] text-[#10243A] hover:text-[#0194F3] flex items-center justify-center transition-colors cursor-pointer disabled:opacity-40"
@@ -170,7 +180,7 @@ export default function BudgetBreakdownCard({
             </div>
           ) : (
             <span className="px-3 py-1.5 rounded-xl bg-[#F5F9FF] border border-[#D0E7FF] text-xs font-bold text-[#0194F3] tabular-nums">
-              {partySize} người · {roomsNeeded} phòng
+              {t('planner.budget.peopleRoomsSummary', { people: partySize, rooms: roomsNeeded })}
             </span>
           )}
         </div>
@@ -207,8 +217,8 @@ export default function BudgetBreakdownCard({
                         >
                           <span className="tabular-nums">
                             {isExpanded
-                              ? 'Ẩn chi tiết từng điểm'
-                              : `Xem ${row.stops!.length} điểm tính phí`}
+                              ? t('planner.budget.hideStopDetails')
+                              : t('planner.budget.showStopDetails', { count: row.stops!.length })}
                           </span>
                           <i
                             className={`fa-solid fa-chevron-down text-[9px] transition-transform ${
@@ -225,7 +235,9 @@ export default function BudgetBreakdownCard({
                     <div className="text-xs sm:text-sm font-bold text-[#10243A] tabular-nums">
                       {formatVnd(row.amount)}
                     </div>
-                    <div className="text-[11px] font-medium text-slate-400 tabular-nums">{pct}% tổng</div>
+                    <div className="text-[11px] font-medium text-slate-400 tabular-nums">
+                      {t('planner.budget.percentOfTotal', { pct })}
+                    </div>
                   </div>
                 </div>
 
@@ -254,13 +266,13 @@ export default function BudgetBreakdownCard({
                             {activity.placeName}
                           </div>
                           <div className="text-[10px] text-slate-500 tabular-nums">
-                            Ngày {dayNumber}
+                            {t('planner.common.day', { n: dayNumber })}
                             {activity.startTime ? ` · ${activity.startTime}` : ''}
                           </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-xs font-bold text-[#10243A] tabular-nums">
-                            ~{formatVnd(activity.estimatedCost ?? 0)}/người
+                            ~{formatVnd(activity.estimatedCost ?? 0)}{t('planner.common.perPerson')}
                           </span>
                           {onJumpToStop && (
                             <i
@@ -284,27 +296,29 @@ export default function BudgetBreakdownCard({
         <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
           <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
             <i className="fa-solid fa-receipt text-[#0194F3]" aria-hidden="true" />
-            <span>Tóm tắt chia tiền &amp; Dự phòng</span>
+            <span>{t('planner.budget.splitSummaryTitle')}</span>
           </h3>
 
           <div className="divide-y divide-slate-100 text-xs">
             <div className="py-2.5 flex items-center justify-between gap-2">
-              <span className="text-slate-600">Ước tính cơ bản ({partySize} người)</span>
+              <span className="text-slate-600">
+                {t('planner.budget.baseEstimateLabel', { count: partySize })}
+              </span>
               <span className="font-semibold text-slate-900 tabular-nums">
                 {formatVnd(breakdown.totalEstimated)}
               </span>
             </div>
 
             <div className="py-2.5 flex items-center justify-between gap-2">
-              <span className="text-slate-600">Chia đều mỗi thành viên</span>
+              <span className="text-slate-600">{t('planner.budget.equalSplitLabel')}</span>
               <span className="font-bold text-[#0194F3] tabular-nums">
-                ~{formatVnd(perPerson)}/người
+                ~{formatVnd(perPerson)}{t('planner.common.perPerson')}
               </span>
             </div>
 
             <div className="py-2.5 flex items-center justify-between gap-2">
               <span className="text-slate-600 tabular-nums">
-                Quỹ dự phòng phát sinh (+{Math.round(BUDGET_BUFFER_RATIO * 100)}%)
+                {t('planner.budget.contingencyLabel', { pct: Math.round(BUDGET_BUFFER_RATIO * 100) })}
               </span>
               <span className="font-semibold text-slate-700 tabular-nums">
                 +{formatVnd(contingencyAmount)}
@@ -312,7 +326,9 @@ export default function BudgetBreakdownCard({
             </div>
 
             <div className="pt-3 flex items-center justify-between gap-2">
-              <span className="font-semibold text-slate-900">Mức chuẩn bị khuyến nghị</span>
+              <span className="font-semibold text-slate-900">
+                {t('planner.budget.recommendedTotalLabel')}
+              </span>
               <span className="text-base font-bold text-slate-900 tabular-nums">
                 ~{formatVnd(recommendedTotal)}
               </span>
@@ -321,9 +337,7 @@ export default function BudgetBreakdownCard({
 
           <div className="rounded-xl bg-[#F5F9FF] border border-[#D0E7FF] p-3.5 text-[11px] text-slate-600 flex items-start gap-2.5 leading-relaxed">
             <i className="fa-solid fa-circle-info text-[#0194F3] shrink-0 mt-0.5" aria-hidden="true" />
-            <span>
-              Ngân sách được tính tự động từ thông tin lưu trú, vé tham quan niêm yết và mặt bằng ẩm thực tại điểm dừng. Con số bình quân tự động cập nhật ngay khi bạn điều chỉnh số người hoặc phương tiện di chuyển.
-            </span>
+            <span>{t('planner.budget.autoCalculatedNote')}</span>
           </div>
         </div>
       </aside>

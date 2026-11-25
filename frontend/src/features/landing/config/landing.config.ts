@@ -15,8 +15,15 @@ export interface VibeOption {
   label: string;
 }
 
+export type QuickSuggestionId =
+  | "da-nang"
+  | "phu-quoc"
+  | "hoi-an"
+  | "ha-noi"
+  | "sa-pa";
+
 export interface QuickSuggestion {
-  label: string;
+  id: QuickSuggestionId;
   href: string;
 }
 
@@ -31,11 +38,11 @@ export const LANDING_CONFIG = {
     headlineLine2: "theo cách của bạn",
     defaultLocationTitle: "Vịnh Hạ Long, Quảng Ninh",
     quickSuggestions: [
-      { label: "Đà Nẵng", href: "/explore?area=da-nang" },
-      { label: "Phú Quốc", href: "/explore?area=phu-quoc" },
-      { label: "Hội An", href: "/explore?area=hoi-an" },
-      { label: "Hà Nội", href: "/explore?area=ha-noi" },
-      { label: "Sa Pa", href: "/explore?area=sa-pa" },
+      { id: "da-nang", href: "/explore?area=da-nang" },
+      { id: "phu-quoc", href: "/explore?area=phu-quoc" },
+      { id: "hoi-an", href: "/explore?area=hoi-an" },
+      { id: "ha-noi", href: "/explore?area=ha-noi" },
+      { id: "sa-pa", href: "/explore?area=sa-pa" },
     ] as QuickSuggestion[],
   },
   destinations: [

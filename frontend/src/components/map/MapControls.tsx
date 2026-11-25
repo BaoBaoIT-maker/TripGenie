@@ -2,6 +2,7 @@
 
 import { Plus, Minus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useI18n } from "@/i18n";
 
 export type MapStyleTheme = "bright" | "dark" | "satellite";
 
@@ -22,6 +23,7 @@ export function MapControls({
   currentTheme = "bright",
   onChangeTheme,
 }: MapControlsProps) {
+  const { t } = useI18n();
   return (
     <div className="absolute right-3 sm:right-4 top-3 sm:top-4 z-20 flex flex-col gap-2 font-sans select-none">
       {/* Zoom In / Out */}
@@ -32,8 +34,8 @@ export function MapControls({
           size="icon"
           className="size-9 sm:size-10 rounded-none border-b border-slate-100 text-slate-700 hover:bg-slate-50 hover:text-slate-900 cursor-pointer"
           onClick={onZoomIn}
-          aria-label="Phóng to"
-          title="Phóng to"
+          aria-label={t("map.controls.zoomIn")}
+          title={t("map.controls.zoomIn")}
         >
           <Plus className="size-4 sm:size-4.5" />
         </Button>
@@ -43,8 +45,8 @@ export function MapControls({
           size="icon"
           className="size-9 sm:size-10 rounded-none text-slate-700 hover:bg-slate-50 hover:text-slate-900 cursor-pointer"
           onClick={onZoomOut}
-          aria-label="Thu nhỏ"
-          title="Thu nhỏ"
+          aria-label={t("map.controls.zoomOut")}
+          title={t("map.controls.zoomOut")}
         >
           <Minus className="size-4 sm:size-4.5" />
         </Button>
@@ -58,8 +60,8 @@ export function MapControls({
         className="size-9 sm:size-10 rounded-xl border border-slate-200/90 bg-white/95 shadow-md backdrop-blur-sm hover:bg-slate-50 cursor-pointer"
         onClick={onRequestCurrentLocation}
         disabled={locating}
-        aria-label="Vị trí của tôi"
-        title="Vị trí của tôi"
+        aria-label={t("map.controls.myLocation")}
+        title={t("map.controls.myLocation")}
       >
         {locating ? (
           <Loader2 className="size-4 sm:size-4.5 animate-spin text-[#0194F3]" />
@@ -79,10 +81,10 @@ export function MapControls({
                 ? "bg-[#0194F3] text-white shadow-xs"
                 : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             }`}
-            title="Bản đồ Sáng Du lịch (VietMap TM @2x chính thức)"
+            title={t("map.controls.themeBrightTitle")}
           >
             <i className="fa-solid fa-sun text-xs" />
-            <span>Sáng</span>
+            <span>{t("map.controls.themeBright")}</span>
           </button>
           <button
             type="button"
@@ -92,10 +94,10 @@ export function MapControls({
                 ? "bg-[#0194F3] text-white shadow-xs"
                 : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             }`}
-            title="Bản đồ Tối Giao thông (VietMap DM @2x)"
+            title={t("map.controls.themeDarkTitle")}
           >
             <i className="fa-solid fa-moon text-xs" />
-            <span>Tối</span>
+            <span>{t("map.controls.themeDark")}</span>
           </button>
           <button
             type="button"
@@ -105,10 +107,10 @@ export function MapControls({
                 ? "bg-[#0194F3] text-white shadow-xs"
                 : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
             }`}
-            title="Ảnh chụp vệ tinh thực địa (Esri Satellite)"
+            title={t("map.controls.themeSatelliteTitle")}
           >
             <i className="fa-solid fa-earth-americas text-xs" />
-            <span>Vệ tinh</span>
+            <span>{t("map.controls.themeSatellite")}</span>
           </button>
         </div>
       )}

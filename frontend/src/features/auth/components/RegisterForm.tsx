@@ -25,7 +25,7 @@ import { authService } from '@/services/auth.service';
 import { GoogleAuthButton } from './GoogleAuthButton';
 import { getSafeRedirectUrl } from '@/lib/safe-redirect';
 import { Button } from '@/components/ui/button';
-import { useI18n } from '@/i18n/LocaleProvider';
+import { useI18n } from '@/i18n';
 
 export function RegisterForm() {
   const router = useRouter();

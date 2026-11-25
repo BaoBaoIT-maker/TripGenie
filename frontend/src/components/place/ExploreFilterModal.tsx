@@ -6,7 +6,7 @@ import { SuitableAudience } from "@/types/place";
 import { RadiusKm, MAP_RADIUS_OPTIONS } from "@/features/map/types";
 import { cn } from "@/lib/utils";
 import { CommunityModalPortal } from "@/components/community/CommunityModalPortal";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 import type { TranslationKey } from "@/i18n";
 
 const AUDIENCES: { id: SuitableAudience | "all"; labelKey: TranslationKey }[] = [

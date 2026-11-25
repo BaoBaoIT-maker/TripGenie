@@ -7,7 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 
 interface PlacePhotoLightboxModalProps {
   placeName: string;

@@ -3,7 +3,7 @@
 import { ReactNode } from "react";
 import { Compass, LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 interface EmptyStateProps {

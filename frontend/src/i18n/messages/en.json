@@ -98,7 +98,8 @@
       "toastSearching": "Searching for \"{query}\"",
       "toastSearchArea": "Searching places in this map area...",
       "areaLabelCoords": "Area ({lat}, {lng})",
-      "fallbackPlaceWord": "places"
+      "fallbackPlaceWord": "places",
+      "nearLandmark": "{keyword} near {landmark}"
     },
     "toolbar": {
       "filters": "Filters",
@@ -467,6 +468,13 @@
       "weatherBadge": "28°C Sunny",
       "scrollDown": "Scroll to explore",
       "suggestionsLabel": "Popular:",
+      "quickSuggestions": {
+        "da-nang": "Da Nang",
+        "phu-quoc": "Phu Quoc",
+        "hoi-an": "Hoi An",
+        "ha-noi": "Hanoi",
+        "sa-pa": "Sa Pa"
+      },
       "searchPlaceholder": "Search destinations, local food, cafes...",
       "searchAria": "Search travel destinations",
       "clearSearchAria": "Clear search",
@@ -1573,8 +1581,10 @@
       "durationBadgeTitle": "AI itinerary planning supports up to {max} days",
       "originLabel": "Departure",
       "originPlaceholder": "Origin city...",
+      "defaultOrigin": "Ho Chi Minh City",
       "destLabel": "Destination",
       "destPlaceholder": "Destination city...",
+      "defaultDestination": "Da Nang",
       "swapLocationsTitle": "Swap origin and destination",
       "loadingLocations": "Loading locations...",
       "noLocationsFound": "No locations found",
@@ -2435,6 +2445,91 @@
       "tripPlanBadge": "Trip plan",
       "joinDesc": "Join to follow the itinerary, explore stops, and travel together with {name}.",
       "joinTripBtn": "Join trip"
+    }
+  },
+  "map": {
+    "loadingAria": "Loading map",
+    "initError": "Unable to initialize VietMap. Please check your network connection and API key.",
+    "searchThisArea": "Search this area",
+    "pinnedLocation": "Pinned location",
+    "cityFallback": "city",
+    "countryFallback": "Vietnam",
+    "controls": {
+      "zoomIn": "Zoom in",
+      "zoomOut": "Zoom out",
+      "myLocation": "My location",
+      "themeBright": "Light",
+      "themeBrightTitle": "Light Travel Map (Official VietMap TM @2x)",
+      "themeDark": "Dark",
+      "themeDarkTitle": "Dark Traffic Map (VietMap DM @2x)",
+      "themeSatellite": "Satellite",
+      "themeSatelliteTitle": "Satellite imagery (Esri Satellite)"
+    },
+    "marker": {
+      "viewOnMap": "View {name} on map"
+    },
+    "popup": {
+      "noPhoto": "No real photo yet",
+      "unsavePlace": "Remove from saved",
+      "saveToFavorites": "Save to Favorites",
+      "openNow": "Open now",
+      "closedNow": "Closed",
+      "activeStopBadge": "Stop {letter} (#{index})",
+      "removeStop": "Remove",
+      "setOriginShort": "Set start",
+      "setOriginFull": "Set as starting point",
+      "addStop": "Add stop",
+      "addToItineraryShort": "Add to trip",
+      "addToItineraryFull": "Add to itinerary",
+      "directions": "Directions",
+      "detailsShort": "Details",
+      "viewDetails": "View details"
+    },
+    "routing": {
+      "dragTitle": "Drag to move panel",
+      "dragHeaderTitle": "Press and drag to move directions panel",
+      "titleCount": "Directions ({count} stops)",
+      "expandTitle": "Expand directions panel",
+      "details": "Details",
+      "collapseTitle": "Collapse panel (view full map)",
+      "closeTitle": "Close directions",
+      "originMarker": "Start ({letter})",
+      "destMarker": "End ({letter})",
+      "stopMarker": "Stop {index} ({letter})",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "removeStop": "Remove stop",
+      "usingMyLocation": "Routing from your location",
+      "myLocation": "Your location",
+      "fromMyLocationTitle": "Calculate distance and directions from your current GPS location",
+      "locating": "Locating...",
+      "fromMyLocation": "From my location",
+      "swapRouteTitle": "Reverse route (invert all stops)",
+      "swapRoute": "Reverse",
+      "drawingRoute": "Drawing route...",
+      "noData": "No data",
+      "openGoogleMapsTitle": "Open Google Maps for turn-by-turn navigation",
+      "openGoogleMaps": "Open Google Maps",
+      "vehicles": {
+        "motorcycle": "Motorbike",
+        "driving": "Car",
+        "walking": "Walk"
+      }
+    },
+    "toasts": {
+      "savedToCollection": "Saved \"{name}\" to {collection}",
+      "changeCollection": "Change collection",
+      "unsavedPlace": "Removed \"{name}\" from saved",
+      "flyingToLocation": "Moving to your location!",
+      "loginToSave": "Please sign in to save places to a collection",
+      "loginToAddItinerary": "Please sign in to add places to an itinerary",
+      "routeLoadError": "Could not load route. Please try again later.",
+      "originSetToMyLocation": "Set your location as starting point!",
+      "routeAutoUpdatedFromLocation": "Route automatically updated from your location!",
+      "fetchingGpsForOrigin": "Getting your GPS location to update starting point...",
+      "originSetToPlace": "Set \"{name}\" as starting point!",
+      "stopAdded": "Added \"{name}\" to route stops!",
+      "stopRemoved": "Removed place from route"
     }
   }
 }

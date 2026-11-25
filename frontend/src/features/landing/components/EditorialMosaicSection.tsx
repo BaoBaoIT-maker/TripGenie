@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { CURATED_STORIES } from "../config/curated-stories.config";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 
 export function EditorialMosaicSection() {
   const { t, messages } = useI18n();

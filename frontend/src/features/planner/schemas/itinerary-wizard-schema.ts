@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { MAX_TRIP_DAYS } from '../config/itinerary-wizard-options';
+import { calculateTripDays, toLocalDateString } from '../model/itinerary-format';
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => toLocalDateString(new Date());
 
 export const itineraryWizardSchema = z
   .object({
@@ -29,10 +30,8 @@ export const itineraryWizardSchema = z
   })
   .refine(
     (d) => {
-      const diff =
-        (new Date(d.endDate).getTime() - new Date(d.startDate).getTime()) /
-        86_400_000;
-      return diff + 1 <= MAX_TRIP_DAYS;
+      const days = calculateTripDays(d.startDate, d.endDate);
+      return days !== null && days <= MAX_TRIP_DAYS;
     },
     { message: `Chuyến đi tối đa ${MAX_TRIP_DAYS} ngày`, path: ['endDate'] },
   );

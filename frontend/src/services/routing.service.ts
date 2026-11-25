@@ -1,4 +1,5 @@
 import { distance, point } from "@turf/turf";
+import type { AppLocale } from "@/i18n";
 import {
   MAX_NEARBY_PROXIMITY_KM,
   MIN_ROUTE_DISTANCE_KM,
@@ -89,20 +90,32 @@ export function calculateDirectDistanceKm(coord1: Coordinate, coord2: Coordinate
 }
 
 /**
- * Định dạng cự ly hiển thị (ví dụ: "850 m" hoặc "3.2 km")
+ * Định dạng cự ly hiển thị (ví dụ: "850 m" hoặc "3,2 km" / "3.2 km")
  */
-export function formatDistanceKm(value: number): string {
+export function formatDistanceKm(value: number, locale: AppLocale = "vi"): string {
   if (value < 1) {
     return `${Math.round(value * 1000)} m`;
   }
-  return `${new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 }).format(value)} km`;
+  const intlLocale = locale === "en" ? "en-US" : "vi-VN";
+  return `${new Intl.NumberFormat(intlLocale, { maximumFractionDigits: 1 }).format(value)} km`;
 }
 
 /**
- * Định dạng thời gian di chuyển (ví dụ: "8 phút" hoặc "1 giờ 15 phút")
+ * Định dạng thời gian di chuyển (ví dụ: "8 phút" / "8 min" hoặc "1 giờ 15 phút" / "1h 15m")
  */
-export function formatDurationMinutes(minutes: number): string {
+export function formatDurationMinutes(minutes: number, locale: AppLocale = "vi"): string {
   const rounded = Math.max(1, Math.round(minutes));
+  if (locale === "en") {
+    if (rounded < 60) {
+      return `${rounded} min`;
+    }
+    const hours = Math.floor(rounded / 60);
+    const remainingMinutes = rounded % 60;
+    if (remainingMinutes === 0) {
+      return `${hours} hr`;
+    }
+    return `${hours}h ${remainingMinutes}m`;
+  }
   if (rounded < 60) {
     return `${rounded} phút`;
   }
@@ -140,7 +153,10 @@ export function computeRealisticDurationMinutes(
 /**
  * Lấy ước tính thời gian cho tất cả phương tiện cùng lúc (để hiển thị dưới icon như Google Maps)
  */
-export function getAllModesEstimates(distanceKm: number): Record<
+export function getAllModesEstimates(
+  distanceKm: number,
+  locale: AppLocale = "vi"
+): Record<
   RouteVehicleMode,
   { distanceKm: number; durationMinutes: number; durationText: string }
 > {
@@ -148,17 +164,17 @@ export function getAllModesEstimates(distanceKm: number): Record<
     motorcycle: {
       distanceKm,
       durationMinutes: computeRealisticDurationMinutes(distanceKm, "motorcycle"),
-      durationText: formatDurationMinutes(computeRealisticDurationMinutes(distanceKm, "motorcycle")),
+      durationText: formatDurationMinutes(computeRealisticDurationMinutes(distanceKm, "motorcycle"), locale),
     },
     driving: {
       distanceKm,
       durationMinutes: computeRealisticDurationMinutes(distanceKm, "driving"),
-      durationText: formatDurationMinutes(computeRealisticDurationMinutes(distanceKm, "driving")),
+      durationText: formatDurationMinutes(computeRealisticDurationMinutes(distanceKm, "driving"), locale),
     },
     walking: {
       distanceKm,
       durationMinutes: computeRealisticDurationMinutes(distanceKm, "walking"),
-      durationText: formatDurationMinutes(computeRealisticDurationMinutes(distanceKm, "walking")),
+      durationText: formatDurationMinutes(computeRealisticDurationMinutes(distanceKm, "walking"), locale),
     },
   };
 }

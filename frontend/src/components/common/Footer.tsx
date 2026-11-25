@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 
 export function Footer() {
   const { t } = useI18n();

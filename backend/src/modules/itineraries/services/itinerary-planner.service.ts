@@ -8,13 +8,17 @@ import {
 } from '@nestjs/common';
 import { BudgetLevel, Prisma, type TravelArea } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
-import { AppLocale, DEFAULT_LOCALE } from '../../../common/i18n/locale.util';
+import {
+  AppLocale,
+  DEFAULT_LOCALE,
+  parseTranslationsMap,
+} from '../../../common/i18n/locale.util';
 import { t } from '../../../common/i18n/t.util';
 import {
   TransitService,
   IntercityTransitResult,
   computeLocalTransfer,
-  formatDurationVi,
+  formatDuration,
   formatVndCurrency,
 } from './transit.service';
 import { GeminiPlannerService } from './gemini-planner.service';
@@ -215,6 +219,9 @@ export interface ItineraryDetail {
   title: string;
   description: string | null;
   destination: string | null;
+  areaName?: string | null;
+  areaNameVi?: string | null;
+  areaTranslations?: Record<string, string> | null;
   coverPhoto?: string | null;
   startDate: string | null; // YYYY-MM-DD
   endDate: string | null;
@@ -258,6 +265,8 @@ const DETAIL_INCLUDE = {
     select: {
       id: true,
       name: true,
+      nameVi: true,
+      translations: true,
       bboxMinLat: true,
       bboxMaxLat: true,
       bboxMinLng: true,
@@ -868,6 +877,7 @@ export class ItineraryPlannerService {
         transitMode: dto.transitMode,
         departDate: dto.startDate,
         returnDate: dto.endDate,
+        locale,
       }),
       creatorId
         ? this.prisma.userPreference.findUnique({
@@ -1357,7 +1367,7 @@ export class ItineraryPlannerService {
         transit.durationMinutes ||
         PRICING_CONFIG.INTERCITY.FLIGHT.MINUTES_SHORT;
       routeSteps = [
-        `Chặng bay chính: Khởi hành từ ${transit.originHub?.name || transit.originName} ──> ${hubName} (~${formatDurationVi(durM, true)}, ~${formatVndCurrency(transit.estimatedPriceOneWay || 0)}/vé)`,
+        `Chặng bay chính: Khởi hành từ ${transit.originHub?.name || transit.originName} ──> ${hubName} (~${formatDuration(durM, true)}, ~${formatVndCurrency(transit.estimatedPriceOneWay || 0)}/vé)`,
         `Trung chuyển sân bay về trung tâm: Xe trung chuyển / Taxi từ ${hubName} về trung tâm ${cleanDest} (~${transferKm}km, ~${transferMinutes} phút)`,
       ];
     }
@@ -1656,6 +1666,9 @@ export class ItineraryPlannerService {
       title: row.title,
       description: row.description,
       destination: row.destination,
+      areaName: row.area?.name ?? null,
+      areaNameVi: row.area?.nameVi ?? null,
+      areaTranslations: parseTranslationsMap(row.area?.translations),
       coverPhoto: stored.coverPhoto || stored.coverImage || null,
       startDate: row.startDate?.toISOString().slice(0, 10) ?? null,
       endDate: row.endDate?.toISOString().slice(0, 10) ?? null,
@@ -1871,6 +1884,7 @@ export class ItineraryPlannerService {
     id: string,
     newTransitMode: TransitModeEnum,
     userId?: string,
+    locale: AppLocale = DEFAULT_LOCALE,
   ): Promise<ItineraryDetail> {
     const row = await this.prisma.itinerary.findFirst({
       where: { id, deletedAt: null },
@@ -1904,6 +1918,7 @@ export class ItineraryPlannerService {
         budgetLevel: row.budgetLevel || stored.budgetLevel,
         departDate,
         returnDate,
+        locale,
       });
 
     // Recalculate 1-unit base & party-scaled budget breakdown with new round-trip transit price

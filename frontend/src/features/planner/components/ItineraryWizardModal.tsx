@@ -22,13 +22,27 @@ import {
   STYLE_PROFILE_MAP,
 } from '../constants/wizard.constants';
 import { PARTY_SIZE_BOUNDS } from '../constants/itinerary.constants';
-import { useI18n, type AppLocale } from '@/i18n';
+import {
+  calculateTripDays,
+  formatWeekdayShort,
+  getMaxTripEndDate,
+  normalizeTripDateRange,
+  toLocalDateString,
+} from '../model/itinerary-format';
+import { pickLocalizedName, useI18n } from '@/i18n';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   initialDestination?: string;
   initialTemplate?: TourTemplate;
+}
+
+interface LocationSelection {
+  areaId: number | null;
+  areaSlug: string | null;
+  customText: string | null;
+  fromProp?: boolean;
 }
 
 function removeVietnameseAccents(str: string): string {
@@ -38,34 +52,6 @@ function removeVietnameseAccents(str: string): string {
     .replace(/đ/g, 'd')
     .replace(/Đ/g, 'D')
     .toLowerCase();
-}
-
-function formatDisplayDate(dateStr: string, locale: AppLocale = 'vi'): string {
-  if (!dateStr) return '';
-  try {
-    const cleanDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr.trim();
-    const parts = cleanDate.split('-');
-    if (parts.length === 3) {
-      const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-      if (locale === 'en') {
-        return d.toLocaleDateString('en-US', {
-          weekday: 'short',
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric',
-        });
-      }
-      const dayNames = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'];
-      const dayName = dayNames[d.getDay()];
-      const day = String(d.getDate()).padStart(2, '0');
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const year = d.getFullYear();
-      return `${dayName}, ${day}/${month}/${year}`;
-    }
-  } catch {
-    // fallback
-  }
-  return dateStr;
 }
 
 function getTransitIcon(mode: TransitMode) {
@@ -92,9 +78,16 @@ export default function ItineraryWizardModal({
   const { t, locale } = useI18n();
 
   // 1. Form States
-  const [originCity, setOriginCity] = useState<string>(WIZARD_DEFAULTS.ORIGIN_CITY);
-  const [destinationCity, setDestinationCity] = useState<string>(
-    initialTemplate?.destination || initialDestination || WIZARD_DEFAULTS.DESTINATION_CITY
+  const initialDestText = initialTemplate?.destination || initialDestination || null;
+  const [originSel, setOriginSel] = useState<LocationSelection>({
+    areaId: null,
+    areaSlug: WIZARD_DEFAULTS.ORIGIN_AREA_SLUG,
+    customText: null,
+  });
+  const [destSel, setDestSel] = useState<LocationSelection>(
+    initialDestText
+      ? { areaId: null, areaSlug: null, customText: initialDestText, fromProp: true }
+      : { areaId: null, areaSlug: WIZARD_DEFAULTS.DESTINATION_AREA_SLUG, customText: null }
   );
 
   const initialDates = useMemo(
@@ -162,7 +155,7 @@ export default function ItineraryWizardModal({
   // Update destination if initialDestination changes
   useEffect(() => {
     if (initialDestination) {
-      setDestinationCity(initialDestination);
+      setDestSel({ areaId: null, areaSlug: null, customText: initialDestination, fromProp: true });
     }
   }, [initialDestination]);
 
@@ -176,68 +169,139 @@ export default function ItineraryWizardModal({
 
   const locations = useMemo(() => {
     return travelAreas.map((a) => {
-      const name = a.nameVi || a.name;
-      const badge = a.hubBadge || name;
+      const name = pickLocalizedName(a, locale);
+      const hubName = a.primaryHub ? pickLocalizedName(a.primaryHub, locale) : null;
+      const badge =
+        a.primaryHub && hubName
+          ? a.primaryHub.hubType === 'AIRPORT'
+            ? `${hubName} (${a.primaryHub.id})`
+            : hubName
+          : name;
+      const areaTranslations = a.translations ? Object.values(a.translations) : [];
+      const hubTranslations = a.primaryHub?.translations
+        ? Object.values(a.primaryHub.translations)
+        : [];
+      const searchText = removeVietnameseAccents(
+        [
+          a.name,
+          a.nameVi,
+          a.slug,
+          ...areaTranslations,
+          a.primaryHub?.id,
+          a.primaryHub?.name,
+          ...hubTranslations,
+        ]
+          .filter(Boolean)
+          .join(' ')
+      );
       return {
         id: a.id,
         name,
+        nameEn: a.name,
+        nameVi: a.nameVi,
+        translations: a.translations ?? null,
+        slug: a.slug,
         badge,
+        searchText,
         lat: a.latitude ?? null,
         lng: a.longitude ?? null,
       };
     });
-  }, [travelAreas]);
+  }, [travelAreas, locale]);
 
-  // Filtered dropdown suggestions
+  const defaultLabelForSlug = useCallback(
+    (slug: string | null): string => {
+      if (slug === WIZARD_DEFAULTS.ORIGIN_AREA_SLUG) return t('planner.wizard.defaultOrigin');
+      if (slug === WIZARD_DEFAULTS.DESTINATION_AREA_SLUG) {
+        return t('planner.wizard.defaultDestination');
+      }
+      return '';
+    },
+    [t]
+  );
+
+  const matchLocationExact = useCallback(
+    (raw: string) => {
+      const clean = removeVietnameseAccents(raw.split('/')[0].trim());
+      if (!clean) return null;
+      return (
+        locations.find((loc) => {
+          const candidates = [
+            loc.name,
+            loc.nameEn,
+            loc.nameVi,
+            loc.slug,
+            ...(loc.translations ? Object.values(loc.translations) : []),
+          ].filter(Boolean) as string[];
+          return candidates.some((c) => removeVietnameseAccents(c) === clean);
+        }) ?? null
+      );
+    },
+    [locations]
+  );
+
+  const resolveSelection = useCallback(
+    (sel: LocationSelection) => {
+      if (sel.areaId !== null || sel.areaSlug) {
+        const matched =
+          locations.find(
+            (loc) =>
+              (sel.areaId !== null && loc.id === sel.areaId) ||
+              (sel.areaSlug !== null && loc.slug === sel.areaSlug)
+          ) ?? null;
+        if (matched) return { area: matched, displayText: matched.name };
+        return { area: null, displayText: sel.customText ?? defaultLabelForSlug(sel.areaSlug) };
+      }
+      const text = sel.customText ?? '';
+      const matched = matchLocationExact(text);
+      // Only auto-localize displayText for prop-seeded values (never rewrite mid-typing)
+      if (matched && sel.fromProp && !text.includes('/')) {
+        return { area: matched, displayText: matched.name };
+      }
+      return { area: matched, displayText: text };
+    },
+    [locations, defaultLabelForSlug, matchLocationExact]
+  );
+
+  const resolvedOrigin = useMemo(
+    () => resolveSelection(originSel),
+    [resolveSelection, originSel]
+  );
+  const resolvedDest = useMemo(
+    () => resolveSelection(destSel),
+    [resolveSelection, destSel]
+  );
+  const originCity = resolvedOrigin.displayText;
+  const destinationCity = resolvedDest.displayText;
+
+  // Filtered dropdown suggestions (bilingual match across EN name, VI name, slug, and hub badge)
   const filteredOrigins = useMemo(() => {
     const q = removeVietnameseAccents(originCity.trim());
     if (!q) return locations.slice(0, 8);
-    return locations
-      .filter(
-        (loc) =>
-          removeVietnameseAccents(loc.name).includes(q) ||
-          removeVietnameseAccents(loc.badge).includes(q)
-      )
-      .slice(0, 8);
+    return locations.filter((loc) => loc.searchText.includes(q)).slice(0, 8);
   }, [originCity, locations]);
 
   const filteredDests = useMemo(() => {
     const q = removeVietnameseAccents(destinationCity.trim());
     if (!q) return locations.slice(0, 8);
-    return locations
-      .filter(
-        (loc) =>
-          removeVietnameseAccents(loc.name).includes(q) ||
-          removeVietnameseAccents(loc.badge).includes(q)
-      )
-      .slice(0, 8);
+    return locations.filter((loc) => loc.searchText.includes(q)).slice(0, 8);
   }, [destinationCity, locations]);
 
-  // Calculate day and night duration
-  const startD = new Date(startDate);
-  const endD = new Date(endDate);
-  const totalDays = Math.max(1, Math.round((endD.getTime() - startD.getTime()) / 86_400_000) + 1);
+  // Calculate day and night duration in local calendar time
+  const todayDate = toLocalDateString(new Date());
+  const totalDays = calculateTripDays(startDate, endDate) ?? 1;
   const totalNights = Math.max(0, totalDays - 1);
-  const maxEndDate = useMemo(() => {
-    const d = new Date(startDate);
-    if (isNaN(d.getTime())) return undefined;
-    d.setDate(d.getDate() + (MAX_TRIP_DAYS - 1));
-    return d.toISOString().slice(0, 10);
-  }, [startDate]);
+  const maxEndDate = useMemo(() => getMaxTripEndDate(startDate, MAX_TRIP_DAYS), [startDate]);
+  const startWeekday = formatWeekdayShort(startDate, locale);
+  const endWeekday = formatWeekdayShort(endDate, locale);
 
   const handleStartDateChange = useCallback(
     (newStart: string) => {
-      setStartDate(newStart);
-      const s = new Date(newStart);
-      const e = new Date(endDate);
-      if (isNaN(s.getTime()) || isNaN(e.getTime())) return;
-      const diffDays = Math.round((e.getTime() - s.getTime()) / 86_400_000) + 1;
-      if (diffDays < 1) {
-        setEndDate(newStart);
-      } else if (diffDays > MAX_TRIP_DAYS) {
-        const clamped = new Date(s);
-        clamped.setDate(clamped.getDate() + (MAX_TRIP_DAYS - 1));
-        setEndDate(clamped.toISOString().slice(0, 10));
+      const normalized = normalizeTripDateRange(newStart, endDate, MAX_TRIP_DAYS);
+      if (!normalized) return;
+      setStartDate(normalized.startDate);
+      setEndDate(normalized.endDate);
+      if (normalized.clamped) {
         toast.info(t('planner.wizard.maxDaysInfo', { max: MAX_TRIP_DAYS }));
       }
     },
@@ -246,19 +310,12 @@ export default function ItineraryWizardModal({
 
   const handleEndDateChange = useCallback(
     (newEnd: string) => {
-      const s = new Date(startDate);
-      const e = new Date(newEnd);
-      if (!isNaN(s.getTime()) && !isNaN(e.getTime())) {
-        const diffDays = Math.round((e.getTime() - s.getTime()) / 86_400_000) + 1;
-        if (diffDays > MAX_TRIP_DAYS) {
-          const clamped = new Date(s);
-          clamped.setDate(clamped.getDate() + (MAX_TRIP_DAYS - 1));
-          setEndDate(clamped.toISOString().slice(0, 10));
-          toast.info(t('planner.wizard.maxDaysInfo', { max: MAX_TRIP_DAYS }));
-          return;
-        }
+      const normalized = normalizeTripDateRange(startDate, newEnd, MAX_TRIP_DAYS);
+      if (!normalized) return;
+      setEndDate(normalized.endDate);
+      if (normalized.clamped) {
+        toast.info(t('planner.wizard.maxDaysInfo', { max: MAX_TRIP_DAYS }));
       }
-      setEndDate(newEnd);
     },
     [startDate, t]
   );
@@ -275,24 +332,36 @@ export default function ItineraryWizardModal({
     return () => clearTimeout(timer);
   }, [originCity, destinationCity]);
 
-  // Resolve coordinates
+  // Resolve coordinates across EN/VI/localized area names
+  const findLocationCoord = useCallback(
+    (rawCity: string) => {
+      const clean = removeVietnameseAccents(rawCity);
+      if (!clean) return null;
+      const found = locations.find((l) => {
+        const candidates = [l.name, l.nameEn, l.nameVi].filter(Boolean) as string[];
+        return candidates.some((c) => {
+          const norm = removeVietnameseAccents(c);
+          return norm.includes(clean) || clean.includes(norm);
+        });
+      });
+      return found && found.lat && found.lng ? { lat: found.lat, lng: found.lng } : null;
+    },
+    [locations]
+  );
+
   const originCoord = useMemo(() => {
-    const clean = removeVietnameseAccents(debouncedOrigin);
-    const found = locations.find((l) => {
-      const locClean = removeVietnameseAccents(l.name);
-      return locClean.includes(clean) || clean.includes(locClean);
-    });
-    return found && found.lat && found.lng ? { lat: found.lat, lng: found.lng } : null;
-  }, [debouncedOrigin, locations]);
+    if (resolvedOrigin.area?.lat && resolvedOrigin.area?.lng) {
+      return { lat: resolvedOrigin.area.lat, lng: resolvedOrigin.area.lng };
+    }
+    return findLocationCoord(debouncedOrigin);
+  }, [resolvedOrigin.area, debouncedOrigin, findLocationCoord]);
 
   const destCoord = useMemo(() => {
-    const clean = removeVietnameseAccents(debouncedDest);
-    const found = locations.find((l) => {
-      const locClean = removeVietnameseAccents(l.name);
-      return locClean.includes(clean) || clean.includes(locClean);
-    });
-    return found && found.lat && found.lng ? { lat: found.lat, lng: found.lng } : null;
-  }, [debouncedDest, locations]);
+    if (resolvedDest.area?.lat && resolvedDest.area?.lng) {
+      return { lat: resolvedDest.area.lat, lng: resolvedDest.area.lng };
+    }
+    return findLocationCoord(debouncedDest);
+  }, [resolvedDest.area, debouncedDest, findLocationCoord]);
 
   // Instant Transit Preview Query
   const { data: transitPreview, isLoading: isTransitLoading } = useTransitPreview(
@@ -313,9 +382,9 @@ export default function ItineraryWizardModal({
 
   // Swap origin and destination
   const handleSwapLocations = useCallback(() => {
-    setOriginCity(destinationCity);
-    setDestinationCity(originCity);
-  }, [originCity, destinationCity]);
+    setOriginSel(destSel);
+    setDestSel(originSel);
+  }, [originSel, destSel]);
 
   // Toggle style tags
   const toggleStyle = useCallback((tag: string) => {
@@ -351,6 +420,7 @@ export default function ItineraryWizardModal({
         {
           originCity: cleanOrigin,
           destinationCity: cleanDest,
+          destinationAreaId: resolvedDest.area?.id,
           startDate,
           endDate,
           transitMode,
@@ -384,6 +454,7 @@ export default function ItineraryWizardModal({
       generate,
       originCity,
       destinationCity,
+      resolvedDest.area?.id,
       startDate,
       endDate,
       totalDays,
@@ -477,7 +548,7 @@ export default function ItineraryWizardModal({
                   autoCorrect="off"
                   onFocus={() => setShowOriginDropdown(true)}
                   onChange={(e) => {
-                    setOriginCity(e.target.value);
+                    setOriginSel({ areaId: null, areaSlug: null, customText: e.target.value });
                     setShowOriginDropdown(true);
                   }}
                   placeholder={t('planner.wizard.originPlaceholder')}
@@ -496,7 +567,7 @@ export default function ItineraryWizardModal({
                         <div
                           key={`origin-${loc.id}-${loc.name}`}
                           onClick={() => {
-                            setOriginCity(loc.name);
+                            setOriginSel({ areaId: loc.id, areaSlug: loc.slug, customText: null });
                             setShowOriginDropdown(false);
                           }}
                           className="px-3 py-2 hover:bg-[#F0F7FF] hover:text-[#0194F3] cursor-pointer flex items-center justify-between font-semibold text-[#10243A]"
@@ -540,7 +611,7 @@ export default function ItineraryWizardModal({
                   autoCorrect="off"
                   onFocus={() => setShowDestDropdown(true)}
                   onChange={(e) => {
-                    setDestinationCity(e.target.value);
+                    setDestSel({ areaId: null, areaSlug: null, customText: e.target.value });
                     setShowDestDropdown(true);
                   }}
                   placeholder={t('planner.wizard.destPlaceholder')}
@@ -559,7 +630,7 @@ export default function ItineraryWizardModal({
                         <div
                           key={`dest-${loc.id}-${loc.name}`}
                           onClick={() => {
-                            setDestinationCity(loc.name);
+                            setDestSel({ areaId: loc.id, areaSlug: loc.slug, customText: null });
                             setShowDestDropdown(false);
                           }}
                           className="px-3 py-2 hover:bg-[#F0F7FF] hover:text-[#0194F3] cursor-pointer flex items-center justify-between font-semibold text-[#10243A]"
@@ -581,42 +652,61 @@ export default function ItineraryWizardModal({
             </div>
 
             {/* Integrated Schedule Date Range Bar (Traveloka-Style 50/50 Balanced) */}
-            <div className="grid grid-cols-2 bg-white rounded-xl border border-[#E2E8F0] shadow-2xs divide-x divide-[#F1F5F9]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 bg-white rounded-xl border border-[#E2E8F0] shadow-2xs divide-y sm:divide-y-0 sm:divide-x divide-[#F1F5F9]">
               {/* Ngày bắt đầu */}
-              <div className="p-3 relative cursor-pointer group hover:bg-[#F8FAFC] transition-colors rounded-l-xl">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">
-                  <i className="fa-regular fa-calendar text-[11px] text-[#0194F3]" aria-hidden="true" />
-                  <span>{t('planner.wizard.startDateLabel')}</span>
-                </div>
-                <div className="text-sm font-bold text-[#10243A]">
-                  {formatDisplayDate(startDate, locale)}
+              <label
+                htmlFor="wizard-start-date"
+                className="p-3 block cursor-pointer hover:bg-[#F8FAFC] focus-within:bg-[#F8FAFC] focus-within:ring-2 focus-within:ring-inset focus-within:ring-[#0194F3]/30 transition-colors rounded-t-xl sm:rounded-tr-none sm:rounded-l-xl"
+              >
+                <div className="flex items-center justify-between gap-1.5 text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">
+                  <span className="flex items-center gap-1.5">
+                    <i className="fa-regular fa-calendar text-[11px] text-[#0194F3]" aria-hidden="true" />
+                    <span>{t('planner.wizard.startDateLabel')}</span>
+                  </span>
+                  {startWeekday && (
+                    <span className="text-[10px] font-semibold normal-case text-[#0194F3]">
+                      {startWeekday}
+                    </span>
+                  )}
                 </div>
                 <input
+                  id="wizard-start-date"
                   type="date"
                   value={startDate}
+                  min={todayDate}
+                  required
                   onChange={(e) => handleStartDateChange(e.target.value)}
-                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  className="w-full bg-transparent text-sm font-bold text-[#10243A] focus:outline-none cursor-pointer tabular-nums"
                 />
-              </div>
+              </label>
 
               {/* Ngày kết thúc */}
-              <div className="p-3 relative cursor-pointer group hover:bg-[#F8FAFC] transition-colors rounded-r-xl">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">
-                  <i className="fa-regular fa-calendar-check text-[11px] text-[#0194F3]" aria-hidden="true" />
-                  <span>{t('planner.wizard.endDateLabel')}</span>
-                </div>
-                <div className="text-sm font-bold text-[#10243A]">
-                  {formatDisplayDate(endDate, locale)}
+              <label
+                htmlFor="wizard-end-date"
+                className="p-3 block cursor-pointer hover:bg-[#F8FAFC] focus-within:bg-[#F8FAFC] focus-within:ring-2 focus-within:ring-inset focus-within:ring-[#0194F3]/30 transition-colors rounded-b-xl sm:rounded-bl-none sm:rounded-r-xl"
+              >
+                <div className="flex items-center justify-between gap-1.5 text-[10px] font-bold uppercase text-slate-400 tracking-wider mb-1">
+                  <span className="flex items-center gap-1.5">
+                    <i className="fa-regular fa-calendar-check text-[11px] text-[#0194F3]" aria-hidden="true" />
+                    <span>{t('planner.wizard.endDateLabel')}</span>
+                  </span>
+                  {endWeekday && (
+                    <span className="text-[10px] font-semibold normal-case text-[#0194F3]">
+                      {endWeekday}
+                    </span>
+                  )}
                 </div>
                 <input
+                  id="wizard-end-date"
                   type="date"
                   value={endDate}
                   min={startDate}
                   max={maxEndDate}
+                  required
                   onChange={(e) => handleEndDateChange(e.target.value)}
-                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  className="w-full bg-transparent text-sm font-bold text-[#10243A] focus:outline-none cursor-pointer tabular-nums"
                 />
-              </div>
+              </label>
             </div>
 
             {/* Party Size Stepper */}

@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { SEASONAL_DESTINATIONS } from "../config/seasonal-destinations.config";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 
 const CENTER_INDEX = Math.floor(SEASONAL_DESTINATIONS.length / 2);
 

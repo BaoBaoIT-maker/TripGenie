@@ -84,8 +84,11 @@ export class ItinerariesController {
    */
   @Post('transit-preview')
   @HttpCode(HttpStatus.OK)
-  previewTransit(@Body() dto: TransitPreviewDto) {
-    return this.transitService.calculateIntercityTransit(dto);
+  previewTransit(
+    @Body() dto: TransitPreviewDto,
+    @RequestLocale() locale: AppLocale,
+  ) {
+    return this.transitService.calculateIntercityTransit({ ...dto, locale });
   }
 
   /**
@@ -218,8 +221,14 @@ export class ItinerariesController {
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: UpdateTransitModeDto,
     @CurrentUser('id') userId: string,
+    @RequestLocale() locale: AppLocale,
   ) {
-    return this.plannerService.updateTransitMode(id, dto.transitMode, userId);
+    return this.plannerService.updateTransitMode(
+      id,
+      dto.transitMode,
+      userId,
+      locale,
+    );
   }
 
   /**

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { DEFAULT_AVATAR } from "@/config/avatars";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 function getUserInitials(fullName?: string | null): string {

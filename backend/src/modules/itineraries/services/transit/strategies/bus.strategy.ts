@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../../database/prisma.service';
 import {
+  DEFAULT_LOCALE,
+  type AppLocale,
+} from '../../../../../common/i18n/locale.util';
+import { t } from '../../../../../common/i18n/t.util';
+import {
   PRICING_CONFIG,
   buildVexereBusUrl,
   checkTransitSafety,
@@ -16,8 +21,9 @@ import {
   TransitTransferLeg,
   computeLocalTransfer,
   findNearestHub,
-  formatDurationVi,
+  formatDuration,
   formatVndCurrency,
+  getHubDisplayName,
   isDirectCityHub,
 } from '../transit.types';
 
@@ -61,15 +67,21 @@ export class BusTransitStrategy implements ITransitStrategy {
     };
   }
 
-  summarize(res: IntercityTransitResult): TransitModeSummary {
+  summarize(
+    res: IntercityTransitResult,
+    _roadDistanceKm?: number,
+    locale: AppLocale = DEFAULT_LOCALE,
+  ): TransitModeSummary {
     const durHours = Math.max(1, Math.round(res.durationMinutes / 60));
     return {
       mode: this.mode,
-      title: 'Xe khách giường nằm',
+      title: t(locale, 'transit.bus.summaryTitle'),
       durationText: res.isMultiModal
-        ? `Xe + Tàu (~${durHours}h)`
-        : `Giường nằm (~${durHours}h)`,
-      priceText: `Từ ~${formatVndCurrency(res.estimatedPriceOneWay)}/vé`,
+        ? t(locale, 'transit.bus.summaryMultiModal', { hours: durHours })
+        : t(locale, 'transit.bus.summaryDirect', { hours: durHours }),
+      priceText: t(locale, 'transit.bus.summaryPrice', {
+        price: formatVndCurrency(res.estimatedPriceOneWay),
+      }),
       estimatedPriceOneWay: res.estimatedPriceOneWay,
       durationMinutes: res.durationMinutes,
       isMultiModal: Boolean(res.isMultiModal),
@@ -88,6 +100,7 @@ export class BusTransitStrategy implements ITransitStrategy {
       roadDistanceKm,
       isIsland,
     } = ctx;
+    const locale: AppLocale = ctx.locale ?? DEFAULT_LOCALE;
 
     const speed = PRICING_CONFIG.INTERCITY.AVG_SPEED_KMH;
     const T = PRICING_CONFIG.INTERCITY.TRANSFER;
@@ -103,16 +116,19 @@ export class BusTransitStrategy implements ITransitStrategy {
     const hasDestBus =
       !isIsland &&
       isDirectCityHub(destBus, destCoords.areaId, T.LOCAL_HUB_MAX_DISTANCE_KM);
-    const ferryPortName = ctx.nearestFerryHub?.name || D.FERRY_PORT_NAME;
+    const ferryPortName =
+      getHubDisplayName(ctx.nearestFerryHub, locale) || D.FERRY_PORT_NAME;
 
     const originBusName =
-      hasOriginBus && originBus ? originBus.name : `Bến xe tại ${originCity}`;
+      hasOriginBus && originBus
+        ? (getHubDisplayName(originBus, locale) ?? originBus.name)
+        : t(locale, 'transit.bus.stationFallback', { city: originCity });
     const destBusName =
       hasDestBus && destBus
-        ? destBus.name
+        ? (getHubDisplayName(destBus, locale) ?? destBus.name)
         : isIsland
           ? ferryPortName
-          : `Bến xe tại ${destCity}`;
+          : t(locale, 'transit.bus.stationFallback', { city: destCity });
 
     const fromPartner = resolveVexereBusPartner(originCity);
     const toPartner =
@@ -142,19 +158,35 @@ export class BusTransitStrategy implements ITransitStrategy {
       const ferryDur = T.FERRY_MINUTES;
       transferLeg = {
         type: 'FERRY',
-        title: `Tàu cao tốc vượt biển từ ${ferryPortName} sang đảo ${destCity}`,
+        title: t(locale, 'transit.bus.islandTransferTitle', {
+          port: ferryPortName,
+          dest: destCity,
+        }),
         fromName: ferryPortName,
         toName: destCity,
         distanceKm: T.ISLAND_PORT_DISTANCE_KM,
         durationMinutes: ferryDur,
         estimatedPrice: ferryFare,
-        description: `Tàu cao tốc từ ${ferryPortName} vượt biển sang đảo ${destCity}`,
+        description: t(locale, 'transit.bus.islandTransferDesc', {
+          port: ferryPortName,
+          dest: destCity,
+        }),
       };
       busPriceOneWay += ferryFare;
       busDurationMinutes += ferryDur;
       routeSteps = [
-        `Chặng 1 (Xe khách giường nằm): ${originBusName} ──> ${ferryPortName} (~${formatDurationVi(baseBusMinutes)}, ~${formatVndCurrency(baseBusFare)}/vé)`,
-        `Chặng 2 (Tàu cao tốc vượt biển): ${ferryPortName} ──> Đảo ${destCity} (~${formatDurationVi(ferryDur, true)}, ~${formatVndCurrency(ferryFare)}/vé)`,
+        t(locale, 'transit.bus.islandStep1', {
+          origin: originBusName,
+          port: ferryPortName,
+          dur: formatDuration(baseBusMinutes, false, locale),
+          price: formatVndCurrency(baseBusFare),
+        }),
+        t(locale, 'transit.bus.islandStep2', {
+          port: ferryPortName,
+          dest: destCity,
+          dur: formatDuration(ferryDur, true, locale),
+          price: formatVndCurrency(ferryFare),
+        }),
       ];
     } else {
       const { transferKm, transferMinutes } = computeLocalTransfer(
@@ -162,14 +194,25 @@ export class BusTransitStrategy implements ITransitStrategy {
         T.MIN_LOCAL_TRANSFER_KM,
       );
       routeSteps = [
-        `Chặng chính (Xe giường nằm / Limousine): Đón xe tại ${originBusName} ──> ${destBusName} (~${formatDurationVi(busDurationMinutes)}, ~${formatVndCurrency(busPriceOneWay)}/vé)`,
-        `Trung chuyển về khách sạn: Xe trung chuyển của nhà xe hoặc Taxi từ ${destBusName} về trung tâm ${destCity} (~${transferKm}km, ~${transferMinutes} phút)`,
+        t(locale, 'transit.bus.directStep1', {
+          origin: originBusName,
+          dest: destBusName,
+          dur: formatDuration(busDurationMinutes, false, locale),
+          price: formatVndCurrency(busPriceOneWay),
+        }),
+        t(locale, 'transit.bus.directStep2', {
+          destStation: destBusName,
+          dest: destCity,
+          km: transferKm,
+          mins: transferMinutes,
+        }),
       ];
     }
 
     const safetyAdvisory = checkTransitSafety(
       TransitModeEnum.SLEEPER_BUS,
       roadDistanceKm,
+      locale,
     );
 
     return {
@@ -193,8 +236,8 @@ export class BusTransitStrategy implements ITransitStrategy {
         carriers: C.SLEEPER_BUS,
         notes:
           busDurationMinutes > T.OVERNIGHT_BUS_MIN_MINUTES
-            ? 'Khuyên chọn xe giường nằm xuất phát lúc 22:00 - 23:00 (có xe trung chuyển miễn phí tận khách sạn) để ngủ đêm trên xe, tiết kiệm 1 đêm lưu trú.'
-            : 'Nên chọn xe Limousine đưa đón tận nơi, xuất phát sáng để đến khách sạn vào đầu giờ chiều.',
+            ? t(locale, 'transit.bus.notesOvernight')
+            : t(locale, 'transit.bus.notesDaytime'),
         routeSteps,
       },
     };

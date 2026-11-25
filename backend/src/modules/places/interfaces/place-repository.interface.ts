@@ -75,6 +75,7 @@ export type TravelAreaRow = Prisma.TravelAreaGetPayload<{
     id: true;
     name: true;
     nameVi: true;
+    translations: true;
     slug: true;
     type: true;
     bboxMinLat: true;
@@ -85,6 +86,7 @@ export type TravelAreaRow = Prisma.TravelAreaGetPayload<{
       select: {
         id: true;
         name: true;
+        translations: true;
         hubType: true;
         latitude: true;
         longitude: true;

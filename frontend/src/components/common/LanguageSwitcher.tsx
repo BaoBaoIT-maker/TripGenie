@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { LOCALE_METADATA, SUPPORTED_LOCALES } from '@/i18n/config';
-import { useI18n } from '@/i18n/LocaleProvider';
+import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 
 interface LanguageSwitcherProps {

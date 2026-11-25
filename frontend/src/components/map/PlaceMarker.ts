@@ -1,4 +1,6 @@
 import type { DiscoveryPlace, NearbyPlace } from "@/features/map/types";
+import { translate, type AppLocale } from "@/i18n";
+import { DEFAULT_LOCALE } from "@/i18n/config";
 
 export interface PlaceMarkerOptions {
   selected?: boolean;
@@ -8,6 +10,7 @@ export interface PlaceMarkerOptions {
   label?: string;
   /** Custom background color for marker pin (e.g. day color hex like #0D9488, #6366F1) */
   customColor?: string;
+  locale?: AppLocale;
 }
 
 interface CategoryStyle {
@@ -159,7 +162,8 @@ export function createPlaceMarkerElement(
   // Inner button with category color & icon
   const button = document.createElement("button");
   button.type = "button";
-  button.setAttribute("aria-label", `Xem ${place.name} trên bản đồ`);
+  const locale = options.locale ?? DEFAULT_LOCALE;
+  button.setAttribute("aria-label", translate(locale, "map.marker.viewOnMap", { name: place.name }));
   button.dataset.active = options.selected ? "true" : "false";
   button.dataset.categoryBg = style.bg;
   if (options.customColor) {

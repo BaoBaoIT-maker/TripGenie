@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ErrorState } from '@/components/common/ErrorState';
 import { AppModalPortal } from '@/components/common/AppModalPortal';
 import { useAuth } from '@/features/auth/hooks/use-auth';
-import { useI18n } from '@/i18n';
+import { pickLocalizedName, useI18n } from '@/i18n';
 import { placeService } from '@/services/place.service';
 import { fetchDailyRouteSegments, type Coordinate } from '@/services/routing.service';
 import { getDayColor, type DiscoveryPlace, type ItineraryPathSegment } from '@/features/map/types';
@@ -106,7 +106,7 @@ function formatShortDate(isoString: string | null | undefined, dayIndex: number)
 
 export default function ItineraryView({ id }: Props) {
   const router = useRouter();
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { user } = useAuth();
   const { data, isLoading, error } = useItineraryQuery(id);
   const { data: weatherData } = useItineraryWeatherQuery(id);
@@ -1044,7 +1044,15 @@ export default function ItineraryView({ id }: Props) {
                 <ItineraryTimeline
                   days={visibleDays}
                   transit={data.intercityTransit}
-                  destination={data.destination}
+                  destination={pickLocalizedName(
+                    {
+                      name: data.areaName,
+                      nameVi: data.areaNameVi,
+                      translations: data.areaTranslations,
+                    },
+                    locale,
+                    data.destination || '',
+                  )}
                   startDate={data.startDate}
                   endDate={data.endDate}
                   selectedPlaceId={selectedPlaceId}

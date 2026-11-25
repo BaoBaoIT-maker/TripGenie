@@ -17,10 +17,18 @@ export interface BackendCategoryItem {
   placeCount?: number;
 }
 
+export interface BackendTravelAreaPrimaryHub {
+  id: string;
+  name: string;
+  translations?: Record<string, string> | null;
+  hubType: string;
+}
+
 export interface BackendTravelAreaItem {
   id: number;
   name: string;
   nameVi: string | null;
+  translations?: Record<string, string> | null;
   slug: string;
   type: string;
   bbox: {
@@ -31,7 +39,7 @@ export interface BackendTravelAreaItem {
   };
   latitude?: number | null;
   longitude?: number | null;
-  hubBadge?: string | null;
+  primaryHub?: BackendTravelAreaPrimaryHub | null;
 }
 
 export interface PlaceFilterParams {

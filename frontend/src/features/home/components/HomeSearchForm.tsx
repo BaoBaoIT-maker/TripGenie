@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { BackendTravelAreaItem } from "@/services/place.service";
 import { buildExploreHref } from "@/features/map/lib/explore-query";
+import { pickLocalizedName, useI18n } from "@/i18n";
 import { HOME_CONFIG } from "../config/home.config";
 
 interface HomeSearchFormProps {
@@ -16,6 +17,7 @@ interface HomeSearchFormProps {
 
 export function HomeSearchForm({ areas }: HomeSearchFormProps) {
   const router = useRouter();
+  const { locale } = useI18n();
   const [keyword, setKeyword] = useState("");
   const [selectedAreaId, setSelectedAreaId] = useState<string>("all");
   const selectedArea = areas.find((area) => String(area.id) === selectedAreaId);
@@ -53,14 +55,16 @@ export function HomeSearchForm({ areas }: HomeSearchFormProps) {
             >
               <SelectTrigger id="destination-select" aria-label={HOME_CONFIG.hero.areaLabel} className="w-full border-0 bg-transparent px-0 text-sm font-medium text-foreground shadow-none cursor-pointer dark:bg-transparent">
                 <SelectValue>
-                  {selectedArea?.nameVi || selectedArea?.name || HOME_CONFIG.hero.defaultAreaLabel}
+                  {selectedArea
+                    ? pickLocalizedName(selectedArea, locale)
+                    : HOME_CONFIG.hero.defaultAreaLabel}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent align="start" alignItemWithTrigger={false} sideOffset={12} className="rounded-xl border border-primary/15 p-1.5 shadow-xl">
                 <SelectItem value="all" className="min-h-11 rounded-lg px-3 cursor-pointer data-highlighted:bg-secondary data-selected:bg-secondary data-selected:text-primary">{HOME_CONFIG.hero.defaultAreaLabel}</SelectItem>
                 {areas.map((area) => (
                   <SelectItem key={area.id} value={String(area.id)} className="min-h-11 rounded-lg px-3 cursor-pointer data-highlighted:bg-secondary data-selected:bg-secondary data-selected:text-primary">
-                    {area.nameVi || area.name}
+                    {pickLocalizedName(area, locale)}
                   </SelectItem>
                 ))}
               </SelectContent>

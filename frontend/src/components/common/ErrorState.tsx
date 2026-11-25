@@ -2,7 +2,7 @@
 
 import { AlertTriangle, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 interface ErrorStateProps {

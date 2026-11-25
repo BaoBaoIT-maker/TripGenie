@@ -1,8 +1,8 @@
 import type { TransitMode, IntracityMode, BudgetLevel, TravelPace } from '@/types/itinerary';
 
 export const WIZARD_DEFAULTS = {
-  ORIGIN_CITY: 'TP. Hồ Chí Minh',
-  DESTINATION_CITY: 'Đà Nẵng',
+  ORIGIN_AREA_SLUG: 'ho-chi-minh',
+  DESTINATION_AREA_SLUG: 'da-nang',
   TRANSIT_MODE: 'FLIGHT' as TransitMode,
   INTRACITY_MODE: 'MOTORBIKE_RENTAL' as IntracityMode,
   BUDGET_LEVEL: 'MEDIUM' as BudgetLevel,

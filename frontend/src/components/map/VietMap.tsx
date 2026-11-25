@@ -29,6 +29,7 @@ if (typeof window !== "undefined") {
   maplibreConfig.WORKER_URL = "/maplibre-gl-worker.mjs";
 }
 import { toast } from "sonner";
+import { useI18n } from "@/i18n";
 import type {
   VietMapProps,
   DiscoveryPlace,
@@ -211,6 +212,7 @@ export default function VietMap({
   travelAreas,
 }: VietMapProps) {
   const router = useRouter();
+  const { t, locale } = useI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markersRef = useRef<Marker[]>([]);
@@ -267,14 +269,20 @@ export default function VietMap({
       const toggledPlace = lastToggledPlaceRef.current;
       if (!toggledPlace) return;
       if (data.isSaved) {
-        toast.success(`Đã lưu "${toggledPlace.name}" vào ${DEFAULT_COLLECTION_TITLE}`, {
-          action: {
-            label: "Đổi bộ sưu tập",
-            onClick: () => setPlaceForSaveModal(toggledPlace),
-          },
-        });
+        toast.success(
+          t("map.toasts.savedToCollection", {
+            name: toggledPlace.name,
+            collection: DEFAULT_COLLECTION_TITLE,
+          }),
+          {
+            action: {
+              label: t("map.toasts.changeCollection"),
+              onClick: () => setPlaceForSaveModal(toggledPlace),
+            },
+          }
+        );
       } else {
-        toast.info(`Đã bỏ lưu "${toggledPlace.name}"`);
+        toast.info(t("map.toasts.unsavedPlace", { name: toggledPlace.name }));
       }
     },
   });
@@ -291,12 +299,12 @@ export default function VietMap({
         zoom: 15.5,
         duration: 800,
       });
-      toast.success("Đang di chuyển đến vị trí của bạn!");
+      toast.success(t("map.toasts.flyingToLocation"));
     }
     if (onRequestCurrentLocation) {
       onRequestCurrentLocation();
     }
-  }, [userLocation, onRequestCurrentLocation]);
+  }, [userLocation, onRequestCurrentLocation, t]);
 
   useEffect(() => {
     onViewportChangeRef.current = onViewportChange;
@@ -356,7 +364,7 @@ export default function VietMap({
   const handleToggleSave = useCallback(
     (place: DiscoveryPlace) => {
       if (!isAuthenticated) {
-        toast.info("Vui lòng đăng nhập để lưu địa điểm vào bộ sưu tập");
+        toast.info(t("map.toasts.loginToSave"));
         router.push(`/login?next=${encodeURIComponent("/explore")}`);
         return;
       }
@@ -364,20 +372,20 @@ export default function VietMap({
       lastToggledPlaceRef.current = place;
       toggleMutation.mutate({ placeId: place.id });
     },
-    [isAuthenticated, router, toggleMutation]
+    [isAuthenticated, router, toggleMutation, t]
   );
 
   // Add Place to Existing Itinerary Handler
   const handleAddToItinerary = useCallback(
     (place: DiscoveryPlace) => {
       if (!isAuthenticated) {
-        toast.info("Vui lòng đăng nhập để thêm địa điểm vào lịch trình");
+        toast.info(t("map.toasts.loginToAddItinerary"));
         router.push(`/login?next=${encodeURIComponent("/explore")}`);
         return;
       }
       setPlaceForItineraryModal(place);
     },
-    [isAuthenticated, router]
+    [isAuthenticated, router, t]
   );
 
   // Compute and Draw Multi-Stop Route Line on Map
@@ -412,10 +420,10 @@ export default function VietMap({
             ? "bg-rose-600"
             : "bg-sky-600";
           const label = isOrigin
-            ? `Điểm đi (${letter})`
+            ? t("map.routing.originMarker", { letter })
             : isDest
-            ? `Điểm đến (${letter})`
-            : `Chặng ${index} (${letter})`;
+            ? t("map.routing.destMarker", { letter })
+            : t("map.routing.stopMarker", { index, letter });
 
           const el = document.createElement("div");
           el.className = "flex flex-col items-center -translate-y-1/2 cursor-pointer select-none group";
@@ -527,12 +535,12 @@ export default function VietMap({
         }
       } catch (err) {
         console.error("Failed to compute multi-stop route:", err);
-        toast.error("Không thể tải tuyến đường. Vui lòng thử lại sau.");
+        toast.error(t("map.toasts.routeLoadError"));
       } finally {
         setRouteLoading(false);
       }
     },
-    []
+    [t]
   );
 
   // Clear route from map and reset state
@@ -560,7 +568,7 @@ export default function VietMap({
         travelAreas,
         selectedProvinceName
       );
-      const provName = targetPlace.areaName || selectedProvinceName || "thành phố";
+      const provName = targetPlace.areaName || selectedProvinceName || t("map.cityFallback");
 
       const newStops = routingService.buildInitialRouteStops({
         targetStop: {
@@ -575,7 +583,7 @@ export default function VietMap({
       });
       setRouteStops(newStops);
     },
-    [userLocation, selectedProvinceName, travelAreas]
+    [userLocation, selectedProvinceName, travelAreas, t]
   );
 
   // Hide underlying place markers for active route stops so markers never collide or peek underneath
@@ -604,14 +612,14 @@ export default function VietMap({
       if (applied) {
         toast.info(
           forceUserOrigin
-            ? "Đã đặt vị trí của bạn làm điểm xuất phát!"
-            : "Đã tự động cập nhật lộ trình từ vị trí của bạn!"
+            ? t("map.toasts.originSetToMyLocation")
+            : t("map.toasts.routeAutoUpdatedFromLocation")
         );
         return updated;
       }
       return prev;
     });
-  }, [userLocation]);
+  }, [userLocation, t]);
 
   // Explicitly use user's live GPS as the route origin regardless of 20km threshold
   const handleUseMyLocationAsOrigin = useCallback(() => {
@@ -624,14 +632,14 @@ export default function VietMap({
         );
         return updated;
       });
-      toast.success("Đã đặt vị trí của bạn làm điểm xuất phát!");
+      toast.success(t("map.toasts.originSetToMyLocation"));
       return;
     }
 
     pendingUserOriginRequestRef.current = true;
     onRequestCurrentLocation?.();
-    toast.info("Đang lấy vị trí GPS của bạn để cập nhật điểm xuất phát...");
-  }, [userLocation, onRequestCurrentLocation]);
+    toast.info(t("map.toasts.fetchingGpsForOrigin"));
+  }, [userLocation, onRequestCurrentLocation, t]);
 
   // Set selected place as the starting origin (Point A)
   const handleSetOrigin = useCallback(
@@ -642,9 +650,9 @@ export default function VietMap({
         coordinate: { latitude: place.latitude, longitude: place.longitude },
       };
       setRouteStops((prev) => routingService.setOriginInRoute(prev, newOrigin));
-      toast.success(`Đã đặt "${place.name}" làm điểm xuất phát!`);
+      toast.success(t("map.toasts.originSetToPlace", { name: place.name }));
     },
-    []
+    [t]
   );
 
   // Add a stop to the existing route — pure state update, drawRoute triggered by reactive effect
@@ -658,9 +666,9 @@ export default function VietMap({
           coordinate: { latitude: place.latitude, longitude: place.longitude },
         })
       );
-      toast.success(`Đã thêm "${place.name}" vào chặng dừng!`);
+      toast.success(t("map.toasts.stopAdded", { name: place.name }));
     },
-    []
+    [t]
   );
 
   // Remove a stop by index — pure state update, reactive effect handles re-draw / clear
@@ -675,9 +683,9 @@ export default function VietMap({
   const handleRemoveStopById = useCallback(
     (placeId: string) => {
       setRouteStops((prev) => routingService.removeStopFromRoute(prev, placeId));
-      toast.info("Đã gỡ địa điểm khỏi lộ trình");
+      toast.info(t("map.toasts.stopRemoved"));
     },
-    []
+    [t]
   );
 
     // Move a stop up or down — pure state update
@@ -742,9 +750,9 @@ export default function VietMap({
         latitude: routeToPinRequest.latitude,
         longitude: routeToPinRequest.longitude,
         category: "custom",
-        categoryLabel: "Vị trí đã ghim",
-        areaSlug: "danang",
-        areaName: "Đà Nẵng",
+        categoryLabel: t("map.pinnedLocation"),
+        areaSlug: "",
+        areaName: selectedProvinceName || "",
         address: routeToPinRequest.name,
         rating: null,
         reviewCount: 0,
@@ -758,7 +766,7 @@ export default function VietMap({
         tags: [],
       });
     }
-  }, [routeToPinRequest, handleStartDirections]);
+  }, [routeToPinRequest, handleStartDirections, selectedProvinceName, t]);
 
   // Switch raster tile layers when theme changes
   useEffect(() => {
@@ -1037,7 +1045,7 @@ export default function VietMap({
       el.innerHTML = `
         <div class="px-2.5 py-1 rounded-full bg-background/95 border border-border/80 text-foreground text-[11px] font-bold shadow-lg mb-1.5 whitespace-nowrap flex items-center gap-1.5 backdrop-blur-md transition-transform group-hover:scale-105">
           <span class="size-1.5 rounded-full bg-rose-500 animate-ping"></span>
-          <span class="max-w-[200px] truncate">${geocodedPin.displayName || "Vị trí đã ghim"}</span>
+          <span class="max-w-[200px] truncate">${geocodedPin.displayName || t("map.pinnedLocation")}</span>
         </div>
         <div class="relative filter drop-shadow-md group-hover:scale-110 active:scale-125 transition-transform duration-150">
           <svg width="34" height="44" viewBox="0 0 34 44" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1071,7 +1079,7 @@ export default function VietMap({
         duration: 900,
       });
     }
-  }, [geocodedPin]);
+  }, [geocodedPin, t]);
 
   // Create / Rebuild places markers when `places` list changes
   useEffect(() => {
@@ -1092,6 +1100,7 @@ export default function VietMap({
         hovered: false,
         label: markerLabels?.[place.id],
         customColor,
+        locale,
         onSelect: () => {
           lastCenteredPlaceIdRef.current = null;
           isUserInteractingRef.current = false;
@@ -1330,6 +1339,7 @@ export default function VietMap({
         },
         hidePopupDirections ? undefined : (targetPlace) => handleStartDirections(targetPlace),
         {
+          locale,
           isRoutingActive: hidePopupDirections ? false : routeStops.length >= 2,
           routeStopIndex,
           isSaved,
@@ -1408,6 +1418,7 @@ export default function VietMap({
       },
       hidePopupDirections ? undefined : (targetPlace) => handleStartDirections(targetPlace),
       {
+        locale,
         isRoutingActive: hidePopupDirections ? false : routeStops.length >= 2,
         routeStopIndex,
         isSaved,
@@ -1444,6 +1455,7 @@ export default function VietMap({
     selectedPlaceId,
     places,
     mapLoaded,
+    locale,
     isAuthenticated,
     savedIdsSet,
     routeStops,
@@ -1474,7 +1486,7 @@ export default function VietMap({
       <div ref={containerRef} className="h-full w-full" />
       {hasError && (
         <div className="absolute inset-0 flex items-center justify-center bg-muted/80 p-4 text-center text-sm text-destructive">
-          Không thể khởi tạo bản đồ VietMap. Vui lòng kiểm tra kết nối mạng và API Key.
+          {t("map.initError")}
         </div>
       )}
 
@@ -1493,7 +1505,7 @@ export default function VietMap({
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-background/95 hover:bg-background text-foreground text-xs font-bold shadow-xl border border-border/80 backdrop-blur-md transition-all hover:scale-105 active:scale-95 cursor-pointer ring-2 ring-primary/20"
           >
             <Search className="size-3.5 text-primary" />
-            <span>Tìm kiếm khu vực này</span>
+            <span>{t("map.searchThisArea")}</span>
           </button>
         </div>
       )}
@@ -1512,32 +1524,32 @@ export default function VietMap({
               dragStartRef.current = { mouseX: e.clientX, mouseY: e.clientY, panelX: curX, panelY: curY };
             }}
             className="absolute top-3 left-3 z-30 flex items-center gap-2 rounded-full border border-border/80 bg-background/95 py-1.5 px-3 shadow-2xl backdrop-blur-md text-xs font-semibold animate-in fade-in slide-in-from-top-2 duration-200 cursor-grab active:cursor-grabbing select-none"
-            title="Kéo thả để di chuyển vị trí"
+            title={t("map.routing.dragTitle")}
           >
             <GripHorizontal className="size-3.5 text-muted-foreground" />
             <div className="flex items-center gap-1.5 text-primary font-bold">
               <Compass className="size-4" />
-              <span>Chỉ đường ({routeStops.length} chặng)</span>
+              <span>{t("map.routing.titleCount", { count: routeStops.length })}</span>
             </div>
             {routeResult && (
               <span className="text-muted-foreground text-[11px] font-medium hidden sm:inline">
-                {routingService.formatDistanceKm(routeResult.distanceKm)} • ~{routingService.formatDurationMinutes(routeResult.durationMinutes)}
+                {routingService.formatDistanceKm(routeResult.distanceKm, locale)} • ~{routingService.formatDurationMinutes(routeResult.durationMinutes, locale)}
               </span>
             )}
             <button
               type="button"
               onClick={() => setIsRoutePanelCollapsed(false)}
               className="px-2.5 py-1 rounded-full bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1"
-              title="Mở rộng bảng chỉ đường"
+              title={t("map.routing.expandTitle")}
             >
-              <span>Chi tiết</span>
+              <span>{t("map.routing.details")}</span>
               <ChevronDown className="size-3" />
             </button>
             <button
               type="button"
               onClick={handleClearRoute}
               className="p-1 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-              title="Đóng chỉ đường"
+              title={t("map.routing.closeTitle")}
             >
               <X className="size-3.5" />
             </button>
@@ -1551,7 +1563,7 @@ export default function VietMap({
             {/* Header with Drag Handle, Title, Collapse button, and Close button */}
             <div
               className="flex items-center justify-between gap-2 cursor-grab active:cursor-grabbing select-none pb-1"
-              title="Nhấn giữ và kéo để di chuyển bảng chỉ đường"
+              title={t("map.routing.dragHeaderTitle")}
               onMouseDown={(e) => {
                 if ((e.target as HTMLElement).closest("button")) return;
                 isDraggingPanelRef.current = true;
@@ -1563,14 +1575,14 @@ export default function VietMap({
               <div className="flex items-center gap-1.5 text-xs font-bold text-primary uppercase tracking-wider">
                 <GripHorizontal className="size-4 text-muted-foreground" />
                 <Compass className="size-4" />
-                <span>Chỉ đường ({routeStops.length} chặng)</span>
+                <span>{t("map.routing.titleCount", { count: routeStops.length })}</span>
               </div>
               <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => setIsRoutePanelCollapsed(true)}
                   className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-                  title="Thu gọn bảng (Xem trọn vẹn bản đồ)"
+                  title={t("map.routing.collapseTitle")}
                 >
                   <ChevronUp className="size-4" />
                 </button>
@@ -1578,7 +1590,7 @@ export default function VietMap({
                   type="button"
                   onClick={handleClearRoute}
                   className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-                  title="Đóng chỉ đường"
+                  title={t("map.routing.closeTitle")}
                 >
                   <X className="size-4" />
                 </button>
@@ -1588,7 +1600,7 @@ export default function VietMap({
           {/* Vehicle Mode Tabs with live ETA under each icon */}
           {(() => {
             const allModes = routeResult
-              ? routingService.getAllModesEstimates(routeResult.distanceKm)
+              ? routingService.getAllModesEstimates(routeResult.distanceKm, locale)
               : null;
             return (
               <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-muted/60 p-1.5 border border-border/60">
@@ -1608,7 +1620,7 @@ export default function VietMap({
                       }`}
                     >
                       <span className="text-base">{config.icon}</span>
-                      <span className="text-[11px] font-medium mt-0.5">{config.label}</span>
+                      <span className="text-[11px] font-medium mt-0.5">{t(`map.routing.vehicles.${m}`)}</span>
                       <span
                         className={`text-[10px] mt-0.5 ${
                           isActive ? "text-primary font-bold" : "text-muted-foreground"
@@ -1634,6 +1646,8 @@ export default function VietMap({
                 : isDest
                 ? "text-rose-600 dark:text-rose-400 font-extrabold"
                 : "text-sky-600 dark:text-sky-400 font-extrabold";
+              const displayStopName =
+                stop.id === ROUTE_STOP_ID_USER_LOCATION ? t("map.routing.myLocation") : stop.name;
 
               return (
                 <div
@@ -1642,7 +1656,7 @@ export default function VietMap({
                 >
                   <span className={`w-5 text-center text-xs ${letterColor}`}>{letter}</span>
                   <span className="flex-1 truncate font-medium text-foreground">
-                    {stop.name}
+                    {displayStopName}
                   </span>
 
                   {/* Move Up */}
@@ -1651,7 +1665,7 @@ export default function VietMap({
                       type="button"
                       onClick={() => handleMoveStop(idx, "up")}
                       className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
-                      title="Chuyển lên trước"
+                      title={t("map.routing.moveUp")}
                     >
                       <ChevronUp className="size-3.5" />
                     </button>
@@ -1663,7 +1677,7 @@ export default function VietMap({
                       type="button"
                       onClick={() => handleMoveStop(idx, "down")}
                       className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
-                      title="Chuyển xuống sau"
+                      title={t("map.routing.moveDown")}
                     >
                       <ChevronDown className="size-3.5" />
                     </button>
@@ -1674,7 +1688,7 @@ export default function VietMap({
                     type="button"
                     onClick={() => handleRemoveStop(idx)}
                     className="p-1 rounded hover:bg-rose-100 hover:text-rose-600 text-muted-foreground transition-colors cursor-pointer"
-                    title="Xóa chặng này"
+                    title={t("map.routing.removeStop")}
                   >
                     <X className="size-3.5" />
                   </button>
@@ -1688,7 +1702,7 @@ export default function VietMap({
             {routeStops[0]?.id === ROUTE_STOP_ID_USER_LOCATION ? (
               <span className="inline-flex items-center gap-1.5 text-primary font-semibold truncate">
                 <LocateFixed className="size-3.5 shrink-0" aria-hidden="true" />
-                <span className="truncate">Đang tính từ vị trí của bạn</span>
+                <span className="truncate">{t("map.routing.usingMyLocation")}</span>
               </span>
             ) : (
               <button
@@ -1696,24 +1710,24 @@ export default function VietMap({
                 onClick={handleUseMyLocationAsOrigin}
                 disabled={Boolean(locating)}
                 className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary font-semibold border border-primary/25 transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                title="Tính khoảng cách và chỉ đường từ vị trí GPS hiện tại của bạn"
+                title={t("map.routing.fromMyLocationTitle")}
               >
                 {locating ? (
                   <Loader2 className="size-3 animate-spin shrink-0" aria-hidden="true" />
                 ) : (
                   <LocateFixed className="size-3 shrink-0" aria-hidden="true" />
                 )}
-                <span>{locating ? "Đang định vị..." : "Từ vị trí của tôi"}</span>
+                <span>{locating ? t("map.routing.locating") : t("map.routing.fromMyLocation")}</span>
               </button>
             )}
             <button
               type="button"
               onClick={handleSwapRoute}
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground font-semibold border border-border/60 transition-colors cursor-pointer whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              title="Đổi chiều lộ trình (Đảo ngược tất cả các chặng)"
+              title={t("map.routing.swapRouteTitle")}
             >
               <ArrowUpDown className="size-3 shrink-0" aria-hidden="true" />
-              <span>Đổi chiều</span>
+              <span>{t("map.routing.swapRoute")}</span>
             </button>
           </div>
 
@@ -1722,20 +1736,20 @@ export default function VietMap({
             {routeLoading ? (
               <div className="flex items-center gap-2 text-muted-foreground py-0.5">
                 <Loader2 className="size-3.5 animate-spin text-primary" />
-                <span className="text-[11px]">Đang vẽ tuyến đường...</span>
+                <span className="text-[11px]">{t("map.routing.drawingRoute")}</span>
               </div>
             ) : routeResult ? (
               <div className="flex items-center gap-1.5">
                 <span className="font-bold text-foreground text-sm">
-                  {routingService.formatDistanceKm(routeResult.distanceKm)}
+                  {routingService.formatDistanceKm(routeResult.distanceKm, locale)}
                 </span>
                 <span className="text-muted-foreground">•</span>
                 <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                  ~{routingService.formatDurationMinutes(routeResult.durationMinutes)}
+                  ~{routingService.formatDurationMinutes(routeResult.durationMinutes, locale)}
                 </span>
               </div>
             ) : (
-              <span className="text-muted-foreground">Chưa có dữ liệu</span>
+              <span className="text-muted-foreground">{t("map.routing.noData")}</span>
             )}
 
             <a
@@ -1743,9 +1757,9 @@ export default function VietMap({
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1 font-semibold text-primary hover:underline text-xs"
-              title="Mở ứng dụng Google Maps để dẫn đường bằng giọng nói"
+              title={t("map.routing.openGoogleMapsTitle")}
             >
-              <span>Mở Google Maps</span>
+              <span>{t("map.routing.openGoogleMaps")}</span>
               <ExternalLink className="size-3" />
             </a>
           </div>

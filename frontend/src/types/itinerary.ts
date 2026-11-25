@@ -77,8 +77,20 @@ export interface IntercityTransit {
   estimatedPriceOneWay: number;
   estimatedPriceRoundTrip: number;
   safetyAdvisory: SafetyAdvisory | null;
-  originHub?: { id: string; name: string; hubType: string; distanceKm: number };
-  destHub?: { id: string; name: string; hubType: string; distanceKm: number };
+  originHub?: {
+    id: string;
+    name: string;
+    translations?: Record<string, string> | null;
+    hubType: string;
+    distanceKm: number;
+  };
+  destHub?: {
+    id: string;
+    name: string;
+    translations?: Record<string, string> | null;
+    hubType: string;
+    distanceKm: number;
+  };
   deepLinks: {
     googleFlights?: string;
     traveloka?: string;
@@ -100,6 +112,7 @@ export interface IntercityTransit {
     routeSteps?: string[];
   };
   allModesSummary?: TransitModeSummary[];
+  locale?: 'vi' | 'en';
 }
 
 export interface BudgetBreakdown {
@@ -247,6 +260,9 @@ export interface ItineraryDetail {
   title: string;
   description: string | null;
   destination: string | null;
+  areaName?: string | null;
+  areaNameVi?: string | null;
+  areaTranslations?: Record<string, string> | null;
   coverPhoto?: string | null;
   startDate: string | null; // YYYY-MM-DD
   endDate: string | null;

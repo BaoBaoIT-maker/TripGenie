@@ -1,9 +1,13 @@
 /** Shared domain constants and format helpers used by wizard, transit card, and detail timeline. */
 
+import { addDays, differenceInCalendarDays, format, isValid, parseISO } from 'date-fns';
 import type { AppLocale } from '@/i18n';
 
 const VND = new Intl.NumberFormat('vi-VN');
 const MINUTES_PER_DAY = 1440;
+const ISO_DATE_FORMAT = 'yyyy-MM-dd';
+const ISO_DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const VI_WEEKDAYS_SHORT = ['CN', 'Thứ 2', 'Thứ 3', 'Thứ 4', 'Thứ 5', 'Thứ 6', 'Thứ 7'] as const;
 
 export const TRANSIT_UI_CONFIG = {
   MOTORBIKE_SAFETY_LIMIT_KM: 350,
@@ -139,4 +143,82 @@ export function formatTripDates(
   const endVi = formatDateVi(end);
   if (!endVi || startVi === endVi) return startVi;
   return `${startVi} – ${endVi}`;
+}
+
+/** Parses YYYY-MM-DD (or ISO timestamp) into a local midnight Date to avoid UTC day-shift bugs. */
+export function parseLocalDate(value?: string | null): Date | null {
+  if (!value) return null;
+  const dateOnly = value.includes('T') ? value.split('T')[0] : value.trim();
+  if (!ISO_DATE_ONLY_PATTERN.test(dateOnly)) return null;
+  const parsed = parseISO(`${dateOnly}T00:00:00`);
+  return isValid(parsed) ? parsed : null;
+}
+
+/** Formats a Date as local YYYY-MM-DD for HTML date inputs and API payloads. */
+export function toLocalDateString(date: Date): string {
+  return format(date, ISO_DATE_FORMAT);
+}
+
+/** Inclusive calendar day count between start and end; returns null if invalid or end < start. */
+export function calculateTripDays(start?: string | null, end?: string | null): number | null {
+  const startDate = parseLocalDate(start);
+  const endDate = parseLocalDate(end);
+  if (!startDate || !endDate) return null;
+  const diff = differenceInCalendarDays(endDate, startDate);
+  return diff < 0 ? null : diff + 1;
+}
+
+/** Returns inclusive max end date (YYYY-MM-DD) for a startDate and maxDays ceiling. */
+export function getMaxTripEndDate(startDate?: string | null, maxDays = 1): string | undefined {
+  const start = parseLocalDate(startDate);
+  if (!start) return undefined;
+  return toLocalDateString(addDays(start, Math.max(1, maxDays) - 1));
+}
+
+export interface NormalizedDateRange {
+  startDate: string;
+  endDate: string;
+  clamped: boolean;
+}
+
+/**
+ * Normalizes a trip date range in local calendar time:
+ * - Returns null when either date is empty/invalid (prevents NaN state on picker clear).
+ * - Pulls endDate forward to startDate when endDate < startDate.
+ * - Clamps endDate to maxDays (inclusive) and flags clamped=true.
+ */
+export function normalizeTripDateRange(
+  startDate: string,
+  endDate: string,
+  maxDays: number,
+): NormalizedDateRange | null {
+  const start = parseLocalDate(startDate);
+  const end = parseLocalDate(endDate);
+  if (!start || !end) return null;
+
+  const limit = Math.max(1, maxDays);
+  const days = differenceInCalendarDays(end, start) + 1;
+  const normalizedStart = toLocalDateString(start);
+
+  if (days < 1) {
+    return { startDate: normalizedStart, endDate: normalizedStart, clamped: false };
+  }
+  if (days > limit) {
+    return {
+      startDate: normalizedStart,
+      endDate: toLocalDateString(addDays(start, limit - 1)),
+      clamped: true,
+    };
+  }
+  return { startDate: normalizedStart, endDate: toLocalDateString(end), clamped: false };
+}
+
+/** Returns a compact weekday label (e.g. "Thứ 4" / "Wed") for YYYY-MM-DD input values. */
+export function formatWeekdayShort(dateStr?: string | null, locale: AppLocale = 'vi'): string {
+  const date = parseLocalDate(dateStr);
+  if (!date) return '';
+  if (locale === 'en') {
+    return date.toLocaleDateString('en-US', { weekday: 'short' });
+  }
+  return VI_WEEKDAYS_SHORT[date.getDay()];
 }

@@ -67,8 +67,9 @@ export function useItinerariesListQuery(scope: 'OWNED' | 'JOINED' = 'OWNED', opt
 
 /** Preview intercity transit before the wizard submits. Disabled when params is null. */
 export function useTransitPreview(params: TransitPreviewRequest | null) {
+  const { locale } = useI18n();
   return useQuery({
-    queryKey: ['transit-preview', params],
+    queryKey: ['transit-preview', locale, params],
     queryFn: params ? () => itineraryService.previewTransit(params) : skipToken,
     staleTime: TRANSIT_STALE_MS,
     retry: false,

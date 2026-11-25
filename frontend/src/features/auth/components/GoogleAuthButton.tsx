@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useAuthModalStore } from "@/features/auth/stores/auth-modal.store";
 import { persistOAuthReturnUrl } from "@/lib/safe-redirect";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 import {
   AuthHudPill,
   clearOAuthPopupMarkers,

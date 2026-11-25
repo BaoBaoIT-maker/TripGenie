@@ -17,7 +17,7 @@ import { placeService } from "@/services/place.service";
 import { PLACE_PHOTO_UPLOAD_CONFIG } from "@/features/admin/admin.constants";
 import type { EnqueuePhotoUploadPayload } from "@/components/place/use-place-photo-contributions";
 import type { PendingContributedPhoto, Place } from "@/types/place";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 
 interface PhotoContributeModalProps {
   place: Place | null;

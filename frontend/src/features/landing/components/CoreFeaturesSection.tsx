@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 import { formatCurrency } from "@/i18n";
 
 const SAMPLE_TRIP_TOTAL_VND = 5400000;

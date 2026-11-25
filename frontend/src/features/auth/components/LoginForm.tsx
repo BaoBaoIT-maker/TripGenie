@@ -12,7 +12,7 @@ import { useAuth } from '../hooks/use-auth';
 import { GoogleAuthButton } from './GoogleAuthButton';
 import { getSafeRedirectUrl, resolvePostLoginRedirect } from '@/lib/safe-redirect';
 import { ApiClientError } from '@/lib/api-client';
-import { useI18n } from '@/i18n/LocaleProvider';
+import { useI18n } from '@/i18n';
 
 export function LoginForm() {
   const router = useRouter();

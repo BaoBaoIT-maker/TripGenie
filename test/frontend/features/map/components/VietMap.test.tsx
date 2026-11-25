@@ -158,4 +158,21 @@ describe("VietMap DOM factories and controls", () => {
     await user.click(screen.getByRole("button", { name: /vị trí của tôi/i }));
     expect(onRequestCurrentLocation).toHaveBeenCalled();
   });
+
+  it("localizes marker aria-label and popup actions in English when locale='en'", () => {
+    const { button } = createPlaceMarkerElement(nearbyPlace, { locale: "en" });
+    expect(button).toHaveAttribute("aria-label", `View ${nearbyPlace.place.name} on map`);
+
+    const popup = createMapPopupElement(nearbyPlace, vi.fn(), vi.fn(), {
+      locale: "en",
+      isRoutingActive: true,
+      routeStopIndex: 1,
+      onRemoveStopFromRoute: vi.fn(),
+      onSetOrigin: vi.fn(),
+    });
+    expect(popup).toHaveTextContent("Stop B (#2)");
+    expect(popup).toHaveTextContent("Remove");
+    expect(popup).toHaveTextContent("Set start");
+    expect(popup).toHaveTextContent("View details");
+  });
 });

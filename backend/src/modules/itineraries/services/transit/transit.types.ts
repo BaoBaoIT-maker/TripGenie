@@ -3,6 +3,11 @@ import {
   SafetyAdvisory,
 } from '../../../../config/pricing.config';
 import { computeHaversineDistance } from '../../../../common/utils/geo.util';
+import {
+  DEFAULT_LOCALE,
+  resolveLocalizedText,
+  type AppLocale,
+} from '../../../../common/i18n/locale.util';
 import { TransitModeEnum } from '../../dto/generate-itinerary.dto';
 
 export { computeHaversineDistance };
@@ -10,11 +15,21 @@ export { computeHaversineDistance };
 export interface TransitHubDto {
   id: string;
   name: string;
+  translations?: unknown;
   hubType: string;
   latitude: number;
   longitude: number;
   areaId: number;
   distanceKm?: number;
+}
+
+/** Resolves a hub's localized display name from its JSONB translations map with fallback to hub.name. */
+export function getHubDisplayName(
+  hub: TransitHubDto | null | undefined,
+  locale: AppLocale = DEFAULT_LOCALE,
+): string | null {
+  if (!hub) return null;
+  return resolveLocalizedText(hub.name, hub.translations, locale);
 }
 
 export interface TransitTransferLeg {
@@ -71,6 +86,7 @@ export interface IntercityTransitResult {
     routeSteps?: string[];
   };
   allModesSummary?: TransitModeSummary[];
+  locale?: AppLocale;
 }
 
 export interface TransitStrategyContext {
@@ -85,6 +101,7 @@ export interface TransitStrategyContext {
   isIsland: boolean;
   nearestFerryHub?: TransitHubDto | null;
   activeHubs?: TransitHubDto[];
+  locale?: AppLocale;
 }
 
 export interface ITransitStrategy {
@@ -93,6 +110,7 @@ export interface ITransitStrategy {
   summarize?(
     result: IntercityTransitResult,
     roadDistanceKm: number,
+    locale?: AppLocale,
   ): TransitModeSummary | null;
 }
 
@@ -158,10 +176,22 @@ export function computeLocalTransfer(
 }
 
 /**
- * Formats minutes into Vietnamese readable duration (e.g. "1h20p" or "25 phút").
+ * Formats minutes into locale-aware readable duration (e.g. "1h20p" / "25 phút" in vi; "1h 20m" / "25 min" in en).
  */
-export function formatDurationVi(minutes: number, compact = false): string {
+export function formatDuration(
+  minutes: number,
+  compact = false,
+  locale: AppLocale = DEFAULT_LOCALE,
+): string {
   const m = Math.max(1, Math.round(minutes));
+  if (locale === 'en') {
+    if (m >= 60) {
+      const h = Math.floor(m / 60);
+      const rem = m % 60;
+      return rem > 0 ? `${h}h ${rem}m` : compact ? `${h}h` : `${h} hr`;
+    }
+    return compact ? `${m}m` : `${m} min`;
+  }
   if (m >= 60) {
     const h = Math.floor(m / 60);
     const rem = m % 60;

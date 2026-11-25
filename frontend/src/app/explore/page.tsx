@@ -51,7 +51,7 @@ import { SUPER_CATEGORIES, type SuperCategory } from "@/config/categories";
 import { DEFAULT_MAP_CENTER } from "@/features/map/map-config";
 import { useGeolocation } from "@/features/map/hooks/use-geolocation";
 import { parseExploreQuery, type ExploreSort } from "@/features/map/lib/explore-query";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 import {
   formatNumber,
   getPlaceCategoryLabel,
@@ -888,7 +888,10 @@ function ExploreContent() {
         );
       } else if (parsed.anchorLandmark) {
         const targetSearch = parsed.cleanedKeyword
-          ? `${parsed.cleanedKeyword} gần ${parsed.anchorLandmark}`
+          ? t("explore.gps.nearLandmark", {
+              keyword: parsed.cleanedKeyword,
+              landmark: parsed.anchorLandmark,
+            })
           : parsed.anchorLandmark;
         setKeyword(targetSearch);
         setPage(1);

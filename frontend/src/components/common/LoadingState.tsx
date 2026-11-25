@@ -2,7 +2,7 @@
 
 import { Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 interface LoadingStateProps {

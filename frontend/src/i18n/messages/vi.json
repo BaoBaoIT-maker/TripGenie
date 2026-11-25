@@ -98,7 +98,8 @@
       "toastSearching": "Đang tìm kiếm \"{query}\"",
       "toastSearchArea": "Đang tìm kiếm các địa điểm trong khu vực này...",
       "areaLabelCoords": "Khu vực ({lat}, {lng})",
-      "fallbackPlaceWord": "địa điểm"
+      "fallbackPlaceWord": "địa điểm",
+      "nearLandmark": "{keyword} gần {landmark}"
     },
     "toolbar": {
       "filters": "Bộ lọc",
@@ -467,6 +468,13 @@
       "weatherBadge": "28°C Nắng đẹp",
       "scrollDown": "Cuộn xuống xem tiếp",
       "suggestionsLabel": "Gợi ý:",
+      "quickSuggestions": {
+        "da-nang": "Đà Nẵng",
+        "phu-quoc": "Phú Quốc",
+        "hoi-an": "Hội An",
+        "ha-noi": "Hà Nội",
+        "sa-pa": "Sa Pa"
+      },
       "searchPlaceholder": "Tìm điểm đến, món ngon, quán cafe...",
       "searchAria": "Tìm kiếm điểm đến du lịch",
       "clearSearchAria": "Xóa tìm kiếm",
@@ -1573,8 +1581,10 @@
       "durationBadgeTitle": "AI hỗ trợ lập lịch trình tối đa {max} ngày",
       "originLabel": "Khởi hành",
       "originPlaceholder": "Điểm đi...",
+      "defaultOrigin": "TP. Hồ Chí Minh",
       "destLabel": "Điểm đến",
       "destPlaceholder": "Điểm đến...",
+      "defaultDestination": "Đà Nẵng",
       "swapLocationsTitle": "Đổi chiều điểm đi / điểm đến",
       "loadingLocations": "Đang tải địa điểm...",
       "noLocationsFound": "Không tìm thấy địa điểm",
@@ -2435,6 +2445,91 @@
       "tripPlanBadge": "Kế hoạch chuyến đi",
       "joinDesc": "Tham gia để cùng theo dõi lịch trình, điểm dừng chân và đồng hành cùng {name} trong suốt chuyến đi.",
       "joinTripBtn": "Tham gia chuyến đi"
+    }
+  },
+  "map": {
+    "loadingAria": "Đang tải bản đồ",
+    "initError": "Không thể khởi tạo bản đồ VietMap. Vui lòng kiểm tra kết nối mạng và API Key.",
+    "searchThisArea": "Tìm kiếm khu vực này",
+    "pinnedLocation": "Vị trí đã ghim",
+    "cityFallback": "thành phố",
+    "countryFallback": "Việt Nam",
+    "controls": {
+      "zoomIn": "Phóng to",
+      "zoomOut": "Thu nhỏ",
+      "myLocation": "Vị trí của tôi",
+      "themeBright": "Sáng",
+      "themeBrightTitle": "Bản đồ Sáng Du lịch (VietMap TM @2x chính thức)",
+      "themeDark": "Tối",
+      "themeDarkTitle": "Bản đồ Tối Giao thông (VietMap DM @2x)",
+      "themeSatellite": "Vệ tinh",
+      "themeSatelliteTitle": "Ảnh chụp vệ tinh thực địa (Esri Satellite)"
+    },
+    "marker": {
+      "viewOnMap": "Xem {name} trên bản đồ"
+    },
+    "popup": {
+      "noPhoto": "Chưa có ảnh thực tế",
+      "unsavePlace": "Bỏ lưu địa điểm",
+      "saveToFavorites": "Lưu vào mục Yêu thích",
+      "openNow": "Đang mở cửa",
+      "closedNow": "Đã đóng cửa",
+      "activeStopBadge": "Đang là Chặng {letter} (#{index})",
+      "removeStop": "Gỡ chặng",
+      "setOriginShort": "Điểm xuất phát",
+      "setOriginFull": "Đặt làm điểm xuất phát",
+      "addStop": "Thêm chặng",
+      "addToItineraryShort": "Thêm lịch trình",
+      "addToItineraryFull": "Thêm vào lịch trình",
+      "directions": "Chỉ đường",
+      "detailsShort": "Chi tiết",
+      "viewDetails": "Xem chi tiết"
+    },
+    "routing": {
+      "dragTitle": "Kéo thả để di chuyển vị trí",
+      "dragHeaderTitle": "Nhấn giữ và kéo để di chuyển bảng chỉ đường",
+      "titleCount": "Chỉ đường ({count} chặng)",
+      "expandTitle": "Mở rộng bảng chỉ đường",
+      "details": "Chi tiết",
+      "collapseTitle": "Thu gọn bảng (Xem trọn vẹn bản đồ)",
+      "closeTitle": "Đóng chỉ đường",
+      "originMarker": "Điểm đi ({letter})",
+      "destMarker": "Điểm đến ({letter})",
+      "stopMarker": "Chặng {index} ({letter})",
+      "moveUp": "Chuyển lên trước",
+      "moveDown": "Chuyển xuống sau",
+      "removeStop": "Xóa chặng này",
+      "usingMyLocation": "Đang tính từ vị trí của bạn",
+      "myLocation": "Vị trí của bạn",
+      "fromMyLocationTitle": "Tính khoảng cách và chỉ đường từ vị trí GPS hiện tại của bạn",
+      "locating": "Đang định vị...",
+      "fromMyLocation": "Từ vị trí của tôi",
+      "swapRouteTitle": "Đổi chiều lộ trình (Đảo ngược tất cả các chặng)",
+      "swapRoute": "Đổi chiều",
+      "drawingRoute": "Đang vẽ tuyến đường...",
+      "noData": "Chưa có dữ liệu",
+      "openGoogleMapsTitle": "Mở ứng dụng Google Maps để dẫn đường bằng giọng nói",
+      "openGoogleMaps": "Mở Google Maps",
+      "vehicles": {
+        "motorcycle": "Xe máy",
+        "driving": "Ô tô",
+        "walking": "Đi bộ"
+      }
+    },
+    "toasts": {
+      "savedToCollection": "Đã lưu \"{name}\" vào {collection}",
+      "changeCollection": "Đổi bộ sưu tập",
+      "unsavedPlace": "Đã bỏ lưu \"{name}\"",
+      "flyingToLocation": "Đang di chuyển đến vị trí của bạn!",
+      "loginToSave": "Vui lòng đăng nhập để lưu địa điểm vào bộ sưu tập",
+      "loginToAddItinerary": "Vui lòng đăng nhập để thêm địa điểm vào lịch trình",
+      "routeLoadError": "Không thể tải tuyến đường. Vui lòng thử lại sau.",
+      "originSetToMyLocation": "Đã đặt vị trí của bạn làm điểm xuất phát!",
+      "routeAutoUpdatedFromLocation": "Đã tự động cập nhật lộ trình từ vị trí của bạn!",
+      "fetchingGpsForOrigin": "Đang lấy vị trí GPS của bạn để cập nhật điểm xuất phát...",
+      "originSetToPlace": "Đã đặt \"{name}\" làm điểm xuất phát!",
+      "stopAdded": "Đã thêm \"{name}\" vào chặng dừng!",
+      "stopRemoved": "Đã gỡ địa điểm khỏi lộ trình"
     }
   }
 }

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Loader2, AlertCircle, ArrowLeft, RotateCw, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/use-auth';
-import { useI18n } from '@/i18n/LocaleProvider';
+import { useI18n } from '@/i18n';
 
 export function VerifyOtpForm() {
   const router = useRouter();

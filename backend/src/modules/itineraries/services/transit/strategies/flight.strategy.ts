@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../../database/prisma.service';
 import {
+  DEFAULT_LOCALE,
+  type AppLocale,
+} from '../../../../../common/i18n/locale.util';
+import { t } from '../../../../../common/i18n/t.util';
+import {
   PRICING_CONFIG,
   buildGoogleFlightsUrl,
   buildGoogleMapsDirUrl,
@@ -18,8 +23,9 @@ import {
   computeHaversineDistance,
   computeLocalTransfer,
   findNearestHub,
-  formatDurationVi,
+  formatDuration,
   formatVndCurrency,
+  getHubDisplayName,
   isDirectCityHub,
 } from '../transit.types';
 
@@ -54,15 +60,21 @@ export class FlightTransitStrategy implements ITransitStrategy {
     };
   }
 
-  summarize(res: IntercityTransitResult): TransitModeSummary {
-    const durLabel = formatDurationVi(res.durationMinutes, true);
+  summarize(
+    res: IntercityTransitResult,
+    _roadDistanceKm?: number,
+    locale: AppLocale = DEFAULT_LOCALE,
+  ): TransitModeSummary {
+    const durLabel = formatDuration(res.durationMinutes, true, locale);
     return {
       mode: this.mode,
-      title: 'Máy bay',
+      title: t(locale, 'transit.flight.summaryTitle'),
       durationText: res.isMultiModal
-        ? `Nối chặng (~${durLabel})`
-        : `Nhanh nhất (~${durLabel})`,
-      priceText: `Từ ~${formatVndCurrency(res.estimatedPriceOneWay)}`,
+        ? t(locale, 'transit.flight.summaryMultiModal', { dur: durLabel })
+        : t(locale, 'transit.flight.summaryDirect', { dur: durLabel }),
+      priceText: t(locale, 'transit.flight.summaryPrice', {
+        price: formatVndCurrency(res.estimatedPriceOneWay),
+      }),
       estimatedPriceOneWay: res.estimatedPriceOneWay,
       durationMinutes: res.durationMinutes,
       isMultiModal: Boolean(res.isMultiModal),
@@ -81,9 +93,9 @@ export class FlightTransitStrategy implements ITransitStrategy {
       roadDistanceKm,
       isIsland,
     } = ctx;
+    const locale: AppLocale = ctx.locale ?? DEFAULT_LOCALE;
 
     const { originAirport, destAirport } = await this.resolveAirports(ctx);
-    const F = PRICING_CONFIG.INTERCITY.FLIGHT;
     const T = PRICING_CONFIG.INTERCITY.TRANSFER;
     const C = PRICING_CONFIG.INTERCITY.CARRIERS;
     const D = PRICING_CONFIG.DEFAULTS;
@@ -93,8 +105,11 @@ export class FlightTransitStrategy implements ITransitStrategy {
       destAirport?.id ||
       (isIsland ? D.ISLAND_AIRPORT_CODE : D.MAINLAND_AIRPORT_CODE);
     const originAirportName =
-      originAirport?.name || `Sân bay tại ${originCity}`;
-    const destAirportName = destAirport?.name || `Sân bay đi ${destCity}`;
+      getHubDisplayName(originAirport, locale) ||
+      t(locale, 'transit.flight.originFallback', { city: originCity });
+    const destAirportName =
+      getHubDisplayName(destAirport, locale) ||
+      t(locale, 'transit.flight.destFallback', { city: destCity });
 
     const googleFlightsUrl = buildGoogleFlightsUrl({
       originCode,
@@ -105,6 +120,7 @@ export class FlightTransitStrategy implements ITransitStrategy {
     const safetyAdvisory = checkTransitSafety(
       TransitModeEnum.FLIGHT,
       roadDistanceKm,
+      locale,
     );
 
     // Case 4: Origin and destination share the exact same gateway airport OR distance is too short (<150km) for commercial flights
@@ -124,16 +140,38 @@ export class FlightTransitStrategy implements ITransitStrategy {
       );
 
       const gatewayNotice = isSameAirport
-        ? `${originCity} và ${destCity} cùng thuộc phạm vi cửa ngõ hàng không ${destAirportName} (~${transferKm}km), không khai thác chuyến bay thương mại giữa hai điểm này.`
-        : `Cự ly giữa ${originCity} và ${destCity} quá ngắn (~${transferKm}km, dưới ngưỡng bay tối thiểu ${T.MIN_FLIGHT_DISTANCE_KM}km), không khai thác chuyến bay thương mại trực tiếp.`;
+        ? t(locale, 'transit.flight.sameAirportNotice', {
+            origin: originCity,
+            dest: destCity,
+            airport: destAirportName,
+            km: transferKm,
+          })
+        : t(locale, 'transit.flight.tooShortNotice', {
+            origin: originCity,
+            dest: destCity,
+            km: transferKm,
+            minKm: T.MIN_FLIGHT_DISTANCE_KM,
+          });
 
       const routeAdvise = isSameAirport
-        ? `Tuyến ${originCity} ──> ${destCity} (~${transferKm}km) dùng chung cửa ngõ ${destAirportName} nên di chuyển thẳng bằng Xe Limousine/Ô tô nhanh và tiết kiệm hơn.`
-        : `Tuyến ${originCity} ──> ${destCity} (~${transferKm}km) di chuyển thẳng bằng Xe Limousine / Ô tô qua cao tốc nhanh hơn (tiết kiệm thời gian làm thủ tục sân bay).`;
+        ? t(locale, 'transit.flight.sameAirportAdvice', {
+            origin: originCity,
+            dest: destCity,
+            km: transferKm,
+            airport: destAirportName,
+          })
+        : t(locale, 'transit.flight.tooShortAdvice', {
+            origin: originCity,
+            dest: destCity,
+            km: transferKm,
+          });
 
       const transferLeg: TransitTransferLeg = {
         type: 'BUS',
-        title: `Xe Limousine / Trung chuyển thẳng ${originCity} ──> ${destCity}`,
+        title: t(locale, 'transit.flight.shortTransferTitle', {
+          origin: originCity,
+          dest: destCity,
+        }),
         fromName: originCity,
         toName: destCity,
         distanceKm: transferKm,
@@ -167,8 +205,14 @@ export class FlightTransitStrategy implements ITransitStrategy {
           carriers: C.LIMOUSINE_DIRECT,
           notes: routeAdvise,
           routeSteps: [
-            `Lưu ý cửa ngõ hàng không: ${gatewayNotice}`,
-            `Lộ trình trung chuyển tối ưu: Đón Xe Limousine / Taxi đường dài trực tiếp từ ${originCity} ──> trung tâm ${destCity} (~${transferKm}km, ~${formatDurationVi(transferMinutes)}, ~${formatVndCurrency(transferPrice)}/chiều).`,
+            t(locale, 'transit.flight.shortStep1', { notice: gatewayNotice }),
+            t(locale, 'transit.flight.shortStep2', {
+              origin: originCity,
+              dest: destCity,
+              km: transferKm,
+              dur: formatDuration(transferMinutes, false, locale),
+              price: formatVndCurrency(transferPrice),
+            }),
           ],
         },
       };
@@ -190,7 +234,11 @@ export class FlightTransitStrategy implements ITransitStrategy {
     });
     const baseFlightDuration = flightPricing.flightDurationMinutes;
     const baseFlightOneWay = flightPricing.finalFare;
-    const flightDurationLabel = formatDurationVi(baseFlightDuration, true);
+    const flightDurationLabel = formatDuration(
+      baseFlightDuration,
+      true,
+      locale,
+    );
 
     const hasIslandDirectAirport =
       isIsland &&
@@ -209,7 +257,8 @@ export class FlightTransitStrategy implements ITransitStrategy {
 
     // Case 3: Island destination WITHOUT its own airport (e.g. Lý Sơn via Chu Lai VCL, Phú Quý, Cát Bà, Cô Tô)
     if (isIsland && !hasIslandDirectAirport) {
-      const ferryPortName = ctx.nearestFerryHub?.name || D.FERRY_PORT_NAME;
+      const ferryPortName =
+        getHubDisplayName(ctx.nearestFerryHub, locale) || D.FERRY_PORT_NAME;
       const landTransferKm = Math.max(
         T.DEFAULT_AIRPORT_TRANSFER_KM,
         destAirport?.distanceKm || T.ISLAND_PORT_DISTANCE_KM,
@@ -223,13 +272,20 @@ export class FlightTransitStrategy implements ITransitStrategy {
 
       const transferLeg: TransitTransferLeg = {
         type: 'FERRY',
-        title: `Xe trung chuyển ra ${ferryPortName} & Tàu cao tốc sang đảo ${destCity}`,
+        title: t(locale, 'transit.flight.islandTransferTitle', {
+          port: ferryPortName,
+          dest: destCity,
+        }),
         fromName: destAirportName,
         toName: destCity,
         distanceKm: landTransferKm + T.ISLAND_PORT_DISTANCE_KM,
         durationMinutes: totalTransferMinutes,
         estimatedPrice: totalTransferPrice,
-        description: `Hạ cánh tại ${destAirportName}, đi xe trung chuyển ra ${ferryPortName} và đón tàu cao tốc vượt biển sang đảo ${destCity}.`,
+        description: t(locale, 'transit.flight.islandTransferDesc', {
+          airport: destAirportName,
+          port: ferryPortName,
+          dest: destCity,
+        }),
       };
 
       const totalOneWay = baseFlightOneWay + totalTransferPrice;
@@ -250,10 +306,27 @@ export class FlightTransitStrategy implements ITransitStrategy {
         transferLeg,
         details: {
           carriers: C.FLIGHT_FERRY,
-          notes: `Đảo ${destCity} chưa có sân bay thương mại trực tiếp. Lộ trình tối ưu là bay tới ${destAirportName} rồi nối chuyến tàu cao tốc tại ${ferryPortName} ra đảo.`,
+          notes: t(locale, 'transit.flight.islandNotes', {
+            dest: destCity,
+            airport: destAirportName,
+            port: ferryPortName,
+          }),
           routeSteps: [
-            `Chặng 1 (Hàng không): Bay từ ${originAirportName} ──> ${destAirportName} (~${airDistanceKm}km đường bay, ~${flightDurationLabel}, ~${formatVndCurrency(baseFlightOneWay)}/vé)`,
-            `Chặng 2 (Trung chuyển & Tàu cao tốc): Xe đón từ ${destAirportName} ra ${ferryPortName} (~${landTransferKm}km) và đi tàu cao tốc sang đảo ${destCity} (~${formatDurationVi(totalTransferMinutes, true)}, ~${formatVndCurrency(totalTransferPrice)})`,
+            t(locale, 'transit.flight.islandStep1', {
+              origin: originAirportName,
+              airport: destAirportName,
+              airKm: airDistanceKm,
+              dur: flightDurationLabel,
+              price: formatVndCurrency(baseFlightOneWay),
+            }),
+            t(locale, 'transit.flight.islandStep2', {
+              airport: destAirportName,
+              port: ferryPortName,
+              landKm: landTransferKm,
+              dest: destCity,
+              dur: formatDuration(totalTransferMinutes, true, locale),
+              price: formatVndCurrency(totalTransferPrice),
+            }),
           ],
         },
       };
@@ -269,13 +342,19 @@ export class FlightTransitStrategy implements ITransitStrategy {
 
       const transferLeg: TransitTransferLeg = {
         type: 'BUS',
-        title: `Xe Limousine / Trung chuyển từ ${destAirportName} về ${destCity}`,
+        title: t(locale, 'transit.flight.farTransferTitle', {
+          airport: destAirportName,
+          dest: destCity,
+        }),
         fromName: destAirportName,
         toName: destCity,
         distanceKm: transferKm,
         durationMinutes: transferMinutes,
         estimatedPrice: transferPrice,
-        description: `Xe Limousine / xe trung chuyển kết nối từ cửa ga ${destAirportName} đi thẳng về trung tâm ${destCity}.`,
+        description: t(locale, 'transit.flight.farTransferDesc', {
+          airport: destAirportName,
+          dest: destCity,
+        }),
       };
 
       const totalOneWay = baseFlightOneWay + transferPrice;
@@ -297,10 +376,25 @@ export class FlightTransitStrategy implements ITransitStrategy {
         transferLeg,
         details: {
           carriers: C.FLIGHT_LIMOUSINE,
-          notes: `${destCity} chưa có sân bay riêng; sau khi đáp tại ${destAirportName}, xe Limousine trung chuyển sẽ đón tại sảnh ga đi thẳng về ${destCity}.`,
+          notes: t(locale, 'transit.flight.farNotes', {
+            dest: destCity,
+            airport: destAirportName,
+          }),
           routeSteps: [
-            `Chặng 1 (Hàng không): Bay từ ${originAirportName} ──> ${destAirportName} (~${airDistanceKm}km đường bay, ~${flightDurationLabel}, ~${formatVndCurrency(baseFlightOneWay)}/vé)`,
-            `Chặng 2 (Xe trung chuyển liên tỉnh): Đón xe Limousine/Shuttle từ ${destAirportName} về trung tâm ${destCity} (~${transferKm}km, ~${formatDurationVi(transferMinutes)}, ~${formatVndCurrency(transferPrice)})`,
+            t(locale, 'transit.flight.islandStep1', {
+              origin: originAirportName,
+              airport: destAirportName,
+              airKm: airDistanceKm,
+              dur: flightDurationLabel,
+              price: formatVndCurrency(baseFlightOneWay),
+            }),
+            t(locale, 'transit.flight.farStep2', {
+              airport: destAirportName,
+              dest: destCity,
+              km: transferKm,
+              dur: formatDuration(transferMinutes, false, locale),
+              price: formatVndCurrency(transferPrice),
+            }),
           ],
         },
       };
@@ -331,10 +425,26 @@ export class FlightTransitStrategy implements ITransitStrategy {
       isMultiModal: false,
       details: {
         carriers: C.FLIGHT_DIRECT,
-        notes: `Sau khi hạ cánh tại ${destAirportName}, bạn có thể bắt xe buýt sân bay, Grab hoặc Taxi (~${transferKm}km, ~${transferMinutes} phút) về thẳng khách sạn tại ${destCity}.`,
+        notes: t(locale, 'transit.flight.directNotes', {
+          airport: destAirportName,
+          km: transferKm,
+          mins: transferMinutes,
+          dest: destCity,
+        }),
         routeSteps: [
-          `Chặng bay chính: Khởi hành từ ${originAirportName} ──> ${destAirportName} (~${airDistanceKm}km đường bay, ~${flightDurationLabel}, ~${formatVndCurrency(baseFlightOneWay)}/vé)`,
-          `Trung chuyển sân bay về trung tâm: Xe trung chuyển / Taxi từ ${destAirportName} về trung tâm ${destCity} (~${transferKm}km, ~${transferMinutes} phút)`,
+          t(locale, 'transit.flight.directStep1', {
+            origin: originAirportName,
+            airport: destAirportName,
+            airKm: airDistanceKm,
+            dur: flightDurationLabel,
+            price: formatVndCurrency(baseFlightOneWay),
+          }),
+          t(locale, 'transit.flight.directStep2', {
+            airport: destAirportName,
+            dest: destCity,
+            km: transferKm,
+            mins: transferMinutes,
+          }),
         ],
       },
     };

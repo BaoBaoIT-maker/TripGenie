@@ -11,7 +11,7 @@ import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
 import { MobileNavSheet } from "@/components/common/MobileNavSheet";
 import { useAuthModalStore } from "@/features/auth/stores/auth-modal.store";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 import type { TranslationKey } from "@/i18n";
 
 const NAV_LINKS: ReadonlyArray<{ href: string; labelKey: TranslationKey }> = [

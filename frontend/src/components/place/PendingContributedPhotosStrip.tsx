@@ -2,7 +2,7 @@
 
 import { CONTRIBUTED_PHOTO_STATES } from "@/types/place";
 import type { ContributedPhotoItem } from "@/components/place/use-place-photo-contributions";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 
 interface PendingContributedPhotosStripProps {
   placeName: string;

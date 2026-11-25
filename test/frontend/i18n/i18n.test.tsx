@@ -20,7 +20,7 @@ import {
   translate,
   translateApiError,
 } from '@/i18n';
-import { LocaleProvider, useI18n } from '@/i18n/LocaleProvider';
+import { LocaleProvider, useI18n } from '@/i18n';
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher';
 import { createLoginSchema } from '@/features/auth/schemas/auth.schema';
 import { formatTripDuration } from '@/services/community.service';
@@ -89,6 +89,15 @@ describe('i18n dictionaries & helpers', () => {
     expect(pickLocalizedName(area, 'en')).toBe('Da Nang City');
     expect(pickLocalizedName({ name: 'Hoi An', nameVi: null }, 'vi')).toBe('Hoi An');
     expect(pickLocalizedName({ name: null, nameVi: 'Hội An' }, 'en')).toBe('Hội An');
+    expect(
+      pickLocalizedName(
+        {
+          name: 'Sân bay Quốc tế Đà Nẵng',
+          translations: { en: 'Da Nang International Airport', vi: 'Sân bay Quốc tế Đà Nẵng' },
+        },
+        'en',
+      ),
+    ).toBe('Da Nang International Airport');
     expect(pickLocalizedName(null, 'en', 'Unknown')).toBe('Unknown');
 
     const place = {

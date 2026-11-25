@@ -6,7 +6,7 @@ import { LandingNavbar } from "./LandingNavbar";
 import { HeroVideoPlayer } from "./HeroVideoPlayer";
 import { HeroSearchBar } from "./HeroSearchBar";
 import { LANDING_CONFIG } from "../config/landing.config";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 
 export function HeroSection() {
   const { t } = useI18n();
@@ -56,11 +56,11 @@ export function HeroSection() {
             </span>
             {LANDING_CONFIG.hero.quickSuggestions.map((item) => (
               <Link
-                key={item.label}
+                key={item.id}
                 href={item.href}
                 className="shrink-0 px-3 py-1 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 backdrop-blur-sm border border-white/20 text-white/90 hover:text-white text-xs font-medium transition-all"
               >
-                {item.label}
+                {t(`landing.hero.quickSuggestions.${item.id}`)}
               </Link>
             ))}
           </div>

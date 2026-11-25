@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import {
+  DEFAULT_LOCALE,
+  type AppLocale,
+} from '../../../../../common/i18n/locale.util';
+import { t } from '../../../../../common/i18n/t.util';
+import {
   PRICING_CONFIG,
   buildGoogleMapsDirUrl,
   checkTransitSafety,
@@ -11,8 +16,9 @@ import {
   IntercityTransitResult,
   TransitModeSummary,
   TransitTransferLeg,
-  formatDurationVi,
+  formatDuration,
   formatVndCurrency,
+  getHubDisplayName,
 } from '../transit.types';
 
 @Injectable()
@@ -25,21 +31,26 @@ export class RoadTransitStrategy implements ITransitStrategy {
   summarize(
     res: IntercityTransitResult,
     roadDistanceKm: number,
+    locale: AppLocale = DEFAULT_LOCALE,
   ): TransitModeSummary | null {
     if (this.mode !== TransitModeEnum.PERSONAL_MOTORBIKE) return null;
     const durHours = Math.max(1, Math.round(res.durationMinutes / 60));
     return {
       mode: this.mode,
-      title: 'Phượt xe máy',
-      durationText: `Phượt xe máy (~${durHours}h)`,
-      priceText: `~${formatVndCurrency(res.estimatedPriceOneWay)} xăng`,
+      title: t(locale, 'transit.road.motorbikeSummaryTitle'),
+      durationText: t(locale, 'transit.road.motorbikeSummaryDur', {
+        hours: durHours,
+      }),
+      priceText: t(locale, 'transit.road.motorbikeSummaryPrice', {
+        price: formatVndCurrency(res.estimatedPriceOneWay),
+      }),
       estimatedPriceOneWay: res.estimatedPriceOneWay,
       durationMinutes: res.durationMinutes,
       isMultiModal: Boolean(res.isMultiModal),
       warning:
         roadDistanceKm >
         PRICING_CONFIG.SAFETY_THRESHOLDS.MOTORBIKE_MAX_DISTANCE_KM
-          ? 'Chú ý cự ly xa'
+          ? t(locale, 'transit.road.motorbikeSummaryWarning')
           : undefined,
     };
   }
@@ -48,13 +59,15 @@ export class RoadTransitStrategy implements ITransitStrategy {
     ctx: TransitStrategyContext,
   ): Promise<IntercityTransitResult> {
     const { originCity, destCity, roadDistanceKm, isIsland } = ctx;
+    const locale: AppLocale = ctx.locale ?? DEFAULT_LOCALE;
 
     const isMotorbike = this.mode === TransitModeEnum.PERSONAL_MOTORBIKE;
     const speed = PRICING_CONFIG.INTERCITY.AVG_SPEED_KMH;
     const gasPrice = PRICING_CONFIG.FUEL.GAS_PRICE_PER_LITER;
     const T = PRICING_CONFIG.INTERCITY.TRANSFER;
     const ferryPortName =
-      ctx.nearestFerryHub?.name || PRICING_CONFIG.DEFAULTS.FERRY_PORT_NAME;
+      getHubDisplayName(ctx.nearestFerryHub, locale) ||
+      PRICING_CONFIG.DEFAULTS.FERRY_PORT_NAME;
 
     if (isMotorbike) {
       const fuelLiters = Number(
@@ -77,37 +90,67 @@ export class RoadTransitStrategy implements ITransitStrategy {
         const ferryDur = T.MOTORBIKE_FERRY_MINUTES;
         transferLeg = {
           type: 'FERRY',
-          title: `Phà biển chở xe máy từ ${ferryPortName} sang đảo ${destCity}`,
+          title: t(locale, 'transit.road.motorbikeIslandTransferTitle', {
+            port: ferryPortName,
+            dest: destCity,
+          }),
           fromName: ferryPortName,
           toName: destCity,
           distanceKm: T.ISLAND_PORT_DISTANCE_KM,
           durationMinutes: ferryDur,
           estimatedPrice: ferryFare,
-          description: `Phà cao tốc chở xe máy và hành khách từ ${ferryPortName} sang đảo ${destCity}`,
+          description: t(locale, 'transit.road.motorbikeIslandTransferDesc', {
+            port: ferryPortName,
+            dest: destCity,
+          }),
         };
         fuelCost += ferryFare;
         durationMinutes += ferryDur;
         routeSteps = [
-          `Chặng 1 (Phượt xe máy): Từ ${originCity} ──> ${ferryPortName} (~${roadDistanceKm}km, ~${formatDurationVi(baseDriveMinutes)} lái xe)`,
-          `Chặng 2 (Phà biển chở xe máy): ${ferryPortName} ──> Đảo ${destCity} (~${formatDurationVi(ferryDur)} vượt biển, ~${formatVndCurrency(ferryFare)} tiền vé người + xe)`,
+          t(locale, 'transit.road.motorbikeIslandStep1', {
+            origin: originCity,
+            port: ferryPortName,
+            km: roadDistanceKm,
+            dur: formatDuration(baseDriveMinutes, false, locale),
+          }),
+          t(locale, 'transit.road.motorbikeIslandStep2', {
+            port: ferryPortName,
+            dest: destCity,
+            dur: formatDuration(ferryDur, false, locale),
+            price: formatVndCurrency(ferryFare),
+          }),
         ];
       } else {
         routeSteps =
           roadDistanceKm >
           PRICING_CONFIG.SAFETY_THRESHOLDS.MOTORBIKE_MAX_DISTANCE_KM
             ? [
-                `Quãng đường ~${roadDistanceKm}km đi xe máy mất hơn ${formatDurationVi(baseDriveMinutes)} liên tục, vượt ngưỡng an toàn (>${PRICING_CONFIG.SAFETY_THRESHOLDS.MOTORBIKE_MAX_DISTANCE_KM}km).`,
-                `Khuyến nghị: Bạn nên chuyển sang Xe khách giường nằm hoặc Máy bay để giữ sức khỏe cho chuyến đi!`,
+                t(locale, 'transit.road.motorbikeUnsafeStep1', {
+                  km: roadDistanceKm,
+                  dur: formatDuration(baseDriveMinutes, false, locale),
+                  maxKm:
+                    PRICING_CONFIG.SAFETY_THRESHOLDS.MOTORBIKE_MAX_DISTANCE_KM,
+                }),
+                t(locale, 'transit.road.motorbikeUnsafeStep2'),
               ]
             : [
-                `Cung đường phượt xe máy từ ${originCity} ──> ${destCity} (~${roadDistanceKm}km, khoảng ~${formatDurationVi(baseDriveMinutes)})`,
-                `Chi phí tiền xăng xe ước tính: ~${formatVndCurrency(fuelCost)} (khoảng ${fuelLiters} lít xăng RON95)`,
+                t(locale, 'transit.road.motorbikeSafeStep1', {
+                  origin: originCity,
+                  dest: destCity,
+                  km: roadDistanceKm,
+                  dur: formatDuration(baseDriveMinutes, false, locale),
+                }),
+                t(locale, 'transit.road.motorbikeSafeStep2', {
+                  price: formatVndCurrency(fuelCost),
+                  liters: fuelLiters,
+                }),
               ];
       }
 
       const safetyAdvisory = checkTransitSafety(
         TransitModeEnum.PERSONAL_MOTORBIKE,
         roadDistanceKm,
+        locale,
       );
 
       return {
@@ -136,8 +179,11 @@ export class RoadTransitStrategy implements ITransitStrategy {
           notes:
             roadDistanceKm >
             PRICING_CONFIG.SAFETY_THRESHOLDS.MOTORBIKE_MAX_DISTANCE_KM
-              ? `Cực kỳ nguy hiểm khi đi xe máy liên tục >${PRICING_CONFIG.SAFETY_THRESHOLDS.MOTORBIKE_MAX_DISTANCE_KM}km. Nên đổi sang xe khách hoặc máy bay.`
-              : 'Nên xuất phát sáng sớm (5:00 - 5:30), kiểm tra lốp, phanh xe và nghỉ chân mỗi 2 tiếng.',
+              ? t(locale, 'transit.road.motorbikeUnsafeNotes', {
+                  maxKm:
+                    PRICING_CONFIG.SAFETY_THRESHOLDS.MOTORBIKE_MAX_DISTANCE_KM,
+                })
+              : t(locale, 'transit.road.motorbikeSafeNotes'),
           routeSteps,
         },
       };
@@ -164,6 +210,7 @@ export class RoadTransitStrategy implements ITransitStrategy {
     const safetyAdvisory = checkTransitSafety(
       TransitModeEnum.PERSONAL_CAR,
       roadDistanceKm,
+      locale,
     );
 
     return {
@@ -187,10 +234,22 @@ export class RoadTransitStrategy implements ITransitStrategy {
         fuelLiters,
         gasPricePerLiter: gasPrice,
         highwayToll,
-        notes: `Bao gồm: ~${formatVndCurrency(fuelCost)} tiền xăng (${fuelLiters}L) + ~${formatVndCurrency(highwayToll)} phí BOT cao tốc.`,
+        notes: t(locale, 'transit.road.carNotes', {
+          fuel: formatVndCurrency(fuelCost),
+          liters: fuelLiters,
+          toll: formatVndCurrency(highwayToll),
+        }),
         routeSteps: [
-          `Lộ trình cao tốc / quốc lộ từ ${originCity} ──> trung tâm ${destCity} (~${roadDistanceKm}km, ~${formatDurationVi(durationMinutes)} lái xe)`,
-          `Dự toán nhiên liệu & cầu đường 1 chiều: ~${formatVndCurrency(fuelCost)} xăng + ~${formatVndCurrency(highwayToll)} trạm thu phí BOT`,
+          t(locale, 'transit.road.carStep1', {
+            origin: originCity,
+            dest: destCity,
+            km: roadDistanceKm,
+            dur: formatDuration(durationMinutes, false, locale),
+          }),
+          t(locale, 'transit.road.carStep2', {
+            fuel: formatVndCurrency(fuelCost),
+            toll: formatVndCurrency(highwayToll),
+          }),
         ],
       },
     };

@@ -1,10 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import ItineraryWizardModal from '@/features/planner/components/ItineraryWizardModal';
 import { useGenerateItinerary, useTransitPreview } from '@/features/planner/hooks/use-itinerary-planner';
 import { useUserPreferences } from '@/features/preferences/hooks/use-user-preferences';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { placeService } from '@/services/place.service';
 
 const push = vi.fn();
 vi.mock('next/navigation', () => ({
@@ -35,6 +36,7 @@ describe('ItineraryWizardModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    queryClient.clear();
     vi.mocked(useUserPreferences).mockReturnValue({
       preferences: null,
       data: null,
@@ -103,6 +105,79 @@ describe('ItineraryWizardModal', () => {
         intracityMode: 'MOTORBIKE_RENTAL',
         budgetLevel: 'MEDIUM',
         partySize: 2,
+      }),
+      expect.any(Object)
+    );
+  });
+
+  it('allows editing start and end dates, clamps to max days, and ignores empty clear', () => {
+    renderComponent({ initialDestination: 'Đà Nẵng' });
+
+    const startInput = screen.getByLabelText(/Ngày bắt đầu/i) as HTMLInputElement;
+    const endInput = screen.getByLabelText(/Ngày kết thúc/i) as HTMLInputElement;
+
+    expect(startInput.type).toBe('date');
+    expect(endInput.type).toBe('date');
+    expect(startInput.className).not.toContain('opacity-0');
+    expect(endInput.className).not.toContain('opacity-0');
+
+    // Edit to a 5-day trip
+    fireEvent.change(startInput, { target: { value: '2026-12-01' } });
+    fireEvent.change(endInput, { target: { value: '2026-12-05' } });
+    expect(startInput.value).toBe('2026-12-01');
+    expect(endInput.value).toBe('2026-12-05');
+    expect(screen.getByText(/5 ngày 4 đêm/i)).toBeInTheDocument();
+
+    // Exceeding MAX_TRIP_DAYS (7) clamps endDate to 2026-12-07
+    fireEvent.change(endInput, { target: { value: '2026-12-20' } });
+    expect(endInput.value).toBe('2026-12-07');
+    expect(screen.getByText(/7 ngày 6 đêm/i)).toBeInTheDocument();
+
+    // Clearing the picker does not corrupt state into NaN
+    fireEvent.change(startInput, { target: { value: '' } });
+    expect(startInput.value).toBe('2026-12-01');
+    expect(screen.queryByText(/NaN/i)).not.toBeInTheDocument();
+  });
+
+  it('formats primaryHub badge from structured hub data and submits destinationAreaId', async () => {
+    const user = userEvent.setup();
+    vi.mocked(placeService.getTravelAreas).mockResolvedValueOnce([
+      {
+        id: 48,
+        name: 'Da Nang',
+        nameVi: 'Đà Nẵng',
+        translations: { en: 'Da Nang', vi: 'Đà Nẵng' },
+        slug: 'da-nang',
+        type: 'CITY',
+        bbox: { minLat: null, maxLat: null, minLng: null, maxLng: null },
+        latitude: 16.0544,
+        longitude: 108.2022,
+        primaryHub: {
+          id: 'DAD',
+          name: 'Sân bay Quốc tế Đà Nẵng',
+          translations: {
+            en: 'Da Nang International Airport',
+            vi: 'Sân bay Quốc tế Đà Nẵng',
+          },
+          hubType: 'AIRPORT',
+        },
+      },
+    ]);
+
+    renderComponent();
+
+    const destInput = screen.getByPlaceholderText(/Điểm đến/i);
+    await user.click(destInput);
+
+    expect(await screen.findByText('Sân bay Quốc tế Đà Nẵng (DAD)')).toBeInTheDocument();
+
+    await user.click(screen.getByText('Sân bay Quốc tế Đà Nẵng (DAD)'));
+    await user.click(screen.getByRole('button', { name: /Tạo lịch trình/i }));
+
+    expect(mockMutate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        destinationCity: 'Đà Nẵng',
+        destinationAreaId: 48,
       }),
       expect.any(Object)
     );

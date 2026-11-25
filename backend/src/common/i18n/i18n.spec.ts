@@ -1,5 +1,15 @@
-import { DEFAULT_LOCALE, parseLocale } from './locale.util';
+import {
+  DEFAULT_LOCALE,
+  parseLocale,
+  parseTranslationsMap,
+  resolveLocalizedText,
+} from './locale.util';
 import { BACKEND_MESSAGES, t } from './t.util';
+import {
+  formatDuration,
+  getHubDisplayName,
+  type TransitHubDto,
+} from '../../modules/itineraries/services/transit/transit.types';
 import {
   getAdvisorFallbackMessages,
   getAdvisorSystemPrompt,
@@ -146,5 +156,61 @@ describe('Backend i18n (parseLocale, t(), dictionaries, prompts & weather)', () 
     expect(guidanceEn).toContain('Light rain');
     expect(guidanceEn).not.toMatch(VIETNAMESE_DIACRITICS);
     expect(guidanceVi).toContain('THỜI TIẾT TỪNG NGÀY TẠI ĐIỂM ĐẾN:');
+  });
+
+  it('extracts valid translations maps via parseTranslationsMap and rejects invalid inputs', () => {
+    expect(
+      parseTranslationsMap({ en: '  Da Nang  ', vi: 'Đà Nẵng', blank: '   ', num: 123 }),
+    ).toEqual({ en: 'Da Nang', vi: 'Đà Nẵng' });
+    expect(parseTranslationsMap(null)).toBeNull();
+    expect(parseTranslationsMap(undefined)).toBeNull();
+    expect(parseTranslationsMap(['en', 'vi'])).toBeNull();
+    expect(parseTranslationsMap('Da Nang')).toBeNull();
+    expect(parseTranslationsMap({ en: '   ' })).toBeNull();
+  });
+
+  it('resolves localized labels cleanly with exact match, en fallback, and base fallback', () => {
+    const translations = { en: 'Da Nang', vi: 'Đà Nẵng' };
+    expect(resolveLocalizedText('Fallback', translations, 'en')).toBe('Da Nang');
+    expect(resolveLocalizedText('Fallback', translations, 'vi')).toBe('Đà Nẵng');
+    expect(resolveLocalizedText('Da Nang', { en: 'Da Nang' }, 'vi')).toBe('Da Nang');
+    expect(resolveLocalizedText('Sân bay Đà Nẵng', null, 'en')).toBe('Sân bay Đà Nẵng');
+    expect(resolveLocalizedText('Sân bay Đà Nẵng', { fr: 'Da Nang FR' }, 'en')).toBe(
+      'Sân bay Đà Nẵng',
+    );
+  });
+
+  it('resolves transit hub display names and handles null/missing hubs safely', () => {
+    const hub: TransitHubDto = {
+      id: 'DAD',
+      name: 'Sân bay Quốc tế Đà Nẵng',
+      translations: {
+        en: 'Da Nang International Airport',
+        vi: 'Sân bay Quốc tế Đà Nẵng',
+      },
+      hubType: 'AIRPORT',
+      latitude: 16.0439,
+      longitude: 108.199,
+      areaId: 48,
+    };
+
+    expect(getHubDisplayName(hub, 'en')).toBe('Da Nang International Airport');
+    expect(getHubDisplayName(hub, 'vi')).toBe('Sân bay Quốc tế Đà Nẵng');
+    expect(getHubDisplayName({ ...hub, translations: null }, 'en')).toBe(
+      'Sân bay Quốc tế Đà Nẵng',
+    );
+    expect(getHubDisplayName(null, 'en')).toBeNull();
+    expect(getHubDisplayName(undefined, 'vi')).toBeNull();
+  });
+
+  it('formats durations cleanly in both vi and en locales', () => {
+    expect(formatDuration(80, false, 'vi')).toBe('1h20p');
+    expect(formatDuration(80, false, 'en')).toBe('1h 20m');
+    expect(formatDuration(25, false, 'vi')).toBe('25 phút');
+    expect(formatDuration(25, false, 'en')).toBe('25 min');
+    expect(formatDuration(120, false, 'vi')).toBe('2 tiếng');
+    expect(formatDuration(120, true, 'vi')).toBe('2h');
+    expect(formatDuration(120, false, 'en')).toBe('2 hr');
+    expect(formatDuration(120, true, 'en')).toBe('2h');
   });
 });

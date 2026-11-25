@@ -22,7 +22,7 @@ import {
 } from "../schemas/auth.schema";
 import { ApiClientError } from "@/lib/api-client";
 import { resolvePostLoginRedirect } from "@/lib/safe-redirect";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 
 export function AuthModal() {
   const router = useRouter();

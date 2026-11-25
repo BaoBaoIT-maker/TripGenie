@@ -5,6 +5,8 @@
  */
 
 import { normalizeVietnamese } from '../common/utils/string.util';
+import { DEFAULT_LOCALE, type AppLocale } from '../common/i18n/locale.util';
+import { t } from '../common/i18n/t.util';
 
 export const PRICING_CONFIG = {
   // 1. Fuel & Highway Tolls
@@ -276,9 +278,21 @@ export const VEXERE_BUS_PARTNERS: readonly VexereBusPartner[] = [
   {
     slug: 'sai-gon',
     externalId: '129',
-    aliases: ['sai gon', 'tp. ho chi minh', 'ho chi minh', 'tphcm', 'sg'],
+    aliases: [
+      'sai gon',
+      'tp. ho chi minh',
+      'ho chi minh',
+      'ho chi minh city',
+      'hcmc',
+      'tphcm',
+      'sg',
+    ],
   },
-  { slug: 'ha-noi', externalId: '124', aliases: ['ha noi', 'hn', 'thu do'] },
+  {
+    slug: 'ha-noi',
+    externalId: '124',
+    aliases: ['ha noi', 'hanoi', 'hn', 'thu do'],
+  },
   { slug: 'da-nang', externalId: '115', aliases: ['da nang', 'dn'] },
   { slug: 'da-lat', externalId: '137', aliases: ['da lat', 'lam dong'] },
   { slug: 'nha-trang', externalId: '139', aliases: ['nha trang', 'khanh hoa'] },
@@ -509,6 +523,7 @@ export interface SafetyAdvisory {
 export function checkTransitSafety(
   transitMode: string,
   distanceKm: number,
+  locale: AppLocale = DEFAULT_LOCALE,
 ): SafetyAdvisory | null {
   if (
     (transitMode === 'PERSONAL_MOTORBIKE' || transitMode === 'MOTORBIKE') &&
@@ -516,8 +531,10 @@ export function checkTransitSafety(
   ) {
     return {
       level: 'WARNING',
-      title: 'Chặng đường quá xa cho xe máy',
-      message: `Quãng đường ${Math.round(distanceKm)}km đi xe máy liên tục (>7 tiếng) rất nguy hiểm và dễ kiệt sức. Bạn nên chia đôi chặng để nghỉ đêm hoặc chọn Xe khách/Máy bay.`,
+      title: t(locale, 'transit.safety.motorbikeTitle'),
+      message: t(locale, 'transit.safety.motorbikeMessage', {
+        km: Math.round(distanceKm),
+      }),
     };
   }
 
@@ -527,8 +544,10 @@ export function checkTransitSafety(
   ) {
     return {
       level: 'INFO',
-      title: 'Lưu ý lái xe đường dài',
-      message: `Hành trình ${Math.round(distanceKm)}km mất khoảng 9-10 tiếng lái xe. Hãy đổi tài xế hoặc dừng nghỉ chân sau mỗi 3 tiếng để đảm bảo an toàn.`,
+      title: t(locale, 'transit.safety.carTitle'),
+      message: t(locale, 'transit.safety.carMessage', {
+        km: Math.round(distanceKm),
+      }),
     };
   }
 

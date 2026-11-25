@@ -45,6 +45,7 @@ import { detectSearchIntent } from '../../common/utils/string.util';
 import { PlaceSortBy } from '../../common/enums/places.enum';
 import { parseSearchQuery } from './utils/search-query-parser.util';
 import { checkIsOpenNow } from '../../common/utils/opening-hours.util';
+import { parseTranslationsMap } from '../../common/i18n/locale.util';
 
 /** Max rows scanned when filtering by openNow in memory (see ponytail note in searchPlaces). */
 const OPEN_NOW_SCAN_LIMIT = 500;
@@ -512,16 +513,12 @@ export class PlacesService {
         area.bboxMinLng !== null && area.bboxMaxLng !== null
           ? (area.bboxMinLng + area.bboxMaxLng) / 2
           : (primaryHub?.longitude ?? null);
-      const hubBadge = primaryHub
-        ? primaryHub.hubType === 'AIRPORT'
-          ? `${primaryHub.name} (${primaryHub.id})`
-          : primaryHub.name
-        : area.nameVi || area.name;
 
       return {
         id: area.id,
         name: area.name,
         nameVi: area.nameVi,
+        translations: parseTranslationsMap(area.translations),
         slug: area.slug,
         type: area.type,
         bbox: {
@@ -532,7 +529,14 @@ export class PlacesService {
         },
         latitude: lat,
         longitude: lng,
-        hubBadge,
+        primaryHub: primaryHub
+          ? {
+              id: primaryHub.id,
+              name: primaryHub.name,
+              translations: parseTranslationsMap(primaryHub.translations),
+              hubType: primaryHub.hubType,
+            }
+          : null,
       };
     });
   }

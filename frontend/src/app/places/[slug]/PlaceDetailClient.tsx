@@ -26,7 +26,7 @@ import { useSavedPlaceIds, useToggleFavorite } from "@/features/collections/hook
 import { SaveToCollectionModal } from "@/features/collections/components/SaveToCollectionModal";
 import { DEFAULT_COLLECTION_TITLE } from "@/services/collection.service";
 import { AddPlaceToItineraryModal } from "@/features/planner/components/AddPlaceToItineraryModal";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 import {
   getPlaceCityLabel,
   getPlaceDescription,

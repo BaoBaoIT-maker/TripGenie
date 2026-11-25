@@ -281,6 +281,7 @@ model UserIdentity {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerUserId], map: "unique_provider_user")
+  @@index([userId])
   @@map("user_identities")
 }
 
@@ -299,20 +300,21 @@ model UserPreference {
 }
 
 model TravelArea {
-  id         Int                                           @id @default(autoincrement())
-  name       String                                        @db.VarChar(100)
-  nameVi     String?                                       @map("name_vi") @db.VarChar(100)
-  slug       String                                        @unique @db.VarChar(100)
-  type       AreaType
-  parentId   Int?                                          @map("parent_id")
-  bboxMinLat Float?                                        @map("bbox_min_lat")
-  bboxMaxLat Float?                                        @map("bbox_max_lat")
-  bboxMinLng Float?                                        @map("bbox_min_lng")
-  bboxMaxLng Float?                                        @map("bbox_max_lng")
-  code       String?                                       @db.VarChar(20)
-  oldNames   String[]                                      @default([]) @map("old_names")
-  boundary   Unsupported("geography(MultiPolygon, 4326)")?
-  isActive   Boolean                                       @default(true) @map("is_active")
+  id           Int                                           @id @default(autoincrement())
+  name         String                                        @db.VarChar(100)
+  nameVi       String?                                       @map("name_vi") @db.VarChar(100)
+  translations Json?                                         @db.JsonB
+  slug         String                                        @unique @db.VarChar(100)
+  type         AreaType
+  parentId     Int?                                          @map("parent_id")
+  bboxMinLat   Float?                                        @map("bbox_min_lat")
+  bboxMaxLat   Float?                                        @map("bbox_max_lat")
+  bboxMinLng   Float?                                        @map("bbox_min_lng")
+  bboxMaxLng   Float?                                        @map("bbox_max_lng")
+  code         String?                                       @db.VarChar(20)
+  oldNames     String[]                                      @default([]) @map("old_names")
+  boundary     Unsupported("geography(MultiPolygon, 4326)")?
+  isActive     Boolean                                       @default(true) @map("is_active")
 
   parent      TravelArea?         @relation("TravelAreaParent", fields: [parentId], references: [id])
   children    TravelArea[]        @relation("TravelAreaParent")
@@ -327,13 +329,14 @@ model TravelArea {
 }
 
 model TransitHub {
-  id        String  @id // "SGN", "HAN", "DAD", "BX_MIENDONG", "GA_SAIGON"
-  name      String  @db.VarChar(255)
-  hubType   String  @map("hub_type") @db.VarChar(50) // "AIRPORT", "BUS_TERMINAL", "TRAIN_STATION"
-  latitude  Float
-  longitude Float
-  areaId    Int     @map("area_id")
-  isActive  Boolean @default(true) @map("is_active")
+  id           String  @id // "SGN", "HAN", "DAD", "BX_MIENDONG", "GA_SAIGON"
+  name         String  @db.VarChar(255)
+  translations Json?   @db.JsonB
+  hubType      String  @map("hub_type") @db.VarChar(50) // "AIRPORT", "BUS_TERMINAL", "TRAIN_STATION", "FERRY_TERMINAL"
+  latitude     Float
+  longitude    Float
+  areaId       Int     @map("area_id")
+  isActive     Boolean @default(true) @map("is_active")
 
   area TravelArea @relation(fields: [areaId], references: [id], onDelete: Cascade)
 
@@ -343,13 +346,14 @@ model TransitHub {
 }
 
 model Category {
-  id        Int     @id @default(autoincrement())
-  name      String  @db.VarChar(100)
-  nameVi    String? @map("name_vi") @db.VarChar(100)
-  slug      String  @unique @db.VarChar(100)
-  iconUrl   String? @map("icon_url")
-  parentId  Int?    @map("parent_id")
-  sortOrder Int     @default(0) @map("sort_order")
+  id           Int     @id @default(autoincrement())
+  name         String  @db.VarChar(100)
+  nameVi       String? @map("name_vi") @db.VarChar(100)
+  translations Json?   @db.JsonB
+  slug         String  @unique @db.VarChar(100)
+  iconUrl      String? @map("icon_url")
+  parentId     Int?    @map("parent_id")
+  sortOrder    Int     @default(0) @map("sort_order")
 
   parent   Category?  @relation("CategoryParent", fields: [parentId], references: [id])
   children Category[] @relation("CategoryParent")
@@ -389,8 +393,8 @@ model Place {
 
   category         Category?              @relation(fields: [categoryId], references: [id])
   area             TravelArea?            @relation(fields: [areaId], references: [id])
-  creator          User?                  @relation("UserCreatedPlaces", fields: [createdBy], references: [id])
-  mergedTarget     Place?                 @relation("PlaceMerged", fields: [mergedInto], references: [id])
+  creator          User?                  @relation("UserCreatedPlaces", fields: [createdBy], references: [id], onDelete: SetNull)
+  mergedTarget     Place?                 @relation("PlaceMerged", fields: [mergedInto], references: [id], onDelete: SetNull)
   mergedSources    Place[]                @relation("PlaceMerged")
   images           PlaceImage[]
   embedding        PlaceEmbedding?
@@ -405,6 +409,8 @@ model Place {
   @@index([areaId])
   @@index([categoryId])
   @@index([status])
+  @@index([areaId, status, deletedAt, ratingAvg(sort: Desc)])
+  @@index([areaId, categoryId, status, deletedAt])
   @@map("places")
 }
 
@@ -465,6 +471,8 @@ model PlaceSource {
   place Place @relation(fields: [placeId], references: [id], onDelete: Cascade)
 
   @@unique([provider, externalId], map: "uq_provider_external")
+  @@index([placeId])
+  @@index([syncStatus, lastSyncedAt])
   @@map("place_sources")
 }
 
@@ -518,6 +526,7 @@ model CollectionPlace {
   place      Place      @relation(fields: [placeId], references: [id], onDelete: Cascade)
 
   @@id([collectionId, placeId])
+  @@index([placeId])
   @@map("collection_places")
 }
 
@@ -556,6 +565,7 @@ model Itinerary {
   chatSessions  AiChatSession[]
 
   @@index([creatorId])
+  @@index([creatorId, deletedAt, updatedAt(sort: Desc)])
   @@index([areaId])
   @@index([status])
   @@map("itineraries")
@@ -625,6 +635,7 @@ model GroupMember {
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([tripGroupId, userId])
+  @@index([userId])
   @@map("group_members")
 }
 
@@ -686,7 +697,7 @@ model GroupPlaceVote {
 model AiChatSession {
   id                      String    @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   userId                  String    @map("user_id") @db.Uuid
-  title                   String?   @default("Trò chuyện mới") @db.VarChar(255)
+  title                   String?   @db.VarChar(255)
   summary                 String?
   lastSummarizedMessageId String?   @map("last_summarized_message_id") @db.Uuid
   lastSummarizedAt        DateTime? @map("last_summarized_at") @db.Timestamptz
@@ -697,9 +708,11 @@ model AiChatSession {
   updatedAt               DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
   user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  linkedItinerary Itinerary?      @relation(fields: [linkedItineraryId], references: [id])
+  linkedItinerary Itinerary?      @relation(fields: [linkedItineraryId], references: [id], onDelete: SetNull)
   messages        AiChatMessage[]
 
+  @@index([userId, updatedAt(sort: Desc)])
+  @@index([linkedItineraryId])
   @@map("ai_chat_sessions")
 }
 
@@ -828,7 +841,7 @@ model ContentReport {
   createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz
 
   reporter User  @relation("UserReported", fields: [reportedBy], references: [id], onDelete: Cascade)
-  reviewer User? @relation("AdminReviewedReports", fields: [reviewedBy], references: [id])
+  reviewer User? @relation("AdminReviewedReports", fields: [reviewedBy], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([targetType, targetId, reportedBy])
@@ -892,12 +905,14 @@ model CrawlJob {
   createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz
   updatedAt      DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz
 
-  area    TravelArea? @relation(fields: [areaId], references: [id])
-  place   Place?      @relation(fields: [placeId], references: [id])
-  creator User?       @relation("UserCrawlJobs", fields: [createdBy], references: [id])
+  area    TravelArea? @relation(fields: [areaId], references: [id], onDelete: SetNull)
+  place   Place?      @relation(fields: [placeId], references: [id], onDelete: SetNull)
+  creator User?       @relation("UserCrawlJobs", fields: [createdBy], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@index([jobType])
+  @@index([status, priority, scheduledAt])
+  @@index([areaId])
   @@map("crawl_jobs")
 }
 
@@ -935,7 +950,7 @@ model KnowledgeChunk {
 
 model AuditLog {
   id          String      @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
-  actorId     String      @map("actor_id") @db.Uuid
+  actorId     String?     @map("actor_id") @db.Uuid
   actorRole   UserRole    @map("actor_role")
   action      AuditAction
   targetType  String      @map("target_type") @db.VarChar(50)
@@ -948,9 +963,10 @@ model AuditLog {
   notes       String?
   createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz
 
-  actor User @relation(fields: [actorId], references: [id], onDelete: Cascade)
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([actorId, createdAt])
+  @@index([createdAt(sort: Desc)])
   @@index([targetType, targetId])
   @@map("audit_logs")
 }

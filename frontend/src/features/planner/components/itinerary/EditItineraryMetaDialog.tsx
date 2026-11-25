@@ -5,6 +5,7 @@ import { AppModalPortal } from '@/components/common/AppModalPortal';
 import { useI18n } from '@/i18n';
 import { ITINERARY_META_LIMITS } from '../../constants/itinerary.constants';
 import { MANUAL_MAX_TRIP_DAYS } from '../../config/itinerary-wizard-options';
+import { calculateTripDays, parseLocalDate } from '../../model/itinerary-format';
 import type { UpdateItineraryMetaRequest } from '@/types/itinerary';
 
 type MetaErrorKey = 'errEmptyTitle' | 'errInvalidDates' | 'errEndBeforeStart' | 'errMaxDays';
@@ -40,14 +41,6 @@ function toDateInputString(dateStr?: string | null): string {
   return dateStr.slice(0, 10);
 }
 
-function calculateSpanDays(start: string, end: string): number | null {
-  if (!start || !end) return null;
-  const d1 = new Date(start);
-  const d2 = new Date(end);
-  if (isNaN(d1.getTime()) || isNaN(d2.getTime()) || d2 < d1) return null;
-  return Math.round((d2.getTime() - d1.getTime()) / (24 * 60 * 60 * 1000)) + 1;
-}
-
 function EditMetaForm({
   initialTitle,
   initialDescription,
@@ -69,7 +62,7 @@ function EditMetaForm({
   const [confirmStep, setConfirmStep] = useState<'reduce' | 'expand' | null>(null);
   const [errorKey, setErrorKey] = useState<MetaErrorKey | null>(null);
 
-  const calculatedNewDays = calculateSpanDays(startDate, endDate) ?? initialTotalDays;
+  const calculatedNewDays = calculateTripDays(startDate, endDate) ?? initialTotalDays;
   const hasDaysChanged =
     startDate &&
     endDate &&
@@ -85,9 +78,9 @@ function EditMetaForm({
     }
 
     if (startDate && endDate) {
-      const d1 = new Date(startDate);
-      const d2 = new Date(endDate);
-      if (isNaN(d1.getTime()) || isNaN(d2.getTime())) {
+      const d1 = parseLocalDate(startDate);
+      const d2 = parseLocalDate(endDate);
+      if (!d1 || !d2) {
         setErrorKey('errInvalidDates');
         return;
       }
@@ -95,7 +88,7 @@ function EditMetaForm({
         setErrorKey('errEndBeforeStart');
         return;
       }
-      const days = calculateSpanDays(startDate, endDate) || 1;
+      const days = calculateTripDays(startDate, endDate) ?? 1;
       if (days > MANUAL_MAX_TRIP_DAYS) {
         setErrorKey('errMaxDays');
         return;

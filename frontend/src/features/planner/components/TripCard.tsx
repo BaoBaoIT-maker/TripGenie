@@ -15,14 +15,18 @@ import {
   MoreVertical,
   Eye,
 } from 'lucide-react';
-import { formatVnd, formatTripDates } from '@/features/planner/model/itinerary-format';
+import {
+  calculateTripDays,
+  formatVnd,
+  formatTripDates,
+} from '@/features/planner/model/itinerary-format';
 import { getItineraryWeather } from '@/features/planner/services/weather.service';
 import { WeatherIcon } from './itinerary/WeatherIcon';
 import {
   getDestinationCover,
   DEFAULT_TRIP_DAYS,
 } from '@/features/planner/constants/itinerary.constants';
-import { useI18n } from '@/i18n';
+import { pickLocalizedName, useI18n } from '@/i18n';
 import type { ItineraryDetail } from '@/types/itinerary';
 import type { CommunityLinkedItinerarySummary } from '@/types/community';
 
@@ -31,6 +35,8 @@ export interface TripCardItem {
   title: string;
   destination?: string | null;
   areaName?: string | null;
+  areaNameVi?: string | null;
+  areaTranslations?: Record<string, string> | null;
   startDate?: string | null;
   endDate?: string | null;
   coverPhoto?: string | null;
@@ -77,14 +83,8 @@ export function TripCard({
   const totalDays =
     item.totalDays ||
     item.days?.length ||
-    (item.startDate && item.endDate
-      ? Math.max(
-          1,
-          Math.round(
-            (new Date(item.endDate).getTime() - new Date(item.startDate).getTime()) / 86400000
-          ) + 1
-        )
-      : DEFAULT_TRIP_DAYS);
+    calculateTripDays(item.startDate, item.endDate) ||
+    DEFAULT_TRIP_DAYS;
   const totalNights = Math.max(0, totalDays - 1);
 
   const budgetText = item.budgetBreakdown?.totalEstimated
@@ -93,7 +93,15 @@ export function TripCard({
     ? formatVnd(item.estimatedCost)
     : t('planner.common.actualCostFallback');
 
-  const destinationName = item.destination || item.areaName || t('planner.common.vietnamFallback');
+  const destinationName = pickLocalizedName(
+    {
+      name: item.areaName,
+      nameVi: item.areaNameVi,
+      translations: item.areaTranslations,
+    },
+    locale,
+    item.destination || t('planner.common.vietnamFallback'),
+  );
   const imageUrl = item.coverPhoto || getDestinationCover(destinationName);
   const dateText = formatTripDates(item.startDate, item.endDate, locale);
   const weather = getItineraryWeather(destinationName, item.startDate, locale);

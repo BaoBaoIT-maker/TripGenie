@@ -1,11 +1,18 @@
 import type { DiscoveryPlace, NearbyPlace } from "@/features/map/types";
 import { routingService } from "@/services/routing.service";
+import {
+  getPlaceCategoryLabel,
+  translate,
+  type AppLocale,
+} from "@/i18n";
+import { DEFAULT_LOCALE } from "@/i18n/config";
 
 export function createMapPopupElement(
   item: NearbyPlace | DiscoveryPlace,
   onOpenDetail?: (placeId: string) => void,
   onRequestDirections?: (place: DiscoveryPlace) => void,
   options?: {
+    locale?: AppLocale;
     isRoutingActive?: boolean;
     routeStopIndex?: number;
     isSaved?: boolean;
@@ -16,8 +23,18 @@ export function createMapPopupElement(
     onSetOrigin?: (place: DiscoveryPlace) => void;
   }
 ): HTMLDivElement {
+  const locale = options?.locale ?? DEFAULT_LOCALE;
   const place = "place" in item ? item.place : item;
   const distanceKm = "distanceKm" in item ? item.distanceKm : undefined;
+  const categoryText =
+    getPlaceCategoryLabel(
+      {
+        categoryName: "categoryName" in place ? (place as { categoryName?: string }).categoryName : undefined,
+        categoryNameVi: "categoryNameVi" in place ? (place as { categoryNameVi?: string | null }).categoryNameVi : undefined,
+        categoryLabel: place.categoryLabel || place.category,
+      },
+      locale
+    ) || place.category;
 
   const container = document.createElement("div");
   container.className = "w-[290px] overflow-hidden rounded-2xl bg-white text-slate-900 shadow-2xl font-sans select-none border border-slate-200/80";
@@ -49,8 +66,8 @@ export function createMapPopupElement(
           <div class="size-8 rounded-full bg-white shadow-xs flex items-center justify-center text-slate-400 mb-1">
             <i class="fa-solid fa-camera text-sm"></i>
           </div>
-          <span class="text-xs font-semibold text-slate-700">Chưa có ảnh thực tế</span>
-          <span class="text-[10px] text-slate-400">${place.categoryLabel || place.category}</span>
+          <span class="text-xs font-semibold text-slate-700">${translate(locale, "map.popup.noPhoto")}</span>
+          <span class="text-[10px] text-slate-400">${categoryText}</span>
         </div>
       `;
     };
@@ -68,8 +85,8 @@ export function createMapPopupElement(
       <div class="size-9 rounded-full bg-white shadow-xs flex items-center justify-center text-slate-400 mb-1">
         <i class="fa-solid fa-camera text-base"></i>
       </div>
-      <span class="text-xs font-semibold text-slate-700">Chưa có ảnh thực tế</span>
-      <span class="text-[10.5px] text-slate-400 font-medium">${place.categoryLabel || place.category}</span>
+      <span class="text-xs font-semibold text-slate-700">${translate(locale, "map.popup.noPhoto")}</span>
+      <span class="text-[10.5px] text-slate-400 font-medium">${categoryText}</span>
     `;
     imgWrapper.appendChild(placeholder);
   }
@@ -77,7 +94,7 @@ export function createMapPopupElement(
   // Floating Category pill on bottom-left of photo
   const categoryPill = document.createElement("span");
   categoryPill.className = "absolute bottom-2 left-2 px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-white text-[10.5px] font-semibold border border-white/20";
-  categoryPill.textContent = place.categoryLabel || place.category;
+  categoryPill.textContent = categoryText;
   imgWrapper.appendChild(categoryPill);
 
   // Floating Quick Save button on top-left of photo
@@ -89,7 +106,7 @@ export function createMapPopupElement(
         ? "bg-rose-500 text-white ring-2 ring-white/50 scale-105"
         : "bg-black/40 hover:bg-black/65 backdrop-blur-md text-white/90 hover:text-white"
     }`;
-    saveBtn.title = options.isSaved ? "Bỏ lưu địa điểm" : "Lưu vào mục Yêu thích";
+    saveBtn.title = options.isSaved ? translate(locale, "map.popup.unsavePlace") : translate(locale, "map.popup.saveToFavorites");
     saveBtn.innerHTML = `<i class="fa-solid fa-heart text-xs ${options.isSaved ? "text-white" : "text-white/90"}"></i>`;
 
     saveBtn.addEventListener("click", (e) => {
@@ -149,7 +166,7 @@ export function createMapPopupElement(
     statusEl.className = isOpen
       ? "text-emerald-600 font-semibold text-[10.5px]"
       : "text-slate-400 font-medium text-[10.5px]";
-    statusEl.textContent = isOpen ? "Đang mở cửa" : "Đã đóng cửa";
+    statusEl.textContent = isOpen ? translate(locale, "map.popup.openNow") : translate(locale, "map.popup.closedNow");
     metaRow.appendChild(statusEl);
   }
 
@@ -161,13 +178,13 @@ export function createMapPopupElement(
 
   const addressText = document.createElement("p");
   addressText.className = "line-clamp-1 flex-1 text-[11px]";
-  addressText.textContent = place.address || "Việt Nam";
+  addressText.textContent = place.address || translate(locale, "map.countryFallback");
   addressRow.appendChild(addressText);
 
   if (distanceKm !== undefined && distanceKm !== null) {
     const distBadge = document.createElement("span");
     distBadge.className = "px-1.5 py-0.2 rounded bg-[#0194F3]/10 text-[#0194F3] font-bold text-[10px] whitespace-nowrap";
-    distBadge.textContent = routingService.formatDistanceKm(distanceKm);
+    distBadge.textContent = routingService.formatDistanceKm(distanceKm, locale);
     addressRow.appendChild(distBadge);
   }
 
@@ -193,7 +210,7 @@ export function createMapPopupElement(
         "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0194F3]/10 border border-[#0194F3]/25 py-1.5 px-2 text-[11px] font-bold text-[#0194F3]";
       statusBadge.innerHTML = `
         <i class="fa-solid fa-check text-xs shrink-0" aria-hidden="true"></i>
-        <span class="truncate">Đang là Chặng ${stopLetter} (#${stopIdx + 1})</span>
+        <span class="truncate">${translate(locale, "map.popup.activeStopBadge", { letter: stopLetter, index: stopIdx + 1 })}</span>
       `;
       row1.appendChild(statusBadge);
 
@@ -204,7 +221,7 @@ export function createMapPopupElement(
           "shrink-0 inline-flex items-center justify-center gap-1 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 py-1.5 px-2.5 text-[11px] font-bold text-rose-600 transition-colors cursor-pointer active:scale-95";
         removeBtn.innerHTML = `
           <i class="fa-solid fa-trash-can text-xs shrink-0" aria-hidden="true"></i>
-          <span>Gỡ chặng</span>
+          <span>${translate(locale, "map.popup.removeStop")}</span>
         `;
         removeBtn.addEventListener("click", (e) => {
           e.preventDefault();
@@ -226,7 +243,7 @@ export function createMapPopupElement(
           "flex-1 min-w-0 inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 py-1.5 px-2 text-[11px] font-semibold text-slate-700 transition-colors cursor-pointer";
         originBtn.innerHTML = `
           <i class="fa-solid fa-flag-checkered text-xs shrink-0" aria-hidden="true"></i>
-          <span>Điểm xuất phát</span>
+          <span>${translate(locale, "map.popup.setOriginShort")}</span>
         `;
         originBtn.addEventListener("click", (e) => {
           e.preventDefault();
@@ -242,7 +259,7 @@ export function createMapPopupElement(
         stopIdx > 0 && options.onSetOrigin
           ? "shrink-0 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-1.5 px-3 text-[11px] font-bold text-slate-800 transition-colors cursor-pointer whitespace-nowrap no-underline"
           : "w-full inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-1.5 px-3 text-[11px] font-bold text-slate-800 transition-colors cursor-pointer whitespace-nowrap no-underline";
-      detailLink.textContent = "Xem chi tiết";
+      detailLink.textContent = translate(locale, "map.popup.viewDetails");
       if (onOpenDetail) {
         detailLink.addEventListener("click", (e) => {
           e.preventDefault();
@@ -263,7 +280,7 @@ export function createMapPopupElement(
           "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0194F3] hover:bg-[#0082d6] py-1.5 px-2 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer active:scale-95";
         addStopBtn.innerHTML = `
           <i class="fa-solid fa-plus text-xs shrink-0" aria-hidden="true"></i>
-          <span>Thêm chặng</span>
+          <span>${translate(locale, "map.popup.addStop")}</span>
         `;
         addStopBtn.addEventListener("click", (e) => {
           e.preventDefault();
@@ -280,7 +297,7 @@ export function createMapPopupElement(
           "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 py-1.5 px-2 text-[11px] font-semibold text-slate-700 transition-colors cursor-pointer active:scale-95";
         originBtn.innerHTML = `
           <i class="fa-solid fa-flag-checkered text-xs shrink-0" aria-hidden="true"></i>
-          <span>Điểm xuất phát</span>
+          <span>${translate(locale, "map.popup.setOriginShort")}</span>
         `;
         originBtn.addEventListener("click", (e) => {
           e.preventDefault();
@@ -302,7 +319,7 @@ export function createMapPopupElement(
           "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#0194F3]/35 bg-[#0194F3]/10 hover:bg-[#0194F3]/20 py-1.5 px-2 text-[11px] font-bold text-[#0194F3] transition-colors cursor-pointer active:scale-95";
         addItineraryBtn.innerHTML = `
           <i class="fa-solid fa-calendar-plus text-xs shrink-0" aria-hidden="true"></i>
-          <span class="truncate">Thêm lịch trình</span>
+          <span class="truncate">${translate(locale, "map.popup.addToItineraryShort")}</span>
         `;
         addItineraryBtn.addEventListener("click", (e) => {
           e.preventDefault();
@@ -317,7 +334,7 @@ export function createMapPopupElement(
       detailLink.className = options.onAddToItinerary
         ? "shrink-0 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-1.5 px-3 text-[11px] font-bold text-slate-800 transition-colors cursor-pointer whitespace-nowrap no-underline"
         : "w-full inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-1.5 px-3 text-[11px] font-bold text-slate-800 transition-colors cursor-pointer whitespace-nowrap no-underline";
-      detailLink.textContent = "Xem chi tiết";
+      detailLink.textContent = translate(locale, "map.popup.viewDetails");
       if (onOpenDetail) {
         detailLink.addEventListener("click", (e) => {
           e.preventDefault();
@@ -338,7 +355,7 @@ export function createMapPopupElement(
       dirBtn.className = "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0194F3] hover:bg-[#0082d6] py-2 px-2.5 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer active:scale-95";
       dirBtn.innerHTML = `
         <i class="fa-solid fa-route text-xs"></i>
-        <span>Chỉ đường</span>
+        <span>${translate(locale, "map.popup.directions")}</span>
       `;
       dirBtn.addEventListener("click", (e) => {
         e.preventDefault();
@@ -353,7 +370,7 @@ export function createMapPopupElement(
     detailLink.className = onRequestDirections
       ? "shrink-0 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-2 px-3 text-xs font-bold text-slate-800 transition-colors cursor-pointer whitespace-nowrap shadow-2xs no-underline"
       : "w-full inline-flex items-center justify-center rounded-xl bg-[#0194F3] hover:bg-[#0082d6] py-2 px-3 text-xs font-bold text-white transition-colors cursor-pointer shadow-xs no-underline";
-    detailLink.textContent = onRequestDirections ? "Chi tiết" : "Xem chi tiết";
+    detailLink.textContent = onRequestDirections ? translate(locale, "map.popup.detailsShort") : translate(locale, "map.popup.viewDetails");
     if (onOpenDetail) {
       detailLink.addEventListener("click", (e) => {
         e.preventDefault();
@@ -375,7 +392,7 @@ export function createMapPopupElement(
           "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#0194F3]/35 bg-[#0194F3]/10 hover:bg-[#0194F3]/20 py-1.5 px-2 text-[11px] font-bold text-[#0194F3] transition-colors cursor-pointer active:scale-95";
         addItineraryBtn.innerHTML = `
           <i class="fa-solid fa-calendar-plus text-xs shrink-0" aria-hidden="true"></i>
-          <span class="truncate">${options.onSetOrigin ? "Thêm lịch trình" : "Thêm vào lịch trình"}</span>
+          <span class="truncate">${options.onSetOrigin ? translate(locale, "map.popup.addToItineraryShort") : translate(locale, "map.popup.addToItineraryFull")}</span>
         `;
         addItineraryBtn.addEventListener("click", (e) => {
           e.preventDefault();
@@ -392,7 +409,7 @@ export function createMapPopupElement(
           "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 py-1.5 px-2 text-[11px] font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer active:scale-95";
         originBtn.innerHTML = `
           <i class="fa-solid fa-flag-checkered text-xs shrink-0" aria-hidden="true"></i>
-          <span class="truncate">${options.onAddToItinerary ? "Điểm xuất phát" : "Đặt làm điểm xuất phát"}</span>
+          <span class="truncate">${options.onAddToItinerary ? translate(locale, "map.popup.setOriginShort") : translate(locale, "map.popup.setOriginFull")}</span>
         `;
         originBtn.addEventListener("click", (e) => {
           e.preventDefault();

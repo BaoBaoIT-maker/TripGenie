@@ -12,7 +12,7 @@ import {
   ForgotPasswordFormData,
 } from '../schemas/auth.schema';
 import { useAuth } from '../hooks/use-auth';
-import { useI18n } from '@/i18n/LocaleProvider';
+import { useI18n } from '@/i18n';
 
 export function ForgotPasswordForm() {
   const router = useRouter();

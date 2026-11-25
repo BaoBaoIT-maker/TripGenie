@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useI18n, type AppLocale } from '@/i18n';
+import { pickLocalizedName, useI18n, type AppLocale } from '@/i18n';
 import type { IntercityTransit, TransitMode } from '@/types/itinerary';
 import {
   TRANSIT_UI_CONFIG,
@@ -46,8 +46,8 @@ const DIRECT_MODE_THEMES: Record<Exclude<TransitMode, 'PERSONAL_MOTORBIKE'>, Dir
       );
       return [
         t('planner.transitBreakdown.flightStepMain', {
-          origin: cleanHubName(transit.originHub?.name || cleanOrigin),
-          dest: cleanHubName(transit.destHub?.name || cleanDest),
+          origin: cleanHubName(pickLocalizedName(transit.originHub, locale, cleanOrigin)),
+          dest: cleanHubName(pickLocalizedName(transit.destHub, locale, cleanDest)),
           duration: formatDuration(durMinutes, locale),
           price: formatVnd(priceOneWay),
         }),
@@ -62,15 +62,21 @@ const DIRECT_MODE_THEMES: Record<Exclude<TransitMode, 'PERSONAL_MOTORBIKE'>, Dir
   SLEEPER_BUS: {
     icon: <i className="fa-solid fa-bus text-amber-600 text-sm shrink-0" aria-hidden="true" />,
     titleKey: 'planner.transitBreakdown.busTitle',
-    buildFallbackSteps: ({ transit, cleanOrigin, cleanDest, durHours, priceOneWay, t }) => [
+    buildFallbackSteps: ({ transit, cleanOrigin, cleanDest, durHours, priceOneWay, t, locale }) => [
       t('planner.transitBreakdown.busStepMain', {
         origin: cleanHubName(
-          transit.originHub?.name ||
+          pickLocalizedName(
+            transit.originHub,
+            locale,
             t('planner.transitBreakdown.busOriginFallback', { city: cleanOrigin }),
+          ),
         ),
         dest: cleanHubName(
-          transit.destHub?.name ||
+          pickLocalizedName(
+            transit.destHub,
+            locale,
             t('planner.transitBreakdown.busDestFallback', { city: cleanDest }),
+          ),
         ),
         hours: durHours,
         price: formatVnd(priceOneWay),
@@ -81,15 +87,21 @@ const DIRECT_MODE_THEMES: Record<Exclude<TransitMode, 'PERSONAL_MOTORBIKE'>, Dir
   TRAIN: {
     icon: <i className="fa-solid fa-train text-[#0194F3] text-sm shrink-0" aria-hidden="true" />,
     titleKey: 'planner.transitBreakdown.trainTitle',
-    buildFallbackSteps: ({ transit, cleanOrigin, cleanDest, durHours, priceOneWay, t }) => [
+    buildFallbackSteps: ({ transit, cleanOrigin, cleanDest, durHours, priceOneWay, t, locale }) => [
       t('planner.transitBreakdown.trainStepMain', {
         origin: cleanHubName(
-          transit.originHub?.name ||
+          pickLocalizedName(
+            transit.originHub,
+            locale,
             t('planner.transitBreakdown.trainOriginFallback', { city: cleanOrigin }),
+          ),
         ),
         dest: cleanHubName(
-          transit.destHub?.name ||
+          pickLocalizedName(
+            transit.destHub,
+            locale,
             t('planner.transitBreakdown.trainDestFallback', { city: cleanDest }),
+          ),
         ),
         hours: durHours,
         price: formatVnd(priceOneWay),
@@ -129,7 +141,11 @@ export default function TransitRouteBreakdown({
   const durMinutes = transit.durationMinutes ?? 0;
   const durHours = Math.max(1, Math.round(durMinutes / 60));
   const priceOneWay = transit.estimatedPriceOneWay ?? 0;
-  const routeSteps = transit.details?.routeSteps ?? [];
+  // ponytail: legacy DB snapshots stored Vietnamese strings before locale tagging; when locale mismatches,
+  // fall back to localized structured builders instead of leaking stale-language copy (upgrade: persist structured leg descriptors).
+  const canUseServerCopy = transit.locale ? transit.locale === locale : locale === 'vi';
+  const routeSteps = canUseServerCopy ? (transit.details?.routeSteps ?? []) : [];
+  const serverNotes = canUseServerCopy ? transit.details?.notes : undefined;
 
   // 1. Multi-Modal Connecting Route (Train/Flight/Bus + Connecting Bus or Island Ferry)
   if (transit.isMultiModal) {
@@ -179,7 +195,9 @@ export default function TransitRouteBreakdown({
                 <i className="fa-solid fa-bus text-[#0194F3] text-xs shrink-0" aria-hidden="true" />
               )}
               <span className="font-bold text-[#10243A] truncate">
-                {cleanHubName(transit.transferLeg.title)}
+                {canUseServerCopy
+                  ? cleanHubName(transit.transferLeg.title)
+                  : `${cleanHubName(transit.transferLeg.fromName)} → ${cleanHubName(transit.transferLeg.toName)}`}
               </span>
             </div>
             <span className="font-bold text-[#0194F3] shrink-0">
@@ -188,12 +206,12 @@ export default function TransitRouteBreakdown({
           </div>
         )}
 
-        {transit.details?.notes && (
+        {serverNotes && (
           <div className="rounded-lg bg-white/90 border border-[#D0E7FF] p-2.5 text-xs text-slate-700 flex items-start gap-2 shadow-2xs">
             <i className="fa-solid fa-circle-info text-[#0194F3] text-sm shrink-0 mt-0.5" aria-hidden="true" />
             <span>
               <strong className="text-[#10243A]">{t('planner.transitBreakdown.noteLabel')}</strong>{' '}
-              {cleanHubName(transit.details.notes)}
+              {cleanHubName(serverNotes)}
             </span>
           </div>
         )}
@@ -277,7 +295,7 @@ export default function TransitRouteBreakdown({
           </div>
         )}
 
-        {transit.details?.notes && (
+        {serverNotes && (
           <div
             className={`rounded-lg border p-2.5 text-xs flex items-start gap-2 shadow-2xs ${
               isOverLimit
@@ -297,7 +315,7 @@ export default function TransitRouteBreakdown({
               <strong className="font-bold">
                 {t('planner.transitBreakdown.recommendationLabel')}
               </strong>{' '}
-              {transit.details.notes}
+              {serverNotes}
             </span>
           </div>
         )}
@@ -346,12 +364,12 @@ export default function TransitRouteBreakdown({
         ))}
       </div>
 
-      {transit.details?.notes && (
+      {serverNotes && (
         <div className="rounded-lg bg-white/90 border border-[#D0E7FF] p-2.5 text-xs text-slate-700 flex items-start gap-2 shadow-2xs">
           <i className="fa-solid fa-circle-info text-[#0194F3] text-sm shrink-0 mt-0.5" aria-hidden="true" />
           <span>
             <strong className="text-[#10243A]">{t('planner.transitBreakdown.noteLabel')}</strong>{' '}
-            {cleanHubName(transit.details.notes)}
+            {cleanHubName(serverNotes)}
           </span>
         </div>
       )}

@@ -433,6 +433,7 @@ export class PlacesRepository implements IPlaceRepository {
         id: true,
         name: true,
         nameVi: true,
+        translations: true,
         slug: true,
         type: true,
         bboxMinLat: true,
@@ -444,6 +445,7 @@ export class PlacesRepository implements IPlaceRepository {
           select: {
             id: true,
             name: true,
+            translations: true,
             hubType: true,
             latitude: true,
             longitude: true,

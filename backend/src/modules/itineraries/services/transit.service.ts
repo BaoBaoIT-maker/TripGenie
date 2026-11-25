@@ -4,6 +4,11 @@ import { PRICING_CONFIG } from '../../../config/pricing.config';
 import { INJECT_TOKENS } from '../../../common/constants/inject-tokens';
 import { normalizeVietnamese } from '../../../common/utils/string.util';
 import {
+  DEFAULT_LOCALE,
+  resolveLocalizedText,
+  type AppLocale,
+} from '../../../common/i18n/locale.util';
+import {
   BudgetLevelEnum,
   TransitModeEnum,
 } from '../dto/generate-itinerary.dto';
@@ -82,9 +87,14 @@ export class TransitService {
    * 2. Query transit_hubs via travel_areas when bbox is null
    * 3. Query transit_hubs directly
    */
-  async resolveCityLocation(
-    cityName: string,
-  ): Promise<{ lat: number; lng: number; areaId?: number }> {
+  async resolveCityLocation(cityName: string): Promise<{
+    lat: number;
+    lng: number;
+    areaId?: number;
+    name?: string;
+    nameVi?: string | null;
+    translations?: unknown;
+  }> {
     const fallback = PRICING_CONFIG.DEFAULTS.FALLBACK_COORDS;
     if (!cityName) return fallback;
     const raw = cityName.trim();
@@ -96,9 +106,16 @@ export class TransitService {
     for (const term of terms) {
       try {
         const areas = await this.prisma.$queryRaw<
-          Array<{ lat: number; lng: number; area_id: number }>
+          Array<{
+            lat: number;
+            lng: number;
+            area_id: number;
+            name?: string;
+            name_vi?: string | null;
+            translations?: unknown;
+          }>
         >`
-          SELECT (bbox_min_lat + bbox_max_lat) / 2 AS lat, (bbox_min_lng + bbox_max_lng) / 2 AS lng, id AS area_id
+          SELECT (bbox_min_lat + bbox_max_lat) / 2 AS lat, (bbox_min_lng + bbox_max_lng) / 2 AS lng, id AS area_id, name, name_vi, translations
           FROM travel_areas
           WHERE type != 'COUNTRY'
             AND (
@@ -115,15 +132,25 @@ export class TransitService {
             lat: Number(areas[0].lat),
             lng: Number(areas[0].lng),
             areaId: areas[0].area_id,
+            name: areas[0].name,
+            nameVi: areas[0].name_vi,
+            translations: areas[0].translations,
           };
         }
       } catch {}
 
       try {
         const areaHub = await this.prisma.$queryRaw<
-          Array<{ lat: number; lng: number; area_id: number }>
+          Array<{
+            lat: number;
+            lng: number;
+            area_id: number;
+            name?: string;
+            name_vi?: string | null;
+            translations?: unknown;
+          }>
         >`
-          SELECT h.latitude AS lat, h.longitude AS lng, a.id AS area_id
+          SELECT h.latitude AS lat, h.longitude AS lng, a.id AS area_id, a.name, a.name_vi, a.translations
           FROM travel_areas a
           JOIN transit_hubs h ON h.area_id = a.id AND h.is_active = true
           WHERE (
@@ -139,6 +166,9 @@ export class TransitService {
             lat: Number(areaHub[0].lat),
             lng: Number(areaHub[0].lng),
             areaId: areaHub[0].area_id,
+            name: areaHub[0].name,
+            nameVi: areaHub[0].name_vi,
+            translations: areaHub[0].translations,
           };
         }
       } catch {}
@@ -217,9 +247,11 @@ export class TransitService {
     budgetLevel?: BudgetLevelEnum | string;
     departDate: string;
     returnDate?: string;
+    locale?: AppLocale;
   }): Promise<IntercityTransitResult> {
     const { originCity, destCity, departDate, returnDate, budgetLevel } =
       params;
+    const locale: AppLocale = params.locale ?? DEFAULT_LOCALE;
 
     const [resolvedOrigin, resolvedDest, activeHubs] = await Promise.all([
       this.resolveCityLocation(originCity),
@@ -265,9 +297,37 @@ export class TransitService {
       destCoords.lng,
     );
 
+    const localizeCity = (
+      rawCity: string,
+      resolved: {
+        name?: string;
+        nameVi?: string | null;
+        translations?: unknown;
+      },
+    ): string => {
+      if (!resolved.name && !resolved.nameVi && !resolved.translations) {
+        return rawCity;
+      }
+      if (locale === 'en') {
+        return resolveLocalizedText(
+          resolved.name || rawCity,
+          resolved.translations,
+          'en',
+        );
+      }
+      return resolveLocalizedText(
+        resolved.nameVi || rawCity,
+        resolved.translations,
+        locale,
+      );
+    };
+
+    const localizedOriginCity = localizeCity(originCity, resolvedOrigin);
+    const localizedDestCity = localizeCity(destCity, resolvedDest);
+
     const context: TransitStrategyContext = {
-      originCity,
-      destCity,
+      originCity: localizedOriginCity,
+      destCity: localizedDestCity,
       departDate,
       returnDate,
       budgetLevel,
@@ -277,6 +337,7 @@ export class TransitService {
       isIsland,
       nearestFerryHub,
       activeHubs,
+      locale,
     };
 
     const requestedMode =
@@ -299,7 +360,7 @@ export class TransitService {
           itemStrategy.mode === requestedMode
             ? result
             : await itemStrategy.calculate(context);
-        const summary = itemStrategy.summarize(itemRes, roadDistanceKm);
+        const summary = itemStrategy.summarize(itemRes, roadDistanceKm, locale);
         if (summary) {
           allModesSummary.push(summary);
         }
@@ -307,6 +368,7 @@ export class TransitService {
     }
 
     result.allModesSummary = allModesSummary;
+    result.locale = locale;
     return result;
   }
 }

@@ -2,7 +2,7 @@
 
 import { memo, useEffect, useState } from 'react';
 import { AppModalPortal } from '@/components/common/AppModalPortal';
-import { useI18n, type AppLocale } from '@/i18n';
+import { pickLocalizedName, useI18n, type AppLocale } from '@/i18n';
 import { useItineraryHoverStore } from '../../stores/itinerary-hover-store';
 import {
   WEATHER_THEMES,
@@ -474,8 +474,8 @@ const ItineraryTimeline = memo(function ItineraryTimeline({
                 <div className="flex items-center gap-1.5 font-bold text-[#10243A] text-xs sm:text-[13px] min-w-0">
                   <span className="shrink-0">{transitVisual.label}:</span>
                   <span className="truncate text-slate-800 font-semibold">
-                    {cleanHubName(transit.originHub?.name || transit.originName)} →{' '}
-                    {cleanHubName(transit.destHub?.name || transit.destName)}
+                    {cleanHubName(pickLocalizedName(transit.originHub, locale, transit.originName))} →{' '}
+                    {cleanHubName(pickLocalizedName(transit.destHub, locale, transit.destName))}
                   </span>
                 </div>
                 <div className="text-[11px] text-slate-500 tabular-nums truncate">

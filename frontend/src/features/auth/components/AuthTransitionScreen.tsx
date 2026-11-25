@@ -7,7 +7,7 @@ import {
 } from "@/lib/safe-redirect";
 import { getActiveClientLocale, type Locale } from "@/i18n/config";
 import { getMessages, translate } from "@/i18n";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 import type { AuthUser } from "@/types/auth";
 
 export const OAUTH_POPUP_CONFIG = {

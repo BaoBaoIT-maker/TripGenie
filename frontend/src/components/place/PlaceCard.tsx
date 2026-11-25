@@ -13,7 +13,7 @@ import { useSavedPlaceIds, useToggleFavorite } from "@/features/collections/hook
 import { SaveToCollectionModal } from "@/features/collections/components/SaveToCollectionModal";
 import { collectionService, DEFAULT_COLLECTION_TITLE } from "@/services/collection.service";
 import { toast } from "sonner";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 import {
   getPlaceCategoryLabel,
   getPlaceCityLabel,

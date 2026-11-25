@@ -12,7 +12,7 @@ import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useAuthModalStore } from "@/features/auth/stores/auth-modal.store";
 import { NotificationBell } from "@/features/notifications/components/NotificationBell";
-import { useI18n } from "@/i18n/LocaleProvider";
+import { useI18n } from "@/i18n";
 import type { TranslationKey } from "@/i18n";
 import { cn } from "@/lib/utils";
 

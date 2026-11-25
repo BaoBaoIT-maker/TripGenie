@@ -99,11 +99,12 @@ export function translate(
 export interface BilingualEntity {
   name?: string | null;
   nameVi?: string | null;
+  translations?: Record<string, string> | null;
 }
 
 /**
- * Picks the appropriate display name from DB reference entities (Category, TravelArea)
- * that already carry both `name` (English) and `nameVi` (Vietnamese).
+ * Picks the appropriate display name from DB reference entities (Category, TravelArea, TransitHub)
+ * using JSONB `translations[locale]` first, then `name` (English) / `nameVi` (Vietnamese) fallback.
  * Keep calls at the Presentation layer so cached TanStack Query items update at 0ms on locale switch.
  */
 export function pickLocalizedName(
@@ -112,8 +113,10 @@ export function pickLocalizedName(
   fallback = '',
 ): string {
   if (!entity) return fallback;
+  const translated = entity.translations?.[locale]?.trim();
+  if (translated) return translated;
   if (locale === 'en') {
-    return entity.name?.trim() || entity.nameVi?.trim() || fallback;
+    return entity.translations?.en?.trim() || entity.name?.trim() || entity.nameVi?.trim() || fallback;
   }
   return entity.nameVi?.trim() || entity.name?.trim() || fallback;
 }

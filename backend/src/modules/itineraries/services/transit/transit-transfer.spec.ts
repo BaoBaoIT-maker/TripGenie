@@ -21,6 +21,7 @@ import { ItineraryAccessService } from '../itinerary-access.service';
 import { GeminiPlannerService } from '../gemini-planner.service';
 import { CopilotAgentService } from '../../copilot/copilot-agent.service';
 import { CopilotToolsService } from '../../copilot/copilot-tools.service';
+import { ItineraryEventsService } from '../../events/itinerary-events.service';
 import {
   TransitService,
   TransitHubDto,
@@ -687,6 +688,7 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
           { provide: GeminiPlannerService, useValue: {} },
           { provide: CopilotAgentService, useValue: {} },
           { provide: CopilotToolsService, useValue: {} },
+          { provide: ItineraryEventsService, useValue: { emit: jest.fn() } },
         ],
       })
         .overrideGuard(OptionalJwtAuthGuard)
@@ -840,6 +842,26 @@ describe('Transit & Transfer Engine — Unit & Integration Test Suite', () => {
         updated.intercityTransit.estimatedPriceRoundTrip,
       );
       expect(mockPrisma.itinerary.update).toHaveBeenCalled();
+    });
+
+    it('returns English transit route steps, notes, and summaries when Accept-Language is en', async () => {
+      const response = await request(app.getHttpServer())
+        .post('/itineraries/transit-preview')
+        .set('Accept-Language', 'en')
+        .send({
+          originCity: 'TP. Hồ Chí Minh',
+          destCity: 'Đà Lạt',
+          transitMode: 'FLIGHT',
+          departDate: '2026-06-10',
+        })
+        .expect(200);
+
+      const body = response.body;
+      expect(body.locale).toBe('en');
+      expect(body.details.routeSteps[0]).toContain('Main flight leg:');
+      expect(body.details.routeSteps[1]).toContain('Airport transfer:');
+      expect(body.details.notes).toContain('After landing at');
+      expect(body.allModesSummary[0].title).toBe('Flight');
     });
   });
 });

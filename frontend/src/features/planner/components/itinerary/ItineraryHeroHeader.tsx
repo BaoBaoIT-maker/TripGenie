@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useI18n } from '@/i18n';
+import { pickLocalizedName, useI18n } from '@/i18n';
 import { formatTripDates } from '../../model/itinerary-format';
 import {
   PARTY_SIZE_BOUNDS,
@@ -124,10 +124,20 @@ export function ItineraryHeroHeader({
         <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
           <div className="space-y-2 min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              {data.destination && (
+              {(data.destination || data.areaName || data.areaNameVi) && (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-[#F0F7FF] text-[#0194F3] text-xs font-bold">
                   <i className="fa-solid fa-location-dot text-[11px]" aria-hidden="true" />
-                  <span>{data.destination}</span>
+                  <span>
+                    {pickLocalizedName(
+                      {
+                        name: data.areaName,
+                        nameVi: data.areaNameVi,
+                        translations: data.areaTranslations,
+                      },
+                      locale,
+                      data.destination || '',
+                    )}
+                  </span>
                 </span>
               )}
               {data.viewerRole && (

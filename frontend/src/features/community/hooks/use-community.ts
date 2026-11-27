@@ -336,6 +336,7 @@ export function useUpdateCommunityPost() {
     }) => communityService.updatePost(postId, payload),
     onSuccess: (data, { postId }) => {
       const updatedPost = data?.post;
+      const isPending = updatedPost?.moderationStatus === "PENDING";
       queryClient.setQueriesData<InfiniteData<CommunityFeedResponse>>(
         { queryKey: ["community", "feed"] },
         (old) =>
@@ -344,15 +345,19 @@ export function useUpdateCommunityPost() {
               ? { ...post, ...updatedPost }
               : {
                   ...post,
-                  moderationStatus: "PENDING" as const,
-                  moderationNote: t("community.toasts.aiReviewingNote"),
+                  moderationStatus: "APPROVED" as const,
+                  moderationNote: null,
                 }
           )
       );
-      toast.info(t("community.toasts.postUpdatedPending"), {
-        duration: COMMUNITY_CONFIG.INFO_TOAST_DURATION_MS,
-      });
-      scheduleModerationOutcomeCheck(queryClient, postId, t);
+      if (isPending) {
+        toast.info(t("community.toasts.postUpdatedPending"), {
+          duration: COMMUNITY_CONFIG.INFO_TOAST_DURATION_MS,
+        });
+        scheduleModerationOutcomeCheck(queryClient, postId, t);
+        return;
+      }
+      toast.success(t("community.toasts.postUpdatedSuccess"));
     },
     onError: (err: Error) => {
       toast.error(err.message || t("community.toasts.postUpdateError"));

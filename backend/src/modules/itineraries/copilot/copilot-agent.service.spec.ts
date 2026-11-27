@@ -56,6 +56,19 @@ describe('CopilotAgentService member scoping & session isolation', () => {
     };
 
     toolsMock = {
+      searchPlacesForItinerary: jest.fn().mockResolvedValue({
+        toolName: 'search_places',
+        success: true,
+        message: 'Đã tìm thấy 2 địa điểm phù hợp trong khu vực chuyến đi.',
+        data: {
+          status: 'SUCCESS',
+          totalMatched: 2,
+          places: [
+            { id: 'p-veg-1', name: 'Quán Chay Liên Hoa', rating: 4.8 },
+            { id: 'p-veg-2', name: 'Nhà Hàng Chay Bồ Đề', rating: 4.6 },
+          ],
+        },
+      }),
       swapActivity: jest.fn().mockResolvedValue({
         success: true,
         message: 'Gợi ý thay quán cà phê',
@@ -162,7 +175,164 @@ describe('CopilotAgentService member scoping & session isolation', () => {
     expect(response.modified).toBe(false);
     expect(response.proposal?.toPlaceName).toBe('Cafe Cộng');
     expect(plannerMock.getById).not.toHaveBeenCalled();
+    expect(prismaMock.place.findMany).not.toHaveBeenCalled();
     expect(postSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('routes recommendation queries through read-only search_places without emitting a proposal or mutation badge', async () => {
+    const postSpy = jest
+      .spyOn((service as any).httpClient, 'post')
+      .mockResolvedValueOnce({
+        data: {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    functionCall: {
+                      name: 'search_places',
+                      args: { query: 'quán chay', categorySlug: 'nha-hang' },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    text: '1. **Quán Chay Liên Hoa** - Quán chay nổi tiếng.\n2. **Nhà Hàng Chay Bồ Đề** - Thực đơn đa dạng.',
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      });
+
+    const response = await service.chat(
+      ITINERARY_ID,
+      'Gợi ý cho mình vài quán chay ngon nhé',
+      VIEWER_ID,
+    );
+
+    expect(prismaMock.place.findMany).not.toHaveBeenCalled();
+    expect(toolsMock.searchPlacesForItinerary).toHaveBeenCalledWith(
+      ITINERARY_ID,
+      expect.objectContaining({ query: 'quán chay', categorySlug: 'nha-hang' }),
+      'vi',
+    );
+    expect(response.modified).toBe(false);
+    expect(response.proposal).toBeUndefined();
+    expect(response.appliedTool).toBeUndefined();
+    expect(response.reply).toContain('Quán Chay Liên Hoa');
+    expect(postSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it('forwards nearPlaceName, radiusKm, minRating to searchPlacesForItinerary and formats fallback list if synthesis fails', async () => {
+    toolsMock.searchPlacesForItinerary.mockResolvedValueOnce({
+      toolName: 'search_places',
+      success: true,
+      message: 'Đã tìm thấy 2 địa điểm phù hợp trong khu vực chuyến đi.',
+      data: {
+        status: 'SUCCESS',
+        anchorName: 'Cầu Rồng',
+        radiusKm: 2,
+        totalMatched: 2,
+        places: [
+          {
+            id: 'c-1',
+            name: 'Cafe Gần Cầu Rồng',
+            category: 'Cà phê',
+            address: '01 Trần Hưng Đạo',
+            rating: 4.8,
+            distanceKm: 0.4,
+          },
+          {
+            id: 'c-2',
+            name: 'Cafe Sông Hàn',
+            category: 'Cà phê',
+            address: '12 Bạch Đằng',
+            rating: 4.7,
+            distanceKm: 1.2,
+          },
+        ],
+      },
+    });
+
+    jest
+      .spyOn((service as any).httpClient, 'post')
+      .mockResolvedValueOnce({
+        data: {
+          candidates: [
+            {
+              content: {
+                parts: [
+                  {
+                    functionCall: {
+                      name: 'search_places',
+                      args: {
+                        query: 'cafe',
+                        nearPlaceName: 'Cầu Rồng',
+                        radiusKm: 2,
+                        minRating: 4.5,
+                      },
+                    },
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      })
+      .mockRejectedValueOnce(new Error('Gemini second-turn timeout'));
+
+    const response = await service.chat(
+      ITINERARY_ID,
+      'Tìm cafe trên 4.5 sao gần Cầu Rồng trong 2km',
+      VIEWER_ID,
+    );
+
+    expect(toolsMock.searchPlacesForItinerary).toHaveBeenCalledWith(
+      ITINERARY_ID,
+      expect.objectContaining({
+        query: 'cafe',
+        nearPlaceName: 'Cầu Rồng',
+        radiusKm: 2,
+        minRating: 4.5,
+      }),
+      'vi',
+    );
+    expect(response.modified).toBe(false);
+    expect(response.reply).toContain('1. **Cafe Gần Cầu Rồng**');
+    expect(response.reply).toContain('2. **Cafe Sông Hàn**');
+    expect(response.reply).toContain('cách Cầu Rồng 0.4 km');
+  });
+
+  it('rejects non-mutating tools at the applyProposal trust boundary', async () => {
+    await expect(
+      service.applyProposal(
+        ITINERARY_ID,
+        'search_places',
+        { query: 'chay' },
+        OWNER_ID,
+      ),
+    ).rejects.toThrow();
+
+    await expect(
+      service.applyProposal(
+        ITINERARY_ID,
+        'change_destination',
+        { newDestination: 'Phú Quốc' },
+        OWNER_ID,
+      ),
+    ).rejects.toThrow();
   });
 
   it('blocks non-member guests in getChatHistory via assertIsGroupMember', async () => {

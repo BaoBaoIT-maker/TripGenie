@@ -49,6 +49,12 @@
     "changeDestinationFallback": "the new destination",
     "changeDestinationMessage": "Switching to {dest} requires creating a new itinerary to recalculate routes, stays, and intercity transit. Click the button below to plan a fresh trip to {dest}!",
     "unsupportedTool": "Tool {toolName} is not supported.",
+    "invalidProposalTool": "Tool {toolName} cannot be applied as an itinerary mutation.",
+    "searchFound": "Found {count} matching places in the trip area.",
+    "searchNoMatch": "No matching places were found in the trip area.",
+    "searchAnchorNotFound": "Could not find reference location \"{anchor}\" within the trip area to calculate distance.",
+    "searchFallbackHeader": "Here are some matching places in your trip area:",
+    "searchDistanceLabel": "{km} km from {anchor}",
     "fallbackDirectReply": "Genie has noted your request. Would you like to adjust any other stops in your itinerary?",
     "fallbackError": "Genie is temporarily busy optimizing data. Please try again or use the Swap button directly on a stop card!"
   },

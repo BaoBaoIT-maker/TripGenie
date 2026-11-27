@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import {
   AuditAction,
   BannedWordCategory,
+  NotificationType,
   PostModerationStatus,
   ReportStatus,
   ReportTargetType,
@@ -23,6 +24,7 @@ describe('AdminModerationService - 3-Tier AI Moderation & Anti-Brigading Reports
   let mockAdminService: { logAudit: jest.Mock; resolvePagination: jest.Mock };
   let mockBannedWordsService: {
     checkBannedSync: jest.Mock;
+    hasReviewTriggerSync: jest.Mock;
     normalizeForScan: jest.Mock;
   };
   let mockRedis: { get: jest.Mock; set: jest.Mock };
@@ -80,8 +82,9 @@ describe('AdminModerationService - 3-Tier AI Moderation & Anti-Brigading Reports
     };
 
     mockBannedWordsService = {
-      // Default: nothing is banned
+      // Default: nothing is banned or suspicious
       checkBannedSync: jest.fn().mockReturnValue({ isBanned: false }),
+      hasReviewTriggerSync: jest.fn().mockReturnValue(false),
       normalizeForScan: jest.fn((t: string) => t.toLowerCase().trim()),
     };
 
@@ -140,26 +143,52 @@ describe('AdminModerationService - 3-Tier AI Moderation & Anti-Brigading Reports
   });
 
   describe('Tier 1 Sync Gate — assertContentAllowedSync', () => {
-    it('should throw BadRequestException when BannedWordsService flags the content', () => {
+    it('should throw BadRequestException with category-specific error code without leaking matched keyword', () => {
       mockBannedWordsService.checkBannedSync.mockReturnValue({
         isBanned: true,
-        matchedWord: 'cờ bạc',
+        matchedWord: 'kubet88',
         category: BannedWordCategory.GAMBLING,
       });
 
       expect(() =>
-        service.assertContentAllowedSync('Tham gia n.h.à c.á.i kubet nhận thưởng'),
+        service.assertContentAllowedSync('Tham gia n.h.à c.á.i kubet88 nhận thưởng'),
       ).toThrow(BadRequestException);
 
       try {
-        service.assertContentAllowedSync('Đồ chó đẻ vcl');
+        service.assertContentAllowedSync('Tham gia kubet88 ngay');
         fail('Should have thrown BadRequestException');
       } catch (err: any) {
-        expect(err.getResponse().code).toBe(
-          ADMIN_ERROR_CODES.CONTENT_VIOLATES_POLICY,
+        const payload = err.getResponse();
+        expect(payload.code).toBe(
+          ADMIN_ERROR_CODES.CONTENT_VIOLATES_GAMBLING,
         );
+        expect(JSON.stringify(payload)).not.toContain('kubet88');
       }
     });
+
+    it.each([
+      [BannedWordCategory.PROFANITY, ADMIN_ERROR_CODES.CONTENT_VIOLATES_PROFANITY],
+      [BannedWordCategory.ADULT, ADMIN_ERROR_CODES.CONTENT_VIOLATES_ADULT],
+      [BannedWordCategory.SCAM, ADMIN_ERROR_CODES.CONTENT_VIOLATES_SCAM],
+      [BannedWordCategory.GAMBLING, ADMIN_ERROR_CODES.CONTENT_VIOLATES_GAMBLING],
+      [BannedWordCategory.OTHER, ADMIN_ERROR_CODES.CONTENT_VIOLATES_POLICY],
+    ])(
+      'should map BannedWordCategory.%s to %s',
+      (category, expectedCode) => {
+        mockBannedWordsService.checkBannedSync.mockReturnValue({
+          isBanned: true,
+          matchedWord: 'tu-cam-test',
+          category,
+        });
+
+        try {
+          service.assertContentAllowedSync('Nội dung test');
+          fail('Should have thrown BadRequestException');
+        } catch (err: any) {
+          expect(err.getResponse().code).toBe(expectedCode);
+        }
+      },
+    );
 
     it('should pass clean and ambiguous content through (no throw)', () => {
       mockBannedWordsService.checkBannedSync.mockReturnValue({ isBanned: false });
@@ -171,6 +200,42 @@ describe('AdminModerationService - 3-Tier AI Moderation & Anti-Brigading Reports
       expect(() =>
         service.assertContentAllowedSync('Quán này ngon chết mê, không chặt chém!'),
       ).not.toThrow();
+    });
+  });
+
+  describe('Tier 2 — matchesSuspiciousTriggers (DB REVIEW + structural regexes)', () => {
+    it('returns true when BannedWordsService hasReviewTriggerSync flags text', () => {
+      mockBannedWordsService.hasReviewTriggerSync.mockReturnValueOnce(true);
+
+      expect(service.matchesSuspiciousTriggers('Quán làm ăn như cc')).toBe(
+        true,
+      );
+      expect(mockBannedWordsService.hasReviewTriggerSync).toHaveBeenCalledWith(
+        'Quán làm ăn như cc',
+      );
+    });
+
+    it('returns true for structural triggers (Vietnamese phone numbers and external URLs) even when lexical DB returns false', () => {
+      mockBannedWordsService.hasReviewTriggerSync.mockReturnValue(false);
+
+      expect(
+        service.matchesSuspiciousTriggers('Liên hệ số 0912345678 đặt tour'),
+      ).toBe(true);
+      expect(
+        service.matchesSuspiciousTriggers(
+          'Xem chi tiết tại https://example.com/tour',
+        ),
+      ).toBe(true);
+    });
+
+    it('returns false for clean content matching neither DB REVIEW words nor structural patterns', () => {
+      mockBannedWordsService.hasReviewTriggerSync.mockReturnValue(false);
+
+      expect(
+        service.matchesSuspiciousTriggers(
+          'Sáng săn mây đồi Đa Phú, chiều uống cà phê ngắm hoàng hôn rất chill.',
+        ),
+      ).toBe(false);
     });
   });
 
@@ -384,6 +449,163 @@ describe('AdminModerationService - 3-Tier AI Moderation & Anti-Brigading Reports
         }),
       );
       expect(mockTx.communityPost.updateMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Tier 3 — evaluatePostAsync (Publish-First / Cách A)', () => {
+    it('auto-published (APPROVED, moderatedAt: null) with AI OFF should retract to FLAGGED, decrement group count, and notify user', async () => {
+      mockPrisma.communityPost.findUnique.mockResolvedValue({
+        id: mockPostId,
+        userId: '55555555-5555-4555-8555-555555555555',
+        deletedAt: null,
+        moderationStatus: PostModerationStatus.APPROVED,
+        moderatedAt: null,
+      });
+      mockRedis.get.mockResolvedValue('false');
+
+      let capturedWhere: any;
+      let capturedData: any;
+      const upsertSpy = jest.fn().mockResolvedValue({ id: 'notif-1' });
+      const executeRawSpy = jest.fn().mockResolvedValue(1);
+
+      mockPrisma.$transaction.mockImplementation(async (cb: any) => {
+        return cb({
+          communityPost: {
+            updateMany: jest.fn().mockImplementation(({ where, data }: any) => {
+              capturedWhere = where;
+              capturedData = data;
+              return { count: 1 };
+            }),
+          },
+          notification: { upsert: upsertSpy },
+          $executeRaw: executeRawSpy,
+        });
+      });
+
+      await service.evaluatePostAsync(mockPostId, 'Liên hệ zalo đặt cọc ngay');
+
+      expect(capturedWhere).toEqual({
+        id: mockPostId,
+        deletedAt: null,
+        moderationStatus: PostModerationStatus.APPROVED,
+        moderatedAt: null,
+      });
+      expect(capturedData.moderationStatus).toBe(PostModerationStatus.FLAGGED);
+      expect(capturedData.moderationNote).toBe(
+        ADMIN_CONSTANTS.MESSAGES.PENDING_MANUAL_MODERATION_NOTE,
+      );
+      expect(capturedData.moderatedAt).toBeInstanceOf(Date);
+      expect(executeRawSpy).toHaveBeenCalledTimes(1);
+      expect(upsertSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            type: NotificationType.POST_FLAGGED,
+          }),
+        }),
+      );
+    });
+
+    it('auto-published (APPROVED, moderatedAt: null) with Gemini REJECTED should retract post, sync group count, and send POST_REJECTED notification', async () => {
+      mockPrisma.communityPost.findUnique.mockResolvedValue({
+        id: mockPostId,
+        userId: '55555555-5555-4555-8555-555555555555',
+        deletedAt: null,
+        moderationStatus: PostModerationStatus.APPROVED,
+        moderatedAt: null,
+      });
+      mockRedis.get.mockResolvedValue('true');
+      jest.spyOn(service as any, 'evaluateWithGemini').mockResolvedValueOnce({
+        status: PostModerationStatus.REJECTED,
+        reason: 'Có dấu hiệu lừa đảo chuyển khoản',
+      });
+
+      let capturedData: any;
+      const upsertSpy = jest.fn().mockResolvedValue({ id: 'notif-2' });
+      const executeRawSpy = jest.fn().mockResolvedValue(1);
+
+      mockPrisma.$transaction.mockImplementation(async (cb: any) => {
+        return cb({
+          communityPost: {
+            updateMany: jest.fn().mockImplementation(({ data }: any) => {
+              capturedData = data;
+              return { count: 1 };
+            }),
+          },
+          notification: { upsert: upsertSpy },
+          $executeRaw: executeRawSpy,
+        });
+      });
+
+      await service.evaluatePostAsync(mockPostId, 'Chuyển khoản cọc ngay');
+
+      expect(capturedData.moderationStatus).toBe(PostModerationStatus.REJECTED);
+      expect(capturedData.moderationNote).toBe(
+        'Có dấu hiệu lừa đảo chuyển khoản',
+      );
+      expect(executeRawSpy).toHaveBeenCalledTimes(1);
+      expect(upsertSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          create: expect.objectContaining({
+            type: NotificationType.POST_REJECTED,
+          }),
+        }),
+      );
+    });
+
+    it('auto-published (APPROVED, moderatedAt: null) with Gemini APPROVED should stamp moderatedAt without resyncing group count or sending duplicate notification', async () => {
+      mockPrisma.communityPost.findUnique.mockResolvedValue({
+        id: mockPostId,
+        userId: '55555555-5555-4555-8555-555555555555',
+        deletedAt: null,
+        moderationStatus: PostModerationStatus.APPROVED,
+        moderatedAt: null,
+      });
+      mockRedis.get.mockResolvedValue('true');
+      jest.spyOn(service as any, 'evaluateWithGemini').mockResolvedValueOnce({
+        status: PostModerationStatus.APPROVED,
+        reason: 'Nội dung du lịch hợp lệ',
+      });
+
+      let capturedData: any;
+      const upsertSpy = jest.fn();
+      const executeRawSpy = jest.fn();
+
+      mockPrisma.$transaction.mockImplementation(async (cb: any) => {
+        return cb({
+          communityPost: {
+            updateMany: jest.fn().mockImplementation(({ data }: any) => {
+              capturedData = data;
+              return { count: 1 };
+            }),
+          },
+          notification: { upsert: upsertSpy },
+          $executeRaw: executeRawSpy,
+        });
+      });
+
+      await service.evaluatePostAsync(
+        mockPostId,
+        'Quán này ăn ngon không chặt chém',
+      );
+
+      expect(capturedData.moderationStatus).toBe(PostModerationStatus.APPROVED);
+      expect(capturedData.moderatedAt).toBeInstanceOf(Date);
+      expect(executeRawSpy).not.toHaveBeenCalled();
+      expect(upsertSpy).not.toHaveBeenCalled();
+    });
+
+    it('already moderated post (APPROVED with moderatedAt !== null) should be skipped cleanly', async () => {
+      mockPrisma.communityPost.findUnique.mockResolvedValue({
+        id: mockPostId,
+        userId: '55555555-5555-4555-8555-555555555555',
+        deletedAt: null,
+        moderationStatus: PostModerationStatus.APPROVED,
+        moderatedAt: new Date(),
+      });
+
+      await service.evaluatePostAsync(mockPostId, 'Nội dung nghi ngờ');
+
+      expect(mockPrisma.$transaction).not.toHaveBeenCalled();
     });
   });
 });

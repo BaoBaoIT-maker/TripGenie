@@ -10,7 +10,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
-import { BannedWordCategory } from '@prisma/client';
+import { BannedWordAction, BannedWordCategory } from '@prisma/client';
 import { ADMIN_CONSTANTS } from '../admin.constants';
 
 export class CreateBannedWordDto {
@@ -29,6 +29,12 @@ export class CreateBannedWordDto {
   category: BannedWordCategory;
 
   @IsOptional()
+  @IsEnum(BannedWordAction, {
+    message: 'Hành động không hợp lệ (BLOCK, REVIEW)',
+  })
+  action?: BannedWordAction;
+
+  @IsOptional()
   @IsString()
   @MaxLength(255, { message: 'Ghi chú không được vượt quá 255 ký tự' })
   notes?: string;
@@ -41,6 +47,12 @@ export class UpdateBannedWordDto {
       'Danh mục không hợp lệ (PROFANITY, ADULT, SCAM, GAMBLING, OTHER)',
   })
   category?: BannedWordCategory;
+
+  @IsOptional()
+  @IsEnum(BannedWordAction, {
+    message: 'Hành động không hợp lệ (BLOCK, REVIEW)',
+  })
+  action?: BannedWordAction;
 
   @IsOptional()
   @IsString()
@@ -74,6 +86,12 @@ export class QueryBannedWordsDto {
   @IsOptional()
   @IsEnum(BannedWordCategory)
   category?: BannedWordCategory;
+
+  @IsOptional()
+  @IsEnum(BannedWordAction, {
+    message: 'Hành động không hợp lệ (BLOCK, REVIEW)',
+  })
+  action?: BannedWordAction;
 
   @IsOptional()
   @Transform(({ value }) => {

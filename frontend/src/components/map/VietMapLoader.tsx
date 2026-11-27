@@ -10,7 +10,7 @@ function MapLoadingSkeleton() {
   const { t } = useI18n();
   return (
     <Skeleton
-      className="h-[430px] w-full rounded-2xl md:h-[520px]"
+      className="h-full min-h-[320px] w-full rounded-2xl"
       aria-label={t("map.loadingAria")}
     />
   );

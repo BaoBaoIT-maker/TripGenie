@@ -36,7 +36,8 @@ import { AdminLiveEventType } from './events/admin-events.constants';
 import {
   ADMIN_CONSTANTS,
   ADMIN_ERRORS,
-  MODERATION_SUSPICIOUS_PATTERNS,
+  BANNED_CATEGORY_ERRORS,
+  MODERATION_STRUCTURAL_PATTERNS,
 } from './admin.constants';
 import { AdminRequestMeta } from './dto/admin-users.dto';
 import {
@@ -100,15 +101,22 @@ export class AdminModerationService {
     if (!isBanned) return;
 
     this.logger.warn(`Blocked content at Tier 1 (${category}): "${matchedWord}"`);
-    throw new BadRequestException(ADMIN_ERRORS.CONTENT_VIOLATES_POLICY);
+    const error = category
+      ? (BANNED_CATEGORY_ERRORS[category] ??
+        ADMIN_ERRORS.CONTENT_VIOLATES_POLICY)
+      : ADMIN_ERRORS.CONTENT_VIOLATES_POLICY;
+    throw new BadRequestException(error);
   }
 
   /**
-   * Tier 2: Checks if text contains ambiguous/context-sensitive words that warrant AI contextual review.
+   * Tier 2: Checks DB-managed REVIEW keywords and structural triggers (phone numbers, URLs).
    */
   matchesSuspiciousTriggers(text: string): boolean {
+    if (this.bannedWordsService.hasReviewTriggerSync(text)) {
+      return true;
+    }
     const normalized = this.bannedWordsService.normalizeForScan(text);
-    return MODERATION_SUSPICIOUS_PATTERNS.some((pattern) =>
+    return MODERATION_STRUCTURAL_PATTERNS.some((pattern) =>
       pattern.test(normalized),
     );
   }
@@ -379,13 +387,21 @@ export class AdminModerationService {
           userId: true,
           deletedAt: true,
           moderationStatus: true,
+          moderatedAt: true,
         },
       });
-      if (
-        !post ||
-        post.deletedAt ||
-        post.moderationStatus !== PostModerationStatus.PENDING
-      ) {
+      if (!post || post.deletedAt) {
+        return;
+      }
+
+      const isAutoPublished =
+        post.moderationStatus === PostModerationStatus.APPROVED &&
+        post.moderatedAt === null;
+      const isLegacyPending =
+        post.moderationStatus === PostModerationStatus.PENDING;
+
+      // Never overwrite already-moderated posts (moderatedAt !== null) or non-eligible states.
+      if (!isAutoPublished && !isLegacyPending) {
         return;
       }
 
@@ -394,17 +410,28 @@ export class AdminModerationService {
         aiEnabled
           ? await this.evaluateWithGemini(text)
           : {
-              status: PostModerationStatus.PENDING,
+              status: isAutoPublished
+                ? PostModerationStatus.FLAGGED
+                : PostModerationStatus.PENDING,
               reason: ADMIN_CONSTANTS.MESSAGES.PENDING_MANUAL_MODERATION_NOTE,
             };
 
-      await this.prisma.$transaction(async (tx) => {
-        const { count } = await tx.communityPost.updateMany({
-          where: {
+      const whereCondition: Prisma.CommunityPostWhereInput = isAutoPublished
+        ? {
+            id: postId,
+            deletedAt: null,
+            moderationStatus: PostModerationStatus.APPROVED,
+            moderatedAt: null,
+          }
+        : {
             id: postId,
             deletedAt: null,
             moderationStatus: PostModerationStatus.PENDING,
-          },
+          };
+
+      await this.prisma.$transaction(async (tx) => {
+        const { count } = await tx.communityPost.updateMany({
+          where: whereCondition,
           data: {
             moderationStatus: result.status,
             moderationNote: result.reason,
@@ -416,7 +443,11 @@ export class AdminModerationService {
         });
         if (count === 0) return;
 
-        if (result.status === PostModerationStatus.APPROVED) {
+        const approvedCountChanged = isAutoPublished
+          ? result.status !== PostModerationStatus.APPROVED
+          : result.status === PostModerationStatus.APPROVED;
+
+        if (approvedCountChanged) {
           await this.syncGroupPostCounts(tx);
         }
 
@@ -429,8 +460,15 @@ export class AdminModerationService {
           [PostModerationStatus.REJECTED]: NotificationType.POST_REJECTED,
         };
 
-        if (result.status !== PostModerationStatus.PENDING) {
-          const notifType = moderationNotificationTypes[result.status];
+        const shouldNotify =
+          result.status !== PostModerationStatus.PENDING &&
+          !(isAutoPublished && result.status === PostModerationStatus.APPROVED);
+
+        if (shouldNotify) {
+          const notifType =
+            moderationNotificationTypes[
+              result.status as Exclude<PostModerationStatus, 'PENDING'>
+            ];
           await writeNotification(tx, {
             recipientId: post.userId,
             actorId: null,

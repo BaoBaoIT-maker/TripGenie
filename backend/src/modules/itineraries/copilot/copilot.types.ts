@@ -130,6 +130,9 @@ export interface CopilotMessageHistoryItem {
 // GEMINI TOOL FUNCTION DECLARATIONS & CONSTANTS (Typed and Constant)
 // =============================================================================
 
+const COPILOT_CATEGORY_SLUGS_DOC =
+  '"nha-hang", "ca-phe", "an-vat-via-he", "bar-pub", "diem-tham-quan", "di-tich-lich-su", "thien-nhien", "vui-choi", "cho-sieu-thi", "khach-san", "homestay", "spa"';
+
 export const COPILOT_CONSTANTS = {
   SLIDING_WINDOW_SIZE: 8,
   SUMMARIZATION_THRESHOLD: 12,
@@ -141,7 +144,17 @@ export const COPILOT_CONSTANTS = {
   SUMMARY_TEMPERATURE: 0.2,
   GEMINI_BASE_URL: 'https://generativelanguage.googleapis.com/v1beta',
   DEFAULT_MODEL: 'gemini-flash-lite-latest',
-  GROUNDING_PLACES_LIMIT: 25,
+  DEFAULT_SEARCH_PLACES_LIMIT: 5,
+  MAX_SEARCH_PLACES_LIMIT: 10,
+  SEARCH_SCAN_MULTIPLIER: 5,
+  ANCHOR_CANDIDATES_LIMIT: 10,
+  DEFAULT_NEARBY_RADIUS_KM: 3,
+  MIN_NEARBY_RADIUS_KM: 0.2,
+  MAX_NEARBY_RADIUS_KM: 30,
+  MIN_RATING_FLOOR: 1,
+  MAX_RATING_CEILING: 5,
+  DISTANCE_ROUND_FACTOR: 100,
+  SEARCH_DESCRIPTION_MAX_CHARS: 100,
   HISTORY_MESSAGES_LIMIT: 30,
   DEFAULT_ALTERNATIVES_LIMIT: 4,
   DEFAULT_BOUNDING_RADIUS_KM: 45,
@@ -181,6 +194,7 @@ export const COPILOT_SUMMARY_QUEUE = 'copilot-summary';
 export const COPILOT_SUMMARY_JOB = 'summarize-session';
 
 export const COPILOT_TOOL_NAMES = {
+  SEARCH_PLACES: 'search_places',
   SWAP_ACTIVITY: 'swap_activity',
   ADD_ACTIVITY: 'add_activity',
   REMOVE_ACTIVITY: 'remove_activity',
@@ -192,18 +206,81 @@ export const COPILOT_TOOL_NAMES = {
 export type CopilotToolName =
   (typeof COPILOT_TOOL_NAMES)[keyof typeof COPILOT_TOOL_NAMES];
 
+export type MutatingCopilotToolName =
+  | typeof COPILOT_TOOL_NAMES.SWAP_ACTIVITY
+  | typeof COPILOT_TOOL_NAMES.ADD_ACTIVITY
+  | typeof COPILOT_TOOL_NAMES.REMOVE_ACTIVITY
+  | typeof COPILOT_TOOL_NAMES.MOVE_ACTIVITY
+  | typeof COPILOT_TOOL_NAMES.SWAP_DAYS;
+
+export const MUTATING_COPILOT_TOOLS: ReadonlySet<string> =
+  new Set<MutatingCopilotToolName>([
+    COPILOT_TOOL_NAMES.SWAP_ACTIVITY,
+    COPILOT_TOOL_NAMES.ADD_ACTIVITY,
+    COPILOT_TOOL_NAMES.REMOVE_ACTIVITY,
+    COPILOT_TOOL_NAMES.MOVE_ACTIVITY,
+    COPILOT_TOOL_NAMES.SWAP_DAYS,
+  ]);
+
+export function isMutatingCopilotTool(
+  name: string,
+): name is MutatingCopilotToolName {
+  return MUTATING_COPILOT_TOOLS.has(name);
+}
+
 export const COPILOT_FUNCTION_DECLARATIONS = [
+  {
+    name: COPILOT_TOOL_NAMES.SEARCH_PLACES,
+    description:
+      "Search verified places in TripGenie's database within the current itinerary area (food, vegetarian, seafood, quiet cafes, stops near landmarks/hotels, attractions, homestays...) when the user asks for suggestions or discovery without committing an itinerary edit yet.",
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        query: {
+          type: 'STRING',
+          description:
+            'Core keyword or exact place name matching TripGenie’s Vietnam database. Convert English descriptive terms into concise Vietnamese keywords when possible (e.g., "vegetarian" -> "chay", "seafood" -> "hải sản", "quiet cafe" -> "cafe yên tĩnh", "homestay").',
+        },
+        categorySlug: {
+          type: 'STRING',
+          description: `Optional category slug: ${COPILOT_CATEGORY_SLUGS_DOC}.`,
+        },
+        budgetLevel: {
+          type: 'STRING',
+          enum: ['LOW', 'MEDIUM', 'HIGH', 'LUXURY'],
+          description: 'Price tier: LOW, MEDIUM, HIGH, or LUXURY.',
+        },
+        nearPlaceName: {
+          type: 'STRING',
+          description:
+            'Reference landmark, district/zone, or exact stop name from CURRENT ITINERARY SCHEDULE to search around. Use the Vietnamese name matching Vietnam data (e.g., "Dragon Bridge" -> "Cầu Rồng", "My Khe Beach" -> "Biển Mỹ Khê", "Sơn Trà").',
+        },
+        radiusKm: {
+          type: 'NUMBER',
+          description: `Maximum search radius in km around nearPlaceName (default: ${COPILOT_CONSTANTS.DEFAULT_NEARBY_RADIUS_KM}, max: ${COPILOT_CONSTANTS.MAX_NEARBY_RADIUS_KM}).`,
+        },
+        minRating: {
+          type: 'NUMBER',
+          description: `Minimum average rating from ${COPILOT_CONSTANTS.MIN_RATING_FLOOR} to ${COPILOT_CONSTANTS.MAX_RATING_CEILING} (e.g., 4.5).`,
+        },
+        limit: {
+          type: 'INTEGER',
+          description: `Maximum number of results to return (default: ${COPILOT_CONSTANTS.DEFAULT_SEARCH_PLACES_LIMIT}, max: ${COPILOT_CONSTANTS.MAX_SEARCH_PLACES_LIMIT}).`,
+        },
+      },
+    },
+  },
   {
     name: COPILOT_TOOL_NAMES.CHANGE_DESTINATION,
     description:
-      'Gọi công cụ này khi người dùng muốn đổi điểm đến của chuyến đi sang một tỉnh/thành phố hoặc địa phương khác (ví dụ: muốn đổi từ Đà Nẵng sang Phú Quốc, Nha Trang, Đà Lạt, Hà Nội, Sa Pa...).',
+      'Call this tool when the user wants to switch the trip destination to another city or province (e.g., switching from Da Nang to Phu Quoc, Nha Trang, Da Lat, Hanoi, Sa Pa...).',
     parameters: {
       type: 'OBJECT',
       properties: {
         newDestination: {
           type: 'STRING',
           description:
-            'Tên tỉnh/thành phố hoặc điểm đến mới mà người dùng muốn đi tới.',
+            'Name of the new city, province, or destination the user wants to visit.',
         },
       },
       required: ['newDestination'],
@@ -212,34 +289,33 @@ export const COPILOT_FUNCTION_DECLARATIONS = [
   {
     name: COPILOT_TOOL_NAMES.SWAP_ACTIVITY,
     description:
-      'Đổi một địa điểm/hoạt động trong lịch trình sang một địa điểm khác theo yêu cầu của người dùng (ví dụ đổi quán ăn trưa sang quán hải sản, đổi quán cafe, đổi điểm tham quan).',
+      'Replace an existing stop/activity in the itinerary with another place requested by the user (e.g., swapping lunch to seafood, changing a cafe, replacing a sightseeing stop).',
     parameters: {
       type: 'OBJECT',
       properties: {
         dayNumber: {
           type: 'INTEGER',
           description:
-            'Số thứ tự ngày của địa điểm trong lịch trình (ví dụ: 1, 2, 3). Tra cứu đúng ngày của địa điểm trong LỊCH TRÌNH HIỆN TẠI.',
+            'Day number of the target stop in CURRENT ITINERARY SCHEDULE (e.g., 1, 2, 3).',
         },
         currentPlaceName: {
           type: 'STRING',
           description:
-            'Tên chính xác của địa điểm hiện tại trong lịch trình mà người dùng muốn thay thế (ví dụ: "Mì Quảng Bà Mua (Trần Bình Trọng)"). QUAN TRỌNG: Nếu người dùng đang chọn đổi cho địa điểm đã bàn ở câu trước hoặc chỉ định rõ tên quán, BẮT BUỘC phải truyền tên quán đó vào đây!',
+            'Exact name of the current stop in CURRENT ITINERARY SCHEDULE to replace (e.g., "Mì Quảng Bà Mua (Trần Bình Trọng)"). REQUIRED whenever the user references a specific stop or continues discussing a previously mentioned stop.',
         },
         mealOrActivityType: {
           type: 'STRING',
           description:
-            'Loại hoạt động hoặc bữa ăn: sáng, trưa, tối, cafe, tham quan, giải trí.',
+            'Meal or activity slot type: morning, lunch, dinner, cafe, sightseeing, or entertainment.',
         },
         query: {
           type: 'STRING',
           description:
-            'Tên riêng hoặc từ khóa cốt lõi của địa điểm mới muốn đổi sang (bỏ các từ đệm như "đổi sang", "quán", "nhà hàng"; ví dụ: "Hải Sản Bé Mặn", "hải sản").',
+            'Exact place name or core Vietnamese keyword for the replacement stop matching TripGenie’s Vietnam database (strip filler words; e.g., "Hải Sản Bé Mặn", "hải sản").',
         },
         categorySlug: {
           type: 'STRING',
-          description:
-            'Slug danh mục của địa điểm mới (nếu xác định được): "nha-hang", "ca-phe", "an-vat-via-he", "bar-pub", "diem-tham-quan", "di-tich-lich-su", "thien-nhien", "vui-choi", "cho-sieu-thi", "khach-san", "homestay", "spa".',
+          description: `Optional category slug of the replacement place: ${COPILOT_CATEGORY_SLUGS_DOC}.`,
         },
       },
       required: ['query'],
@@ -248,28 +324,27 @@ export const COPILOT_FUNCTION_DECLARATIONS = [
   {
     name: COPILOT_TOOL_NAMES.ADD_ACTIVITY,
     description:
-      'Thêm một địa điểm hoặc hoạt động mới vào một ngày trong lịch trình (ví dụ: thêm quán cafe sáng, thêm quán bar/pub tối, thêm điểm tham quan).',
+      'Add a new place or activity to a specific day in the itinerary (e.g., adding a morning cafe, evening bar/pub, or sightseeing attraction).',
     parameters: {
       type: 'OBJECT',
       properties: {
         dayNumber: {
           type: 'INTEGER',
-          description: 'Số thứ tự ngày muốn thêm địa điểm (ví dụ: 1, 2, 3).',
+          description: 'Day number to insert the new stop into (e.g., 1, 2, 3).',
         },
         timeSlot: {
           type: 'STRING',
           description:
-            'Khung giờ hoặc buổi muốn chèn: "morning" (sáng), "lunch" (trưa), "afternoon" (chiều), "dinner" (tối), "night" (đêm).',
+            'Target time slot: "morning", "lunch", "afternoon", "dinner", or "night".',
         },
         query: {
           type: 'STRING',
           description:
-            'Tên riêng hoặc từ khóa cốt lõi của địa điểm muốn thêm (bỏ các từ đệm như "thêm", "quán", "tiệm").',
+            'Exact place name or core Vietnamese keyword of the stop to add matching TripGenie’s Vietnam database (strip filler words).',
         },
         categorySlug: {
           type: 'STRING',
-          description:
-            'Slug danh mục của địa điểm muốn thêm (nếu xác định được): "nha-hang", "ca-phe", "an-vat-via-he", "bar-pub", "diem-tham-quan", "di-tich-lich-su", "thien-nhien", "vui-choi", "cho-sieu-thi", "khach-san", "homestay", "spa".',
+          description: `Optional category slug of the place to add: ${COPILOT_CATEGORY_SLUGS_DOC}.`,
         },
       },
       required: ['dayNumber', 'query'],
@@ -278,17 +353,18 @@ export const COPILOT_FUNCTION_DECLARATIONS = [
   {
     name: COPILOT_TOOL_NAMES.REMOVE_ACTIVITY,
     description:
-      'Xóa một địa điểm/hoạt động ra khỏi lịch trình (ví dụ: xóa bớt 1 điểm vì mệt, bỏ quán cafe chiều, về sớm).',
+      'Remove an existing stop/activity from the itinerary (e.g., dropping a stop to rest, removing an afternoon cafe).',
     parameters: {
       type: 'OBJECT',
       properties: {
         dayNumber: {
           type: 'INTEGER',
-          description: 'Số thứ tự ngày chứa hoạt động muốn xóa.',
+          description: 'Day number containing the stop to remove.',
         },
         placeName: {
           type: 'STRING',
-          description: 'Tên hoặc từ khóa nhận diện địa điểm muốn xóa.',
+          description:
+            'Exact name from CURRENT ITINERARY SCHEDULE (or identifying keyword) of the stop to remove.',
         },
       },
       required: ['dayNumber', 'placeName'],
@@ -297,26 +373,27 @@ export const COPILOT_FUNCTION_DECLARATIONS = [
   {
     name: COPILOT_TOOL_NAMES.MOVE_ACTIVITY,
     description:
-      'Di chuyển một địa điểm từ ngày này sang ngày khác trong lịch trình (ví dụ: dời Chùa Linh Ứng từ chiều ngày 1 sang sáng ngày 2).',
+      'Move an existing stop from one day to another in the itinerary (e.g., moving Chùa Linh Ứng from Day 1 afternoon to Day 2 morning).',
     parameters: {
       type: 'OBJECT',
       properties: {
         placeName: {
           type: 'STRING',
-          description: 'Tên địa điểm muốn di chuyển.',
+          description:
+            'Exact name from CURRENT ITINERARY SCHEDULE of the stop to move.',
         },
         fromDay: {
           type: 'INTEGER',
-          description: 'Ngày hiện tại chứa địa điểm.',
+          description: 'Current day number containing the stop.',
         },
         toDay: {
           type: 'INTEGER',
-          description: 'Ngày đích muốn chuyển địa điểm tới.',
+          description: 'Target day number to move the stop to.',
         },
         targetTimeSlot: {
           type: 'STRING',
           description:
-            'Khung giờ ở ngày đích: "morning", "afternoon", "evening". Mặc định "afternoon".',
+            'Target time slot on the destination day: "morning", "afternoon", or "evening". Defaults to "afternoon".',
         },
       },
       required: ['placeName', 'fromDay', 'toDay'],
@@ -325,17 +402,17 @@ export const COPILOT_FUNCTION_DECLARATIONS = [
   {
     name: COPILOT_TOOL_NAMES.SWAP_DAYS,
     description:
-      'Hoán đổi toàn bộ lịch trình giữa 2 ngày cho nhau (ví dụ: đổi lịch ngày 1 với ngày 2 vì ngày 1 trời mưa).',
+      'Swap the full schedule between two days of the itinerary (e.g., swapping Day 1 with Day 2 due to weather).',
     parameters: {
       type: 'OBJECT',
       properties: {
         dayA: {
           type: 'INTEGER',
-          description: 'Số thứ tự ngày thứ nhất (ví dụ: 1).',
+          description: 'First day number (e.g., 1).',
         },
         dayB: {
           type: 'INTEGER',
-          description: 'Số thứ tự ngày thứ hai (ví dụ: 2).',
+          description: 'Second day number (e.g., 2).',
         },
       },
       required: ['dayA', 'dayB'],

@@ -8,6 +8,7 @@ import {
 import {
   AuditAction,
   BannedWord,
+  BannedWordAction,
   BannedWordCategory,
   Prisma,
 } from '@prisma/client';
@@ -19,6 +20,7 @@ import { AdminRequestMeta } from './dto/admin-users.dto';
 import {
   CreateBannedWordDto,
   QueryBannedWordsDto,
+  UpdateBannedWordDto,
 } from './dto/admin-banned-words.dto';
 
 export interface BannedWordCheckResult {
@@ -41,8 +43,9 @@ const WORD_END = '(?![\\p{L}\\p{N}])';
 @Injectable()
 export class BannedWordsService implements OnModuleInit {
   private readonly logger = new Logger(BannedWordsService.name);
-  private categoryByWord = new Map<string, BannedWordCategory>();
-  private compiledRegex: RegExp | null = null;
+  private blockCategoryByWord = new Map<string, BannedWordCategory>();
+  private blockRegex: RegExp | null = null;
+  private reviewRegex: RegExp | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -58,17 +61,26 @@ export class BannedWordsService implements OnModuleInit {
     try {
       const activeWords = await this.prisma.bannedWord.findMany({
         where: { isActive: true },
-        select: { word: true, category: true },
+        select: { word: true, category: true, action: true },
       });
 
-      const nextMap = new Map<string, BannedWordCategory>();
-      for (const { word, category } of activeWords) {
-        nextMap.set(this.normalizeForScan(word), category);
+      const nextBlockMap = new Map<string, BannedWordCategory>();
+      const nextReviewWords: string[] = [];
+      for (const { word, category, action } of activeWords) {
+        const normalized = this.normalizeForScan(word);
+        if (action === BannedWordAction.REVIEW) {
+          nextReviewWords.push(normalized);
+        } else {
+          nextBlockMap.set(normalized, category);
+        }
       }
 
-      this.categoryByWord = nextMap;
-      this.compiledRegex = this.compile([...nextMap.keys()]);
-      this.logger.log(`Banned words cache reloaded: ${nextMap.size} active words.`);
+      this.blockCategoryByWord = nextBlockMap;
+      this.blockRegex = this.compile([...nextBlockMap.keys()]);
+      this.reviewRegex = this.compile(nextReviewWords);
+      this.logger.log(
+        `Banned words cache reloaded: ${nextBlockMap.size} BLOCK, ${nextReviewWords.length} REVIEW active words.`,
+      );
     } catch (err) {
       // Keep serving the previous cache rather than dropping protection.
       this.logger.error(
@@ -98,17 +110,25 @@ export class BannedWordsService implements OnModuleInit {
   }
 
   checkBannedSync(text: string): BannedWordCheckResult {
-    if (!text || !this.compiledRegex) return { isBanned: false };
+    if (!text || !this.blockRegex) return { isBanned: false };
 
-    const match = this.compiledRegex.exec(this.normalizeForScan(text));
+    const match = this.blockRegex.exec(this.normalizeForScan(text));
     if (!match) return { isBanned: false };
 
     const matchedWord = match[0].toLowerCase();
     return {
       isBanned: true,
       matchedWord,
-      category: this.categoryByWord.get(matchedWord),
+      category: this.blockCategoryByWord.get(matchedWord),
     };
+  }
+
+  /**
+   * Tier 2 lexical trigger check against DB-managed REVIEW keywords in RAM.
+   */
+  hasReviewTriggerSync(text: string): boolean {
+    if (!text || !this.reviewRegex) return false;
+    return this.reviewRegex.test(this.normalizeForScan(text));
   }
 
   async findAll(query: QueryBannedWordsDto) {
@@ -117,6 +137,7 @@ export class BannedWordsService implements OnModuleInit {
     const search = query.search?.trim();
     const where: Prisma.BannedWordWhereInput = {
       ...(query.category ? { category: query.category } : {}),
+      ...(query.action ? { action: query.action } : {}),
       ...(query.isActive !== undefined ? { isActive: query.isActive } : {}),
       ...(search
         ? {
@@ -162,6 +183,7 @@ export class BannedWordsService implements OnModuleInit {
       data: {
         word,
         category: dto.category,
+        action: dto.action ?? BannedWordAction.BLOCK,
         notes: dto.notes?.trim() || null,
         createdBy: admin.id,
       },
@@ -174,6 +196,44 @@ export class BannedWordsService implements OnModuleInit {
     });
     await this.reloadCache();
     return created;
+  }
+
+  async update(
+    admin: AuthenticatedUser,
+    id: string,
+    dto: UpdateBannedWordDto,
+    meta?: AdminRequestMeta,
+  ): Promise<BannedWord> {
+    const existing = await this.findOrThrow(id);
+    const data: Prisma.BannedWordUpdateInput = {
+      ...(dto.category !== undefined ? { category: dto.category } : {}),
+      ...(dto.action !== undefined ? { action: dto.action } : {}),
+      ...(dto.notes !== undefined ? { notes: dto.notes.trim() || null } : {}),
+      ...(dto.isActive !== undefined ? { isActive: dto.isActive } : {}),
+    };
+
+    const updated = await this.prisma.bannedWord.update({
+      where: { id },
+      data,
+    });
+
+    await this.audit(admin, AuditAction.UPDATE, updated, meta, {
+      before: {
+        category: existing.category,
+        action: existing.action,
+        notes: existing.notes,
+        isActive: existing.isActive,
+      },
+      after: {
+        category: updated.category,
+        action: updated.action,
+        notes: updated.notes,
+        isActive: updated.isActive,
+      },
+      note: ADMIN_CONSTANTS.MESSAGES.DEFAULT_UPDATE_BANNED_WORD_NOTE,
+    });
+    await this.reloadCache();
+    return updated;
   }
 
   async toggleActive(

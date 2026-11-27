@@ -22,6 +22,7 @@ import type {
   QueryAdminPlacesParams,
   QueryAdminReportsParams,
   QueryAdminUsersParams,
+  UpdateBannedWordPayload,
 } from "@/types/admin";
 
 function buildQueryString(params?: Record<string, unknown>): string {
@@ -266,6 +267,15 @@ export const adminService = {
   ): Promise<AdminBannedWordItem> =>
     apiClient<AdminBannedWordItem>("/admin/banned-words", {
       method: "POST",
+      body: JSON.stringify(payload),
+    }),
+
+  updateBannedWord: (
+    id: string,
+    payload: UpdateBannedWordPayload
+  ): Promise<AdminBannedWordItem> =>
+    apiClient<AdminBannedWordItem>(`/admin/banned-words/${id}`, {
+      method: "PATCH",
       body: JSON.stringify(payload),
     }),
 

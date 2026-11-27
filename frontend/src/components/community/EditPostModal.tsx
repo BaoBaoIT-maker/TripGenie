@@ -45,6 +45,7 @@ export function EditPostModal({
   const [selectedGroupId, setSelectedGroupId] = useState<string>(
     post.group?.slug || post.groupId || COMMUNITY_UI_CONSTANTS.DEFAULT_GROUP_SLUG
   );
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const updatePostMutation = useUpdateCommunityPost();
   const hasProvidedGroups = Boolean(
@@ -57,6 +58,7 @@ export function EditPostModal({
 
   const handleClose = useCallback(() => {
     if (!updatePostMutation.isPending) {
+      setSubmitError(null);
       onClose();
     }
   }, [updatePostMutation.isPending, onClose]);
@@ -67,23 +69,32 @@ export function EditPostModal({
     e.preventDefault();
     const trimmedTitle = title.trim();
     if (!trimmedTitle) return;
+    setSubmitError(null);
 
     const parsedTags = tagsInput
       .split(/[\s,]+/)
       .map((t) => t.trim())
       .filter(Boolean);
 
-    await updatePostMutation.mutateAsync({
-      postId: post.id,
-      payload: {
-        title: trimmedTitle,
-        caption: caption.trim() || undefined,
-        tags: parsedTags,
-        groupId: selectedGroupId || undefined,
-      },
-    });
+    try {
+      await updatePostMutation.mutateAsync({
+        postId: post.id,
+        payload: {
+          title: trimmedTitle,
+          caption: caption.trim() || undefined,
+          tags: parsedTags,
+          groupId: selectedGroupId || undefined,
+        },
+      });
 
-    handleClose();
+      handleClose();
+    } catch (err: unknown) {
+      setSubmitError(
+        err instanceof Error && err.message
+          ? err.message
+          : t("community.toasts.postUpdateError")
+      );
+    }
   };
 
   const handleAddTagSuggestion = (tag: string) => {
@@ -300,6 +311,19 @@ export function EditPostModal({
             </div>
           )}
         </div>
+
+        {submitError && (
+          <div
+            role="alert"
+            className="flex items-start gap-2.5 rounded-[12px] border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-900"
+          >
+            <i
+              className="fa-solid fa-circle-exclamation text-rose-500 mt-0.5 shrink-0"
+              aria-hidden="true"
+            />
+            <span className="leading-relaxed">{submitError}</span>
+          </div>
+        )}
 
         {/* Footer Actions */}
         <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#F1F5F9] shrink-0">

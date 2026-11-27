@@ -64,6 +64,7 @@ export function CreatePostModal({
     defaultGroupId || COMMUNITY_UI_CONSTANTS.DEFAULT_GROUP_SLUG
   );
   const [uploadedItems, setUploadedItems] = useState<UploadedMediaItem[]>([]);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -196,6 +197,7 @@ export function CreatePostModal({
     setIsTagDropdownOpen(false);
     setSelectedItineraryId("");
     setUploadedItems([]);
+    setSubmitError(null);
     hasProcessedInitialFilesRef.current = false;
     onClose();
   }, [createPostMutation.isPending, isUploading, cancelUpload, onClose]);
@@ -280,27 +282,36 @@ export function CreatePostModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
+    setSubmitError(null);
 
     const parsedTags = tagsInput
       .split(/[\s,]+/)
       .map((t) => t.trim())
       .filter(Boolean);
 
-    await createPostMutation.mutateAsync({
-      title: title.trim(),
-      caption: caption.trim() || undefined,
-      mediaUrls: uploadedItems.map((item) => item.url),
-      tags: parsedTags,
-      itineraryId: selectedItineraryId || undefined,
-      groupId: selectedGroupId || undefined,
-    });
+    try {
+      await createPostMutation.mutateAsync({
+        title: title.trim(),
+        caption: caption.trim() || undefined,
+        mediaUrls: uploadedItems.map((item) => item.url),
+        tags: parsedTags,
+        itineraryId: selectedItineraryId || undefined,
+        groupId: selectedGroupId || undefined,
+      });
 
-    setTitle("");
-    setCaption("");
-    setTagsInput("");
-    setSelectedItineraryId("");
-    setUploadedItems([]);
-    onClose();
+      setTitle("");
+      setCaption("");
+      setTagsInput("");
+      setSelectedItineraryId("");
+      setUploadedItems([]);
+      onClose();
+    } catch (err: unknown) {
+      setSubmitError(
+        err instanceof Error && err.message
+          ? err.message
+          : t("community.toasts.postCreateError")
+      );
+    }
   };
 
   return (
@@ -646,6 +657,19 @@ export function CreatePostModal({
             </div>
           </div>
         </div>
+
+        {submitError && (
+          <div
+            role="alert"
+            className="flex items-start gap-2.5 rounded-[12px] border border-rose-200 bg-rose-50 px-3.5 py-2.5 text-xs font-medium text-rose-900"
+          >
+            <i
+              className="fa-solid fa-circle-exclamation text-rose-500 mt-0.5 shrink-0"
+              aria-hidden="true"
+            />
+            <span className="leading-relaxed">{submitError}</span>
+          </div>
+        )}
 
         {/* Footer Actions */}
         <div className="flex items-center justify-end gap-2.5 pt-3.5 border-t border-border">

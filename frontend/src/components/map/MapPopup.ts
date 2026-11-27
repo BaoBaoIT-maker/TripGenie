@@ -37,7 +37,7 @@ export function createMapPopupElement(
     ) || place.category;
 
   const container = document.createElement("div");
-  container.className = "w-[290px] overflow-hidden rounded-2xl bg-white text-slate-900 shadow-2xl font-sans select-none border border-slate-200/80";
+  container.className = "w-[290px] overflow-hidden bg-white text-[#10243A] font-sans select-none";
 
   // 1. Header Image or Neutral Placeholder
   const dbImage =
@@ -93,7 +93,7 @@ export function createMapPopupElement(
 
   // Floating Category pill on bottom-left of photo
   const categoryPill = document.createElement("span");
-  categoryPill.className = "absolute bottom-2 left-2 px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md text-white text-[10.5px] font-semibold border border-white/20";
+  categoryPill.className = "absolute bottom-2 left-2 px-2.5 py-0.5 rounded-full bg-[#10243A]/75 text-white text-[10.5px] font-semibold border border-white/20";
   categoryPill.textContent = categoryText;
   imgWrapper.appendChild(categoryPill);
 
@@ -104,7 +104,7 @@ export function createMapPopupElement(
     saveBtn.className = `absolute top-2 left-2 size-7 rounded-full flex items-center justify-center transition-all cursor-pointer shadow-md ${
       options.isSaved
         ? "bg-rose-500 text-white ring-2 ring-white/50 scale-105"
-        : "bg-black/40 hover:bg-black/65 backdrop-blur-md text-white/90 hover:text-white"
+        : "bg-[#10243A]/65 hover:bg-[#10243A]/85 text-white/95 hover:text-white"
     }`;
     saveBtn.title = options.isSaved ? translate(locale, "map.popup.unsavePlace") : translate(locale, "map.popup.saveToFavorites");
     saveBtn.innerHTML = `<i class="fa-solid fa-heart text-xs ${options.isSaved ? "text-white" : "text-white/90"}"></i>`;
@@ -125,7 +125,7 @@ export function createMapPopupElement(
 
   // Title (clickable to detail)
   const title = document.createElement("h4");
-  title.className = "font-bold text-slate-900 text-[13.5px] leading-snug line-clamp-1 cursor-pointer hover:text-[#0194F3] transition-colors";
+  title.className = "font-bold text-[#10243A] text-[13.5px] leading-snug line-clamp-1 cursor-pointer hover:text-[#0194F3] transition-colors";
   title.textContent = place.name;
   if (onOpenDetail) {
     title.addEventListener("click", () => onOpenDetail(place.id));
@@ -183,7 +183,7 @@ export function createMapPopupElement(
 
   if (distanceKm !== undefined && distanceKm !== null) {
     const distBadge = document.createElement("span");
-    distBadge.className = "px-1.5 py-0.2 rounded bg-[#0194F3]/10 text-[#0194F3] font-bold text-[10px] whitespace-nowrap";
+    distBadge.className = "px-1.5 py-0.5 rounded bg-[#F0F7FF] border border-[#D0E7FF] text-[#0194F3] font-bold text-[10px] whitespace-nowrap";
     distBadge.textContent = routingService.formatDistanceKm(distanceKm, locale);
     addressRow.appendChild(distBadge);
   }
@@ -207,7 +207,7 @@ export function createMapPopupElement(
 
       const statusBadge = document.createElement("div");
       statusBadge.className =
-        "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0194F3]/10 border border-[#0194F3]/25 py-1.5 px-2 text-[11px] font-bold text-[#0194F3]";
+        "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#F0F7FF] border border-[#D0E7FF] py-1.5 px-2 text-[11px] font-bold text-[#0194F3]";
       statusBadge.innerHTML = `
         <i class="fa-solid fa-check text-xs shrink-0" aria-hidden="true"></i>
         <span class="truncate">${translate(locale, "map.popup.activeStopBadge", { letter: stopLetter, index: stopIdx + 1 })}</span>
@@ -240,7 +240,7 @@ export function createMapPopupElement(
         const originBtn = document.createElement("button");
         originBtn.type = "button";
         originBtn.className =
-          "flex-1 min-w-0 inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 py-1.5 px-2 text-[11px] font-semibold text-slate-700 transition-colors cursor-pointer";
+          "flex-1 min-w-0 inline-flex items-center justify-center gap-1 rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F0F7FF] hover:border-[#D0E7FF] hover:text-[#0194F3] py-1.5 px-2 text-[11px] font-semibold text-[#10243A] transition-colors cursor-pointer";
         originBtn.innerHTML = `
           <i class="fa-solid fa-flag-checkered text-xs shrink-0" aria-hidden="true"></i>
           <span>${translate(locale, "map.popup.setOriginShort")}</span>
@@ -257,8 +257,8 @@ export function createMapPopupElement(
       detailLink.href = `/places/${place.slug || place.id}`;
       detailLink.className =
         stopIdx > 0 && options.onSetOrigin
-          ? "shrink-0 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-1.5 px-3 text-[11px] font-bold text-slate-800 transition-colors cursor-pointer whitespace-nowrap no-underline"
-          : "w-full inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-1.5 px-3 text-[11px] font-bold text-slate-800 transition-colors cursor-pointer whitespace-nowrap no-underline";
+          ? "shrink-0 inline-flex items-center justify-center rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F0F7FF] hover:border-[#D0E7FF] hover:text-[#0194F3] py-1.5 px-3 text-[11px] font-bold text-[#10243A] transition-colors cursor-pointer whitespace-nowrap no-underline"
+          : "w-full inline-flex items-center justify-center rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F0F7FF] hover:border-[#D0E7FF] hover:text-[#0194F3] py-1.5 px-3 text-[11px] font-bold text-[#10243A] transition-colors cursor-pointer whitespace-nowrap no-underline";
       detailLink.textContent = translate(locale, "map.popup.viewDetails");
       if (onOpenDetail) {
         detailLink.addEventListener("click", (e) => {
@@ -277,7 +277,7 @@ export function createMapPopupElement(
         const addStopBtn = document.createElement("button");
         addStopBtn.type = "button";
         addStopBtn.className =
-          "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0194F3] hover:bg-[#0082d6] py-1.5 px-2 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer active:scale-95";
+          "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] py-1.5 px-2 text-xs font-bold text-white shadow-[0_2px_8px_rgba(1,148,243,0.28)] transition-colors cursor-pointer active:scale-95";
         addStopBtn.innerHTML = `
           <i class="fa-solid fa-plus text-xs shrink-0" aria-hidden="true"></i>
           <span>${translate(locale, "map.popup.addStop")}</span>
@@ -294,7 +294,7 @@ export function createMapPopupElement(
         const originBtn = document.createElement("button");
         originBtn.type = "button";
         originBtn.className =
-          "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 py-1.5 px-2 text-[11px] font-semibold text-slate-700 transition-colors cursor-pointer active:scale-95";
+          "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F0F7FF] hover:border-[#D0E7FF] hover:text-[#0194F3] py-1.5 px-2 text-[11px] font-semibold text-[#10243A] transition-colors cursor-pointer active:scale-95";
         originBtn.innerHTML = `
           <i class="fa-solid fa-flag-checkered text-xs shrink-0" aria-hidden="true"></i>
           <span>${translate(locale, "map.popup.setOriginShort")}</span>
@@ -316,7 +316,7 @@ export function createMapPopupElement(
         const addItineraryBtn = document.createElement("button");
         addItineraryBtn.type = "button";
         addItineraryBtn.className =
-          "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#0194F3]/35 bg-[#0194F3]/10 hover:bg-[#0194F3]/20 py-1.5 px-2 text-[11px] font-bold text-[#0194F3] transition-colors cursor-pointer active:scale-95";
+          "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#D0E7FF] bg-[#F0F7FF] hover:bg-[#E8F4FD] py-1.5 px-2 text-[11px] font-bold text-[#0194F3] transition-colors cursor-pointer active:scale-95";
         addItineraryBtn.innerHTML = `
           <i class="fa-solid fa-calendar-plus text-xs shrink-0" aria-hidden="true"></i>
           <span class="truncate">${translate(locale, "map.popup.addToItineraryShort")}</span>
@@ -332,8 +332,8 @@ export function createMapPopupElement(
       const detailLink = document.createElement("a");
       detailLink.href = `/places/${place.slug || place.id}`;
       detailLink.className = options.onAddToItinerary
-        ? "shrink-0 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-1.5 px-3 text-[11px] font-bold text-slate-800 transition-colors cursor-pointer whitespace-nowrap no-underline"
-        : "w-full inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-1.5 px-3 text-[11px] font-bold text-slate-800 transition-colors cursor-pointer whitespace-nowrap no-underline";
+        ? "shrink-0 inline-flex items-center justify-center rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F0F7FF] hover:border-[#D0E7FF] hover:text-[#0194F3] py-1.5 px-3 text-[11px] font-bold text-[#10243A] transition-colors cursor-pointer whitespace-nowrap no-underline"
+        : "w-full inline-flex items-center justify-center rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F0F7FF] hover:border-[#D0E7FF] hover:text-[#0194F3] py-1.5 px-3 text-[11px] font-bold text-[#10243A] transition-colors cursor-pointer whitespace-nowrap no-underline";
       detailLink.textContent = translate(locale, "map.popup.viewDetails");
       if (onOpenDetail) {
         detailLink.addEventListener("click", (e) => {
@@ -352,7 +352,8 @@ export function createMapPopupElement(
     if (onRequestDirections) {
       const dirBtn = document.createElement("button");
       dirBtn.type = "button";
-      dirBtn.className = "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0194F3] hover:bg-[#0082d6] py-2 px-2.5 text-xs font-bold text-white shadow-xs transition-colors cursor-pointer active:scale-95";
+      dirBtn.className =
+        "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] py-2 px-2.5 text-xs font-bold text-white shadow-[0_2px_8px_rgba(1,148,243,0.28)] transition-colors cursor-pointer active:scale-95";
       dirBtn.innerHTML = `
         <i class="fa-solid fa-route text-xs"></i>
         <span>${translate(locale, "map.popup.directions")}</span>
@@ -368,8 +369,8 @@ export function createMapPopupElement(
     const detailLink = document.createElement("a");
     detailLink.href = `/places/${place.slug || place.id}`;
     detailLink.className = onRequestDirections
-      ? "shrink-0 inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white hover:bg-slate-50 py-2 px-3 text-xs font-bold text-slate-800 transition-colors cursor-pointer whitespace-nowrap shadow-2xs no-underline"
-      : "w-full inline-flex items-center justify-center rounded-xl bg-[#0194F3] hover:bg-[#0082d6] py-2 px-3 text-xs font-bold text-white transition-colors cursor-pointer shadow-xs no-underline";
+      ? "shrink-0 inline-flex items-center justify-center rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F0F7FF] hover:border-[#D0E7FF] hover:text-[#0194F3] py-2 px-3 text-xs font-bold text-[#10243A] transition-colors cursor-pointer whitespace-nowrap shadow-2xs no-underline"
+      : "w-full inline-flex items-center justify-center rounded-xl bg-[#0194F3] hover:bg-[#0084DE] py-2 px-3 text-xs font-bold text-white transition-colors cursor-pointer shadow-[0_2px_8px_rgba(1,148,243,0.28)] no-underline";
     detailLink.textContent = onRequestDirections ? translate(locale, "map.popup.detailsShort") : translate(locale, "map.popup.viewDetails");
     if (onOpenDetail) {
       detailLink.addEventListener("click", (e) => {
@@ -389,7 +390,7 @@ export function createMapPopupElement(
         const addItineraryBtn = document.createElement("button");
         addItineraryBtn.type = "button";
         addItineraryBtn.className =
-          "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#0194F3]/35 bg-[#0194F3]/10 hover:bg-[#0194F3]/20 py-1.5 px-2 text-[11px] font-bold text-[#0194F3] transition-colors cursor-pointer active:scale-95";
+          "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#D0E7FF] bg-[#F0F7FF] hover:bg-[#E8F4FD] py-1.5 px-2 text-[11px] font-bold text-[#0194F3] transition-colors cursor-pointer active:scale-95";
         addItineraryBtn.innerHTML = `
           <i class="fa-solid fa-calendar-plus text-xs shrink-0" aria-hidden="true"></i>
           <span class="truncate">${options.onSetOrigin ? translate(locale, "map.popup.addToItineraryShort") : translate(locale, "map.popup.addToItineraryFull")}</span>
@@ -406,7 +407,7 @@ export function createMapPopupElement(
         const originBtn = document.createElement("button");
         originBtn.type = "button";
         originBtn.className =
-          "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 py-1.5 px-2 text-[11px] font-semibold text-slate-600 hover:text-slate-900 transition-colors cursor-pointer active:scale-95";
+          "flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 rounded-xl border border-[#E2E8F0] bg-white hover:bg-[#F0F7FF] hover:border-[#D0E7FF] hover:text-[#0194F3] py-1.5 px-2 text-[11px] font-semibold text-[#10243A] transition-colors cursor-pointer active:scale-95";
         originBtn.innerHTML = `
           <i class="fa-solid fa-flag-checkered text-xs shrink-0" aria-hidden="true"></i>
           <span class="truncate">${options.onAddToItinerary ? translate(locale, "map.popup.setOriginShort") : translate(locale, "map.popup.setOriginFull")}</span>

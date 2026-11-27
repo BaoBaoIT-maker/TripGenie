@@ -6,7 +6,12 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
-import { Prisma } from '@prisma/client';
+import { BudgetLevel, Prisma } from '@prisma/client';
+import {
+  AppLocale,
+  DEFAULT_LOCALE,
+} from '../../../common/i18n/locale.util';
+import { t } from '../../../common/i18n/t.util';
 import {
   AlternativePlaceItem,
   CopilotToolExecutionResult,
@@ -509,6 +514,391 @@ export class CopilotToolsService {
       newPlace,
       `Đã đổi từ ${activity.place.name} sang ${newPlace.name}.`,
     );
+  }
+
+  /**
+   * Resolves a geographic reference landmark or zone objectively within tripBbox
+   * (exact name match first, then highest reviewCount in DB) so nearby queries avoid
+   * itinerary-stop coordinate bias while preventing cross-province mismatches.
+   */
+  private async resolveSearchAnchor(
+    nearPlaceName: string,
+    tripBbox: BoundingBox,
+  ): Promise<{ name: string; lat: number; lng: number } | null> {
+    const raw = nearPlaceName.trim();
+    if (!raw) return null;
+    const norm = normalizeVietnamese(raw);
+
+    const placeCandidates = await this.prisma.place.findMany({
+      where: {
+        deletedAt: null,
+        status: 'ACTIVE',
+        latitude: { gte: tripBbox.minLat, lte: tripBbox.maxLat },
+        longitude: { gte: tripBbox.minLng, lte: tripBbox.maxLng },
+        OR: [
+          { name: { contains: raw, mode: 'insensitive' } },
+          { nameNormalized: { contains: norm, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        name: true,
+        nameNormalized: true,
+        latitude: true,
+        longitude: true,
+        reviewCount: true,
+      },
+      orderBy: [{ reviewCount: 'desc' }, { ratingAvg: 'desc' }],
+      take: COPILOT_CONSTANTS.ANCHOR_CANDIDATES_LIMIT,
+    });
+
+    if (placeCandidates.length > 0) {
+      const exactMatch = placeCandidates.find(
+        (c) =>
+          normalizeVietnamese(c.name) === norm ||
+          normalizeVietnamese(c.nameNormalized || '') === norm,
+      );
+      const chosen = exactMatch ?? placeCandidates[0];
+      if (
+        typeof chosen.latitude === 'number' &&
+        typeof chosen.longitude === 'number'
+      ) {
+        return {
+          name: chosen.name,
+          lat: chosen.latitude,
+          lng: chosen.longitude,
+        };
+      }
+    }
+
+    if (!this.prisma.travelArea?.findMany) {
+      return null;
+    }
+
+    const areaCandidates = await this.prisma.travelArea.findMany({
+      where: {
+        isActive: true,
+        bboxMinLat: { not: null },
+        bboxMaxLat: { not: null },
+        bboxMinLng: { not: null },
+        bboxMaxLng: { not: null },
+        OR: [
+          { nameVi: { contains: raw, mode: 'insensitive' } },
+          { name: { contains: raw, mode: 'insensitive' } },
+          { slug: { contains: norm, mode: 'insensitive' } },
+        ],
+      },
+      select: {
+        name: true,
+        nameVi: true,
+        bboxMinLat: true,
+        bboxMaxLat: true,
+        bboxMinLng: true,
+        bboxMaxLng: true,
+      },
+      take: COPILOT_CONSTANTS.ANCHOR_CANDIDATES_LIMIT,
+    });
+
+    const scopedAreas = areaCandidates
+      .map((a) => {
+        if (
+          a.bboxMinLat == null ||
+          a.bboxMaxLat == null ||
+          a.bboxMinLng == null ||
+          a.bboxMaxLng == null
+        ) {
+          return null;
+        }
+        const lat = (a.bboxMinLat + a.bboxMaxLat) / 2;
+        const lng = (a.bboxMinLng + a.bboxMaxLng) / 2;
+        const insideTrip =
+          lat >= tripBbox.minLat &&
+          lat <= tripBbox.maxLat &&
+          lng >= tripBbox.minLng &&
+          lng <= tripBbox.maxLng;
+        if (!insideTrip) return null;
+        return { name: a.nameVi || a.name, rawName: a.name, lat, lng };
+      })
+      .filter(
+        (item): item is { name: string; rawName: string; lat: number; lng: number } =>
+          item !== null,
+      );
+
+    if (scopedAreas.length === 0) return null;
+
+    const exactArea = scopedAreas.find(
+      (a) =>
+        normalizeVietnamese(a.name) === norm ||
+        normalizeVietnamese(a.rawName) === norm,
+    );
+    const chosenArea = exactArea ?? scopedAreas[0];
+    return {
+      name: chosenArea.name,
+      lat: chosenArea.lat,
+      lng: chosenArea.lng,
+    };
+  }
+
+  /**
+   * Tool: search_places — Read-only DB-grounded place discovery scoped to the itinerary's area
+   * with optional landmark proximity (Haversine radiusKm) and minimum rating filtering.
+   */
+  async searchPlacesForItinerary(
+    itineraryId: string,
+    args: {
+      query?: string;
+      categorySlug?: string;
+      budgetLevel?: string;
+      nearPlaceName?: string;
+      radiusKm?: number;
+      minRating?: number;
+      limit?: number;
+    },
+    locale: AppLocale = DEFAULT_LOCALE,
+  ): Promise<CopilotToolExecutionResult> {
+    const rawLimit = Number.isFinite(args.limit)
+      ? Number(args.limit)
+      : COPILOT_CONSTANTS.DEFAULT_SEARCH_PLACES_LIMIT;
+    const limit = Math.min(
+      Math.max(1, Math.floor(rawLimit)),
+      COPILOT_CONSTANTS.MAX_SEARCH_PLACES_LIMIT,
+    );
+
+    const minRating = Number.isFinite(args.minRating)
+      ? Math.min(
+          Math.max(
+            Number(args.minRating),
+            COPILOT_CONSTANTS.MIN_RATING_FLOOR,
+          ),
+          COPILOT_CONSTANTS.MAX_RATING_CEILING,
+        )
+      : undefined;
+
+    const radiusKm = Number.isFinite(args.radiusKm)
+      ? Math.min(
+          Math.max(
+            Number(args.radiusKm),
+            COPILOT_CONSTANTS.MIN_NEARBY_RADIUS_KM,
+          ),
+          COPILOT_CONSTANTS.MAX_NEARBY_RADIUS_KM,
+        )
+      : COPILOT_CONSTANTS.DEFAULT_NEARBY_RADIUS_KM;
+
+    const [tripBbox, existingDestinations] = await Promise.all([
+      this.resolveItineraryBbox(itineraryId),
+      this.prisma.itineraryDestination.findMany({
+        where: { itineraryId },
+        select: { placeId: true },
+      }),
+    ]);
+    const existingPlaceIds = existingDestinations.map((d) => d.placeId);
+
+    const anchorQuery = args.nearPlaceName?.trim() || '';
+    let anchor: { name: string; lat: number; lng: number } | null = null;
+    if (anchorQuery) {
+      anchor = await this.resolveSearchAnchor(anchorQuery, tripBbox);
+      if (!anchor) {
+        return {
+          toolName: COPILOT_TOOL_NAMES.SEARCH_PLACES,
+          success: true,
+          message: t(locale, 'copilot.searchAnchorNotFound', {
+            anchor: anchorQuery,
+          }),
+          data: {
+            status: 'ANCHOR_NOT_FOUND',
+            anchorName: anchorQuery,
+            totalMatched: 0,
+            places: [],
+          },
+        };
+      }
+    }
+
+    const searchBbox = anchor
+      ? this.computeBboxAround(anchor.lat, anchor.lng, radiusKm)
+      : tripBbox;
+
+    const terms = args.query?.trim()
+      ? this.extractCleanSearchTerms(args.query)
+      : {
+          searchQuery: '',
+          corePhrase: '',
+          normPhrase: '',
+          keywords: [],
+          normKeywords: [],
+        };
+
+    const normalizedSlug = args.categorySlug?.trim().toLowerCase() || undefined;
+    const budgetRaw = args.budgetLevel?.trim().toUpperCase();
+    const validBudgets = Object.values(BudgetLevel) as string[];
+    const priceLevel =
+      budgetRaw && validBudgets.includes(budgetRaw)
+        ? (budgetRaw as BudgetLevel)
+        : undefined;
+
+    const lodgingCfg = ITINERARY_PLANNING_CONFIG.LODGING;
+    const allowLodging =
+      (normalizedSlug !== undefined &&
+        (lodgingCfg.CATEGORY_SLUGS as readonly string[]).includes(
+          normalizedSlug,
+        )) ||
+      (terms.normPhrase.length > 0 &&
+        lodgingCfg.CATEGORY_KEYWORDS.some((kw) =>
+          terms.normPhrase.includes(kw),
+        ));
+
+    const keywordClauses: Prisma.PlaceWhereInput[] = terms.corePhrase
+      ? [
+          { name: { contains: terms.corePhrase, mode: 'insensitive' } },
+          {
+            nameNormalized: {
+              contains: terms.normPhrase,
+              mode: 'insensitive',
+            },
+          },
+          { description: { contains: terms.corePhrase, mode: 'insensitive' } },
+          { tags: { has: terms.corePhrase.toLowerCase() } },
+          ...terms.keywords.flatMap((kw, idx) => {
+            const nk = terms.normKeywords[idx] || kw;
+            return [
+              { name: { contains: kw, mode: 'insensitive' as const } },
+              {
+                nameNormalized: {
+                  contains: nk,
+                  mode: 'insensitive' as const,
+                },
+              },
+              { description: { contains: kw, mode: 'insensitive' as const } },
+              { tags: { has: nk } },
+            ];
+          }),
+        ]
+      : [];
+
+    const scanLimit = Math.max(
+      limit * COPILOT_CONSTANTS.SEARCH_SCAN_MULTIPLIER,
+      ITINERARY_PLANNING_CONFIG.LIMITS.CANDIDATE_MIN,
+    );
+    // ponytail: Pre-scans top `scanLimit` places ordered by reviewCount inside searchBbox before
+    // in-RAM keyword/distance ranking (ceiling: low-review niche places outside top scanLimit);
+    // upgrade path: Postgres pg_trgm / PostGIS index if per-city POI count exceeds tens of thousands.
+    const rawPlaces = await this.prisma.place.findMany({
+      where: {
+        ...(existingPlaceIds.length > 0
+          ? { id: { notIn: existingPlaceIds } }
+          : {}),
+        deletedAt: null,
+        status: 'ACTIVE',
+        latitude: { gte: searchBbox.minLat, lte: searchBbox.maxLat },
+        longitude: { gte: searchBbox.minLng, lte: searchBbox.maxLng },
+        ...(normalizedSlug ? { category: { slug: normalizedSlug } } : {}),
+        ...(priceLevel ? { priceLevel } : {}),
+        ...(minRating !== undefined ? { ratingAvg: { gte: minRating } } : {}),
+        ...(keywordClauses.length > 0 ? { OR: keywordClauses } : {}),
+      },
+      include: { category: true },
+      orderBy: [{ reviewCount: 'desc' }, { ratingAvg: 'desc' }],
+      take: scanLimit,
+    });
+
+    const normalizedAnchorName = anchor ? normalizeVietnamese(anchor.name) : '';
+
+    const scoredCandidates = rawPlaces
+      .filter(
+        (p) =>
+          !isNonTouristicNoise(p.name) &&
+          (allowLodging || !isLodgingCategory(p.category, p.name)),
+      )
+      .map((place) => {
+        const keywordMatched =
+          terms.normKeywords.length === 0
+            ? 0
+            : (() => {
+                const haystack = `${normalizeVietnamese(place.nameNormalized || place.name)} ${normalizeVietnamese(place.description || '')} ${(place.tags || []).join(' ')}`;
+                return terms.normKeywords.filter((nk) =>
+                  haystack.includes(nk),
+                ).length;
+              })();
+        const popularityScore = computeCandidatePopularityScore(place);
+        let distanceKm: number | undefined;
+        if (
+          anchor &&
+          typeof place.latitude === 'number' &&
+          typeof place.longitude === 'number'
+        ) {
+          const rawDist = this.haversineDistance(
+            anchor.lat,
+            anchor.lng,
+            place.latitude,
+            place.longitude,
+          );
+          distanceKm =
+            Math.round(rawDist * COPILOT_CONSTANTS.DISTANCE_ROUND_FACTOR) /
+            COPILOT_CONSTANTS.DISTANCE_ROUND_FACTOR;
+        }
+        return { place, keywordMatched, popularityScore, distanceKm };
+      })
+      .filter((item) => {
+        if (!anchor) return true;
+        if (normalizeVietnamese(item.place.name) === normalizedAnchorName) {
+          return false;
+        }
+        return item.distanceKm !== undefined && item.distanceKm <= radiusKm;
+      });
+
+    const ranked = scoredCandidates
+      .sort((a, b) => {
+        if (anchor) {
+          if (b.keywordMatched !== a.keywordMatched) {
+            return b.keywordMatched - a.keywordMatched;
+          }
+          const distDiff = (a.distanceKm ?? Infinity) - (b.distanceKm ?? Infinity);
+          if (distDiff !== 0) return distDiff;
+          return b.popularityScore - a.popularityScore;
+        }
+        const scoreA =
+          a.keywordMatched * COPILOT_CONSTANTS.KEYWORD_MATCH_WEIGHT +
+          a.popularityScore;
+        const scoreB =
+          b.keywordMatched * COPILOT_CONSTANTS.KEYWORD_MATCH_WEIGHT +
+          b.popularityScore;
+        return scoreB - scoreA;
+      })
+      .slice(0, limit);
+
+    const places = ranked.map(({ place: p, distanceKm }) => {
+      const cat =
+        locale === 'en'
+          ? p.category?.name || p.category?.nameVi || ''
+          : p.category?.nameVi || p.category?.name || '';
+      return {
+        id: p.id,
+        name: p.name,
+        category: cat,
+        address: p.address,
+        rating: Number(p.ratingAvg ?? 0),
+        reviewCount: p.reviewCount ?? 0,
+        priceLevel: p.priceLevel ? String(p.priceLevel) : null,
+        ...(distanceKm !== undefined ? { distanceKm } : {}),
+        description: p.description
+          ? p.description.slice(0, COPILOT_CONSTANTS.SEARCH_DESCRIPTION_MAX_CHARS)
+          : undefined,
+      };
+    });
+
+    return {
+      toolName: COPILOT_TOOL_NAMES.SEARCH_PLACES,
+      success: true,
+      message:
+        places.length > 0
+          ? t(locale, 'copilot.searchFound', { count: places.length })
+          : t(locale, 'copilot.searchNoMatch'),
+      data: {
+        status: places.length > 0 ? 'SUCCESS' : 'NO_MATCH',
+        totalMatched: scoredCandidates.length,
+        ...(anchor ? { anchorName: anchor.name, radiusKm } : {}),
+        places,
+      },
+    };
   }
 
   /**
@@ -1198,6 +1588,30 @@ export class CopilotToolsService {
     return pool[0];
   }
 
+  private extractCleanSearchTerms(rawQuery: string): {
+    searchQuery: string;
+    corePhrase: string;
+    normPhrase: string;
+    keywords: string[];
+    normKeywords: string[];
+  } {
+    const cleanQuery = rawQuery
+      .replace(/[.,!?]/g, ' ')
+      .replace(QUERY_FILLER_REGEX, '')
+      .trim();
+    const searchQuery = cleanQuery || rawQuery.trim();
+    const corePhrase =
+      searchQuery.replace(VENUE_PREFIX_REGEX, '').trim() || searchQuery;
+    const normPhrase = normalizeVietnamese(corePhrase);
+    const keywords = corePhrase
+      .split(/[\s,()/-]+/)
+      .map((w) => w.trim())
+      .filter((w) => w.length >= 2 && !COMMAND_STOP_WORDS.has(w.toLowerCase()));
+    const normKeywords = keywords.map(normalizeVietnamese);
+
+    return { searchQuery, corePhrase, normPhrase, keywords, normKeywords };
+  }
+
   /**
    * Shared place resolution pipeline used by both `swapActivity` and `addActivity`:
    * 1. Exact/core phrase match (accented `name` + unaccented `nameNormalized`, address, tags, category)
@@ -1222,14 +1636,8 @@ export class CopilotToolsService {
       allowRevisitExisting,
     } = params;
 
-    const cleanQuery = query
-      .replace(/[.,!?]/g, ' ')
-      .replace(QUERY_FILLER_REGEX, '')
-      .trim();
-    const searchQuery = cleanQuery || query.trim();
-    const corePhrase =
-      searchQuery.replace(VENUE_PREFIX_REGEX, '').trim() || searchQuery;
-    const normPhrase = normalizeVietnamese(corePhrase);
+    const { searchQuery, corePhrase, normPhrase, keywords, normKeywords } =
+      this.extractCleanSearchTerms(query);
 
     const baseWhere: Prisma.PlaceWhereInput = {
       id: { notIn: existingPlaceIds },
@@ -1261,15 +1669,8 @@ export class CopilotToolsService {
     });
     if (phraseCandidates[0]) return phraseCandidates[0];
 
-    // Extract substantive keywords (both original and unaccented)
-    const keywords = corePhrase
-      .split(/[\s,()/-]+/)
-      .map((w) => w.trim())
-      .filter((w) => w.length >= 2 && !COMMAND_STOP_WORDS.has(w.toLowerCase()));
-    const normKeywords = keywords.map(normalizeVietnamese);
-
+    // Stage 2: Strict multi-keyword AND match (supports both accented and unaccented input)
     if (keywords.length > 0) {
-      // Stage 2: Strict multi-keyword AND match (supports both accented and unaccented input)
       const andCandidates = await this.prisma.place.findMany({
         where: {
           ...baseWhere,

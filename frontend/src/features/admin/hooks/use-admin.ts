@@ -28,6 +28,7 @@ import type {
   QueryAdminPlacesParams,
   QueryAdminReportsParams,
   QueryAdminUsersParams,
+  UpdateBannedWordPayload,
 } from "@/types/admin";
 import { ADMIN_QUERY_CONFIG } from "../admin.constants";
 
@@ -665,12 +666,37 @@ export function useCreateAdminBannedWord() {
     mutationFn: (payload: CreateBannedWordPayload) =>
       adminService.createBannedWord(payload),
     onSuccess: (res) => {
-      toast.success(`Đã thêm từ cấm: "${res.word}"`);
+      const scopeLabel =
+        res.action === "REVIEW" ? "từ khóa AI duyệt (T2)" : "từ cấm (T1)";
+      toast.success(`Đã thêm ${scopeLabel}: "${res.word}"`);
       qc.invalidateQueries({ queryKey: ADMIN_QUERY_KEYS.bannedWordsPrefix });
       qc.invalidateQueries({ queryKey: ADMIN_QUERY_KEYS.auditLogsPrefix });
     },
     onError: (err) => {
-      toast.error(getErrorMessage(err, "Không thể thêm từ cấm"));
+      toast.error(getErrorMessage(err, "Không thể thêm từ khóa kiểm duyệt"));
+    },
+  });
+}
+
+export function useUpdateAdminBannedWord() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      payload,
+    }: {
+      id: string;
+      payload: UpdateBannedWordPayload;
+    }) => adminService.updateBannedWord(id, payload),
+    onSuccess: (res) => {
+      toast.success(`Đã cập nhật từ khóa: "${res.word}"`);
+      qc.invalidateQueries({ queryKey: ADMIN_QUERY_KEYS.bannedWordsPrefix });
+      qc.invalidateQueries({ queryKey: ADMIN_QUERY_KEYS.auditLogsPrefix });
+    },
+    onError: (err) => {
+      toast.error(
+        getErrorMessage(err, "Không thể cập nhật từ khóa kiểm duyệt")
+      );
     },
   });
 }

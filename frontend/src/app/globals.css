@@ -225,18 +225,18 @@
   box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.25);
 }
 
-/* Custom MapLibre Popup Styling (Google Maps / Airbnb style) */
+/* Custom MapLibre Popup Styling (DESIGN.md unified surface & arrow tip) */
 .maplibregl-popup {
   z-index: 45 !important;
-  max-width: 320px !important;
+  max-width: 300px !important;
 }
 
 .maplibregl-popup-content {
   padding: 0 !important;
-  border-radius: 1.25rem !important;
-  border: 1px solid rgba(0, 0, 0, 0.1) !important;
-  background: var(--background) !important;
-  box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.25), 0 10px 15px -5px rgba(0, 0, 0, 0.1) !important;
+  border-radius: 1rem !important;
+  border: 1px solid var(--border) !important;
+  background: var(--card) !important;
+  box-shadow: 0 20px 30px -10px rgba(16, 36, 58, 0.22), 0 10px 15px -5px rgba(16, 36, 58, 0.08) !important;
   overflow: hidden !important;
 }
 
@@ -251,34 +251,33 @@
   align-items: center !important;
   justify-content: center !important;
   border-radius: 9999px !important;
-  background: rgba(0, 0, 0, 0.55) !important;
+  background: rgba(16, 36, 58, 0.72) !important;
   color: #ffffff !important;
   top: 10px !important;
   right: 10px !important;
   font-size: 15px !important;
-  backdrop-filter: blur(6px) !important;
   z-index: 30 !important;
-  transition: all 0.15s ease !important;
+  transition: background-color 0.15s ease, transform 0.15s ease !important;
   cursor: pointer !important;
   border: none !important;
 }
 
 .maplibregl-popup-close-button:hover {
-  background: rgba(0, 0, 0, 0.8) !important;
-  transform: scale(1.1) !important;
+  background: rgba(16, 36, 58, 0.92) !important;
+  transform: scale(1.08) !important;
 }
 
 .maplibregl-popup-anchor-top .maplibregl-popup-tip {
-  border-bottom-color: var(--background) !important;
+  border-bottom-color: var(--card) !important;
 }
 .maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
-  border-top-color: var(--background) !important;
+  border-top-color: var(--card) !important;
 }
 .maplibregl-popup-anchor-left .maplibregl-popup-tip {
-  border-right-color: var(--background) !important;
+  border-right-color: var(--card) !important;
 }
 .maplibregl-popup-anchor-right .maplibregl-popup-tip {
-  border-left-color: var(--background) !important;
+  border-left-color: var(--card) !important;
 }
 
 

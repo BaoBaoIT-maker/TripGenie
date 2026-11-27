@@ -86,19 +86,19 @@ export class CommunityService {
     return [title, caption ?? '', tags.join(' ')].join(' ').trim();
   }
 
-  /** Posts start hidden (PENDING) only when a moderation pipeline exists to resolve them. */
-  private pendingModerationFields(): PostModerationFields {
+  /** Publish-first (Cách A): posts go live immediately after Tier 1; clearing moderation metadata allows async Tier 2/3 retraction if suspicious. */
+  private publishedModerationFields(): PostModerationFields {
     if (!this.moderationService) return {};
     return {
-      moderationStatus: PostModerationStatus.PENDING,
-      moderationNote: ADMIN_CONSTANTS.MESSAGES.AI_REVIEWING_NOTE,
+      moderationStatus: PostModerationStatus.APPROVED,
+      moderationNote: null,
       moderatedAt: null,
     };
   }
 
-  /** Fire-and-forget: the user already got their response; evaluatePostAsync handles its own errors. */
+  /** Fire-and-forget Tier 2 -> Tier 3: only calls Gemini AI when suspicious patterns match. */
   private scheduleAiModeration(postId: string, text: string): void {
-    if (!this.moderationService) return;
+    if (!this.moderationService?.matchesSuspiciousTriggers(text)) return;
     setImmediate(() => {
       void this.moderationService?.evaluatePostAsync(postId, text);
     });
@@ -325,7 +325,7 @@ export class CommunityService {
     );
     this.moderationService?.assertContentAllowedSync(moderationText);
 
-    // Tier 2: persist as PENDING (hidden from public feed) and respond immediately.
+    // Publish-first (Cách A): persist as APPROVED immediately; run Tier 3 async only if Tier 2 triggers match.
     const created = await this.communityRepository.createPost({
       userId,
       groupId: resolvedGroupId,
@@ -334,7 +334,7 @@ export class CommunityService {
       mediaUrls: sanitizedMediaUrls,
       tags: normalizedTags,
       itineraryId: dto.itineraryId ?? null,
-      ...this.pendingModerationFields(),
+      ...this.publishedModerationFields(),
     });
 
     this.scheduleAiModeration(created.id, moderationText);
@@ -385,7 +385,7 @@ export class CommunityService {
         caption: trimmedCaption,
         tags: normalizedTags,
         ...(resolvedGroupId !== undefined ? { groupId: resolvedGroupId } : {}),
-        ...this.pendingModerationFields(),
+        ...this.publishedModerationFields(),
       },
       userId,
     );

@@ -661,6 +661,10 @@
     "ADMIN_POST_NOT_FOUND": "Post not found.",
     "ADMIN_COMMENT_NOT_FOUND": "Comment not found.",
     "ADMIN_REPORT_NOT_FOUND": "Report not found.",
+    "COMMUNITY_CONTENT_VIOLATES_PROFANITY": "This content contains profanity or offensive language and cannot be published.",
+    "COMMUNITY_CONTENT_VIOLATES_ADULT": "This content contains adult (18+) material and cannot be published.",
+    "COMMUNITY_CONTENT_VIOLATES_SCAM": "This content appears to contain scam or unauthorized advertising and cannot be published.",
+    "COMMUNITY_CONTENT_VIOLATES_GAMBLING": "This content contains gambling or betting information and cannot be published.",
     "COMMUNITY_CONTENT_VIOLATES_POLICY": "This content violates our community guidelines and cannot be published."
   },
   "collections": {
@@ -1309,6 +1313,7 @@
       "postCreatedSuccess": "Published to the TripGenie Community!",
       "postCreateError": "Could not create post. Please try again.",
       "postUpdatedPending": "Changes saved! AI is re-reviewing your post.",
+      "postUpdatedSuccess": "Post updated!",
       "postUpdateError": "Could not update post.",
       "postDeleted": "Post permanently deleted.",
       "postDeleteError": "Could not delete post",
@@ -2450,6 +2455,7 @@
   "map": {
     "loadingAria": "Loading map",
     "initError": "Unable to initialize VietMap. Please check your network connection and API key.",
+    "retry": "Retry",
     "searchThisArea": "Search this area",
     "pinnedLocation": "Pinned location",
     "cityFallback": "city",
@@ -2458,10 +2464,10 @@
       "zoomIn": "Zoom in",
       "zoomOut": "Zoom out",
       "myLocation": "My location",
+      "layers": "Layers",
+      "layersTitle": "Choose map type",
       "themeBright": "Light",
       "themeBrightTitle": "Light Travel Map (Official VietMap TM @2x)",
-      "themeDark": "Dark",
-      "themeDarkTitle": "Dark Traffic Map (VietMap DM @2x)",
       "themeSatellite": "Satellite",
       "themeSatelliteTitle": "Satellite imagery (Esri Satellite)"
     },

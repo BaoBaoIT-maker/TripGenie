@@ -1,3 +1,5 @@
+import { BannedWordCategory } from '@prisma/client';
+
 export const ADMIN_CONSTANTS = {
   PAGINATION: {
     DEFAULT_LIMIT: 20,
@@ -90,6 +92,7 @@ export const ADMIN_CONSTANTS = {
     DEFAULT_CREATE_BANNED_WORD_NOTE: 'Thêm từ khóa cấm mới',
     DEFAULT_ENABLE_BANNED_WORD_NOTE: 'Kích hoạt từ khóa cấm',
     DEFAULT_DISABLE_BANNED_WORD_NOTE: 'Vô hiệu hóa từ khóa cấm',
+    DEFAULT_UPDATE_BANNED_WORD_NOTE: 'Cập nhật từ khóa kiểm duyệt',
     DEFAULT_DELETE_BANNED_WORD_NOTE: 'Xóa từ khóa cấm khỏi hệ thống',
     DEFAULT_APPROVE_POST_NOTE: 'Đã được phê duyệt bởi Quản trị viên',
     DEFAULT_REJECT_POST_NOTE: 'Bị từ chối bởi Quản trị viên do vi phạm tiêu chuẩn cộng đồng',
@@ -105,16 +108,12 @@ export const ADMIN_CONSTANTS = {
 } as const;
 
 /**
- * Tier 2: Ambiguous / Context-dependent Triggers (0.05ms, 0 AI tokens) — Bilingual Vietnamese & English.
- * Words that can be legitimate travel reviews ("không chặt chém", "đẹp chết mê") OR malicious attacks/scams.
- * Comments only invoke Tier 3 Gemini AI if they match one of these triggers.
+ * Tier 2 Structural Patterns (~0.05ms, 0 AI tokens):
+ * Non-lexical technical signatures (phone numbers, external URLs) kept safely in code.
+ * Lexical Tier 2 trigger words live in `banned_words` (action = REVIEW) so Admins can manage them dynamically.
  */
-export const MODERATION_SUSPICIOUS_PATTERNS: readonly RegExp[] = [
-  /\b(lừa đảo|lừa|chặt chém|bóc phốt|phốt|scam|rip-off|fraud|tẩy chay)\b/i,
-  /\b(chuyển khoản|đặt cọc|cọc trước|zalo|telegram|inbox|ib ngay|vé giá rẻ|xả vé|deposit|wire transfer)\b/i,
-  /\b(chết|giết|máu|đánh nhau|chém|đâm|kill|die|dead|blood)\b/i,
-  /\b(ngu|điên|rác rưởi|bẩn thỉu|mất dạy|vô học|lũ|bọn|stupid|idiot|trash|garbage|disgusting)\b/i,
-  /(?:\+84|0)[35789]\d{8}\b/, // Vietnamese phone numbers in comments/posts (potential spam)
+export const MODERATION_STRUCTURAL_PATTERNS: readonly RegExp[] = [
+  /(?:\+84|0)[35789]\d{8}\b/, // Vietnamese phone numbers (potential spam / off-platform solicitation)
   /https?:\/\/[^\s]+/i, // External links
 ];
 
@@ -140,6 +139,10 @@ export const ADMIN_ERROR_CODES = {
   COMMENT_NOT_FOUND: 'ADMIN_COMMENT_NOT_FOUND',
   REPORT_NOT_FOUND: 'ADMIN_REPORT_NOT_FOUND',
   CONTENT_VIOLATES_POLICY: 'COMMUNITY_CONTENT_VIOLATES_POLICY',
+  CONTENT_VIOLATES_PROFANITY: 'COMMUNITY_CONTENT_VIOLATES_PROFANITY',
+  CONTENT_VIOLATES_ADULT: 'COMMUNITY_CONTENT_VIOLATES_ADULT',
+  CONTENT_VIOLATES_SCAM: 'COMMUNITY_CONTENT_VIOLATES_SCAM',
+  CONTENT_VIOLATES_GAMBLING: 'COMMUNITY_CONTENT_VIOLATES_GAMBLING',
   BANNED_WORD_EXISTS: 'ADMIN_BANNED_WORD_EXISTS',
   BANNED_WORD_NOT_FOUND: 'ADMIN_BANNED_WORD_NOT_FOUND',
   PLACE_IMAGE_NOT_FOUND: 'ADMIN_PLACE_IMAGE_NOT_FOUND',
@@ -234,6 +237,24 @@ export const ADMIN_ERRORS = {
     code: ADMIN_ERROR_CODES.CONTENT_VIOLATES_POLICY,
     message: 'Nội dung chứa từ ngữ vi phạm tiêu chuẩn cộng đồng và đã bị chặn',
   },
+  CONTENT_VIOLATES_PROFANITY: {
+    code: ADMIN_ERROR_CODES.CONTENT_VIOLATES_PROFANITY,
+    message: 'Nội dung chứa ngôn từ thô tục hoặc xúc phạm và đã bị chặn',
+  },
+  CONTENT_VIOLATES_ADULT: {
+    code: ADMIN_ERROR_CODES.CONTENT_VIOLATES_ADULT,
+    message: 'Nội dung chứa yếu tố nhạy cảm 18+ và đã bị chặn',
+  },
+  CONTENT_VIOLATES_SCAM: {
+    code: ADMIN_ERROR_CODES.CONTENT_VIOLATES_SCAM,
+    message:
+      'Nội dung có dấu hiệu lừa đảo hoặc quảng cáo trái phép và đã bị chặn',
+  },
+  CONTENT_VIOLATES_GAMBLING: {
+    code: ADMIN_ERROR_CODES.CONTENT_VIOLATES_GAMBLING,
+    message:
+      'Nội dung chứa thông tin cờ bạc hoặc cá cược trái phép và đã bị chặn',
+  },
   BANNED_WORD_EXISTS: {
     code: ADMIN_ERROR_CODES.BANNED_WORD_EXISTS,
     message: 'Từ khóa này đã tồn tại trong danh sách từ cấm',
@@ -243,3 +264,22 @@ export const ADMIN_ERRORS = {
     message: 'Không tìm thấy từ cấm yêu cầu',
   },
 } as const;
+
+export type PolicyViolationError = (typeof ADMIN_ERRORS)[
+  | 'CONTENT_VIOLATES_POLICY'
+  | 'CONTENT_VIOLATES_PROFANITY'
+  | 'CONTENT_VIOLATES_ADULT'
+  | 'CONTENT_VIOLATES_SCAM'
+  | 'CONTENT_VIOLATES_GAMBLING'
+];
+
+export const BANNED_CATEGORY_ERRORS: Record<
+  BannedWordCategory,
+  PolicyViolationError
+> = {
+  [BannedWordCategory.PROFANITY]: ADMIN_ERRORS.CONTENT_VIOLATES_PROFANITY,
+  [BannedWordCategory.ADULT]: ADMIN_ERRORS.CONTENT_VIOLATES_ADULT,
+  [BannedWordCategory.SCAM]: ADMIN_ERRORS.CONTENT_VIOLATES_SCAM,
+  [BannedWordCategory.GAMBLING]: ADMIN_ERRORS.CONTENT_VIOLATES_GAMBLING,
+  [BannedWordCategory.OTHER]: ADMIN_ERRORS.CONTENT_VIOLATES_POLICY,
+};

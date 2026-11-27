@@ -61,6 +61,7 @@ import {
   CreateBannedWordDto,
   QueryBannedWordsDto,
   ToggleBannedWordDto,
+  UpdateBannedWordDto,
 } from './dto/admin-banned-words.dto';
 
 @Controller('admin')
@@ -363,6 +364,21 @@ export class AdminController {
       admin,
       id,
       dto.isActive,
+      this.extractMeta(req),
+    );
+  }
+
+  @Patch('banned-words/:id')
+  async updateBannedWord(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateBannedWordDto,
+    @Req() req: Request,
+  ) {
+    return this.bannedWordsService.update(
+      admin,
+      id,
+      dto,
       this.extractMeta(req),
     );
   }

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -38,6 +39,8 @@ import {
   CopilotProposal,
   CopilotToolExecutionResult,
   CopilotToolName,
+  MutatingCopilotToolName,
+  isMutatingCopilotTool,
 } from './copilot.types';
 
 type CopilotToolHandler = (
@@ -48,7 +51,7 @@ type CopilotToolHandler = (
 ) => Promise<CopilotToolExecutionResult>;
 
 const PROPOSAL_TITLE_BUILDERS: Record<
-  CopilotToolName,
+  MutatingCopilotToolName,
   (locale: AppLocale, data?: Record<string, unknown>) => string
 > = {
   [COPILOT_TOOL_NAMES.SWAP_ACTIVITY]: (locale, data) =>
@@ -78,8 +81,6 @@ const PROPOSAL_TITLE_BUILDERS: Record<
       : t(locale, 'copilot.proposals.removeActivity'),
   [COPILOT_TOOL_NAMES.MOVE_ACTIVITY]: (locale) =>
     t(locale, 'copilot.proposals.moveActivity'),
-  [COPILOT_TOOL_NAMES.CHANGE_DESTINATION]: (locale) =>
-    t(locale, 'copilot.proposals.changeDestination'),
 };
 
 @Injectable()
@@ -118,6 +119,33 @@ export class CopilotAgentService {
 
     // Strategy/Dispatcher map: Open/Closed Principle (OCP) without switch/if-else chains
     this.toolHandlers = {
+      [COPILOT_TOOL_NAMES.SEARCH_PLACES]: (
+        itineraryId,
+        args,
+        _dryRun,
+        locale,
+      ) =>
+        this.toolsService.searchPlacesForItinerary(
+          itineraryId,
+          {
+            query: args.query ? String(args.query) : undefined,
+            categorySlug: args.categorySlug
+              ? String(args.categorySlug)
+              : undefined,
+            budgetLevel: args.budgetLevel
+              ? String(args.budgetLevel)
+              : undefined,
+            nearPlaceName: args.nearPlaceName
+              ? String(args.nearPlaceName)
+              : undefined,
+            radiusKm:
+              args.radiusKm !== undefined ? Number(args.radiusKm) : undefined,
+            minRating:
+              args.minRating !== undefined ? Number(args.minRating) : undefined,
+            limit: args.limit !== undefined ? Number(args.limit) : undefined,
+          },
+          locale,
+        ),
       [COPILOT_TOOL_NAMES.CHANGE_DESTINATION]: async (
         _itineraryId,
         args,
@@ -251,6 +279,7 @@ export class CopilotAgentService {
       itinerary.creatorId,
       userId,
       sessionId,
+      itinerary.destination,
     );
 
     // 2. Fetch recent conversation history using Sliding Window before persisting the turn
@@ -261,7 +290,7 @@ export class CopilotAgentService {
     });
     const historyRows = recentRows.reverse();
 
-    // 3. Build prompt context and contents with destination places grounding
+    // 3. Build prompt context (schedule + weather + session memory) without static place stuffing
     const coords =
       resolveItineraryCoordinates(itinerary) ??
       (this.transitService && itinerary.destination
@@ -278,8 +307,8 @@ export class CopilotAgentService {
       (m, d) => Math.max(m, d.dayNumber),
       1,
     );
-    const weatherPromise = this.weatherService
-      ? this.weatherService.getTripWeather({
+    const weatherSummary = this.weatherService
+      ? await this.weatherService.getTripWeather({
           lat: coords?.lat,
           lng: coords?.lng,
           destination: itinerary.destination,
@@ -287,50 +316,13 @@ export class CopilotAgentService {
           totalDays: Math.max(spanDays, maxDay, 1),
           locale,
         })
-      : Promise.resolve(null);
-
-    const [destinationPlaces, weatherSummary] = await Promise.all([
-      this.prisma.place.findMany({
-        where: {
-          deletedAt: null,
-          status: 'ACTIVE',
-          OR: itinerary.areaId
-            ? [
-                { areaId: itinerary.areaId },
-                { area: { parentId: itinerary.areaId } },
-                { area: { parent: { parentId: itinerary.areaId } } },
-              ]
-            : [
-                {
-                  address: {
-                    contains: itinerary.destination || '',
-                    mode: 'insensitive',
-                  },
-                },
-                {
-                  name: {
-                    contains: itinerary.destination || '',
-                    mode: 'insensitive',
-                  },
-                },
-              ],
-        },
-        select: {
-          name: true,
-          category: { select: { nameVi: true, name: true } },
-        },
-        take: COPILOT_CONSTANTS.GROUNDING_PLACES_LIMIT,
-        orderBy: [{ ratingAvg: 'desc' }, { reviewCount: 'desc' }],
-      }),
-      weatherPromise,
-    ]);
+      : null;
 
     const systemInstruction = this.buildSystemInstruction({
       destination:
         itinerary.destination || COPILOT_CONSTANTS.DEFAULT_DESTINATION,
       partySize: itinerary.partySize ?? 1,
       destinations: itinerary.destinations,
-      availablePlaces: destinationPlaces,
       sessionSummary: session.summary,
       weatherGuidance: weatherSummary?.guidance,
       locale,
@@ -347,6 +339,7 @@ export class CopilotAgentService {
     const url = `${this.baseUrl}/${modelPath}:generateContent?key=${this.apiKey}`;
 
     let agentReply = '';
+    let executedToolCall: CopilotChatResponse['appliedTool'] = undefined;
     let appliedTool: CopilotChatResponse['appliedTool'] = undefined;
     let action: CopilotChatResponse['action'] = undefined;
     let proposal: CopilotChatResponse['proposal'] = undefined;
@@ -373,14 +366,16 @@ export class CopilotAgentService {
 
       if (functionCall) {
         // --- TOOL EXECUTION PATH ---
+        // ponytail: Single-step tool execution caps latency at 2 LLM calls;
+        // upgrade to bounded multi-turn loop (like AdvisorService) if compound multi-tool commands are requested.
         const toolName = functionCall.name;
         const toolArgs = functionCall.args || {};
         this.logger.log(
           `Gemini invoked tool: ${toolName} with args: ${JSON.stringify(toolArgs)}`,
         );
 
-        const isModifyingTool =
-          toolName !== COPILOT_TOOL_NAMES.CHANGE_DESTINATION;
+        const isModifyingTool = isMutatingCopilotTool(toolName);
+        const isSearchTool = toolName === COPILOT_TOOL_NAMES.SEARCH_PLACES;
         // VIEWER group members can ask Copilot for suggestions strictly in dry-run proposal mode,
         // while OWNER / EDITOR may also opt into autoApply=true direct mutations.
         const canDirectMutate = isModifyingTool && autoApply && access.canEdit;
@@ -393,17 +388,20 @@ export class CopilotAgentService {
           shouldDryRun,
           locale,
         );
-        appliedTool = {
+        executedToolCall = {
           name: toolName,
           args: toolArgs,
           resultMessage: toolResult.message,
         };
+        appliedTool = isSearchTool ? undefined : executedToolCall;
 
         if (toolResult.data?.action) {
           action = toolResult.data.action as CopilotChatResponse['action'];
         }
 
-        if (shouldDryRun && toolResult.success) {
+        if (isSearchTool) {
+          modified = false;
+        } else if (shouldDryRun && toolResult.success) {
           modified = false;
           proposal = {
             id: `prop-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -414,19 +412,23 @@ export class CopilotAgentService {
             fromPlaceId: toolResult.data?.oldPlaceId as string | undefined,
             fromPlaceName: toolResult.data?.oldPlaceName as string | undefined,
             fromPlaceCoordinates: toolResult.data?.oldPlaceCoordinates as
-              { latitude: number; longitude: number } | undefined,
+              | { latitude: number; longitude: number }
+              | undefined,
             toPlaceId: (toolResult.data?.newPlaceId ||
               toolResult.data?.placeId) as string | undefined,
             toPlaceName: (toolResult.data?.newPlaceName ||
               toolResult.data?.placeName) as string | undefined,
             toPlaceRating: toolResult.data?.newPlaceRating as
-              number | undefined,
+              | number
+              | undefined,
             toPlaceCategory: toolResult.data?.newPlaceCategory as
-              string | undefined,
+              | string
+              | undefined,
             toPlaceAddress: (toolResult.data?.newPlaceAddress ||
               toolResult.data?.address) as string | undefined,
             toPlaceCoordinates: toolResult.data?.newPlaceCoordinates as
-              { latitude: number; longitude: number } | undefined,
+              | { latitude: number; longitude: number }
+              | undefined,
             swapDays:
               toolResult.data?.dayA && toolResult.data?.dayB
                 ? {
@@ -440,8 +442,36 @@ export class CopilotAgentService {
             >,
           };
         } else {
-          modified = toolResult.success;
+          modified = isModifyingTool && toolResult.success;
         }
+
+        const functionResponsePayload = isSearchTool
+          ? {
+              status: toolResult.data?.status ?? 'NO_MATCH',
+              mode: 'READ_ONLY_SEARCH',
+              ...(toolResult.data?.anchorName
+                ? {
+                    anchorName: toolResult.data.anchorName,
+                    radiusKm: toolResult.data.radiusKm,
+                  }
+                : {}),
+              places: toolResult.data?.places ?? [],
+              instruction: `Read-only search completed. Recommend ONLY exact place names from \`places\` above (never invent or guess external places). When \`distanceKm\` is present, briefly mention the distance from \`anchorName\`. Format 2+ recommendations cleanly as numbered lines "1. **Exact Place Name** - brief reason" so the UI renders interactive cards. If \`status\` is "ANCHOR_NOT_FOUND", honestly tell the user the reference location was not found in this trip area. If \`places\` is empty, honestly tell the user no matching place was found in TripGenie's database for this area. Follow the OUTPUT LANGUAGE & TONE rule (${locale === 'en' ? 'English' : 'Vietnamese'}).`,
+            }
+          : {
+              status: toolResult.success ? 'SUCCESS' : 'FAILED',
+              mode: shouldDryRun ? 'PROPOSAL_DRY_RUN' : 'APPLIED',
+              resultMessage: toolResult.message,
+              oldPlaceName: proposal?.fromPlaceName,
+              proposedPlaceName: proposal?.toPlaceName,
+              instruction: shouldDryRun
+                ? `This is a PROPOSAL only (not yet applied to the itinerary). You MUST mention the exact proposed place name from resultMessage ("${proposal?.toPlaceName || ''}"), never invent another place name, and invite the user to click the Apply button below. Follow the OUTPUT LANGUAGE & TONE rule (${locale === 'en' ? 'English' : 'Vietnamese'}).`
+                : `The itinerary update succeeded. Respond concisely, warmly, and naturally following the OUTPUT LANGUAGE & TONE rule (${locale === 'en' ? 'English' : 'Vietnamese'}).`,
+            };
+
+        const searchFallbackReply = isSearchTool
+          ? this.formatSearchPlacesFallback(toolResult.data, locale)
+          : null;
 
         // Synthesize natural response from LLM by preserving candidateParts (thoughtSignature)
         // and sending a spec-compliant functionResponse turn
@@ -459,16 +489,7 @@ export class CopilotAgentService {
                   {
                     functionResponse: {
                       name: toolName,
-                      response: {
-                        status: toolResult.success ? 'SUCCESS' : 'FAILED',
-                        mode: shouldDryRun ? 'PROPOSAL_DRY_RUN' : 'APPLIED',
-                        resultMessage: toolResult.message,
-                        oldPlaceName: proposal?.fromPlaceName,
-                        proposedPlaceName: proposal?.toPlaceName,
-                        instruction: shouldDryRun
-                          ? `This is a PROPOSAL only (not yet applied to the itinerary). You MUST mention the exact proposed place name from resultMessage ("${proposal?.toPlaceName || ''}"), never invent another place name, and invite the user to click the Apply button below. Follow the OUTPUT LANGUAGE & TONE rule (${locale === 'en' ? 'English' : 'Vietnamese'}).`
-                          : `The itinerary update succeeded. Respond concisely, warmly, and naturally following the OUTPUT LANGUAGE & TONE rule (${locale === 'en' ? 'English' : 'Vietnamese'}).`,
-                      },
+                      response: functionResponsePayload,
                     },
                   },
                 ],
@@ -486,12 +507,14 @@ export class CopilotAgentService {
               .filter((p) => p.text)
               .map((p) => p.text)
               .join('\n')
-              .trim() || toolResult.message;
+              .trim() ||
+            searchFallbackReply ||
+            toolResult.message;
         } catch (synthErr) {
           this.logger.warn(
             `Copilot second-turn synthesis fallback: ${(synthErr as Error).message}`,
           );
-          agentReply = toolResult.message;
+          agentReply = searchFallbackReply || toolResult.message;
         }
       } else {
         // --- DIRECT TEXT PATH (Q&A / Guardrails) ---
@@ -522,8 +545,8 @@ export class CopilotAgentService {
           sessionId: session.id,
           sender: 'AGENT',
           content: agentReply,
-          toolCalls: appliedTool
-            ? JSON.parse(JSON.stringify(appliedTool))
+          toolCalls: executedToolCall
+            ? JSON.parse(JSON.stringify(executedToolCall))
             : undefined,
           toolResults: proposal
             ? JSON.parse(JSON.stringify(proposal))
@@ -622,6 +645,12 @@ export class CopilotAgentService {
     proposalId?: string,
   ): Promise<{ success: boolean; message: string; itinerary: unknown }> {
     await this.accessService.assertCanEdit(itineraryId, userId);
+
+    if (!isMutatingCopilotTool(toolName)) {
+      throw new BadRequestException(
+        t(DEFAULT_LOCALE, 'copilot.invalidProposalTool', { toolName }),
+      );
+    }
 
     const toolResult = await this.executeTool(
       itineraryId,
@@ -761,12 +790,12 @@ export class CopilotAgentService {
       .map((m) => `${m.sender}: ${m.content || ''}`)
       .join('\n');
 
-    const prompt = `Bạn là trợ lý ghi nhớ thông tin du lịch. Dưới đây là cuộc trò chuyện giữa khách và trợ lý du lịch:${
-      session.summary ? `\n[Tóm tắt trước đó]:\n${session.summary}\n` : ''
-    }\n[Các trao đổi mới]:\n${deltaTranscript}\n\nHãy cập nhật và tóm tắt ngắn gọn trong 2-3 câu hoặc gạch đầu dòng:
-1. Nhu cầu, sở thích đặc biệt của khách (nếu có: đi với ai, ăn gì, kiêng gì, ngân sách...).
-2. Các quyết định hoặc thay đổi lịch trình đã được thống nhất.
-Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏi hay mở bài.`;
+    const prompt = `You are a travel memory assistant. Below is the conversation between the traveler and the trip assistant:${
+      session.summary ? `\n[Previous summary]:\n${session.summary}\n` : ''
+    }\n[New exchanges]:\n${deltaTranscript}\n\nUpdate and summarize concisely in 2-3 neutral English sentences or bullets capturing:
+1. Traveler preferences, dietary restrictions, companions, and budget constraints (keep exact Vietnamese place names as-is).
+2. Confirmed itinerary decisions or edits already agreed upon.
+Return ONLY the concise summary with no greeting or preamble.`;
 
     try {
       const modelPath = this.modelName.startsWith('models/')
@@ -819,8 +848,10 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
     data?: Record<string, unknown>,
     locale: AppLocale = DEFAULT_LOCALE,
   ): string {
-    const builder = PROPOSAL_TITLE_BUILDERS[toolName as CopilotToolName];
-    return builder ? builder(locale, data) : t(locale, 'copilot.proposals.default');
+    if (!isMutatingCopilotTool(toolName)) {
+      return t(locale, 'copilot.proposals.default');
+    }
+    return PROPOSAL_TITLE_BUILDERS[toolName](locale, data);
   }
 
   private async executeTool(
@@ -841,11 +872,56 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
     return handler(itineraryId, args, dryRun, locale);
   }
 
+  private formatSearchPlacesFallback(
+    data: Record<string, unknown> | undefined,
+    locale: AppLocale = DEFAULT_LOCALE,
+  ): string | null {
+    const rawPlaces = Array.isArray(data?.places) ? data.places : [];
+    if (rawPlaces.length === 0) return null;
+
+    const anchorName =
+      typeof data?.anchorName === 'string' ? data.anchorName : undefined;
+    const header = t(locale, 'copilot.searchFallbackHeader');
+    const lines = rawPlaces
+      .filter(
+        (item): item is Record<string, unknown> =>
+          Boolean(item) && typeof item === 'object',
+      )
+      .map((p, idx) => {
+        const name = String(p.name || '').trim();
+        if (!name) return '';
+        const parts: string[] = [];
+        if (typeof p.category === 'string' && p.category.trim()) {
+          parts.push(p.category.trim());
+        }
+        if (typeof p.rating === 'number' && p.rating > 0) {
+          parts.push(`★ ${p.rating}`);
+        }
+        if (typeof p.distanceKm === 'number' && anchorName) {
+          parts.push(
+            t(locale, 'copilot.searchDistanceLabel', {
+              anchor: anchorName,
+              km: String(p.distanceKm),
+            }),
+          );
+        }
+        if (typeof p.address === 'string' && p.address.trim()) {
+          parts.push(p.address.trim());
+        }
+        const suffix = parts.length > 0 ? ` - ${parts.join(', ')}` : '';
+        return `${idx + 1}. **${name}**${suffix}`;
+      })
+      .filter(Boolean);
+
+    return lines.length > 0 ? `${header}\n${lines.join('\n')}` : null;
+  }
+
   private async resolveSession(
     itineraryId: string,
     creatorId: string,
     userId?: string,
     sessionId?: string,
+    destination?: string | null,
   ) {
     const effectiveUserId = userId || creatorId;
 
@@ -871,7 +947,7 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
         userId: effectiveUserId,
         linkedItineraryId: itineraryId,
         title: COPILOT_CONSTANTS.DEFAULT_SESSION_TITLE,
-        contextCity: COPILOT_CONSTANTS.DEFAULT_DESTINATION,
+        contextCity: destination || COPILOT_CONSTANTS.DEFAULT_DESTINATION,
       },
     });
   }
@@ -888,10 +964,6 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
         address: string;
         category?: { nameVi?: string | null; name: string } | null;
       };
-    }>;
-    availablePlaces?: Array<{
-      name: string;
-      category?: { nameVi?: string | null; name: string } | null;
     }>;
     sessionSummary?: string | null;
     weatherGuidance?: string;
@@ -915,15 +987,6 @@ Chỉ trả về nội dung tóm tắt súc tích, không thêm lời chào hỏ
       .map(([day, items]) => `Day ${day}:\n  - ${items.join('\n  - ')}`)
       .join('\n\n');
 
-    const availableSummary = (itinerary.availablePlaces || [])
-      .map((p) => {
-        const cat = isEn
-          ? p.category?.name || p.category?.nameVi || ''
-          : p.category?.nameVi || p.category?.name || '';
-        return `- ${p.name}${cat ? ` (${cat})` : ''}`;
-      })
-      .join('\n');
-
     const outputLanguageAndTone = isEn
       ? `OUTPUT LANGUAGE & TONE (UI Locale = English):
    - Respond in warm, natural, concise English (local Vietnam travel companion tone; keep authentic Vietnamese place/dish names).
@@ -938,14 +1001,12 @@ ${itinerary.sessionSummary ? `\nLONG-TERM SESSION MEMORY:\n${itinerary.sessionSu
 CURRENT ITINERARY SCHEDULE:
 ${scheduleSummary || 'No stops scheduled yet.'}
 
-FEATURED PLACES IN "${itinerary.destination}" (the database contains 2,000+ additional places; your tools search the entire database):
-${availableSummary || 'Updating'}
-
 MANDATORY GUARDRAILS & BEHAVIOR RULES:
-1. GROUNDING & SWAP RULES (CRITICAL):
-   - When the user asks for alternatives or recommendations without deciding yet: prioritize places from the featured list above.
-   - When the user asks to swap or select a place (e.g., "swap Day 1 lunch to Bé Mặn seafood", "pick option 1", "change lunch to seafood"):
-     IMMEDIATELY call \`swap_activity\` (even if the place name is not in the short list above, since \`swap_activity\` searches the full database). NEVER refuse a swap before calling the tool:
+1. GROUNDING, SEARCH & SWAP RULES (CRITICAL):
+   - When the user asks for place recommendations, suggestions, or discovery without committing to an edit yet (e.g., "gợi ý quán chay", "quán cafe yên tĩnh nào đẹp?", "find homestays near the beach"):
+     IMMEDIATELY call \`search_places\` to look up verified places in TripGenie's database for "${itinerary.destination}". NEVER invent place names from memory.
+   - When the user explicitly asks to swap or add a place/meal (e.g., "swap Day 1 lunch to Bé Mặn seafood", "pick option 1", "change lunch to seafood"):
+     IMMEDIATELY call \`swap_activity\` or \`add_activity\` directly (these tools search the full database, so do NOT call \`search_places\` first):
      + \`currentPlaceName\`: exact name of the existing stop in CURRENT ITINERARY SCHEDULE.
      + \`dayNumber\`: day number of that stop (1, 2, 3...).
      + \`query\`: exact place name or category requested by the user.

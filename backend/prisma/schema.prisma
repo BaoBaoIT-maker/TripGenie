@@ -217,6 +217,13 @@ enum BannedWordCategory {
   @@map("banned_word_category_enum")
 }
 
+enum BannedWordAction {
+  BLOCK
+  REVIEW
+
+  @@map("banned_word_action_enum")
+}
+
 // =============================================================================
 // MODELS
 // =============================================================================
@@ -852,6 +859,7 @@ model BannedWord {
   id        String             @id @default(dbgenerated("uuid_generate_v4()")) @db.Uuid
   word      String             @unique @db.VarChar(100)
   category  BannedWordCategory @default(PROFANITY)
+  action    BannedWordAction   @default(BLOCK)
   isActive  Boolean            @default(true) @map("is_active")
   notes     String?            @db.VarChar(255)
   createdBy String?            @map("created_by") @db.Uuid
@@ -862,6 +870,7 @@ model BannedWord {
 
   @@index([isActive])
   @@index([category])
+  @@index([action])
   @@map("banned_words")
 }
 

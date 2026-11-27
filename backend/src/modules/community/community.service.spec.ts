@@ -5,8 +5,15 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { ReportStatus, ReportType, UserRole } from '@prisma/client';
+import {
+  PostModerationStatus,
+  ReportStatus,
+  ReportType,
+  UserRole,
+} from '@prisma/client';
 import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
+import { AdminModerationService } from '../admin/admin-moderation.service';
+import { ADMIN_ERRORS } from '../admin/admin.constants';
 import { CommunityService } from './community.service';
 import { CommunitySortMode } from './community.constants';
 
@@ -599,6 +606,149 @@ describe('CommunityService', () => {
           limit: 10,
           viewerId: 'viewer-1',
         }),
+      );
+    });
+  });
+
+  describe('Publish-First (Cách A) moderation', () => {
+    let serviceWithMod: CommunityService;
+    let mockModeration: {
+      assertContentAllowedSync: jest.Mock;
+      matchesSuspiciousTriggers: jest.Mock;
+      evaluatePostAsync: jest.Mock;
+    };
+
+    beforeEach(async () => {
+      mockModeration = {
+        assertContentAllowedSync: jest.fn(),
+        matchesSuspiciousTriggers: jest.fn().mockReturnValue(false),
+        evaluatePostAsync: jest.fn().mockResolvedValue(undefined),
+      };
+
+      const modModule: TestingModule = await Test.createTestingModule({
+        providers: [
+          CommunityService,
+          {
+            provide: INJECT_TOKENS.COMMUNITY_REPOSITORY,
+            useValue: mockRepo,
+          },
+          {
+            provide: INJECT_TOKENS.MEDIA_STORAGE_PROVIDER,
+            useValue: mockStorage,
+          },
+          {
+            provide: AdminModerationService,
+            useValue: mockModeration,
+          },
+        ],
+      }).compile();
+
+      serviceWithMod = modModule.get<CommunityService>(CommunityService);
+    });
+
+    it('createPost should block Tier 1 banned content synchronously without saving post', async () => {
+      mockModeration.assertContentAllowedSync.mockImplementation(() => {
+        throw new BadRequestException(ADMIN_ERRORS.CONTENT_VIOLATES_PROFANITY);
+      });
+
+      await expect(
+        serviceWithMod.createPost('user-1', {
+          title: 'Tiêu đề chứa từ cấm',
+          caption: 'Nội dung test',
+          mediaUrls: [],
+          tags: [],
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockRepo.createPost).not.toHaveBeenCalled();
+      expect(mockModeration.evaluatePostAsync).not.toHaveBeenCalled();
+    });
+
+    it('createPost should publish clean post immediately as APPROVED without calling AI moderation', async () => {
+      mockRepo.createPost.mockResolvedValue({
+        id: 'post-clean-1',
+        moderationStatus: PostModerationStatus.APPROVED,
+      });
+
+      const created = await serviceWithMod.createPost('user-1', {
+        title: 'Kinh nghiệm đi Đà Lạt mùa hoa',
+        caption: 'Thời tiết rất dễ chịu, đồ ăn ngon.',
+        mediaUrls: [],
+        tags: ['DaLat'],
+      });
+
+      expect(created.moderationStatus).toBe(PostModerationStatus.APPROVED);
+      expect(mockRepo.createPost).toHaveBeenCalledWith(
+        expect.objectContaining({
+          moderationStatus: PostModerationStatus.APPROVED,
+          moderationNote: null,
+          moderatedAt: null,
+        }),
+      );
+      expect(mockModeration.matchesSuspiciousTriggers).toHaveBeenCalled();
+
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(mockModeration.evaluatePostAsync).not.toHaveBeenCalled();
+    });
+
+    it('createPost should publish suspicious post as APPROVED first and schedule async AI review', async () => {
+      mockModeration.matchesSuspiciousTriggers.mockReturnValue(true);
+      mockRepo.createPost.mockResolvedValue({
+        id: 'post-suspicious-1',
+        moderationStatus: PostModerationStatus.APPROVED,
+      });
+
+      await serviceWithMod.createPost('user-1', {
+        title: 'Cảnh báo vé rẻ chuyển khoản',
+        caption: 'Inbox zalo đặt cọc ngay',
+        mediaUrls: [],
+        tags: [],
+      });
+
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(mockModeration.evaluatePostAsync).toHaveBeenCalledWith(
+        'post-suspicious-1',
+        expect.stringContaining('Cảnh báo vé rẻ chuyển khoản'),
+      );
+    });
+
+    it('updatePost should keep clean edit APPROVED without calling AI, and schedule AI when suspicious triggers match', async () => {
+      mockRepo.findPostById.mockResolvedValue({
+        id: 'post-edit-1',
+        userId: 'owner-1',
+      });
+      mockRepo.updatePost.mockResolvedValue({
+        id: 'post-edit-1',
+        moderationStatus: PostModerationStatus.APPROVED,
+      });
+
+      await serviceWithMod.updatePost('owner-1', UserRole.USER, 'post-edit-1', {
+        title: 'Sửa lỗi chính tả tiêu đề',
+        caption: 'Chuyến đi tuyệt vời',
+      });
+
+      expect(mockRepo.updatePost).toHaveBeenCalledWith(
+        'post-edit-1',
+        expect.objectContaining({
+          moderationStatus: PostModerationStatus.APPROVED,
+          moderationNote: null,
+          moderatedAt: null,
+        }),
+        'owner-1',
+      );
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(mockModeration.evaluatePostAsync).not.toHaveBeenCalled();
+
+      mockModeration.matchesSuspiciousTriggers.mockReturnValue(true);
+      await serviceWithMod.updatePost('owner-1', UserRole.USER, 'post-edit-1', {
+        title: 'Sửa nội dung có từ nghi ngờ',
+        caption: 'Chuyển khoản cọc trước nhé',
+      });
+
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(mockModeration.evaluatePostAsync).toHaveBeenCalledWith(
+        'post-edit-1',
+        expect.stringContaining('Chuyển khoản cọc trước nhé'),
       );
     });
   });

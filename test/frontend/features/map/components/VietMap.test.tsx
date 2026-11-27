@@ -5,6 +5,8 @@ import { createPlaceMarkerElement } from "@/components/map/PlaceMarker";
 import { createMapPopupElement } from "@/components/map/MapPopup";
 import { VietMapLoader } from "@/components/map/VietMapLoader";
 import { MapControls } from "@/components/map/MapControls";
+import { RouteControlPanel } from "@/components/map/RouteControlPanel";
+import { computeRouteFitPadding } from "@/features/map/map-config";
 import type { NearbyPlace, VietMapProps } from "@/features/map/types";
 import { MOCK_PLACES } from "@/mocks/data/places";
 
@@ -174,5 +176,116 @@ describe("VietMap DOM factories and controls", () => {
     expect(popup).toHaveTextContent("Remove");
     expect(popup).toHaveTextContent("Set start");
     expect(popup).toHaveTextContent("View details");
+  });
+
+  it("omits dead GPS button when onRequestCurrentLocation is undefined and toggles desktop Layers tray via click & Escape", async () => {
+    const user = userEvent.setup();
+    const onChangeTheme = vi.fn();
+    render(
+      <MapControls
+        onZoomIn={vi.fn()}
+        onZoomOut={vi.fn()}
+        locating={false}
+        currentTheme="bright"
+        onChangeTheme={onChangeTheme}
+      />
+    );
+
+    expect(screen.queryByRole("button", { name: /vị trí của tôi/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+
+    // Desktop thumbnail trigger shows satellite preview image when currently in bright mode
+    const layerTriggers = screen.getAllByRole("button", { name: /chọn loại bản đồ/i });
+    const desktopTrigger = layerTriggers[layerTriggers.length - 1];
+    expect(desktopTrigger.querySelector("img")?.getAttribute("src")).toBe(
+      "/images/map/layer-satellite.jpg"
+    );
+
+    // Click to open layer choices (Sáng / Vệ tinh, never Tối)
+    await user.click(desktopTrigger);
+    expect(screen.getByRole("radio", { name: /sáng/i })).toHaveAttribute("aria-checked", "true");
+    const satRadio = screen.getByRole("radio", { name: /vệ tinh/i });
+    expect(satRadio).toHaveAttribute("aria-checked", "false");
+    expect(screen.queryByRole("radio", { name: /tối/i })).not.toBeInTheDocument();
+
+    await user.click(satRadio);
+    expect(onChangeTheme).toHaveBeenCalledWith("satellite");
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+
+    // Reopen and close with Escape for keyboard accessibility
+    await user.click(desktopTrigger);
+    expect(screen.getByRole("radiogroup")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+  });
+
+  it("renders RouteControlPanel with Font Awesome vehicle icons (no emojis) and interactive stop controls", async () => {
+    const user = userEvent.setup();
+    const onToggleCollapse = vi.fn();
+    const onChangeMode = vi.fn();
+    const onMoveStop = vi.fn();
+    const onSwapRoute = vi.fn();
+    const onClearRoute = vi.fn();
+
+    const { container } = render(
+      <RouteControlPanel
+        routeStops={[
+          { id: "stop-a", name: "Cầu Rồng", coordinate: { latitude: 16.0611, longitude: 108.2275 } },
+          { id: "stop-b", name: "Biển Mỹ Khê", coordinate: { latitude: 16.0678, longitude: 108.2467 } },
+        ]}
+        routeMode="motorcycle"
+        routeResult={{
+          distanceKm: 3.4,
+          durationMinutes: 9,
+          geometry: { type: "LineString", coordinates: [[108.2275, 16.0611], [108.2467, 16.0678]] },
+          mode: "motorcycle",
+          origin: { latitude: 16.0611, longitude: 108.2275 },
+          destination: { latitude: 16.0678, longitude: 108.2467 },
+        }}
+        routeLoading={false}
+        locale="vi"
+        isCollapsed={false}
+        mapContainerRef={{ current: null }}
+        onToggleCollapse={onToggleCollapse}
+        onChangeMode={onChangeMode}
+        onMoveStop={onMoveStop}
+        onRemoveStop={vi.fn()}
+        onUseMyLocationAsOrigin={vi.fn()}
+        onSwapRoute={onSwapRoute}
+        onClearRoute={onClearRoute}
+      />
+    );
+
+    expect(container.textContent).not.toMatch(/🏍️|🚗|🚶/);
+    expect(container.querySelector("i.fa-motorcycle")).toBeInTheDocument();
+    expect(screen.getByText("Cầu Rồng")).toBeInTheDocument();
+    expect(screen.getByText("Biển Mỹ Khê")).toBeInTheDocument();
+    expect(screen.getByText(/3,4 km/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /ô tô/i }));
+    expect(onChangeMode).toHaveBeenCalledWith("driving");
+
+    await user.click(screen.getByRole("button", { name: /đổi chiều/i }));
+    expect(onSwapRoute).toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: /thu gọn bảng/i }));
+    expect(onToggleCollapse).toHaveBeenCalledWith(true);
+
+    await user.click(screen.getByRole("button", { name: /đóng chỉ đường/i }));
+    expect(onClearRoute).toHaveBeenCalled();
+  });
+
+  it("avoids invalid py-0.2 class and double outer border on map popup container", () => {
+    const popup = createMapPopupElement(nearbyPlace);
+    expect(popup.className).not.toContain("border-slate-200/80");
+    expect(popup.className).not.toContain("rounded-2xl");
+    expect(popup.innerHTML).not.toContain("py-0.2");
+  });
+
+  it("computes route fitBounds left padding to clear expanded RouteControlPanel on desktop", () => {
+    expect(computeRouteFitPadding(1000, true).left).toBe(408);
+    expect(computeRouteFitPadding(768, true).left).toBe(346);
+    expect(computeRouteFitPadding(1000, false).left).toBe(60);
+    expect(computeRouteFitPadding(390, true).left).toBe(60);
   });
 });

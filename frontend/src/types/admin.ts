@@ -403,10 +403,13 @@ export type BannedWordCategory =
   | "GAMBLING"
   | "OTHER";
 
+export type BannedWordAction = "BLOCK" | "REVIEW";
+
 export interface AdminBannedWordItem {
   id: string;
   word: string;
   category: BannedWordCategory;
+  action: BannedWordAction;
   isActive: boolean;
   notes: string | null;
   createdBy: string | null;
@@ -422,13 +425,22 @@ export interface AdminBannedWordItem {
 export interface CreateBannedWordPayload {
   word: string;
   category: BannedWordCategory;
+  action?: BannedWordAction;
   notes?: string;
+}
+
+export interface UpdateBannedWordPayload {
+  category?: BannedWordCategory;
+  action?: BannedWordAction;
+  notes?: string;
+  isActive?: boolean;
 }
 
 export interface QueryAdminBannedWordsParams {
   page?: number;
   limit?: number;
   category?: BannedWordCategory;
+  action?: BannedWordAction;
   isActive?: boolean;
   search?: string;
 }

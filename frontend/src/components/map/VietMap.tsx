@@ -11,23 +11,6 @@ import {
   type GeoJSONSource,
   type StyleSpecification,
 } from "maplibre-gl";
-import {
-  Compass,
-  X,
-  Loader2,
-  ExternalLink,
-  ArrowUpDown,
-  Search,
-  ChevronUp,
-  ChevronDown,
-  GripHorizontal,
-  LocateFixed,
-} from "lucide-react";
-
-// Fix Web Worker URL in Next.js / Turbopack
-if (typeof window !== "undefined") {
-  maplibreConfig.WORKER_URL = "/maplibre-gl-worker.mjs";
-}
 import { toast } from "sonner";
 import { useI18n } from "@/i18n";
 import type {
@@ -35,6 +18,7 @@ import type {
   DiscoveryPlace,
   MapCoordinate,
 } from "@/features/map/types";
+import type { BackendTravelAreaItem } from "@/services/place.service";
 import { useAuth } from "@/features/auth/hooks/use-auth";
 import { useSavedPlaceIds, useToggleFavorite } from "@/features/collections/hooks/use-collections";
 import { SaveToCollectionModal } from "@/features/collections/components/SaveToCollectionModal";
@@ -46,11 +30,17 @@ import {
   MAX_NEARBY_PROXIMITY_KM,
   MAX_ROUTE_FIT_ZOOM,
   DANANG_GSO_PROVINCE_CODE,
-  ROUTE_STOP_ID_USER_LOCATION,
+  MAP_TILE_URLS,
+  MAP_SOURCE_IDS,
+  MAP_LAYER_IDS,
+  MAP_CAMERA_CONFIG,
+  MAP_PAINT_CONFIG,
+  computeRouteFitPadding,
 } from "@/features/map/map-config";
 import { createPlaceMarkerElement, getMarkerButtonClasses } from "./PlaceMarker";
 import { createMapPopupElement } from "./MapPopup";
 import { MapControls, type MapStyleTheme } from "./MapControls";
+import { RouteControlPanel, type RouteStop } from "./RouteControlPanel";
 import provincesBoundsData from "@/features/map/vietnam_provinces_bounds.json";
 import {
   routingService,
@@ -59,61 +49,57 @@ import {
   type Coordinate,
 } from "@/services/routing.service";
 
-export interface RouteStop {
-  id: string;
-  name: string;
-  coordinate: Coordinate;
+// Fix Web Worker URL in Next.js / Turbopack
+if (typeof window !== "undefined") {
+  maplibreConfig.WORKER_URL = "/maplibre-gl-worker.mjs";
 }
+
+export type { RouteStop };
 
 const VIETMAP_API_KEY =
   process.env.NEXT_PUBLIC_VIETMAP_TILEMAP_KEY ||
   process.env.NEXT_PUBLIC_VIETMAP_API_KEY ||
-  "2666c52efc01d7dc003ee0e7f99832ce958c659a9070a645";
+  "";
 
-// Multi-layer Map Style (100% official VietMap @2x tiles, no watermarks, no "API key required"):
-// 1. Bright / Du lịch (VietMap official @2x tiles — verified 200 image/png) - Mặc định
-// 2. Tối / Giao thông (Esri World Dark Gray Canvas — verified 200 image/jpeg + labels)
-// 3. Vệ tinh (Esri World Imagery — verified 200 image/jpeg)
+// Multi-layer Map Style:
+// 1. Bright / Travel (Official VietMap TM @2x tiles) - Default
+// 2. Satellite (Esri World Imagery)
 const MULTI_LAYER_MAP_STYLE: StyleSpecification = {
   version: 8,
   sources: {
-    "source-satellite": {
+    [MAP_SOURCE_IDS.SATELLITE]: {
       type: "raster",
-      tiles: [
-        "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-      ],
+      tiles: [MAP_TILE_URLS.SATELLITE],
       tileSize: 256,
       maxzoom: 19,
     },
-    "source-bright": {
+    [MAP_SOURCE_IDS.BRIGHT]: {
       type: "raster",
-      tiles: [
-        `https://maps.vietmap.vn/tm/{z}/{x}/{y}@2x.png?apikey=${VIETMAP_API_KEY}`,
-      ],
+      tiles: [`${MAP_TILE_URLS.VIETMAP_BRIGHT_BASE}?apikey=${VIETMAP_API_KEY}`],
       tileSize: 256,
       maxzoom: 19,
     },
   },
   layers: [
     {
-      id: "layer-background",
+      id: MAP_LAYER_IDS.BACKGROUND,
       type: "background",
       paint: {
-        "background-color": "#f8fafc",
+        "background-color": MAP_PAINT_CONFIG.BACKGROUND_COLOR,
       },
     },
     {
-      id: "layer-satellite",
+      id: MAP_LAYER_IDS.SATELLITE,
       type: "raster",
-      source: "source-satellite",
+      source: MAP_SOURCE_IDS.SATELLITE,
       layout: { visibility: "none" },
       minzoom: 0,
       maxzoom: 24,
     },
     {
-      id: "layer-bright",
+      id: MAP_LAYER_IDS.BRIGHT,
       type: "raster",
-      source: "source-bright",
+      source: MAP_SOURCE_IDS.BRIGHT,
       layout: { visibility: "visible" },
       minzoom: 0,
       maxzoom: 24,
@@ -133,8 +119,6 @@ interface ProvinceBoundItem {
 }
 
 const boundsMap = provincesBoundsData as Record<string, ProvinceBoundItem>;
-
-import type { BackendTravelAreaItem } from "@/services/place.service";
 
 /**
  * Resolves geographic center for a destination dynamically without hard-coding
@@ -224,6 +208,7 @@ export default function VietMap({
   const currentPopupPlaceIdRef = useRef<string | null>(null);
   const previousViewportRef = useRef<{ center: [number, number]; zoom: number } | null>(null);
   const [hasError, setHasError] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<MapStyleTheme>("bright");
 
@@ -245,16 +230,13 @@ export default function VietMap({
   const [routeResult, setRouteResult] = useState<RouteResult | null>(null);
   const [routeLoading, setRouteLoading] = useState(false);
   const [isRoutePanelCollapsed, setIsRoutePanelCollapsed] = useState(false);
-  const [panelPos, setPanelPos] = useState<{ x: number; y: number } | null>(null);
-  const isDraggingPanelRef = useRef(false);
-  const dragStartRef = useRef<{ mouseX: number; mouseY: number; panelX: number; panelY: number }>({
-    mouseX: 0,
-    mouseY: 0,
-    panelX: 12,
-    panelY: 12,
-  });
+  const isRoutePanelCollapsedRef = useRef(isRoutePanelCollapsed);
   const routeStopMarkersRef = useRef<Marker[]>([]);
   const pendingDestinationRef = useRef<DiscoveryPlace | null>(null);
+
+  useEffect(() => {
+    isRoutePanelCollapsedRef.current = isRoutePanelCollapsed;
+  }, [isRoutePanelCollapsed]);
 
   // Synced Collections & Add-to-Itinerary Modals
   const { user } = useAuth();
@@ -296,7 +278,7 @@ export default function VietMap({
     if (userLocation && mapRef.current) {
       mapRef.current.flyTo({
         center: [userLocation.longitude, userLocation.latitude],
-        zoom: 15.5,
+        zoom: MAP_CAMERA_CONFIG.USER_LOCATION_ZOOM,
         duration: 800,
       });
       toast.success(t("map.toasts.flyingToLocation"));
@@ -329,29 +311,6 @@ export default function VietMap({
   useEffect(() => {
     selectedPlaceIdRef.current = selectedPlaceId;
   }, [selectedPlaceId]);
-
-  // Global mousemove and mouseup listeners to drag the route panel freely
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isDraggingPanelRef.current) return;
-      const dx = e.clientX - dragStartRef.current.mouseX;
-      const dy = e.clientY - dragStartRef.current.mouseY;
-      const nextX = Math.max(8, dragStartRef.current.panelX + dx);
-      const nextY = Math.max(8, dragStartRef.current.panelY + dy);
-      setPanelPos({ x: nextX, y: nextY });
-    };
-
-    const handleMouseUp = () => {
-      isDraggingPanelRef.current = false;
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-  }, []);
 
   // When center prop updates, dismiss "Search This Area" button
   useEffect(() => {
@@ -418,7 +377,7 @@ export default function VietMap({
             ? "bg-emerald-600"
             : isDest
             ? "bg-rose-600"
-            : "bg-sky-600";
+            : "bg-[#0194F3]";
           const label = isOrigin
             ? t("map.routing.originMarker", { letter })
             : isDest
@@ -451,9 +410,9 @@ export default function VietMap({
         });
 
         // Add or update route GeoJSON source
-        const sourceId = "tripgenie-route-source";
-        const casingLayerId = "tripgenie-route-casing";
-        const lineLayerId = "tripgenie-route-line";
+        const sourceId = MAP_SOURCE_IDS.ROUTE;
+        const casingLayerId = MAP_LAYER_IDS.ROUTE_CASING;
+        const lineLayerId = MAP_LAYER_IDS.ROUTE_LINE;
 
         const routeGeoJson: GeoJSON.Feature<GeoJSON.LineString> = {
           type: "Feature",
@@ -471,7 +430,7 @@ export default function VietMap({
           });
         }
 
-        // Route line dark casing (ensure layer is present)
+        // Route line high-contrast casing (zoom-responsive)
         if (!map.getLayer(casingLayerId)) {
           map.addLayer({
             id: casingLayerId,
@@ -482,14 +441,14 @@ export default function VietMap({
               "line-cap": "round",
             },
             paint: {
-              "line-color": "#1e3a8a",
-              "line-width": 7.5,
-              "line-opacity": 0.85,
+              "line-color": MAP_PAINT_CONFIG.BRAND_BLUE_CASING,
+              "line-width": MAP_PAINT_CONFIG.ROUTE_CASING_WIDTH,
+              "line-opacity": MAP_PAINT_CONFIG.ROUTE_CASING_OPACITY,
             },
           });
         }
 
-        // Route main vibrant line (ensure layer is present)
+        // Route main brand line (zoom-responsive)
         if (!map.getLayer(lineLayerId)) {
           map.addLayer({
             id: lineLayerId,
@@ -500,9 +459,9 @@ export default function VietMap({
               "line-cap": "round",
             },
             paint: {
-              "line-color": "#2563eb",
-              "line-width": 4.5,
-              "line-opacity": 0.95,
+              "line-color": MAP_PAINT_CONFIG.BRAND_BLUE,
+              "line-width": MAP_PAINT_CONFIG.ROUTE_LINE_WIDTH,
+              "line-opacity": MAP_PAINT_CONFIG.ROUTE_LINE_OPACITY,
             },
           });
         }
@@ -528,7 +487,10 @@ export default function VietMap({
           });
         } else {
           map.fitBounds(bounds, {
-            padding: { top: 100, bottom: 80, left: 60, right: 60 },
+            padding: computeRouteFitPadding(
+              containerRef.current?.clientWidth ?? 0,
+              !isRoutePanelCollapsedRef.current
+            ),
             maxZoom: MAX_ROUTE_FIT_ZOOM,
             duration: 800,
           });
@@ -553,9 +515,22 @@ export default function VietMap({
     pendingDestinationRef.current = null;
     if (!mapRef.current) return;
     const map = mapRef.current;
-    if (map.getLayer("tripgenie-route-line")) map.removeLayer("tripgenie-route-line");
-    if (map.getLayer("tripgenie-route-casing")) map.removeLayer("tripgenie-route-casing");
-    if (map.getSource("tripgenie-route-source")) map.removeSource("tripgenie-route-source");
+    if (map.getLayer(MAP_LAYER_IDS.ROUTE_LINE)) map.removeLayer(MAP_LAYER_IDS.ROUTE_LINE);
+    if (map.getLayer(MAP_LAYER_IDS.ROUTE_CASING)) map.removeLayer(MAP_LAYER_IDS.ROUTE_CASING);
+    if (map.getSource(MAP_SOURCE_IDS.ROUTE)) map.removeSource(MAP_SOURCE_IDS.ROUTE);
+  }, []);
+
+  // Close place popup cleanly when switching to or mutating active routing
+  const dismissPopupForRouting = useCallback(() => {
+    if (popupRef.current) {
+      isProgrammaticPopupCloseRef.current = true;
+      popupRef.current.remove();
+      popupRef.current = null;
+      isProgrammaticPopupCloseRef.current = false;
+    }
+    currentPopupPlaceIdRef.current = null;
+    previousViewportRef.current = null;
+    onSelectPlaceRef.current(null);
   }, []);
 
   // Request directions handler (initiates 2-stop route from nearby GPS or area center)
@@ -563,6 +538,7 @@ export default function VietMap({
 
   const handleStartDirections = useCallback(
     (targetPlace: DiscoveryPlace) => {
+      dismissPopupForRouting();
       const provCenter = resolveTargetAreaCenter(
         targetPlace,
         travelAreas,
@@ -583,7 +559,7 @@ export default function VietMap({
       });
       setRouteStops(newStops);
     },
-    [userLocation, selectedProvinceName, travelAreas, t]
+    [dismissPopupForRouting, userLocation, selectedProvinceName, travelAreas, t]
   );
 
   // Hide underlying place markers for active route stops so markers never collide or peek underneath
@@ -644,6 +620,7 @@ export default function VietMap({
   // Set selected place as the starting origin (Point A)
   const handleSetOrigin = useCallback(
     (place: DiscoveryPlace) => {
+      dismissPopupForRouting();
       const newOrigin: RouteStop = {
         id: place.id,
         name: place.name,
@@ -652,13 +629,14 @@ export default function VietMap({
       setRouteStops((prev) => routingService.setOriginInRoute(prev, newOrigin));
       toast.success(t("map.toasts.originSetToPlace", { name: place.name }));
     },
-    [t]
+    [dismissPopupForRouting, t]
   );
 
   // Add a stop to the existing route — pure state update, drawRoute triggered by reactive effect
   const handleAddStopToRoute = useCallback(
     (place: DiscoveryPlace) => {
       if (!place) return;
+      dismissPopupForRouting();
       setRouteStops((prev) =>
         routingService.addStopToRoute(prev, {
           id: place.id,
@@ -668,7 +646,7 @@ export default function VietMap({
       );
       toast.success(t("map.toasts.stopAdded", { name: place.name }));
     },
-    [t]
+    [dismissPopupForRouting, t]
   );
 
   // Remove a stop by index — pure state update, reactive effect handles re-draw / clear
@@ -682,10 +660,11 @@ export default function VietMap({
   // Remove a stop by place ID (from popup) — pure state update
   const handleRemoveStopById = useCallback(
     (placeId: string) => {
+      dismissPopupForRouting();
       setRouteStops((prev) => routingService.removeStopFromRoute(prev, placeId));
       toast.info(t("map.toasts.stopRemoved"));
     },
-    [t]
+    [dismissPopupForRouting, t]
   );
 
     // Move a stop up or down — pure state update
@@ -729,9 +708,9 @@ export default function VietMap({
     } else if (routeStops.length === 0) {
       const map = mapRef.current;
       if (map) {
-        if (map.getLayer("tripgenie-route-line")) map.removeLayer("tripgenie-route-line");
-        if (map.getLayer("tripgenie-route-casing")) map.removeLayer("tripgenie-route-casing");
-        if (map.getSource("tripgenie-route-source")) map.removeSource("tripgenie-route-source");
+        if (map.getLayer(MAP_LAYER_IDS.ROUTE_LINE)) map.removeLayer(MAP_LAYER_IDS.ROUTE_LINE);
+        if (map.getLayer(MAP_LAYER_IDS.ROUTE_CASING)) map.removeLayer(MAP_LAYER_IDS.ROUTE_CASING);
+        if (map.getSource(MAP_SOURCE_IDS.ROUTE)) map.removeSource(MAP_SOURCE_IDS.ROUTE);
       }
       routeStopMarkersRef.current.forEach((m) => m.remove());
       routeStopMarkersRef.current = [];
@@ -774,11 +753,11 @@ export default function VietMap({
     const map = mapRef.current;
     const isSatellite = currentTheme === "satellite";
 
-    if (map.getLayer("layer-bright")) {
-      map.setLayoutProperty("layer-bright", "visibility", isSatellite ? "none" : "visible");
+    if (map.getLayer(MAP_LAYER_IDS.BRIGHT)) {
+      map.setLayoutProperty(MAP_LAYER_IDS.BRIGHT, "visibility", isSatellite ? "none" : "visible");
     }
-    if (map.getLayer("layer-satellite")) {
-      map.setLayoutProperty("layer-satellite", "visibility", isSatellite ? "visible" : "none");
+    if (map.getLayer(MAP_LAYER_IDS.SATELLITE)) {
+      map.setLayoutProperty(MAP_LAYER_IDS.SATELLITE, "visibility", isSatellite ? "visible" : "none");
     }
   }, [currentTheme, mapLoaded]);
 
@@ -787,7 +766,9 @@ export default function VietMap({
     if (!containerRef.current) return;
 
     try {
-      const initialZoom = selectedPlaceIdRef.current ? 16 : DEFAULT_MAP_ZOOM;
+      const initialZoom = selectedPlaceIdRef.current
+        ? MAP_CAMERA_CONFIG.SELECTED_PLACE_ZOOM
+        : DEFAULT_MAP_ZOOM;
       const map = new MapLibreMap({
         container: containerRef.current,
         style: MULTI_LAYER_MAP_STYLE,
@@ -797,40 +778,41 @@ export default function VietMap({
 
       map.on("load", () => {
         setMapLoaded(true);
+        setHasError(false);
         map.resize();
 
         // Load 34 Provinces GeoJSON boundary overlay
         try {
-          if (!map.getSource("vietnam-provinces")) {
-            map.addSource("vietnam-provinces", {
+          if (!map.getSource(MAP_SOURCE_IDS.PROVINCES)) {
+            map.addSource(MAP_SOURCE_IDS.PROVINCES, {
               type: "geojson",
-              data: "/data/vietnam_34_tinhthanh.geojson",
+              data: MAP_TILE_URLS.PROVINCES_GEOJSON,
             });
 
             // Fill layer for province highlight
             map.addLayer({
-              id: "vietnam-provinces-fill",
+              id: MAP_LAYER_IDS.PROVINCES_FILL,
               type: "fill",
-              source: "vietnam-provinces",
+              source: MAP_SOURCE_IDS.PROVINCES,
               paint: {
-                "fill-color": "#3b82f6",
+                "fill-color": MAP_PAINT_CONFIG.BRAND_BLUE,
                 "fill-opacity": 0.0,
               },
             });
 
             // Stroke line layer for provincial borders
             map.addLayer({
-              id: "vietnam-provinces-line",
+              id: MAP_LAYER_IDS.PROVINCES_LINE,
               type: "line",
-              source: "vietnam-provinces",
+              source: MAP_SOURCE_IDS.PROVINCES,
               layout: {
                 "line-join": "round",
                 "line-cap": "round",
               },
               paint: {
-                "line-color": "#94a3b8",
-                "line-width": 1.2,
-                "line-opacity": 0.35,
+                "line-color": MAP_PAINT_CONFIG.PROVINCE_MUTED_LINE,
+                "line-width": MAP_PAINT_CONFIG.PROVINCE_MUTED_WIDTH,
+                "line-opacity": MAP_PAINT_CONFIG.PROVINCE_MUTED_OPACITY,
               },
             });
           }
@@ -857,7 +839,7 @@ export default function VietMap({
         }
       });
 
-      // Listen to Pan/Move to show "Search This Area" if user pans far (> 1.2km)
+      // Listen to Pan/Move to show "Search This Area" if user pans far
       map.on("moveend", () => {
         const c = map.getCenter();
         onViewportChangeRef.current({
@@ -871,7 +853,7 @@ export default function VietMap({
             lastSearchCenterRef.current,
             { latitude: c.lat, longitude: c.lng }
           );
-          if (distFromLast > 1.2) {
+          if (distFromLast > MAP_CAMERA_CONFIG.SEARCH_THIS_AREA_PAN_KM) {
             setShowSearchThisArea((prev) => (prev ? prev : true));
             setPendingSearchCenter((prev) => {
               if (
@@ -949,43 +931,55 @@ export default function VietMap({
       console.error("Failed to initialize VietMap:", err);
       setTimeout(() => setHasError(true), 0);
     }
-  }, []);
+  }, [retryNonce]);
 
   // Update Highlight and FitBounds when selectedProvinceName changes
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
 
-    // Giữ phần ruột tỉnh trong suốt hoàn toàn, không phủ mờ bề mặt bản đồ
-    if (map.getLayer("vietnam-provinces-fill")) {
-      map.setPaintProperty("vietnam-provinces-fill", "fill-opacity", 0.0);
+    // Keep province interior completely transparent
+    if (map.getLayer(MAP_LAYER_IDS.PROVINCES_FILL)) {
+      map.setPaintProperty(MAP_LAYER_IDS.PROVINCES_FILL, "fill-opacity", 0.0);
     }
 
-    // Làm đậm đường viền ranh giới tỉnh thành được chọn bằng màu xanh nhận diện
-    if (map.getLayer("vietnam-provinces-line")) {
+    // Highlight selected province border with brand blue
+    if (map.getLayer(MAP_LAYER_IDS.PROVINCES_LINE)) {
       if (selectedProvinceName) {
-        map.setPaintProperty("vietnam-provinces-line", "line-color", [
+        map.setPaintProperty(MAP_LAYER_IDS.PROVINCES_LINE, "line-color", [
           "case",
           ["==", ["get", "ten_tinh"], selectedProvinceName],
-          "#0194F3",
-          "#94a3b8",
+          MAP_PAINT_CONFIG.BRAND_BLUE,
+          MAP_PAINT_CONFIG.PROVINCE_MUTED_LINE,
         ]);
-        map.setPaintProperty("vietnam-provinces-line", "line-width", [
+        map.setPaintProperty(MAP_LAYER_IDS.PROVINCES_LINE, "line-width", [
           "case",
           ["==", ["get", "ten_tinh"], selectedProvinceName],
-          3.5,
+          MAP_PAINT_CONFIG.PROVINCE_SELECTED_WIDTH,
           1.0,
         ]);
-        map.setPaintProperty("vietnam-provinces-line", "line-opacity", [
+        map.setPaintProperty(MAP_LAYER_IDS.PROVINCES_LINE, "line-opacity", [
           "case",
           ["==", ["get", "ten_tinh"], selectedProvinceName],
           1.0,
           0.3,
         ]);
       } else {
-        map.setPaintProperty("vietnam-provinces-line", "line-color", "#94a3b8");
-        map.setPaintProperty("vietnam-provinces-line", "line-width", 1.2);
-        map.setPaintProperty("vietnam-provinces-line", "line-opacity", 0.35);
+        map.setPaintProperty(
+          MAP_LAYER_IDS.PROVINCES_LINE,
+          "line-color",
+          MAP_PAINT_CONFIG.PROVINCE_MUTED_LINE
+        );
+        map.setPaintProperty(
+          MAP_LAYER_IDS.PROVINCES_LINE,
+          "line-width",
+          MAP_PAINT_CONFIG.PROVINCE_MUTED_WIDTH
+        );
+        map.setPaintProperty(
+          MAP_LAYER_IDS.PROVINCES_LINE,
+          "line-opacity",
+          MAP_PAINT_CONFIG.PROVINCE_MUTED_OPACITY
+        );
       }
     }
 
@@ -997,13 +991,13 @@ export default function VietMap({
             [b.minLng, b.minLat],
             [b.maxLng, b.maxLat],
           ],
-          { padding: 40, maxZoom: 14, duration: 800 }
+          { padding: 40, maxZoom: MAP_CAMERA_CONFIG.PROVINCE_FIT_MAX_ZOOM, duration: 800 }
         );
       }
     }
   }, [selectedProvinceName, mapLoaded, places.length, selectedPlaceId]);
 
-  // Update User Location Marker (GPS) - Renders user pin without overriding active place focus
+  // Update User Location Marker (GPS) - Static soft halo (no endless animation loops)
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -1017,8 +1011,8 @@ export default function VietMap({
       const el = document.createElement("div");
       el.className = "relative flex items-center justify-center cursor-pointer";
       el.innerHTML = `
-        <div class="absolute h-8 w-8 rounded-full bg-blue-500/25 animate-ping"></div>
-        <div class="h-4.5 w-4.5 rounded-full border-2 border-white bg-blue-600 shadow-lg"></div>
+        <div class="absolute h-7 w-7 rounded-full bg-[#0194F3]/20 border border-[#0194F3]/30"></div>
+        <div class="relative h-4 w-4 rounded-full border-2 border-white bg-[#0194F3] shadow-md"></div>
       `;
 
       const marker = new Marker({ element: el })
@@ -1029,7 +1023,7 @@ export default function VietMap({
     }
   }, [userLocation]);
 
-  // Display Draggable Geocoded Pin (Google Maps Draggable Marker)
+  // Display Draggable Geocoded Pin
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -1043,8 +1037,8 @@ export default function VietMap({
       const el = document.createElement("div");
       el.className = "relative flex flex-col items-center -translate-y-full cursor-grab active:cursor-grabbing select-none group z-50 pointer-events-auto";
       el.innerHTML = `
-        <div class="px-2.5 py-1 rounded-full bg-background/95 border border-border/80 text-foreground text-[11px] font-bold shadow-lg mb-1.5 whitespace-nowrap flex items-center gap-1.5 backdrop-blur-md transition-transform group-hover:scale-105">
-          <span class="size-1.5 rounded-full bg-rose-500 animate-ping"></span>
+        <div class="px-2.5 py-1 rounded-full bg-white border border-[#D5E2F0] text-[#10243A] text-[11px] font-bold shadow-lg mb-1.5 whitespace-nowrap flex items-center gap-1.5 transition-transform group-hover:scale-105">
+          <span class="size-2 rounded-full bg-rose-500 shrink-0"></span>
           <span class="max-w-[200px] truncate">${geocodedPin.displayName || t("map.pinnedLocation")}</span>
         </div>
         <div class="relative filter drop-shadow-md group-hover:scale-110 active:scale-125 transition-transform duration-150">
@@ -1075,7 +1069,7 @@ export default function VietMap({
       // Smoothly fly map to pinned position
       map.flyTo({
         center: [geocodedPin.lng, geocodedPin.lat],
-        zoom: 15.5,
+        zoom: MAP_CAMERA_CONFIG.GEOCODED_PIN_ZOOM,
         duration: 900,
       });
     }
@@ -1144,7 +1138,11 @@ export default function VietMap({
         bounds.extend([geocodedPin.lng, geocodedPin.lat]);
       }
       try {
-        map.fitBounds(bounds, { padding: 60, maxZoom: 15, duration: 600 });
+        map.fitBounds(bounds, {
+          padding: 60,
+          maxZoom: MAP_CAMERA_CONFIG.PLACES_FIT_MAX_ZOOM,
+          duration: 600,
+        });
       } catch {
         // ignore bounds calculation error
       }
@@ -1180,13 +1178,13 @@ export default function VietMap({
     });
   }, [selectedPlaceId, hoveredPlaceId]);
 
-  // Draw / update the itinerary polyline (supports multi-day colored segments with high-contrast casing)
-  // Maps paint properties dynamically read each segment's color from feature properties
+  // Draw / update the itinerary polyline (sleek dashed zoom-responsive multi-day segments)
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !mapLoaded) return;
-    const SOURCE_ID = "tripgenie-itinerary-path";
-    const LAYER_ID = "tripgenie-itinerary-path-line";
+    const SOURCE_ID = MAP_SOURCE_IDS.ITINERARY_PATH;
+    const LAYER_ID = MAP_LAYER_IDS.ITINERARY_PATH_LINE;
+    const CASING_LAYER_ID = MAP_LAYER_IDS.ITINERARY_PATH_CASING;
 
     let features: GeoJSON.Feature<GeoJSON.LineString>[] = [];
 
@@ -1197,7 +1195,7 @@ export default function VietMap({
           type: "Feature",
           properties: {
             dayNumber: seg.dayNumber,
-            color: seg.color || "#0068B8",
+            color: seg.color || MAP_PAINT_CONFIG.BRAND_BLUE,
           },
           geometry: {
             type: "LineString",
@@ -1210,7 +1208,7 @@ export default function VietMap({
           type: "Feature",
           properties: {
             dayNumber: 1,
-            color: "#0068B8",
+            color: MAP_PAINT_CONFIG.BRAND_BLUE,
           },
           geometry: {
             type: "LineString",
@@ -1225,47 +1223,41 @@ export default function VietMap({
       features,
     };
 
-    const casingColor = currentTheme === "dark" ? "#0F172A" : "#FFFFFF";
-
     try {
       if (map.getSource(SOURCE_ID)) {
         (map.getSource(SOURCE_ID) as GeoJSONSource).setData(geojson);
       } else {
         map.addSource(SOURCE_ID, { type: "geojson", data: geojson });
-        // High-contrast casing layer: crisp white in bright/satellite mode, dark in dark mode
+        // Crisp white casing underneath dashed stop connector
         map.addLayer({
-          id: `${LAYER_ID}-casing`,
+          id: CASING_LAYER_ID,
           type: "line",
           source: SOURCE_ID,
           layout: { "line-join": "round", "line-cap": "round" },
           paint: {
-            "line-color": casingColor,
-            "line-width": 8.5,
-            "line-opacity": 0.9,
+            "line-color": MAP_PAINT_CONFIG.WHITE_CASING,
+            "line-width": MAP_PAINT_CONFIG.ITINERARY_CASING_WIDTH,
+            "line-opacity": MAP_PAINT_CONFIG.ITINERARY_CASING_OPACITY,
           },
         });
-        // Core line layer with dynamic per-segment day color
+        // Sleek zoom-responsive dashed connector per day
         map.addLayer({
           id: LAYER_ID,
           type: "line",
           source: SOURCE_ID,
           layout: { "line-join": "round", "line-cap": "round" },
           paint: {
-            "line-color": ["coalesce", ["get", "color"], "#0068B8"],
-            "line-width": 4.5,
-            "line-opacity": 0.95,
+            "line-color": ["coalesce", ["get", "color"], MAP_PAINT_CONFIG.BRAND_BLUE],
+            "line-width": MAP_PAINT_CONFIG.ITINERARY_LINE_WIDTH,
+            "line-dasharray": MAP_PAINT_CONFIG.ITINERARY_LINE_DASHARRAY,
+            "line-opacity": MAP_PAINT_CONFIG.ITINERARY_LINE_OPACITY,
           },
         });
-      }
-
-      // Keep casing color up to date with map theme
-      if (map.getLayer(`${LAYER_ID}-casing`)) {
-        map.setPaintProperty(`${LAYER_ID}-casing`, "line-color", casingColor);
       }
     } catch (e) {
       console.warn("[ItineraryPath] failed to update polyline:", e);
     }
-  }, [pathSegments, pathLine, mapLoaded, currentTheme]);
+  }, [pathSegments, pathLine, mapLoaded]);
 
   // Center on selected place & show popup (with Quick Save & Multi-stop Add options)
 
@@ -1285,8 +1277,8 @@ export default function VietMap({
         isProgrammaticPopupCloseRef.current = false;
       }
 
-      // Smoothly zoom out back to overview when closing popup
-      if (wasSelected) {
+      // Smoothly zoom out back to overview when closing popup (unless active routing owns camera)
+      if (wasSelected && routeStops.length < 2) {
         if (previousViewportRef.current) {
           map.flyTo({
             center: previousViewportRef.current.center,
@@ -1306,11 +1298,15 @@ export default function VietMap({
             bounds.extend([p.longitude, p.latitude]);
           });
           try {
-            map.fitBounds(bounds, { padding: 60, maxZoom: 14, duration: 500 });
+            map.fitBounds(bounds, {
+              padding: 60,
+              maxZoom: MAP_CAMERA_CONFIG.OVERVIEW_MAX_ZOOM,
+              duration: 500,
+            });
           } catch {
             map.flyTo({
               center: [center.longitude, center.latitude],
-              zoom: 13,
+              zoom: DEFAULT_MAP_ZOOM,
               duration: 500,
             });
           }
@@ -1356,7 +1352,7 @@ export default function VietMap({
 
     // Save previous overview viewport before zooming into selected place
     const currentZoom = map.getZoom();
-    if (currentZoom < 15.5 && !previousViewportRef.current) {
+    if (currentZoom < MAP_CAMERA_CONFIG.MOBILE_SELECTED_ZOOM && !previousViewportRef.current) {
       const c = map.getCenter();
       previousViewportRef.current = {
         center: [c.lng, c.lat],
@@ -1375,18 +1371,18 @@ export default function VietMap({
 
       if (routeStops.length < 2) {
         if (isMobile) {
-          // On mobile: quick, snappy easeTo (200ms) directly to target place
+          // On mobile: quick, snappy easeTo directly to target place
           map.easeTo({
             center: [targetPlace.longitude, targetPlace.latitude],
-            zoom: 15.5,
+            zoom: MAP_CAMERA_CONFIG.MOBILE_SELECTED_ZOOM,
             duration: 200,
             essential: true,
           });
         } else {
           map.flyTo({
             center: [targetPlace.longitude, targetPlace.latitude],
-            zoom: 16,
-            offset: [0, 95],
+            zoom: MAP_CAMERA_CONFIG.SELECTED_PLACE_ZOOM,
+            offset: [0, MAP_CAMERA_CONFIG.DESKTOP_POPUP_OFFSET_Y],
             duration: 350,
             essential: true,
           });
@@ -1433,8 +1429,8 @@ export default function VietMap({
     const popup = new Popup({
       closeButton: true,
       closeOnClick: false,
-      offset: 25,
-      maxWidth: "320px",
+      offset: MAP_CAMERA_CONFIG.POPUP_OFFSET_PX,
+      maxWidth: MAP_CAMERA_CONFIG.POPUP_MAX_WIDTH,
     })
       .setLngLat([targetPlace.longitude, targetPlace.latitude])
       .setDOMContent(popupEl)
@@ -1471,26 +1467,31 @@ export default function VietMap({
   ]);
 
   return (
-    <div
-      className={`relative h-full w-full bg-zinc-950 overflow-hidden ${
-        currentTheme === "dark" ? "theme-dark-map" : ""
-      }`}
-    >
-      {currentTheme === "dark" && (
-        <style>{`
-          .theme-dark-map .maplibregl-canvas {
-            filter: invert(92%) hue-rotate(180deg) brightness(88%) contrast(105%) !important;
-          }
-        `}</style>
-      )}
+    <div className="relative h-full w-full bg-[#F5F9FF] overflow-hidden">
       <div ref={containerRef} className="h-full w-full" />
       {hasError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted/80 p-4 text-center text-sm text-destructive">
-          {t("map.initError")}
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-[#F5F9FF]/95 p-6 text-center">
+          <div className="max-w-xs space-y-3 rounded-2xl border border-[#D5E2F0] bg-white p-5 shadow-lg">
+            <div className="mx-auto flex size-10 items-center justify-center rounded-full bg-rose-50 text-rose-500">
+              <i className="fa-solid fa-triangle-exclamation text-base" aria-hidden="true" />
+            </div>
+            <p className="text-sm font-medium text-[#10243A]">{t("map.initError")}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setHasError(false);
+                setRetryNonce((n) => n + 1);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#0194F3] hover:bg-[#0084DE] px-4 py-2 text-xs font-bold text-white shadow-[0_2px_8px_rgba(1,148,243,0.3)] transition-colors cursor-pointer"
+            >
+              <i className="fa-solid fa-rotate-right text-xs" aria-hidden="true" />
+              <span>{t("map.retry")}</span>
+            </button>
+          </div>
         </div>
       )}
 
-      {/* "Search This Area" Pill (Google Maps Style) */}
+      {/* "Search This Area" Pill */}
       {showSearchThisArea && routeStops.length === 0 && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 animate-in fade-in slide-in-from-top-2 duration-200">
           <button
@@ -1502,274 +1503,37 @@ export default function VietMap({
                 setShowSearchThisArea(false);
               }
             }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-background/95 hover:bg-background text-foreground text-xs font-bold shadow-xl border border-border/80 backdrop-blur-md transition-all hover:scale-105 active:scale-95 cursor-pointer ring-2 ring-primary/20"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white hover:bg-[#F0F7FF] text-[#10243A] hover:text-[#0194F3] text-xs font-bold shadow-lg border border-[#D0E7FF] transition-all hover:scale-105 active:scale-95 cursor-pointer"
           >
-            <Search className="size-3.5 text-primary" />
+            <i className="fa-solid fa-magnifying-glass text-xs text-[#0194F3]" aria-hidden="true" />
             <span>{t("map.searchThisArea")}</span>
           </button>
         </div>
       )}
 
-      {/* Floating Multi-Stop Route Control Panel (Google Maps Style) */}
-      {routeStops.length >= 2 &&
-        (isRoutePanelCollapsed ? (
-          // Compact Collapsed Pill Bar (Draggable)
-          <div
-            style={panelPos ? { top: `${panelPos.y}px`, left: `${panelPos.x}px` } : undefined}
-            onMouseDown={(e) => {
-              if ((e.target as HTMLElement).closest("button")) return;
-              isDraggingPanelRef.current = true;
-              const curX = panelPos ? panelPos.x : 12;
-              const curY = panelPos ? panelPos.y : 12;
-              dragStartRef.current = { mouseX: e.clientX, mouseY: e.clientY, panelX: curX, panelY: curY };
-            }}
-            className="absolute top-3 left-3 z-30 flex items-center gap-2 rounded-full border border-border/80 bg-background/95 py-1.5 px-3 shadow-2xl backdrop-blur-md text-xs font-semibold animate-in fade-in slide-in-from-top-2 duration-200 cursor-grab active:cursor-grabbing select-none"
-            title={t("map.routing.dragTitle")}
-          >
-            <GripHorizontal className="size-3.5 text-muted-foreground" />
-            <div className="flex items-center gap-1.5 text-primary font-bold">
-              <Compass className="size-4" />
-              <span>{t("map.routing.titleCount", { count: routeStops.length })}</span>
-            </div>
-            {routeResult && (
-              <span className="text-muted-foreground text-[11px] font-medium hidden sm:inline">
-                {routingService.formatDistanceKm(routeResult.distanceKm, locale)} • ~{routingService.formatDurationMinutes(routeResult.durationMinutes, locale)}
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => setIsRoutePanelCollapsed(false)}
-              className="px-2.5 py-1 rounded-full bg-primary/10 hover:bg-primary/20 text-primary text-[11px] font-bold transition-colors cursor-pointer flex items-center gap-1"
-              title={t("map.routing.expandTitle")}
-            >
-              <span>{t("map.routing.details")}</span>
-              <ChevronDown className="size-3" />
-            </button>
-            <button
-              type="button"
-              onClick={handleClearRoute}
-              className="p-1 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-              title={t("map.routing.closeTitle")}
-            >
-              <X className="size-3.5" />
-            </button>
-          </div>
-        ) : (
-          // Full Expanded Route Control Panel (Draggable)
-          <div
-            style={panelPos ? { top: `${panelPos.y}px`, left: `${panelPos.x}px` } : undefined}
-            className="absolute top-3 left-3 right-3 sm:right-auto sm:w-88 md:w-96 z-30 rounded-2xl border border-border/80 bg-background/95 p-3.5 shadow-2xl backdrop-blur-md space-y-3 animate-in fade-in slide-in-from-top-2 duration-200"
-          >
-            {/* Header with Drag Handle, Title, Collapse button, and Close button */}
-            <div
-              className="flex items-center justify-between gap-2 cursor-grab active:cursor-grabbing select-none pb-1"
-              title={t("map.routing.dragHeaderTitle")}
-              onMouseDown={(e) => {
-                if ((e.target as HTMLElement).closest("button")) return;
-                isDraggingPanelRef.current = true;
-                const curX = panelPos ? panelPos.x : 12;
-                const curY = panelPos ? panelPos.y : 12;
-                dragStartRef.current = { mouseX: e.clientX, mouseY: e.clientY, panelX: curX, panelY: curY };
-              }}
-            >
-              <div className="flex items-center gap-1.5 text-xs font-bold text-primary uppercase tracking-wider">
-                <GripHorizontal className="size-4 text-muted-foreground" />
-                <Compass className="size-4" />
-                <span>{t("map.routing.titleCount", { count: routeStops.length })}</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setIsRoutePanelCollapsed(true)}
-                  className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-                  title={t("map.routing.collapseTitle")}
-                >
-                  <ChevronUp className="size-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClearRoute}
-                  className="rounded-lg p-1 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer"
-                  title={t("map.routing.closeTitle")}
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-            </div>
-
-          {/* Vehicle Mode Tabs with live ETA under each icon */}
-          {(() => {
-            const allModes = routeResult
-              ? routingService.getAllModesEstimates(routeResult.distanceKm, locale)
-              : null;
-            return (
-              <div className="grid grid-cols-3 gap-1.5 rounded-xl bg-muted/60 p-1.5 border border-border/60">
-                {(["motorcycle", "driving", "walking"] as const).map((m) => {
-                  const config = routingService.VEHICLE_MODES[m];
-                  const isActive = routeMode === m;
-                  const est = allModes ? allModes[m] : null;
-                  return (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => handleChangeMode(m)}
-                      className={`flex flex-col items-center justify-center py-1.5 px-1 rounded-lg transition-all cursor-pointer ${
-                        isActive
-                          ? "bg-background text-foreground shadow-sm font-semibold border border-border/80"
-                          : "text-muted-foreground hover:text-foreground hover:bg-background/50"
-                      }`}
-                    >
-                      <span className="text-base">{config.icon}</span>
-                      <span className="text-[11px] font-medium mt-0.5">{t(`map.routing.vehicles.${m}`)}</span>
-                      <span
-                        className={`text-[10px] mt-0.5 ${
-                          isActive ? "text-primary font-bold" : "text-muted-foreground"
-                        }`}
-                      >
-                        {routeLoading ? "..." : est ? est.durationText : "--"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            );
-          })()}
-
-          {/* Stops List (A, B, C...) with reorder and delete actions */}
-          <div className="space-y-1.5 max-h-52 overflow-y-auto pr-1">
-            {routeStops.map((stop, idx) => {
-              const letter = String.fromCharCode(65 + idx);
-              const isOrigin = idx === 0;
-              const isDest = idx === routeStops.length - 1;
-              const letterColor = isOrigin
-                ? "text-emerald-600 dark:text-emerald-400 font-extrabold"
-                : isDest
-                ? "text-rose-600 dark:text-rose-400 font-extrabold"
-                : "text-sky-600 dark:text-sky-400 font-extrabold";
-              const displayStopName =
-                stop.id === ROUTE_STOP_ID_USER_LOCATION ? t("map.routing.myLocation") : stop.name;
-
-              return (
-                <div
-                  key={stop.id + idx}
-                  className="flex items-center gap-1.5 rounded-xl bg-muted/40 p-2 border border-border/50 text-xs"
-                >
-                  <span className={`w-5 text-center text-xs ${letterColor}`}>{letter}</span>
-                  <span className="flex-1 truncate font-medium text-foreground">
-                    {displayStopName}
-                  </span>
-
-                  {/* Move Up */}
-                  {idx > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => handleMoveStop(idx, "up")}
-                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
-                      title={t("map.routing.moveUp")}
-                    >
-                      <ChevronUp className="size-3.5" />
-                    </button>
-                  )}
-
-                  {/* Move Down */}
-                  {idx < routeStops.length - 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleMoveStop(idx, "down")}
-                      className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
-                      title={t("map.routing.moveDown")}
-                    >
-                      <ChevronDown className="size-3.5" />
-                    </button>
-                  )}
-
-                  {/* Remove Stop */}
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveStop(idx)}
-                    className="p-1 rounded hover:bg-rose-100 hover:text-rose-600 text-muted-foreground transition-colors cursor-pointer"
-                    title={t("map.routing.removeStop")}
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Quick Action Buttons: Use My Location & Swap all stops */}
-          <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/50 text-[11px]">
-            {routeStops[0]?.id === ROUTE_STOP_ID_USER_LOCATION ? (
-              <span className="inline-flex items-center gap-1.5 text-primary font-semibold truncate">
-                <LocateFixed className="size-3.5 shrink-0" aria-hidden="true" />
-                <span className="truncate">{t("map.routing.usingMyLocation")}</span>
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={handleUseMyLocationAsOrigin}
-                disabled={Boolean(locating)}
-                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary font-semibold border border-primary/25 transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                title={t("map.routing.fromMyLocationTitle")}
-              >
-                {locating ? (
-                  <Loader2 className="size-3 animate-spin shrink-0" aria-hidden="true" />
-                ) : (
-                  <LocateFixed className="size-3 shrink-0" aria-hidden="true" />
-                )}
-                <span>{locating ? t("map.routing.locating") : t("map.routing.fromMyLocation")}</span>
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={handleSwapRoute}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground font-semibold border border-border/60 transition-colors cursor-pointer whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              title={t("map.routing.swapRouteTitle")}
-            >
-              <ArrowUpDown className="size-3 shrink-0" aria-hidden="true" />
-              <span>{t("map.routing.swapRoute")}</span>
-            </button>
-          </div>
-
-          {/* Distance, ETA and Google Maps Navigation link */}
-          <div className="flex items-center justify-between pt-1 border-t border-border/60 text-xs">
-            {routeLoading ? (
-              <div className="flex items-center gap-2 text-muted-foreground py-0.5">
-                <Loader2 className="size-3.5 animate-spin text-primary" />
-                <span className="text-[11px]">{t("map.routing.drawingRoute")}</span>
-              </div>
-            ) : routeResult ? (
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-foreground text-sm">
-                  {routingService.formatDistanceKm(routeResult.distanceKm, locale)}
-                </span>
-                <span className="text-muted-foreground">•</span>
-                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
-                  ~{routingService.formatDurationMinutes(routeResult.durationMinutes, locale)}
-                </span>
-              </div>
-            ) : (
-              <span className="text-muted-foreground">{t("map.routing.noData")}</span>
-            )}
-
-            <a
-              href={routingService.getGoogleMapsMultiStopUrl(routeStops, routeMode)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 font-semibold text-primary hover:underline text-xs"
-              title={t("map.routing.openGoogleMapsTitle")}
-            >
-              <span>{t("map.routing.openGoogleMaps")}</span>
-              <ExternalLink className="size-3" />
-            </a>
-          </div>
-        </div>
-      ))}
+      {/* Floating Multi-Stop Route Control Panel */}
+      <RouteControlPanel
+        routeStops={routeStops}
+        routeMode={routeMode}
+        routeResult={routeResult}
+        routeLoading={routeLoading}
+        locating={locating}
+        locale={locale}
+        isCollapsed={isRoutePanelCollapsed}
+        mapContainerRef={containerRef}
+        onToggleCollapse={setIsRoutePanelCollapsed}
+        onChangeMode={handleChangeMode}
+        onMoveStop={handleMoveStop}
+        onRemoveStop={handleRemoveStop}
+        onUseMyLocationAsOrigin={handleUseMyLocationAsOrigin}
+        onSwapRoute={handleSwapRoute}
+        onClearRoute={handleClearRoute}
+      />
 
       <MapControls
         onZoomIn={() => mapRef.current?.zoomIn()}
         onZoomOut={() => mapRef.current?.zoomOut()}
-        onRequestCurrentLocation={handleRequestLocation}
+        onRequestCurrentLocation={onRequestCurrentLocation ? handleRequestLocation : undefined}
         locating={locating}
         currentTheme={currentTheme}
         onChangeTheme={setCurrentTheme}

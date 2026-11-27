@@ -37,7 +37,7 @@ export interface RouteResult {
 export interface VehicleModeConfig {
   id: RouteVehicleMode;
   label: string;
-  icon: string;
+  iconClass: string;
   osrmProfile: string;
   averageSpeedKmH: number;
   googleMapsMode: string;
@@ -47,7 +47,7 @@ export const VEHICLE_MODES: Record<RouteVehicleMode, VehicleModeConfig> = {
   motorcycle: {
     id: "motorcycle",
     label: "Xe máy",
-    icon: "🏍️",
+    iconClass: "fa-solid fa-motorcycle",
     osrmProfile: "bike", // Tận dụng ngõ hẹp, lối tắt, tránh cao tốc cấm xe máy
     averageSpeedKmH: 35,
     googleMapsMode: "two_wheeler",
@@ -55,7 +55,7 @@ export const VEHICLE_MODES: Record<RouteVehicleMode, VehicleModeConfig> = {
   driving: {
     id: "driving",
     label: "Ô tô",
-    icon: "🚗",
+    iconClass: "fa-solid fa-car",
     osrmProfile: "driving", // Tuân thủ đường 1 chiều, cấm ô tô
     averageSpeedKmH: 30,
     googleMapsMode: "driving",
@@ -63,7 +63,7 @@ export const VEHICLE_MODES: Record<RouteVehicleMode, VehicleModeConfig> = {
   walking: {
     id: "walking",
     label: "Đi bộ",
-    icon: "🚶",
+    iconClass: "fa-solid fa-person-walking",
     osrmProfile: "foot", // Lối đi bộ, công viên, bậc thang
     averageSpeedKmH: 4.5,
     googleMapsMode: "walking",

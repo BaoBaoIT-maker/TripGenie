@@ -661,6 +661,10 @@
     "ADMIN_POST_NOT_FOUND": "Không tìm thấy bài viết.",
     "ADMIN_COMMENT_NOT_FOUND": "Không tìm thấy bình luận.",
     "ADMIN_REPORT_NOT_FOUND": "Không tìm thấy báo cáo vi phạm.",
+    "COMMUNITY_CONTENT_VIOLATES_PROFANITY": "Nội dung chứa ngôn từ thô tục hoặc xúc phạm, không thể đăng tải.",
+    "COMMUNITY_CONTENT_VIOLATES_ADULT": "Nội dung chứa yếu tố nhạy cảm 18+, không thể đăng tải.",
+    "COMMUNITY_CONTENT_VIOLATES_SCAM": "Nội dung có dấu hiệu lừa đảo hoặc quảng cáo trái phép, không thể đăng tải.",
+    "COMMUNITY_CONTENT_VIOLATES_GAMBLING": "Nội dung chứa thông tin cờ bạc hoặc cá cược trái phép, không thể đăng tải.",
     "COMMUNITY_CONTENT_VIOLATES_POLICY": "Nội dung vi phạm tiêu chuẩn cộng đồng và không thể đăng tải."
   },
   "collections": {
@@ -1309,6 +1313,7 @@
       "postCreatedSuccess": "Đã đăng bài viết chia sẻ lên Cộng đồng TripGenie!",
       "postCreateError": "Không thể tạo bài viết. Vui lòng thử lại.",
       "postUpdatedPending": "Đã lưu chỉnh sửa! AI đang kiểm duyệt lại nội dung.",
+      "postUpdatedSuccess": "Đã cập nhật bài viết!",
       "postUpdateError": "Không thể cập nhật bài viết.",
       "postDeleted": "Bài viết đã được xóa vĩnh viễn.",
       "postDeleteError": "Không thể xóa bài viết",
@@ -2450,6 +2455,7 @@
   "map": {
     "loadingAria": "Đang tải bản đồ",
     "initError": "Không thể khởi tạo bản đồ VietMap. Vui lòng kiểm tra kết nối mạng và API Key.",
+    "retry": "Thử lại",
     "searchThisArea": "Tìm kiếm khu vực này",
     "pinnedLocation": "Vị trí đã ghim",
     "cityFallback": "thành phố",
@@ -2458,10 +2464,10 @@
       "zoomIn": "Phóng to",
       "zoomOut": "Thu nhỏ",
       "myLocation": "Vị trí của tôi",
+      "layers": "Lớp",
+      "layersTitle": "Chọn loại bản đồ",
       "themeBright": "Sáng",
       "themeBrightTitle": "Bản đồ Sáng Du lịch (VietMap TM @2x chính thức)",
-      "themeDark": "Tối",
-      "themeDarkTitle": "Bản đồ Tối Giao thông (VietMap DM @2x)",
       "themeSatellite": "Vệ tinh",
       "themeSatelliteTitle": "Ảnh chụp vệ tinh thực địa (Esri Satellite)"
     },

@@ -141,7 +141,7 @@ export interface VietMapProps {
   hoveredPlaceId: string | null;
   onSelectPlace: (placeId: string | null) => void;
   onViewportChange: (viewport: MapViewport) => void;
-  onRequestCurrentLocation: () => void;
+  onRequestCurrentLocation?: () => void;
   locating: boolean;
   selectedProvinceName?: string | null;
   userLocation?: MapCoordinate | null;

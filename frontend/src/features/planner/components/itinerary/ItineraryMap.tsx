@@ -46,7 +46,6 @@ const ItineraryMap = memo(function ItineraryMap({
         hoveredPlaceId={effectiveHoveredPlaceId}
         onSelectPlace={onSelectPlace || noopNull}
         onViewportChange={noop}
-        onRequestCurrentLocation={noop}
         locating={false}
         markerLabels={markerLabels}
         markerColors={markerColors}

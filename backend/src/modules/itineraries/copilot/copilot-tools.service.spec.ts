@@ -29,7 +29,9 @@ describe('CopilotToolsService.addActivity & Dynamic Budget Recalculation', () =>
   };
 
   let prismaMock: {
-    place: { findFirst: jest.Mock };
+    place: { findFirst: jest.Mock; findMany: jest.Mock };
+    travelArea: { findMany: jest.Mock };
+    itinerary: { update: jest.Mock; findUnique: jest.Mock };
     itineraryDestination: {
       findFirst: jest.Mock;
       findMany: jest.Mock;
@@ -38,7 +40,6 @@ describe('CopilotToolsService.addActivity & Dynamic Budget Recalculation', () =>
       delete: jest.Mock;
       count: jest.Mock;
     };
-    itinerary: { update: jest.Mock };
     $transaction: jest.Mock;
   };
   let service: CopilotToolsService;
@@ -47,6 +48,10 @@ describe('CopilotToolsService.addActivity & Dynamic Budget Recalculation', () =>
     prismaMock = {
       place: {
         findFirst: jest.fn().mockResolvedValue(mockPlace),
+        findMany: jest.fn().mockResolvedValue([]),
+      },
+      travelArea: {
+        findMany: jest.fn().mockResolvedValue([]),
       },
       itineraryDestination: {
         findFirst: jest.fn(),
@@ -58,6 +63,14 @@ describe('CopilotToolsService.addActivity & Dynamic Budget Recalculation', () =>
       },
       itinerary: {
         update: jest.fn().mockResolvedValue({ id: 'itin-1' }),
+        findUnique: jest.fn().mockResolvedValue({
+          area: {
+            bboxMinLat: 15.9,
+            bboxMaxLat: 16.2,
+            bboxMinLng: 107.9,
+            bboxMaxLng: 108.4,
+          },
+        }),
       },
       $transaction: jest.fn(async (cb: (tx: typeof prismaMock) => unknown) =>
         cb(prismaMock),
@@ -416,5 +429,284 @@ describe('CopilotToolsService.addActivity & Dynamic Budget Recalculation', () =>
       (call: Array<{ where: { id: string } }>) => call[0].where.id,
     );
     expect(writtenIds).toEqual(['d-2', 'd-1']);
+  });
+
+  describe('searchPlacesForItinerary', () => {
+    it('excludes scheduled places, filters noise & hotels by default, ranks by popularity, and truncates description', async () => {
+      prismaMock.itineraryDestination.findMany.mockResolvedValueOnce([
+        { placeId: 'already-in-trip' },
+      ]);
+      const longDesc = 'A'.repeat(160);
+      prismaMock.place.findMany.mockResolvedValueOnce([
+        {
+          id: 'noise-1',
+          name: 'Công ty TNHH Cho thuê xe máy Đà Nẵng',
+          address: 'Đà Nẵng',
+          ratingAvg: 5.0,
+          reviewCount: 200,
+          priceLevel: 'LOW',
+          description: longDesc,
+          tags: [],
+          category: { slug: 'diem-tham-quan', name: 'Attraction', nameVi: 'Điểm tham quan' },
+        },
+        {
+          id: 'hotel-1',
+          name: 'Khách sạn Biển Xanh',
+          address: 'Đà Nẵng',
+          ratingAvg: 4.9,
+          reviewCount: 500,
+          priceLevel: 'MEDIUM',
+          description: longDesc,
+          tags: [],
+          category: { slug: 'khach-san', name: 'Hotel', nameVi: 'Khách sạn' },
+        },
+        {
+          id: 'veg-low-rev',
+          name: 'Quán Chay Mới',
+          address: '10 Lê Lợi',
+          ratingAvg: 5.0,
+          reviewCount: 1,
+          priceLevel: 'LOW',
+          description: longDesc,
+          tags: ['chay'],
+          category: { slug: 'nha-hang', name: 'Restaurant', nameVi: 'Nhà hàng' },
+        },
+        {
+          id: 'veg-top',
+          name: 'Quán Chay Liên Hoa',
+          address: '49 Lê Hồng Phong',
+          ratingAvg: 4.8,
+          reviewCount: 900,
+          priceLevel: 'LOW',
+          description: longDesc,
+          tags: ['chay'],
+          category: { slug: 'nha-hang', name: 'Restaurant', nameVi: 'Nhà hàng' },
+        },
+      ]);
+
+      const res = await service.searchPlacesForItinerary('itin-1', {
+        query: 'quán chay nhé',
+        categorySlug: 'nha-hang',
+        limit: 5,
+      });
+
+      const queryArgs = prismaMock.place.findMany.mock.calls[0][0];
+      expect(queryArgs.where.id).toEqual({ notIn: ['already-in-trip'] });
+      expect(res.success).toBe(true);
+      expect(res.data?.status).toBe('SUCCESS');
+      const places = res.data?.places as Array<{ id: string; description?: string }>;
+      expect(places.map((p) => p.id)).toEqual(['veg-top', 'veg-low-rev']);
+      expect(places[0].description?.length).toBe(100);
+    });
+
+    it('allows lodging candidates when user explicitly asks for homestay or hotel', async () => {
+      prismaMock.itineraryDestination.findMany.mockResolvedValueOnce([]);
+      prismaMock.place.findMany.mockResolvedValueOnce([
+        {
+          id: 'homestay-1',
+          name: 'Mộc Nhiên Homestay',
+          address: 'Sơn Trà, Đà Nẵng',
+          ratingAvg: 4.7,
+          reviewCount: 120,
+          priceLevel: 'MEDIUM',
+          description: 'Homestay gần biển Mỹ Khê',
+          tags: ['homestay'],
+          category: { slug: 'homestay', name: 'Homestay', nameVi: 'Homestay' },
+        },
+      ]);
+
+      const res = await service.searchPlacesForItinerary('itin-1', {
+        query: 'homestay gần biển',
+        categorySlug: 'homestay',
+      });
+
+      expect(res.success).toBe(true);
+      const places = res.data?.places as Array<{ id: string }>;
+      expect(places).toHaveLength(1);
+      expect(places[0].id).toBe('homestay-1');
+    });
+
+    it('returns NO_MATCH cleanly when no places match the query', async () => {
+      prismaMock.itineraryDestination.findMany.mockResolvedValueOnce([]);
+      prismaMock.place.findMany.mockResolvedValueOnce([]);
+
+      const res = await service.searchPlacesForItinerary(
+        'itin-1',
+        { query: 'quán không tồn tại' },
+        'en',
+      );
+
+      expect(res.success).toBe(true);
+      expect(res.data).toMatchObject({ status: 'NO_MATCH', totalMatched: 0, places: [] });
+      expect(res.message).toBe('No matching places were found in the trip area.');
+    });
+
+    it('resolves landmark anchor objectively inside tripBbox, filters by radiusKm & minRating, and sorts nearest-first with distanceKm', async () => {
+      prismaMock.itineraryDestination.findMany.mockResolvedValueOnce([]);
+      prismaMock.place.findMany
+        // Anchor resolution query
+        .mockResolvedValueOnce([
+          {
+            name: 'Cầu Rồng',
+            nameNormalized: 'cau rong',
+            latitude: 16.061,
+            longitude: 108.227,
+            reviewCount: 5000,
+          },
+        ])
+        // Nearby place search query
+        .mockResolvedValueOnce([
+          {
+            id: 'anchor-self',
+            name: 'Cầu Rồng',
+            address: 'Hải Châu, Đà Nẵng',
+            latitude: 16.061,
+            longitude: 108.227,
+            ratingAvg: 4.9,
+            reviewCount: 5000,
+            priceLevel: 'LOW',
+            tags: [],
+            category: { slug: 'diem-tham-quan', name: 'Attraction', nameVi: 'Điểm tham quan' },
+          },
+          {
+            id: 'cafe-corner-outside-circle',
+            name: 'Cafe Ngoài Bán Kính',
+            address: 'Góc rìa 2.6km',
+            latitude: 16.078,
+            longitude: 108.244,
+            ratingAvg: 4.9,
+            reviewCount: 999,
+            priceLevel: 'MEDIUM',
+            tags: ['cafe'],
+            category: { slug: 'ca-phe', name: 'Cafe', nameVi: 'Cà phê' },
+          },
+          {
+            id: 'cafe-farther',
+            name: 'Cafe Cách 1.5km',
+            address: '12 Bạch Đằng',
+            latitude: 16.070,
+            longitude: 108.216,
+            ratingAvg: 4.9,
+            reviewCount: 600,
+            priceLevel: 'MEDIUM',
+            tags: ['cafe'],
+            category: { slug: 'ca-phe', name: 'Cafe', nameVi: 'Cà phê' },
+          },
+          {
+            id: 'cafe-closest',
+            name: 'Cafe Gần Cầu Rồng',
+            address: '01 Trần Hưng Đạo',
+            latitude: 16.063,
+            longitude: 108.230,
+            ratingAvg: 4.6,
+            reviewCount: 80,
+            priceLevel: 'LOW',
+            tags: ['cafe'],
+            category: { slug: 'ca-phe', name: 'Cafe', nameVi: 'Cà phê' },
+          },
+        ]);
+
+      const res = await service.searchPlacesForItinerary('itin-1', {
+        query: 'cafe',
+        categorySlug: 'ca-phe',
+        nearPlaceName: 'Cầu Rồng',
+        radiusKm: 2,
+        minRating: 4.5,
+      });
+
+      const searchWhere = prismaMock.place.findMany.mock.calls[1][0].where;
+      expect(searchWhere.ratingAvg).toEqual({ gte: 4.5 });
+      expect(res.data?.status).toBe('SUCCESS');
+      expect(res.data?.anchorName).toBe('Cầu Rồng');
+      expect(res.data?.radiusKm).toBe(2);
+      const places = res.data?.places as Array<{ id: string; distanceKm?: number }>;
+      expect(places.map((p) => p.id)).toEqual(['cafe-closest', 'cafe-farther']);
+      expect(places[0].distanceKm).toBeLessThan(places[1].distanceKm!);
+    });
+
+    it('falls back to travelArea inside tripBbox when nearPlaceName matches a district/zone', async () => {
+      prismaMock.itineraryDestination.findMany.mockResolvedValueOnce([]);
+      prismaMock.place.findMany
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            id: 'zone-cafe-1',
+            name: 'Cafe Bán Đảo Sơn Trà',
+            address: 'Sơn Trà, Đà Nẵng',
+            latitude: 16.102,
+            longitude: 108.248,
+            ratingAvg: 4.7,
+            reviewCount: 150,
+            priceLevel: 'MEDIUM',
+            tags: ['cafe'],
+            category: { slug: 'ca-phe', name: 'Cafe', nameVi: 'Cà phê' },
+          },
+        ]);
+      prismaMock.travelArea.findMany.mockResolvedValueOnce([
+        {
+          name: 'Son Tra',
+          nameVi: 'Sơn Trà',
+          bboxMinLat: 16.08,
+          bboxMaxLat: 16.12,
+          bboxMinLng: 108.22,
+          bboxMaxLng: 108.28,
+        },
+      ]);
+
+      const res = await service.searchPlacesForItinerary('itin-1', {
+        nearPlaceName: 'Sơn Trà',
+        radiusKm: 5,
+      });
+
+      expect(res.data?.status).toBe('SUCCESS');
+      expect(res.data?.anchorName).toBe('Sơn Trà');
+      const places = res.data?.places as Array<{ id: string; distanceKm?: number }>;
+      expect(places).toHaveLength(1);
+      expect(places[0].id).toBe('zone-cafe-1');
+      expect(typeof places[0].distanceKm).toBe('number');
+    });
+
+    it('returns fail-honest ANCHOR_NOT_FOUND when nearPlaceName does not exist in tripBbox', async () => {
+      prismaMock.itineraryDestination.findMany.mockResolvedValueOnce([]);
+      prismaMock.place.findMany.mockResolvedValueOnce([]);
+      prismaMock.travelArea.findMany.mockResolvedValueOnce([]);
+
+      const res = await service.searchPlacesForItinerary(
+        'itin-1',
+        { query: 'cafe', nearPlaceName: 'Tháp Eiffel' },
+        'vi',
+      );
+
+      expect(prismaMock.place.findMany).toHaveBeenCalledTimes(1);
+      expect(res.success).toBe(true);
+      expect(res.data).toMatchObject({
+        status: 'ANCHOR_NOT_FOUND',
+        anchorName: 'Tháp Eiffel',
+        totalMatched: 0,
+        places: [],
+      });
+    });
+
+    it('clamps requested limit down to MAX_SEARCH_PLACES_LIMIT (10)', async () => {
+      prismaMock.itineraryDestination.findMany.mockResolvedValueOnce([]);
+      const candidates = Array.from({ length: 14 }, (_, i) => ({
+        id: `p-${i + 1}`,
+        name: `Quán ${i + 1}`,
+        address: 'Đà Nẵng',
+        ratingAvg: 4.8,
+        reviewCount: 100 - i,
+        priceLevel: 'MEDIUM',
+        tags: [],
+        category: { slug: 'nha-hang', name: 'Restaurant', nameVi: 'Nhà hàng' },
+      }));
+      prismaMock.place.findMany.mockResolvedValueOnce(candidates);
+
+      const res = await service.searchPlacesForItinerary('itin-1', {
+        limit: 20,
+      });
+
+      const places = res.data?.places as Array<{ id: string }>;
+      expect(places).toHaveLength(10);
+    });
   });
 });

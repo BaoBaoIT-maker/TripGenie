@@ -64,7 +64,6 @@ import { WeatherModule } from '../weather/weather.module';
     ItineraryPlannerService,
     TransitService,
     GeminiPlannerService,
-    ItineraryEventsService,
     CopilotToolsService,
     CopilotAgentService,
     CopilotSummaryProcessor,

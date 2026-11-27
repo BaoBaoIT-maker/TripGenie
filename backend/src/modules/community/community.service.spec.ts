@@ -13,7 +13,9 @@ import {
 } from '@prisma/client';
 import { INJECT_TOKENS } from '@/common/constants/inject-tokens';
 import { AdminModerationService } from '../admin/admin-moderation.service';
-import { ADMIN_ERRORS } from '../admin/admin.constants';
+import { AdminEventsService } from '../admin/events/admin-events.service';
+import { AdminLiveEventType } from '../admin/events/admin-events.constants';
+import { ADMIN_CONSTANTS, ADMIN_ERRORS } from '../admin/admin.constants';
 import { CommunityService } from './community.service';
 import { CommunitySortMode } from './community.constants';
 
@@ -617,6 +619,7 @@ describe('CommunityService', () => {
       matchesSuspiciousTriggers: jest.Mock;
       evaluatePostAsync: jest.Mock;
     };
+    let mockAdminEvents: { emit: jest.Mock };
 
     beforeEach(async () => {
       mockModeration = {
@@ -624,6 +627,7 @@ describe('CommunityService', () => {
         matchesSuspiciousTriggers: jest.fn().mockReturnValue(false),
         evaluatePostAsync: jest.fn().mockResolvedValue(undefined),
       };
+      mockAdminEvents = { emit: jest.fn() };
 
       const modModule: TestingModule = await Test.createTestingModule({
         providers: [
@@ -639,6 +643,10 @@ describe('CommunityService', () => {
           {
             provide: AdminModerationService,
             useValue: mockModeration,
+          },
+          {
+            provide: AdminEventsService,
+            useValue: mockAdminEvents,
           },
         ],
       }).compile();
@@ -716,6 +724,7 @@ describe('CommunityService', () => {
       mockRepo.findPostById.mockResolvedValue({
         id: 'post-edit-1',
         userId: 'owner-1',
+        moderationStatus: PostModerationStatus.APPROVED,
       });
       mockRepo.updatePost.mockResolvedValue({
         id: 'post-edit-1',
@@ -750,6 +759,83 @@ describe('CommunityService', () => {
         'post-edit-1',
         expect.stringContaining('Chuyển khoản cọc trước nhé'),
       );
+    });
+
+    it.each([
+      PostModerationStatus.REJECTED,
+      PostModerationStatus.FLAGGED,
+      PostModerationStatus.PENDING,
+    ])(
+      'updatePost on %s post should route to PENDING manual review without self-approving or calling AI',
+      async (currentStatus) => {
+        mockRepo.findPostById.mockResolvedValue({
+          id: 'post-resubmit-1',
+          userId: 'owner-1',
+          moderationStatus: currentStatus,
+        });
+        mockRepo.updatePost.mockResolvedValue({
+          id: 'post-resubmit-1',
+          moderationStatus: PostModerationStatus.PENDING,
+          moderationNote:
+            ADMIN_CONSTANTS.MESSAGES.RESUBMITTED_FOR_MANUAL_REVIEW_NOTE,
+        });
+        mockModeration.matchesSuspiciousTriggers.mockReturnValue(true);
+
+        const updated = await serviceWithMod.updatePost(
+          'owner-1',
+          UserRole.USER,
+          'post-resubmit-1',
+          {
+            title: 'Đã chỉnh sửa nội dung sạch hơn',
+            caption: 'Cập nhật lại theo góp ý',
+          },
+        );
+
+        expect(updated.moderationStatus).toBe(PostModerationStatus.PENDING);
+        expect(mockRepo.updatePost).toHaveBeenCalledWith(
+          'post-resubmit-1',
+          expect.objectContaining({
+            moderationStatus: PostModerationStatus.PENDING,
+            moderationNote:
+              ADMIN_CONSTANTS.MESSAGES.RESUBMITTED_FOR_MANUAL_REVIEW_NOTE,
+            moderatedAt: null,
+          }),
+          'owner-1',
+        );
+        await new Promise((resolve) => setImmediate(resolve));
+        expect(mockModeration.evaluatePostAsync).not.toHaveBeenCalled();
+        expect(mockAdminEvents.emit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            type: AdminLiveEventType.POST_NEEDS_MODERATION,
+            payload: expect.objectContaining({
+              postId: 'post-resubmit-1',
+              status: PostModerationStatus.PENDING,
+              reason:
+                ADMIN_CONSTANTS.MESSAGES.RESUBMITTED_FOR_MANUAL_REVIEW_NOTE,
+            }),
+          }),
+        );
+      },
+    );
+
+    it('updatePost on REJECTED post should still block Tier 1 banned content synchronously without saving', async () => {
+      mockRepo.findPostById.mockResolvedValue({
+        id: 'post-rejected-1',
+        userId: 'owner-1',
+        moderationStatus: PostModerationStatus.REJECTED,
+      });
+      mockModeration.assertContentAllowedSync.mockImplementation(() => {
+        throw new BadRequestException(ADMIN_ERRORS.CONTENT_VIOLATES_SCAM);
+      });
+
+      await expect(
+        serviceWithMod.updatePost('owner-1', UserRole.USER, 'post-rejected-1', {
+          title: 'Vẫn chứa nội dung lừa đảo',
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(mockRepo.updatePost).not.toHaveBeenCalled();
+      expect(mockAdminEvents.emit).not.toHaveBeenCalled();
     });
   });
 });

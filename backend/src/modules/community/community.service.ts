@@ -96,6 +96,24 @@ export class CommunityService {
     };
   }
 
+  /** Rejected, flagged, or already-pending posts cannot self-approve on edit; they route to Admin manual review. */
+  private requiresManualReviewOnEdit(status?: PostModerationStatus): boolean {
+    return (
+      status === PostModerationStatus.REJECTED ||
+      status === PostModerationStatus.FLAGGED ||
+      status === PostModerationStatus.PENDING
+    );
+  }
+
+  private manualReviewModerationFields(): PostModerationFields {
+    return {
+      moderationStatus: PostModerationStatus.PENDING,
+      moderationNote:
+        ADMIN_CONSTANTS.MESSAGES.RESUBMITTED_FOR_MANUAL_REVIEW_NOTE,
+      moderatedAt: null,
+    };
+  }
+
   /** Fire-and-forget Tier 2 -> Tier 3: only calls Gemini AI when suspicious patterns match. */
   private scheduleAiModeration(postId: string, text: string): void {
     if (!this.moderationService?.matchesSuspiciousTriggers(text)) return;
@@ -378,6 +396,10 @@ export class CommunityService {
     );
     this.moderationService?.assertContentAllowedSync(moderationText);
 
+    const requiresManualReview = this.requiresManualReviewOnEdit(
+      post.moderationStatus,
+    );
+
     const updated = await this.communityRepository.updatePost(
       postId,
       {
@@ -385,12 +407,27 @@ export class CommunityService {
         caption: trimmedCaption,
         tags: normalizedTags,
         ...(resolvedGroupId !== undefined ? { groupId: resolvedGroupId } : {}),
-        ...this.publishedModerationFields(),
+        ...(requiresManualReview
+          ? this.manualReviewModerationFields()
+          : this.publishedModerationFields()),
       },
       userId,
     );
 
-    this.scheduleAiModeration(postId, moderationText);
+    if (requiresManualReview) {
+      void this.adminEvents?.emit({
+        type: AdminLiveEventType.POST_NEEDS_MODERATION,
+        payload: {
+          postId,
+          status: PostModerationStatus.PENDING,
+          reason: ADMIN_CONSTANTS.MESSAGES.RESUBMITTED_FOR_MANUAL_REVIEW_NOTE,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    } else {
+      this.scheduleAiModeration(postId, moderationText);
+    }
+
     this.invalidateSidebarCache();
     return updated;
   }

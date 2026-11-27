@@ -83,6 +83,8 @@ export const ADMIN_CONSTANTS = {
     RESOLVE_REPORT_SUCCESS: 'Đã xử lý báo cáo vi phạm thành công',
     DELETE_COMMENT_SUCCESS: 'Đã gỡ bình luận vi phạm thành công',
     PENDING_MANUAL_MODERATION_NOTE: 'Đang chờ Quản trị viên duyệt thủ công',
+    RESUBMITTED_FOR_MANUAL_REVIEW_NOTE:
+      'Tác giả đã chỉnh sửa lại bài viết và gửi Quản trị viên xem xét',
     AUTO_APPROVED_CLEAN_NOTE: 'Duyệt tự động (văn bản hợp lệ)',
     HARD_BLOCKLIST_REJECT_NOTE: 'Chứa từ ngữ bị cấm hoặc quảng cáo vi phạm tiêu chuẩn cộng đồng',
     FALLBACK_FLAGGED_NOTE: 'Nội dung chứa từ khóa nhạy cảm, cần Quản trị viên duyệt thủ công',

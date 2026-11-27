@@ -1078,11 +1078,12 @@
       "nextPhotoAria": "Next photo",
       "moderation": {
         "PENDING_label": "Pending review (Visible only to you & moderators)",
-        "PENDING_note": "AI is reviewing your post before making it public to the community.",
+        "PENDING_note": "A moderator is reviewing your post before making it public to the community.",
         "FLAGGED_label": "Needs manual review (Visible only to you & moderators)",
         "FLAGGED_note": "This post is awaiting manual review by a moderator.",
         "REJECTED_label": "Not approved (Visible only to you & moderators)",
-        "REJECTED_note": "This post violates community guidelines. You can edit it to resubmit or delete it."
+        "REJECTED_note": "This post violates community guidelines. You can edit it to resubmit or delete it.",
+        "REJECTED_actionHint": "You can edit and save this post to resubmit it for moderator review."
       }
     },
     "comments": {
@@ -1312,7 +1313,7 @@
       "postCreatedPending": "Post submitted! AI is running a quick review (visible only to you for a few seconds).",
       "postCreatedSuccess": "Published to the TripGenie Community!",
       "postCreateError": "Could not create post. Please try again.",
-      "postUpdatedPending": "Changes saved! AI is re-reviewing your post.",
+      "postUpdatedPending": "Changes saved! Your post has been submitted for moderator review.",
       "postUpdatedSuccess": "Post updated!",
       "postUpdateError": "Could not update post.",
       "postDeleted": "Post permanently deleted.",

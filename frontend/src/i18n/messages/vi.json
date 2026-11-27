@@ -1078,11 +1078,12 @@
       "nextPhotoAria": "Ảnh tiếp theo",
       "moderation": {
         "PENDING_label": "Đang chờ kiểm duyệt (Chỉ bạn & Quản trị viên thấy)",
-        "PENDING_note": "AI đang xem xét bài viết trước khi hiển thị công khai trên cộng đồng.",
+        "PENDING_note": "Bài viết đang chờ Quản trị viên xem xét thủ công trước khi hiển thị công khai.",
         "FLAGGED_label": "Chưa thể duyệt tự động (Chỉ bạn & Quản trị viên thấy)",
         "FLAGGED_note": "Bài viết đang chờ Quản trị viên xem xét thủ công.",
         "REJECTED_label": "Không được duyệt (Chỉ bạn & Quản trị viên thấy)",
-        "REJECTED_note": "Bài viết vi phạm tiêu chuẩn cộng đồng. Bạn có thể chỉnh sửa để gửi duyệt lại hoặc xóa bài."
+        "REJECTED_note": "Bài viết vi phạm tiêu chuẩn cộng đồng. Bạn có thể chỉnh sửa để gửi duyệt lại hoặc xóa bài.",
+        "REJECTED_actionHint": "Bạn có thể chỉnh sửa và lưu lại để gửi Quản trị viên xem xét lại."
       }
     },
     "comments": {
@@ -1312,7 +1313,7 @@
       "postCreatedPending": "Bài viết đã gửi! AI đang kiểm duyệt tự động (chỉ mình bạn thấy trong vài giây).",
       "postCreatedSuccess": "Đã đăng bài viết chia sẻ lên Cộng đồng TripGenie!",
       "postCreateError": "Không thể tạo bài viết. Vui lòng thử lại.",
-      "postUpdatedPending": "Đã lưu chỉnh sửa! AI đang kiểm duyệt lại nội dung.",
+      "postUpdatedPending": "Đã lưu chỉnh sửa! Bài viết đã được gửi để Quản trị viên xem xét lại.",
       "postUpdatedSuccess": "Đã cập nhật bài viết!",
       "postUpdateError": "Không thể cập nhật bài viết.",
       "postDeleted": "Bài viết đã được xóa vĩnh viễn.",

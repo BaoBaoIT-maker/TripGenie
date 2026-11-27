@@ -354,7 +354,6 @@ export function useUpdateCommunityPost() {
         toast.info(t("community.toasts.postUpdatedPending"), {
           duration: COMMUNITY_CONFIG.INFO_TOAST_DURATION_MS,
         });
-        scheduleModerationOutcomeCheck(queryClient, postId, t);
         return;
       }
       toast.success(t("community.toasts.postUpdatedSuccess"));

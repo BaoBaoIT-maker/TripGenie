@@ -94,6 +94,12 @@ function ModerationStatusBanner({
       <div className="min-w-0">
         <span className="font-bold">{label}.</span>{" "}
         <span className="opacity-80">{note || defaultNote}</span>
+        {status === "REJECTED" && note && (
+          <span className="opacity-80">
+            {" "}
+            {t("community.post.moderation.REJECTED_actionHint")}
+          </span>
+        )}
       </div>
     </div>
   );
